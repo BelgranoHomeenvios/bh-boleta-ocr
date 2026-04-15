@@ -77,7 +77,7 @@ Reglas:
 Respondé SOLO el JSON, nada más.`;
 
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('/api/process',
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
