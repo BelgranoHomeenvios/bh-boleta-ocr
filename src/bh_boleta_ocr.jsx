@@ -77,33 +77,14 @@ Reglas:
 Respondé SOLO el JSON, nada más.`;
 
     try {
-      const response = await fetch('/api/process',
+const response = await fetch('/api/process', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'image',
-                  source: {
-                    type: 'base64',
-                    media_type: 'image/jpeg',
-                    data: imageBase64
-                  }
-                },
-                {
-                  type: 'text',
-                  text: prompt
-                }
-              ]
-            }
-          ]
+          imageBase64: imageBase64,
+          prompt: prompt
         })
       });
 
