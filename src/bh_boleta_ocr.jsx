@@ -14,6 +14,7 @@ const LOCALES = ['2299', '2020'];
 export default function BHBoletaOCR() {
   const [image, setImage] = useState(null);
   const [imageBase64, setImageBase64] = useState(null);
+  const [imageMediaType, setImageMediaType] = useState('image/jpeg');
   const [loading, setLoading] = useState(false);
   const [datos, setDatos] = useState(null);
   const [error, setError] = useState(null);
@@ -23,17 +24,39 @@ export default function BHBoletaOCR() {
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      setImage(URL.createObjectURL(file));
-      setDatos(null);
-      setError(null);
-      
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64 = reader.result.split(',')[1];
-        setImageBase64(base64);
-      };
-      reader.readAsDataURL(file);
+      processFile(file);
     }
+  };
+
+  const processFile = (file) => {
+    setImage(URL.createObjectURL(file));
+    setDatos(null);
+    setError(null);
+
+    // Detectar media type
+    const type = file.type || 'image/jpeg';
+    const supportedType = type.startsWith('image/') ? type : 'image/jpeg';
+    setImageMediaType(supportedType);
+
+    // Comprimir imagen para evitar problemas de tamaño
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const maxSize = 1600;
+      let w = img.width;
+      let h = img.height;
+      if (w > maxSize || h > maxSize) {
+        if (w > h) { h = (h * maxSize) / w; w = maxSize; }
+        else { w = (w * maxSize) / h; h = maxSize; }
+      }
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+      setImageBase64(base64);
+      setImageMediaType('image/jpeg');
+    };
+    img.src = URL.createObjectURL(file);
   };
 
   const procesarBoleta = async () => {
@@ -77,21 +100,27 @@ Reglas:
 Respondé SOLO el JSON, nada más.`;
 
     try {
-const response = await fetch('/api/process', {
+      const response = await fetch('/api/process', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           imageBase64: imageBase64,
-          prompt: prompt
+          prompt: prompt,
+          mediaType: imageMediaType
         })
       });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData?.error?.message || `Error del servidor (${response.status})`);
+      }
 
       const data = await response.json();
       
       if (data.error) {
-        throw new Error(data.error.message);
+        throw new Error(typeof data.error === 'string' ? data.error : data.error.message || 'Error desconocido');
       }
 
       const jsonText = data.content[0].text.replace(/```json|```/g, '').trim();
@@ -312,11 +341,7 @@ const response = await fetch('/api/process', {
           e.currentTarget.style.borderColor = '#3a3a3a';
           const file = e.dataTransfer.files[0];
           if (file) {
-            setImage(URL.createObjectURL(file));
-            setDatos(null);
-            const reader = new FileReader();
-            reader.onload = () => setImageBase64(reader.result.split(',')[1]);
-            reader.readAsDataURL(file);
+            processFile(file);
           }
         }}
         >
