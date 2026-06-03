@@ -35,6 +35,13 @@ input,select,textarea{font:inherit;padding:11px 12px;border:1px solid var(--line
 textarea{min-height:64px;resize:vertical}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--brand-soft);border-color:var(--brand)}
 .sub-h{font-size:13px;font-weight:700;color:var(--brand-dark);text-transform:uppercase;letter-spacing:.04em;margin:18px 0 2px}
+.acc{border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden;background:#fff}
+.acc>summary{cursor:pointer;padding:14px 16px;font-weight:700;font-size:15px;list-style:none;display:flex;align-items:center;gap:10px;background:#f8fafc;user-select:none}
+.acc>summary::-webkit-details-marker{display:none}
+.acc>summary::after{content:'▸';margin-left:auto;transition:transform .2s;color:var(--muted);font-size:13px}
+.acc[open]>summary::after{transform:rotate(90deg)}
+.acc[open]>summary{border-bottom:1px solid var(--line)}
+.acc .acc-body{padding:16px}
 .btn{font:inherit;font-weight:700;cursor:pointer;border-radius:10px;padding:11px 18px;border:1px solid transparent}
 .btn-primary{background:var(--brand);color:#fff}.btn-primary:hover{background:var(--brand-dark)}
 .btn-ghost{background:#fff;border-color:var(--line);color:var(--ink)}.btn-ghost:hover{background:var(--bg)}
@@ -134,36 +141,34 @@ function vistaCargar(){
   const provVals=[...new Set([...PROVEEDORES,...state.reclamos.map(x=>x.proveedor).filter(Boolean)])];
   view.innerHTML=`<form class="card" id="formR">
     <h2>${ed?'✏️ Editar reclamo':'➕ Cargar reclamo'}</h2>
-    <div class="sub-h">Datos del reclamo</div>
-    <div class="form-grid">
+    <details class="acc" open><summary>📋 Datos del reclamo</summary><div class="acc-body"><div class="form-grid">
       <label class="field">Estado<select id="r_estado">${opts(ESTADOS,r.estado||'ABIERTO')}</select></label>
       <label class="field">Fecha del reclamo<input type="date" id="r_fecha" value="${esc(r.fechaReclamo||hoyISO())}"></label>
       <label class="field">Nombre del cliente<input id="r_nombre" value="${esc(r.nombre||'')}" placeholder="Nombre y apellido"></label>
       <label class="field">Celular<input id="r_cel" value="${esc(r.celular||'')}" placeholder="11..."></label>
       <label class="field">N° de orden<input id="r_orden" value="${esc(r.orden||'')}" placeholder="Ej: 3522"></label>
-    </div>
-    <div class="sub-h">Sobre el mueble y la entrega</div>
-    <div class="form-grid">
+    </div></div></details>
+    <details class="acc"><summary>⚠️ El problema</summary><div class="acc-body"><div class="form-grid">
+      <label class="field" style="grid-column:1/-1">Problema<textarea id="r_problema" placeholder="¿Cuál fue el inconveniente?">${esc(r.problema||'')}</textarea></label>
+    </div></div></details>
+    <details class="acc"><summary>🛋️ Información del mueble</summary><div class="acc-body"><div class="form-grid">
       <label class="field">Mueble<input list="dl_mueble" id="r_mueble" value="${esc(r.mueble||'')}" placeholder="Cómoda, Mesa…"></label>
+      <label class="field">Proveedor <span class="hint">(si se sabe)</span><input list="dl_prov" id="r_prov" value="${esc(r.proveedor||'')}" placeholder="Proveedor"></label>
+    </div></div></details>
+    <details class="acc"><summary>🚚 Información de la entrega</summary><div class="acc-body"><div class="form-grid">
       <label class="field">Fecha de entrega <span class="hint">(si se entregó)</span><input type="date" id="r_fent" value="${esc(r.fechaEntrega||'')}"></label>
       <label class="field">Flete / Chofer<input list="dl_flete" id="r_flete" value="${esc(r.flete||'')}" placeholder="Quién entregó"></label>
-      <label class="field">Proveedor <span class="hint">(si se sabe)</span><input list="dl_prov" id="r_prov" value="${esc(r.proveedor||'')}" placeholder="Proveedor"></label>
-    </div>
-    <div class="sub-h">El problema</div>
-    <div class="form-grid">
-      <label class="field" style="grid-column:1/-1">Problema<textarea id="r_problema" placeholder="¿Cuál fue el inconveniente?">${esc(r.problema||'')}</textarea></label>
-    </div>
-    <div class="sub-h">La solución</div>
-    <div class="form-grid">
+    </div></div></details>
+    <details class="acc"><summary>🛠️ Información de la solución</summary><div class="acc-body"><div class="form-grid">
       <label class="field">Responsable del problema<select id="r_respprob"><option value="">— sin definir —</option>${opts(RESPONSABLES,r.respProblema)}</select></label>
       <label class="field">Tipo de solución<select id="r_tiposol"><option value="">— sin definir —</option>${opts(TIPOS_SOLUCION,r.tipoSolucion)}</select></label>
       <label class="field">Responsable de la solución<select id="r_respsol"><option value="">— sin definir —</option>${opts(RESPONSABLES,r.respSolucion)}</select></label>
       <label class="field">Costo de la solución<select id="r_costocat"><option value="">— sin definir —</option>${opts(COSTOS,r.costoCat)}</select></label>
       <label class="field">Costo $ <span class="hint">(opcional)</span><input type="number" min="0" id="r_costomonto" value="${r.costoMonto??''}" placeholder="0"></label>
-    </div>
-    <div class="form-grid">
+    </div></div></details>
+    <details class="acc"><summary>📝 Observaciones varias</summary><div class="acc-body"><div class="form-grid">
       <label class="field" style="grid-column:1/-1">Observaciones<textarea id="r_obs" placeholder="Notas adicionales">${esc(r.observaciones||'')}</textarea></label>
-    </div>
+    </div></div></details>
     <div class="error-msg" id="r_err" style="display:none"></div>
     <div class="row-actions" style="margin-top:16px">
       <button type="submit" class="btn btn-primary">${ed?'Guardar cambios':'Agregar reclamo'}</button>
