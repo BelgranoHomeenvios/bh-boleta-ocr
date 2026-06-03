@@ -67,7 +67,13 @@ tbody tr:hover{background:#f8fafc}
 .bar-row .n{text-align:right;font-weight:700}
 .bar-lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .charts-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px}
-.txt-clip{max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.txt-clip{max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.compact th,.compact td{padding:4px 8px;font-size:12.5px;border-bottom:1px solid #eef2f7}
+.compact tbody tr{line-height:1.25}
+.stat.clickable{cursor:pointer;transition:transform .08s,box-shadow .12s}
+.stat.clickable:hover{transform:translateY(-2px);box-shadow:0 5px 14px rgba(15,23,42,.12)}
+.act-btn{cursor:pointer;border:none;background:transparent;font-size:15px;padding:2px 4px;border-radius:6px;line-height:1}
+.act-btn:hover{background:var(--bg)}
 @media(max-width:600px){.stat .value{font-size:24px}.bar-row{grid-template-columns:100px 1fr 36px}}
 </style>
 </head>
@@ -198,29 +204,27 @@ function vistaLista(){
   const meses=[...new Set(state.reclamos.map(r=>claveMes(r.fechaReclamo)).filter(Boolean))].sort().reverse();
   const q=state._q.toLowerCase();
   const fil=state.reclamos
-    .filter(r=>!state._fEstado||r.estado===state._fEstado)
+    .filter(r=>{if(!state._fEstado)return true;if(state._fEstado==='__SINCERRAR__')return r.estado!=='CERRADO';return r.estado===state._fEstado})
     .filter(r=>!state._fMes||claveMes(r.fechaReclamo)===state._fMes)
     .filter(r=>!q||[r.nombre,r.orden,r.problema,r.mueble,r.flete,r.proveedor].some(v=>String(v||'').toLowerCase().includes(q)))
     .sort((a,b)=>a.fechaReclamo<b.fechaReclamo?1:-1);
   const rows=fil.map(r=>`<tr>
+    <td style="white-space:nowrap"><button class="act-btn" title="Editar" data-ed="${r.id}">✏️</button><button class="act-btn" title="Borrar" data-del="${r.id}">🗑️</button></td>
     <td><span class="badge ${estClass(r.estado)}">${esc(r.estado)}</span></td>
-    <td>${formatFecha(r.fechaReclamo)}</td>
-    <td><strong>${esc(r.nombre)||'—'}</strong>${r.celular?'<br><span class="muted">'+esc(r.celular)+'</span>':''}</td>
+    <td style="white-space:nowrap">${formatFecha(r.fechaReclamo)}</td>
+    <td><strong>${esc(r.nombre)||'—'}</strong></td>
     <td>${esc(r.orden)||'—'}</td>
     <td>${esc(r.mueble)||'—'}</td>
-    <td class="txt-clip" title="${esc(r.problema)}">${esc(r.problema)||'—'}</td>
-    <td>${esc(r.flete)||'—'}</td>
-    <td>${esc(r.proveedor)||'—'}</td>
-    <td>${esc(r.costoCat)||'—'}</td>
-    <td><div class="row-actions" style="justify-content:flex-end"><button class="btn btn-ghost btn-sm" data-ed="${r.id}">Editar</button><button class="btn btn-danger btn-sm" data-del="${r.id}">Borrar</button></div></td></tr>`).join('');
+    <td class="txt-clip" title="${esc(r.problema)}">${esc(r.problema)||'—'}</td></tr>`).join('');
+  const selEstado=state._fEstado==='__SINCERRAR__'?'<option value="__SINCERRAR__" selected>Sin cerrar</option>':'<option value="__SINCERRAR__">Sin cerrar</option>';
   view.innerHTML=`<div class="card"><div class="section-title"><h2>📋 Reclamos</h2><span class="muted">${fil.length} de ${state.reclamos.length}</span></div>
     <div class="filters" style="margin-bottom:14px">
-      <label class="field" style="min-width:220px">Buscar<input id="lq" value="${esc(state._q)}" placeholder="Nombre, orden, mueble, problema…"></label>
-      <label class="field">Estado<select id="lEstado"><option value="">Todos</option>${opts(ESTADOS,state._fEstado)}</select></label>
+      <label class="field" style="min-width:200px">Buscar<input id="lq" value="${esc(state._q)}" placeholder="Nombre, orden, mueble, problema…"></label>
+      <label class="field">Estado<select id="lEstado"><option value="">Todos</option>${selEstado}${opts(ESTADOS,state._fEstado)}</select></label>
       <label class="field">Mes<select id="lMes"><option value="">Todos</option>${meses.map(m=>`<option value="${m}" ${state._fMes===m?'selected':''}>${nombreMes(m)}</option>`).join('')}</select></label>
     </div>
     ${fil.length===0?`<div class="empty"><div class="big">📣</div>${state.reclamos.length===0?'Todavía no cargaste reclamos.':'No hay reclamos con esos filtros.'}</div>`:
-    `<div class="table-wrap"><table><thead><tr><th>Estado</th><th>Fecha</th><th>Cliente</th><th>Orden</th><th>Mueble</th><th>Problema</th><th>Flete</th><th>Proveedor</th><th>Costo</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`}
+    `<div class="table-wrap"><table class="compact"><thead><tr><th></th><th>Estado</th><th>Fecha</th><th>Cliente</th><th>Orden</th><th>Mueble</th><th>Problema</th></tr></thead><tbody>${rows}</tbody></table></div>`}
   </div>`;
   const lq=$('lq');lq.oninput=()=>{state._q=lq.value;const p=lq.selectionStart;vistaLista();const n=$('lq');n.focus();n.setSelectionRange(p,p)};
   $('lEstado').onchange=e=>{state._fEstado=e.target.value;vistaLista()};
@@ -262,12 +266,14 @@ function vistaTablero(){
   const porMes=countBy(R,r=>claveMes(r.fechaReclamo)).sort((a,b)=>a.label<b.label?-1:1).slice(-12).map(i=>({label:nombreMes(i.label).split(' ')[0].slice(0,3),n:i.n}));
   view.innerHTML=`<div class="card"><div class="section-title"><h2>📊 Tablero de reclamos</h2>
     <select id="tbMes" style="width:auto"><option value="">Todos los meses</option>${meses.map(m=>`<option value="${m}" ${state._fMes===m?'selected':''}>${nombreMes(m)}</option>`).join('')}</select></div>
+    <p class="muted" style="margin:0 0 10px">👆 Tocá una tarjeta para ver esos reclamos en el listado.</p>
     <div class="grid grid-stats">
-      <div class="stat"><div class="label">Total reclamos</div><div class="value">${fil.length}</div></div>
-      <div class="stat s-abierto"><div class="label">🔴 Sin cerrar</div><div class="value">${abiertos}</div></div>
-      <div class="stat s-prod"><div class="label">🔵 En producción</div><div class="value">${cont('EN PRODUCCIÓN')}</div></div>
-      <div class="stat s-espera"><div class="label">🟡 En espera</div><div class="value">${cont('EN ESPERA')}</div></div>
-      <div class="stat s-cerrado"><div class="label">🟢 Cerrados</div><div class="value">${cerrados}<small> (${pctCerr}%)</small></div></div>
+      <div class="stat clickable" data-go=""><div class="label">📋 Total reclamos</div><div class="value">${fil.length}</div></div>
+      <div class="stat s-abierto clickable" data-go="__SINCERRAR__"><div class="label">🔴 Sin cerrar</div><div class="value">${abiertos}</div></div>
+      <div class="stat s-abierto clickable" data-go="ABIERTO"><div class="label">🆕 Abiertos</div><div class="value">${cont('ABIERTO')}</div></div>
+      <div class="stat s-espera clickable" data-go="EN ESPERA"><div class="label">🟡 En espera</div><div class="value">${cont('EN ESPERA')}</div></div>
+      <div class="stat s-prod clickable" data-go="EN PRODUCCIÓN"><div class="label">🔵 En producción</div><div class="value">${cont('EN PRODUCCIÓN')}</div></div>
+      <div class="stat s-cerrado clickable" data-go="CERRADO"><div class="label">🟢 Cerrados</div><div class="value">${cerrados}<small> (${pctCerr}%)</small></div></div>
       ${montos>0?`<div class="stat"><div class="label">💲 Costo total</div><div class="value">$${montos.toLocaleString('es-AR')}</div></div>`:''}
     </div></div>
     <div class="card"><h3>📅 Reclamos por mes</h3>${trendSVG(porMes)}</div>
@@ -280,6 +286,7 @@ function vistaTablero(){
       <div class="card"><h3>💲 Costo de las soluciones</h3>${bars(countBy(fil,r=>r.costoCat),l=>COL_COSTO[l]||'#64748b')}</div>
     </div>`;
   $('tbMes').onchange=e=>{state._fMes=e.target.value;vistaTablero()};
+  view.querySelectorAll('.stat.clickable').forEach(c=>c.onclick=()=>{state._fEstado=c.getAttribute('data-go');state._q='';state.tab='lista';render()});
 }
 
 // ---------- Backup ----------
