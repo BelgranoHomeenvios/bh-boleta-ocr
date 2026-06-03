@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Reclamos · Belgrano Home</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📣</text></svg>" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{--brand:#b91c1c;--brand-dark:#991b1b;--brand-soft:#fee2e2;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f1f5f9;--card:#fff;--green:#16a34a;--yellow:#ca8a04;--orange:#ea580c;--red:#dc2626;--blue:#2563eb;--shadow:0 1px 3px rgba(15,23,42,.08),0 1px 2px rgba(15,23,42,.04)}
 *{box-sizing:border-box}
@@ -77,6 +78,20 @@ tbody tr:hover{background:#f8fafc}
 .cfg-list{display:flex;flex-direction:column;gap:6px}
 .cfg-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;background:var(--bg);border-radius:8px;font-size:14px}
 .cfg-item .cfg-acts{display:flex;gap:2px;flex:0 0 auto}
+.login-wrap{max-width:380px;margin:8vh auto;padding:16px}
+.login-card{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:28px 24px}
+.login-card .logo{font-size:40px;text-align:center}
+.login-card h2{text-align:center;margin:8px 0 4px}
+.login-card p{text-align:center;color:var(--muted);font-size:13px;margin:0 0 18px}
+.login-card label{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
+.login-card input{margin-bottom:14px}
+.login-card .btn{width:100%}
+.user-pill{display:flex;align-items:center;gap:8px;color:#fff;font-size:13px}
+.banner{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;background:#0f172a;color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:50;max-width:90%}
+.banner.err{background:#b91c1c}
+.banner.ok{background:#16a34a}
+.spin{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp 1s linear infinite;vertical-align:-3px}
+@keyframes sp{to{transform:rotate(360deg)}}
 @media(max-width:600px){.stat .value{font-size:24px}.bar-row{grid-template-columns:100px 1fr 36px}}
 </style>
 </head>
@@ -86,13 +101,15 @@ tbody tr:hover{background:#f8fafc}
     <span class="logo">📣</span>
     <div><h1>Reclamos</h1><div class="sub">Belgrano Home Envíos · seguimiento y estadísticas</div></div>
     <span class="spacer"></span>
-    <div class="row-actions">
+    <div class="row-actions" id="topActions" style="display:none">
+      <span class="user-pill" id="userEmail"></span>
       <button class="btn btn-ghost btn-sm" id="btnBackup">⬇️ Backup</button>
       <button class="btn btn-ghost btn-sm" id="btnImport">⬆️ Importar</button>
+      <button class="btn btn-ghost btn-sm" id="btnLogout">Salir</button>
       <input type="file" id="fileImport" accept="application/json" hidden />
     </div>
   </div>
-  <nav class="tabs" id="tabs"></nav>
+  <nav class="tabs" id="tabs" style="display:none"></nav>
 </header>
 <main class="container" id="view"></main>
 
@@ -123,6 +140,62 @@ const DEFAULT_LISTS={muebles:MUEBLES,fletes:FLETES,proveedores:PROVEEDORES,respo
 function getConfig(){let c=read(K_CFG,null);if(!c){c={};for(const k in DEFAULT_LISTS)c[k]=DEFAULT_LISTS[k].slice();write(K_CFG,c);return c}
   let ch=false;for(const k in DEFAULT_LISTS){if(!Array.isArray(c[k])){c[k]=DEFAULT_LISTS[k].slice();ch=true}}if(ch)write(K_CFG,c);return c}
 function setConfig(c){write(K_CFG,c);state.config=c}
+
+// ====== Nube (Supabase) ======
+const SUPA_URL='https://lyppcndfgwhxjjgpqufp.supabase.co';
+const SUPA_KEY='sb_publishable_f9MJ9jnBPDXBRbLbtDj69g_NgR3iOgV';
+const APP='reclamos';
+let db=null;
+function initDb(){try{if(window.supabase){db=window.supabase.createClient(SUPA_URL,SUPA_KEY);return true}}catch(e){}return false}
+function banner(msg,tipo){let b=document.getElementById('banner');if(!b){b=document.createElement('div');b.id='banner';document.body.appendChild(b)}b.className='banner '+(tipo||'');b.innerHTML=msg;b.style.display='block';if(tipo!=='load'){clearTimeout(banner._t);banner._t=setTimeout(()=>{b.style.display='none'},3500)}}
+function ocultarBanner(){const b=document.getElementById('banner');if(b)b.style.display='none'}
+function avisoError(e){console.error(e);banner('⚠️ No se pudo sincronizar con la nube. Revisá tu internet.','err')}
+async function supaLoad(){const {data,error}=await db.from('store').select('kind,id,data').eq('app',APP);if(error)throw error;
+  const reclamos=data.filter(r=>r.kind==='reclamo').map(r=>r.data);const cfg=data.find(r=>r.kind==='config');return {reclamos,config:cfg?cfg.data:null}}
+async function supaUpsertReclamo(reg){const {error}=await db.from('store').upsert({app:APP,kind:'reclamo',id:reg.id,data:reg},{onConflict:'app,kind,id'});if(error)throw error}
+async function supaDeleteReclamo(id){const {error}=await db.from('store').delete().match({app:APP,kind:'reclamo',id});if(error)throw error}
+async function supaUpsertConfig(cfg){const {error}=await db.from('store').upsert({app:APP,kind:'config',id:'config',data:cfg},{onConflict:'app,kind,id'});if(error)throw error}
+async function supaUpsertMany(reclamos,cfg){const rows=reclamos.map(r=>({app:APP,kind:'reclamo',id:r.id,data:r}));if(cfg)rows.push({app:APP,kind:'config',id:'config',data:cfg});const {error}=await db.from('store').upsert(rows,{onConflict:'app,kind,id'});if(error)throw error}
+
+let _refrescando=false;
+function suscribirRealtime(){try{db.channel('rt-'+APP).on('postgres_changes',{event:'*',schema:'public',table:'store',filter:'app=eq.'+APP},()=>refrescarNube()).subscribe()}catch(e){}}
+function refrescarNube(){if(_refrescando)return;_refrescando=true;setTimeout(async()=>{_refrescando=false;try{const {reclamos,config}=await supaLoad();state.reclamos=reclamos;write(K_REC,reclamos);if(config){state.config=config;write(K_CFG,config)}render()}catch(e){}},500)}
+
+function mostrarLogin(msg){
+  document.getElementById('topActions').style.display='none';
+  document.getElementById('tabs').style.display='none';
+  view.innerHTML=`<div class="login-wrap"><div class="login-card">
+    <div class="logo">📣</div><h2>Reclamos</h2><p>Belgrano Home Envíos · ingresá para continuar</p>
+    <form id="loginForm">
+      <label>Email</label><input type="email" id="lg_email" placeholder="tu@email.com" autocomplete="username">
+      <label>Contraseña</label><input type="password" id="lg_pass" placeholder="••••••••" autocomplete="current-password">
+      <button type="submit" class="btn btn-primary" id="lg_btn">Entrar</button>
+      <div class="error-msg" id="lg_err" style="display:${msg?'block':'none'}">${msg?('⚠️ '+esc(msg)):''}</div>
+    </form></div></div>`;
+  document.getElementById('loginForm').onsubmit=async ev=>{ev.preventDefault();
+    const email=document.getElementById('lg_email').value.trim();const pass=document.getElementById('lg_pass').value;
+    const btn=document.getElementById('lg_btn');btn.disabled=true;btn.innerHTML='<span class="spin"></span> Entrando…';
+    const {error}=await db.auth.signInWithPassword({email,password:pass});
+    if(error){btn.disabled=false;btn.textContent='Entrar';const el=document.getElementById('lg_err');el.style.display='block';el.textContent='⚠️ '+(error.message==='Invalid login credentials'?'Email o contraseña incorrectos.':error.message)}
+    else{await entrarApp()}};
+}
+async function entrarApp(){
+  banner('<span class="spin"></span> Cargando datos de la nube…','load');
+  try{const {reclamos,config}=await supaLoad();state.reclamos=reclamos;write(K_REC,reclamos);
+    if(config){state.config=config;write(K_CFG,config)}else{await supaUpsertConfig(state.config)}
+    ocultarBanner();
+  }catch(e){state.reclamos=getReclamos();avisoError(e)}
+  const {data:{user}}=await db.auth.getUser();
+  document.getElementById('userEmail').textContent='👤 '+(user?user.email:'');
+  document.getElementById('topActions').style.display='flex';
+  document.getElementById('tabs').style.display='flex';
+  state.tab='tablero';render();suscribirRealtime();
+}
+async function start(){
+  if(!initDb()){view.innerHTML='<div class="card" style="margin:24px">No se pudo cargar la conexión con la nube. Revisá tu internet y recargá la página (Ctrl+F5).</div>';return}
+  try{const {data:{session}}=await db.auth.getSession();if(session)return entrarApp()}catch(e){}
+  mostrarLogin();
+}
 
 const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 function parseFecha(iso){if(!iso)return null;const a=iso.split('-').map(Number);if(!a[0]||!a[1]||!a[2])return null;return new Date(a[0],a[1]-1,a[2])}
@@ -209,6 +282,7 @@ function vistaCargar(){
       costoCat:$('r_costocat').value, costoMonto:($('r_costomonto').value!==''?+$('r_costomonto').value:''), observaciones:$('r_obs').value.trim(),
     };
     const l=state.reclamos.slice();const i=l.findIndex(x=>x.id===reg.id);if(i>=0)l[i]=reg;else l.push(reg);setReclamos(l);
+    supaUpsertReclamo(reg).then(()=>banner('✅ Guardado en la nube','ok')).catch(avisoError);
     if(ed){state.editando=null;state.tab='lista'}render();};
 }
 
@@ -243,7 +317,7 @@ function vistaLista(){
   $('lEstado').onchange=e=>{state._fEstado=e.target.value;vistaLista()};
   $('lMes').onchange=e=>{state._fMes=e.target.value;vistaLista()};
   view.querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>{state.editando=state.reclamos.find(x=>x.id===b.dataset.ed);state.tab='cargar';render()});
-  view.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const r=state.reclamos.find(x=>x.id===b.dataset.del);if(confirm('¿Borrar el reclamo de '+(r.nombre||r.orden||'')+'?')){setReclamos(state.reclamos.filter(x=>x.id!==b.dataset.del));vistaLista()}});
+  view.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const r=state.reclamos.find(x=>x.id===b.dataset.del);if(confirm('¿Borrar el reclamo de '+(r.nombre||r.orden||'')+'?')){setReclamos(state.reclamos.filter(x=>x.id!==b.dataset.del));supaDeleteReclamo(b.dataset.del).catch(avisoError);vistaLista()}});
 }
 
 // ---------- Tablero ----------
@@ -317,9 +391,9 @@ function vistaConfig(){
     </div>`).join('');
   view.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{const k=b.dataset.add;const inp=$('new_'+k);const val=inp.value.trim();if(!val)return;
     if(state.config[k].some(x=>x.toLowerCase()===val.toLowerCase())){alert('Esa opción ya existe.');return}
-    const c={...state.config};c[k]=[...c[k],val];setConfig(c);vistaConfig()});
-  view.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const [k,i]=b.dataset.del.split('|');if(!confirm('¿Borrar "'+state.config[k][+i]+'" de la lista?'))return;const c={...state.config};c[k]=c[k].filter((_,idx)=>idx!==+i);setConfig(c);vistaConfig()});
-  view.querySelectorAll('[data-ren]').forEach(b=>b.onclick=()=>{const [k,i]=b.dataset.ren.split('|');const cur=state.config[k][+i];const nv=(prompt('Editar opción:',cur)||'').trim();if(!nv||nv===cur)return;const c={...state.config};c[k]=c[k].map((x,idx)=>idx===+i?nv:x);setConfig(c);vistaConfig()});
+    const c={...state.config};c[k]=[...c[k],val];setConfig(c);supaUpsertConfig(c).catch(avisoError);vistaConfig()});
+  view.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const [k,i]=b.dataset.del.split('|');if(!confirm('¿Borrar "'+state.config[k][+i]+'" de la lista?'))return;const c={...state.config};c[k]=c[k].filter((_,idx)=>idx!==+i);setConfig(c);supaUpsertConfig(c).catch(avisoError);vistaConfig()});
+  view.querySelectorAll('[data-ren]').forEach(b=>b.onclick=()=>{const [k,i]=b.dataset.ren.split('|');const cur=state.config[k][+i];const nv=(prompt('Editar opción:',cur)||'').trim();if(!nv||nv===cur)return;const c={...state.config};c[k]=c[k].map((x,idx)=>idx===+i?nv:x);setConfig(c);supaUpsertConfig(c).catch(avisoError);vistaConfig()});
 }
 
 // ---------- Backup ----------
@@ -328,12 +402,15 @@ $('btnBackup').onclick=()=>{const data={app:'reclamos',version:2,exportadoEn:new
   const a=document.createElement('a');a.href=url;a.download='backup-reclamos-'+hoyISO()+'.json';a.click();URL.revokeObjectURL(url)};
 $('btnImport').onclick=()=>$('fileImport').click();
 $('fileImport').onchange=ev=>{const f=ev.target.files[0];if(!f)return;const r=new FileReader();
-  r.onload=()=>{try{const d=JSON.parse(r.result);if(!confirm('Esto reemplaza los reclamos actuales por los del archivo. ¿Continuar?'))return;
-    if(Array.isArray(d.reclamos))setReclamos(d.reclamos);if(d.config&&typeof d.config==='object')setConfig(d.config);render();alert('Backup importado correctamente.')}
+  r.onload=()=>{try{const d=JSON.parse(r.result);if(!confirm('Esto sube los reclamos del archivo a la nube (se combinan con los que ya haya). ¿Continuar?'))return;
+    if(Array.isArray(d.reclamos))setReclamos(d.reclamos);if(d.config&&typeof d.config==='object')setConfig(d.config);render();
+    banner('<span class="spin"></span> Subiendo a la nube…','load');
+    supaUpsertMany(state.reclamos,state.config).then(()=>banner('✅ Datos subidos a la nube','ok')).catch(avisoError);}
     catch(e){alert('No pude leer el archivo. ¿Es un archivo de backup válido?')}};
   r.readAsText(f);ev.target.value=''};
+$('btnLogout').onclick=async()=>{try{await db.auth.signOut()}catch(e){}location.reload()};
 
-render();
+start();
 </script>
 </body>
 </html>
