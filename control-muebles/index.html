@@ -1,14 +1,431 @@
 <!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛋️</text></svg>" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0f766e" />
-    <title>Control de Muebles · Belgrano Home</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Control de Muebles · Belgrano Home</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛋️</text></svg>" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--brand:#0f766e;--brand-dark:#115e59;--brand-soft:#ccfbf1;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f1f5f9;--card:#fff;--green:#16a34a;--yellow:#ca8a04;--orange:#ea580c;--red:#dc2626;--blue:#2563eb;--shadow:0 1px 3px rgba(15,23,42,.08),0 1px 2px rgba(15,23,42,.04)}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+.app-header{background:linear-gradient(135deg,var(--brand),var(--brand-dark));color:#fff;padding:18px 16px}
+.app-header .wrap{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.app-header h1{font-size:20px;margin:0;font-weight:700}
+.app-header .sub{opacity:.85;font-size:13px;margin-top:2px}
+.app-header .logo{font-size:28px}.app-header .spacer{flex:1}
+.tabs{display:flex;gap:4px;max-width:1100px;margin:0 auto;padding:0 8px;overflow-x:auto}
+.tabs button{border:none;background:transparent;color:rgba(255,255,255,.8);padding:12px 16px;font-size:15px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap}
+.tabs button.active{color:#fff;border-bottom-color:#fff}
+.container{max-width:1100px;margin:0 auto;padding:20px 16px 60px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow);margin-bottom:18px}
+.card h2{margin:0 0 14px;font-size:17px}.card h3{margin:0 0 10px;font-size:15px;color:var(--muted);font-weight:600}
+.grid{display:grid;gap:14px}.grid-stats{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow)}
+.stat.taller{background:#eff6ff;border-color:#bfdbfe}
+.stat .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.stat .value{font-size:28px;font-weight:800;margin-top:6px}.stat .value small{font-size:14px;font-weight:600;color:var(--muted)}
+.stat .delta{font-size:13px;font-weight:700;margin-top:4px}
+.delta.up{color:var(--green)}.delta.down{color:var(--red)}.delta.flat{color:var(--muted)}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+.linea{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+label.field{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--ink)}
+label.field .hint{font-weight:400;color:var(--muted);font-size:12px}
+input,select{font:inherit;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);width:100%}
+input:focus,select:focus{outline:2px solid var(--brand-soft);border-color:var(--brand)}
+.calc-box{background:var(--brand-soft);border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-weight:700;color:var(--brand-dark)}
+.calc-box .big{font-size:24px}
+.btn{font:inherit;font-weight:700;cursor:pointer;border-radius:10px;padding:11px 18px;border:1px solid transparent}
+.btn-primary{background:var(--brand);color:#fff}.btn-primary:hover{background:var(--brand-dark)}
+.btn-ghost{background:#fff;border-color:var(--line);color:var(--ink)}.btn-ghost:hover{background:var(--bg)}
+.btn-danger{background:#fff;border-color:#fecaca;color:var(--red)}
+.btn-sm{padding:7px 12px;font-size:13px}.btn:disabled{opacity:.5;cursor:not-allowed}
+.row-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.error-msg{color:var(--red);font-size:13px;font-weight:600;margin-top:8px}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:10px 12px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;font-weight:700}
+tbody tr:hover{background:#f8fafc}td.left,th.left{text-align:left}
+.badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700}
+.q-a{background:#dcfce7;color:#166534}.q-b{background:#fef9c3;color:#854d0e}.q-c{background:#ffedd5;color:#9a3412}.q-d{background:#fee2e2;color:#991b1b}
+.taller-num{font-weight:800;color:var(--blue)}.taller-0{color:var(--green)}
+.filters{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}.filters label.field{min-width:160px}
+.empty{text-align:center;color:var(--muted);padding:40px 20px}.empty .big{font-size:40px;margin-bottom:10px}
+.pill-group{display:inline-flex;background:var(--bg);border-radius:10px;padding:3px;gap:3px}
+.pill-group button{border:none;background:transparent;padding:7px 14px;border-radius:8px;font-weight:600;cursor:pointer;color:var(--muted)}
+.pill-group button.active{background:#fff;color:var(--brand-dark);box-shadow:var(--shadow)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:6px}
+.legend span{display:inline-flex;align-items:center;gap:6px}.dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.muted{color:var(--muted);font-size:13px}
+.section-title{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+@media(max-width:600px){.stat .value{font-size:24px}.app-header h1{font-size:18px}}
+.login-wrap{max-width:380px;margin:8vh auto;padding:16px}
+.login-card{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:28px 24px}
+.login-card .logo{font-size:40px;text-align:center}
+.login-card h2{text-align:center;margin:8px 0 4px}
+.login-card p{text-align:center;color:var(--muted);font-size:13px;margin:0 0 18px}
+.login-card label{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
+.login-card input{margin-bottom:14px}
+.login-card .btn{width:100%}
+.user-pill{display:flex;align-items:center;gap:8px;color:#fff;font-size:13px}
+.banner{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;background:#0f172a;color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:50;max-width:90%}
+.banner.err{background:#dc2626}
+.banner.ok{background:#16a34a}
+.spin{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp 1s linear infinite;vertical-align:-3px}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<header class="app-header">
+  <div class="wrap">
+    <span class="logo">🛋️</span>
+    <div><h1>Control de Muebles</h1><div class="sub">Belgrano Home Envíos · calidad de proveedores</div></div>
+    <span class="spacer"></span>
+    <div class="row-actions" id="topActions" style="display:none">
+      <span class="user-pill" id="userEmail"></span>
+      <button class="btn btn-ghost btn-sm" id="btnBackup">⬇️ Backup</button>
+      <button class="btn btn-ghost btn-sm" id="btnImport">⬆️ Importar</button>
+      <button class="btn btn-ghost btn-sm" id="btnLogout">Salir</button>
+      <input type="file" id="fileImport" accept="application/json" hidden />
+    </div>
+  </div>
+  <nav class="tabs" id="tabs" style="display:none"></nav>
+</header>
+<main class="container" id="view"></main>
+
+<script>
+"use strict";
+// ===================== Datos =====================
+const K_ENT='cm_entregas_v1', K_PROV='cm_proveedores_v1', K_PED='cm_pedidos_v1';
+const PROV_INI=[
+  {id:'p_tony',nombre:'Tony',cupoSemanal:60,activo:true},
+  {id:'p_mati',nombre:'Mati',cupoSemanal:30,activo:true},
+  {id:'p_raul',nombre:'Raúl',cupoSemanal:20,activo:true},
+  {id:'p_luciano',nombre:'Luciano',cupoSemanal:20,activo:true},
+  {id:'p_leandro',nombre:'Leandro',cupoSemanal:15,activo:true},
+  {id:'p_enrique',nombre:'Enrique',cupoSemanal:0,activo:true},
+];
+function read(k,f){try{const r=localStorage.getItem(k);return r?JSON.parse(r):f}catch(e){return f}}
+function write(k,v){localStorage.setItem(k,JSON.stringify(v))}
+function nuevoId(p){return p+'_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7)}
+function getEntregas(){return read(K_ENT,[])}
+function setEntregas(l){write(K_ENT,l);state.entregas=l}
+function getPedidos(){return read(K_PED,[])}
+function setPedidos(l){write(K_PED,l);state.pedidos=l}
+function getProveedores(){let p=read(K_PROV,null);if(!p){write(K_PROV,PROV_INI);return PROV_INI.slice()}return p}
+function setProveedores(l){write(K_PROV,l);state.proveedores=l}
+
+// ====== Nube (Supabase) ======
+const SUPA_URL='https://lyppcndfgwhxjjgpqufp.supabase.co';
+const SUPA_KEY='sb_publishable_f9MJ9jnBPDXBRbLbtDj69g_NgR3iOgV';
+const APP='muebles';
+let db=null;
+function initDb(){try{if(window.supabase){db=window.supabase.createClient(SUPA_URL,SUPA_KEY);return true}}catch(e){}return false}
+function banner(msg,tipo){let b=document.getElementById('banner');if(!b){b=document.createElement('div');b.id='banner';document.body.appendChild(b)}b.className='banner '+(tipo||'');b.innerHTML=msg;b.style.display='block';if(tipo!=='load'){clearTimeout(banner._t);banner._t=setTimeout(()=>{b.style.display='none'},3500)}}
+function ocultarBanner(){const b=document.getElementById('banner');if(b)b.style.display='none'}
+function avisoError(e){console.error(e);banner('⚠️ No se pudo sincronizar con la nube. Revisá tu internet.','err')}
+async function supaLoad(){const {data,error}=await db.from('store').select('kind,id,data').eq('app',APP);if(error)throw error;
+  return {entregas:data.filter(r=>r.kind==='entrega').map(r=>r.data),pedidos:data.filter(r=>r.kind==='pedido').map(r=>r.data),proveedores:data.filter(r=>r.kind==='proveedor').map(r=>r.data)}}
+async function supaUpsert(kind,obj){const {error}=await db.from('store').upsert({app:APP,kind,id:obj.id,data:obj},{onConflict:'app,kind,id'});if(error)throw error}
+async function supaDelete(kind,id){const {error}=await db.from('store').delete().match({app:APP,kind,id});if(error)throw error}
+async function supaUpsertKind(kind,arr){if(!arr.length)return;const rows=arr.map(o=>({app:APP,kind,id:o.id,data:o}));const {error}=await db.from('store').upsert(rows,{onConflict:'app,kind,id'});if(error)throw error}
+async function supaUpsertAll(){const rows=[];state.entregas.forEach(o=>rows.push({app:APP,kind:'entrega',id:o.id,data:o}));state.pedidos.forEach(o=>rows.push({app:APP,kind:'pedido',id:o.id,data:o}));state.proveedores.forEach(o=>rows.push({app:APP,kind:'proveedor',id:o.id,data:o}));if(!rows.length)return;const {error}=await db.from('store').upsert(rows,{onConflict:'app,kind,id'});if(error)throw error}
+function guardarProv(){supaUpsertKind('proveedor',state.proveedores).catch(avisoError)}
+
+let _refrescando=false;
+function suscribirRealtime(){try{db.channel('rt-'+APP).on('postgres_changes',{event:'*',schema:'public',table:'store',filter:'app=eq.'+APP},()=>refrescarNube()).subscribe()}catch(e){}}
+function refrescarNube(){if(_refrescando)return;_refrescando=true;setTimeout(async()=>{_refrescando=false;try{const {entregas,pedidos,proveedores}=await supaLoad();state.entregas=entregas;write(K_ENT,entregas);state.pedidos=pedidos;write(K_PED,pedidos);if(proveedores.length){state.proveedores=proveedores;write(K_PROV,proveedores)}render()}catch(e){}},500)}
+
+function mostrarLogin(){
+  document.getElementById('topActions').style.display='none';
+  document.getElementById('tabs').style.display='none';
+  view.innerHTML=`<div class="login-wrap"><div class="login-card">
+    <div class="logo">🛋️</div><h2>Control de Muebles</h2><p>Belgrano Home Envíos · ingresá para continuar</p>
+    <form id="loginForm">
+      <label>Email</label><input type="email" id="lg_email" placeholder="tu@email.com" autocomplete="username">
+      <label>Contraseña</label><input type="password" id="lg_pass" placeholder="••••••••" autocomplete="current-password">
+      <button type="submit" class="btn btn-primary" id="lg_btn">Entrar</button>
+      <div class="error-msg" id="lg_err" style="display:none"></div>
+    </form></div></div>`;
+  document.getElementById('loginForm').onsubmit=async ev=>{ev.preventDefault();
+    const email=document.getElementById('lg_email').value.trim();const pass=document.getElementById('lg_pass').value;
+    const btn=document.getElementById('lg_btn');btn.disabled=true;btn.innerHTML='<span class="spin"></span> Entrando…';
+    const {error}=await db.auth.signInWithPassword({email,password:pass});
+    if(error){btn.disabled=false;btn.textContent='Entrar';const el=document.getElementById('lg_err');el.style.display='block';el.textContent='⚠️ '+(error.message==='Invalid login credentials'?'Email o contraseña incorrectos.':error.message)}
+    else{await entrarApp()}};
+}
+async function entrarApp(){
+  banner('<span class="spin"></span> Cargando datos de la nube…','load');
+  try{const {entregas,pedidos,proveedores}=await supaLoad();
+    state.entregas=entregas;write(K_ENT,entregas);state.pedidos=pedidos;write(K_PED,pedidos);
+    if(proveedores.length){state.proveedores=proveedores;write(K_PROV,proveedores)}else{state.proveedores=getProveedores();await supaUpsertKind('proveedor',state.proveedores)}
+    ocultarBanner();
+  }catch(e){state.entregas=getEntregas();state.pedidos=getPedidos();state.proveedores=getProveedores();avisoError(e)}
+  const {data:{user}}=await db.auth.getUser();
+  document.getElementById('userEmail').textContent='👤 '+(user?user.email:'');
+  document.getElementById('topActions').style.display='flex';
+  document.getElementById('tabs').style.display='flex';
+  state.tab='tablero';render();suscribirRealtime();
+}
+async function start(){
+  if(!initDb()){view.innerHTML='<div class="card" style="margin:24px">No se pudo cargar la conexión con la nube. Revisá tu internet y recargá la página (Ctrl+F5).</div>';return}
+  try{const {data:{session}}=await db.auth.getSession();if(session)return entrarApp()}catch(e){}
+  mostrarLogin();
+}
+
+// ===================== Cálculos =====================
+const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+function parseFecha(iso){if(!iso)return null;const a=iso.split('-').map(Number);if(!a[0]||!a[1]||!a[2])return null;return new Date(a[0],a[1]-1,a[2])}
+function dosD(n){return String(n).padStart(2,'0')}
+function formatFecha(iso){const d=parseFecha(iso);return d?dosD(d.getDate())+'/'+dosD(d.getMonth()+1)+'/'+d.getFullYear():'—'}
+function hoyISO(){const d=new Date();return d.getFullYear()+'-'+dosD(d.getMonth()+1)+'-'+dosD(d.getDate())}
+function claveMes(iso){return iso?iso.slice(0,7):''}
+function nombreMes(c){if(!c)return'';const a=c.split('-').map(Number);return MESES[a[1]-1]+' '+a[0]}
+function toISO(d){return d.getFullYear()+'-'+dosD(d.getMonth()+1)+'-'+dosD(d.getDate())}
+function lunesDe(d){const x=new Date(d);const dia=(x.getDay()+6)%7;x.setDate(x.getDate()-dia);x.setHours(0,0,0,0);return x}
+function claveSemana(iso){const d=parseFecha(iso);return d?toISO(lunesDe(d)):''}
+function etiquetaSemana(c){const l=parseFecha(c);if(!l)return'';const dm=new Date(l);dm.setDate(dm.getDate()+6);const f=x=>dosD(x.getDate())+'/'+dosD(x.getMonth()+1);return f(l)+' al '+f(dm)}
+function sinDetalle(e){return Math.max(0,(+e.total||0)-(+e.devueltos||0)-(+e.detChicos||0)-(+e.detGrandes||0))}
+function resumir(es){const r={total:0,devueltos:0,detChicos:0,detGrandes:0,sinDetalle:0,cant:es.length};for(const e of es){r.total+=+e.total||0;r.devueltos+=+e.devueltos||0;r.detChicos+=+e.detChicos||0;r.detGrandes+=+e.detGrandes||0;r.sinDetalle+=sinDetalle(e)}return r}
+function pct(p,t){return t?Math.round(p/t*1000)/10:0}
+function indiceCalidad(r){if(!r.total)return 0;return Math.round((r.sinDetalle*100+r.detChicos*50)/r.total*10)/10}
+function nivelCalidad(p){if(p>=70)return{l:'A',c:'q-a'};if(p>=50)return{l:'B',c:'q-b'};if(p>=30)return{l:'C',c:'q-c'};return{l:'D',c:'q-d'}}
+function agrupar(es,fn){const m=new Map();for(const e of es){const k=fn(e);if(!k)continue;if(!m.has(k))m.set(k,[]);m.get(k).push(e)}return m}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+// En taller por proveedor = pedido total - traido total (lo que le queda por traer)
+function enTaller(){
+  const m=new Map();
+  for(const p of state.pedidos){const k=p.proveedor;if(!m.has(k))m.set(k,{pedido:0,traido:0});m.get(k).pedido+=+p.cantidad||0}
+  for(const e of state.entregas){const k=e.proveedor;if(!m.has(k))m.set(k,{pedido:0,traido:0});m.get(k).traido+=+e.total||0}
+  return [...m.entries()].map(([nombre,v])=>({nombre,pedido:v.pedido,traido:v.traido,taller:Math.max(0,v.pedido-v.traido)})).sort((a,b)=>b.taller-a.taller);
+}
+
+// ===================== Estado / UI =====================
+const COL={sinDetalle:'#16a34a',detChicos:'#ca8a04',detGrandes:'#ea580c',devueltos:'#dc2626'};
+const state={tab:'tablero',entregas:getEntregas(),pedidos:getPedidos(),proveedores:getProveedores(),editandoEnt:null,editandoPed:null,modoCarga:'entrega',periodo:'mensual',provFiltro:''};
+const TABS=[['tablero','📊 Tablero'],['cargar','➕ Cargar'],['pedidos','📦 Pedidos'],['entregas','🚚 Entregas'],['proveedores','👷 Proveedores']];
+const $=id=>document.getElementById(id);
+const view=$('view');
+
+function renderTabs(){
+  $('tabs').innerHTML=TABS.map(t=>`<button data-tab="${t[0]}" class="${state.tab===t[0]?'active':''}">${t[1]}</button>`).join('');
+  $('tabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{state.tab=b.dataset.tab;if(state.tab!=='cargar'){state.editandoEnt=null;state.editandoPed=null}render()});
+}
+function render(){renderTabs();({tablero:vistaTablero,cargar:vistaCargar,pedidos:vistaPedidos,entregas:vistaEntregas,proveedores:vistaProveedores}[state.tab])();}
+
+function provSelect(id,sel){const activos=state.proveedores.filter(p=>p.activo);
+  let o='<option value="">— elegir —</option>'+activos.map(p=>`<option value="${esc(p.nombre)}" ${sel===p.nombre?'selected':''}>${esc(p.nombre)}</option>`).join('');
+  if(sel&&!activos.some(p=>p.nombre===sel))o+=`<option value="${esc(sel)}" selected>${esc(sel)}</option>`;
+  return `<select id="${id}">${o}</select>`;
+}
+
+// ---------- Cargar (Pedido / Entrega) ----------
+function vistaCargar(){
+  if(state.editandoPed)state.modoCarga='pedido';
+  if(state.editandoEnt)state.modoCarga='entrega';
+  const modo=state.modoCarga;
+  const toggle=`<div class="pill-group" style="margin-bottom:16px">
+    <button id="mc_ent" class="${modo==='entrega'?'active':''}">🚚 Entrega (lo que trajo)</button>
+    <button id="mc_ped" class="${modo==='pedido'?'active':''}">📦 Pedido (lo que le encargás)</button></div>`;
+  if(modo==='pedido'){
+    const e=state.editandoPed||{};const ed=!!state.editandoPed;
+    view.innerHTML=`<form class="card" id="formP"><h2>${ed?'✏️ Editar pedido':'📦 Cargar pedido'}</h2>${toggle}
+      <div class="linea">
+        <label class="field">Proveedor${provSelect('p_prov',e.proveedor)}</label>
+        <label class="field">Fecha de solicitud<input type="date" id="p_fsol" value="${esc(e.fechaSolicitud||hoyISO())}"></label>
+        <label class="field">Cantidad pedida<input type="number" min="0" id="p_cant" value="${e.cantidad??''}" placeholder="0"></label>
+      </div>
+      <p class="muted" style="margin-bottom:0">Lo que le encargaste. Después, cuando lo trae, lo cargás en "Entrega" y el tablero te muestra cuánto le queda en el taller.</p>
+      <div class="error-msg" id="p_err" style="display:none"></div>
+      <div class="row-actions" style="margin-top:16px"><button type="submit" class="btn btn-primary">${ed?'Guardar cambios':'Agregar pedido'}</button>
+      ${ed?'<button type="button" class="btn btn-ghost" id="p_cancel">Cancelar</button>':''}</div></form>`;
+    $('mc_ent').onclick=()=>{state.editandoPed=null;state.modoCarga='entrega';vistaCargar()};
+    $('mc_ped').onclick=()=>{state.modoCarga='pedido';vistaCargar()};
+    if(ed)$('p_cancel').onclick=()=>{state.editandoPed=null;state.tab='pedidos';render()};
+    $('formP').onsubmit=ev=>{ev.preventDefault();const err=m=>{const el=$('p_err');el.textContent='⚠️ '+m;el.style.display='block'};
+      const prov=$('p_prov').value,fsol=$('p_fsol').value,cant=+$('p_cant').value||0;
+      if(!prov)return err('Elegí un proveedor.');if(!fsol)return err('Poné la fecha de solicitud.');if(cant<=0)return err('La cantidad pedida tiene que ser mayor a 0.');
+      const reg={id:(state.editandoPed&&state.editandoPed.id)||nuevoId('ped'),proveedor:prov,fechaSolicitud:fsol,cantidad:cant};
+      const l=state.pedidos.slice();const i=l.findIndex(x=>x.id===reg.id);if(i>=0)l[i]=reg;else l.push(reg);setPedidos(l);
+      supaUpsert('pedido',reg).then(()=>banner('✅ Guardado en la nube','ok')).catch(avisoError);
+      if(ed){state.editandoPed=null;state.tab='pedidos'}render();};
+    return;
+  }
+  // modo entrega
+  const e=state.editandoEnt||{};const ed=!!state.editandoEnt;
+  view.innerHTML=`<form class="card" id="formE"><h2>${ed?'✏️ Editar entrega':'🚚 Cargar entrega'}</h2>${toggle}
+    <label class="field" style="margin-bottom:14px;max-width:320px">Proveedor${provSelect('f_prov',e.proveedor)}</label>
+    <div class="linea">
+      <label class="field">Fecha de entrega<input type="date" id="f_fent" value="${esc(e.fechaEntrega||hoyISO())}"></label>
+      <label class="field">Total que trajo<input type="number" min="0" id="f_total" value="${e.total??''}" placeholder="0"></label>
+      <label class="field">Devueltos<input type="number" min="0" id="f_dev" value="${e.devueltos??''}" placeholder="0"></label>
+      <label class="field">Detalles chicos<input type="number" min="0" id="f_dc" value="${e.detChicos??''}" placeholder="0"></label>
+      <label class="field">Detalles grandes<input type="number" min="0" id="f_dg" value="${e.detGrandes??''}" placeholder="0"></label>
+    </div>
+    <div class="calc-box" style="margin-top:14px"><span>✅ Sin detalle (calculado solo)</span><span class="big" id="f_sd">0</span></div>
+    <div class="error-msg" id="f_err" style="display:none"></div>
+    <div class="row-actions" style="margin-top:16px"><button type="submit" class="btn btn-primary">${ed?'Guardar cambios':'Agregar entrega'}</button>
+    ${ed?'<button type="button" class="btn btn-ghost" id="f_cancel">Cancelar</button>':''}</div></form>`;
+  $('mc_ent').onclick=()=>{state.modoCarga='entrega';vistaCargar()};
+  $('mc_ped').onclick=()=>{state.editandoEnt=null;state.modoCarga='pedido';vistaCargar()};
+  const recalc=()=>{$('f_sd').textContent=Math.max(0,(+$('f_total').value||0)-(+$('f_dev').value||0)-(+$('f_dc').value||0)-(+$('f_dg').value||0))};
+  ['f_total','f_dev','f_dc','f_dg'].forEach(id=>$(id).oninput=recalc);recalc();
+  if(ed)$('f_cancel').onclick=()=>{state.editandoEnt=null;state.tab='entregas';render()};
+  $('formE').onsubmit=ev=>{ev.preventDefault();const err=m=>{const el=$('f_err');el.textContent='⚠️ '+m;el.style.display='block'};
+    const prov=$('f_prov').value,fent=$('f_fent').value;
+    const total=+$('f_total').value||0,dev=+$('f_dev').value||0,dc=+$('f_dc').value||0,dg=+$('f_dg').value||0;
+    if(!prov)return err('Elegí un proveedor.');if(!fent)return err('Poné la fecha de entrega.');if(total<=0)return err('El total que trajo tiene que ser mayor a 0.');
+    if(dev+dc+dg>total)return err('Devueltos + detalles ('+(dev+dc+dg)+') no puede superar el total que trajo ('+total+').');
+    const reg={id:(state.editandoEnt&&state.editandoEnt.id)||nuevoId('e'),proveedor:prov,fechaEntrega:fent,total,devueltos:dev,detChicos:dc,detGrandes:dg};
+    const l=state.entregas.slice();const i=l.findIndex(x=>x.id===reg.id);if(i>=0)l[i]=reg;else l.push(reg);setEntregas(l);
+    supaUpsert('entrega',reg).then(()=>banner('✅ Guardado en la nube','ok')).catch(avisoError);
+    if(ed){state.editandoEnt=null;state.tab='entregas'}render();};
+}
+
+// ---------- Pedidos ----------
+function vistaPedidos(){
+  const lista=state.pedidos.slice().sort((a,b)=>a.fechaSolicitud<b.fechaSolicitud?1:-1);
+  const rows=lista.map(p=>`<tr><td class="left">${formatFecha(p.fechaSolicitud)}</td><td class="left"><strong>${esc(p.proveedor)}</strong></td><td>${p.cantidad}</td>
+    <td><div class="row-actions" style="justify-content:flex-end"><button class="btn btn-ghost btn-sm" data-ed="${p.id}">Editar</button><button class="btn btn-danger btn-sm" data-del="${p.id}">Borrar</button></div></td></tr>`).join('');
+  view.innerHTML=`<div class="card"><div class="section-title"><h2>📦 Pedidos (lo que le encargaste)</h2>
+    <button class="btn btn-primary btn-sm" id="ped_nuevo">➕ Nuevo pedido</button></div>
+    ${lista.length===0?`<div class="empty"><div class="big">📦</div>Todavía no cargaste pedidos. Cargá uno para llevar la cuenta de lo que le queda en el taller.</div>`:
+    `<div class="table-wrap"><table><thead><tr><th class="left">Fecha de solicitud</th><th class="left">Proveedor</th><th>Cantidad pedida</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`}</div>`;
+  $('ped_nuevo').onclick=()=>{state.editandoPed=null;state.modoCarga='pedido';state.tab='cargar';render()};
+  view.querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>{state.editandoPed=state.pedidos.find(x=>x.id===b.dataset.ed);state.tab='cargar';render()});
+  view.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const p=state.pedidos.find(x=>x.id===b.dataset.del);if(confirm('¿Borrar el pedido de '+p.proveedor+' del '+formatFecha(p.fechaSolicitud)+'?')){setPedidos(state.pedidos.filter(x=>x.id!==b.dataset.del));supaDelete('pedido',b.dataset.del).catch(avisoError);vistaPedidos()}});
+}
+
+// ---------- Entregas ----------
+function vistaEntregas(){
+  const meses=[...new Set(state.entregas.map(e=>claveMes(e.fechaEntrega)).filter(Boolean))].sort().reverse();
+  if(state._fProv===undefined)state._fProv='';if(state._fMes===undefined)state._fMes='';
+  const provOpts=state.proveedores.map(p=>`<option value="${esc(p.nombre)}" ${state._fProv===p.nombre?'selected':''}>${esc(p.nombre)}</option>`).join('');
+  const mesOpts=meses.map(m=>`<option value="${m}" ${state._fMes===m?'selected':''}>${nombreMes(m)}</option>`).join('');
+  const fil=state.entregas.filter(e=>(!state._fProv||e.proveedor===state._fProv)&&(!state._fMes||claveMes(e.fechaEntrega)===state._fMes)).sort((a,b)=>a.fechaEntrega<b.fechaEntrega?1:-1);
+  let rows=fil.map(e=>{const sd=sinDetalle(e);return `<tr>
+    <td class="left">${formatFecha(e.fechaEntrega)}</td><td class="left"><strong>${esc(e.proveedor)}</strong></td>
+    <td>${e.total}</td><td>${e.devueltos}</td><td>${e.detChicos}</td><td>${e.detGrandes}</td>
+    <td><strong>${sd}</strong></td><td>${pct(sd,e.total)}%</td>
+    <td><div class="row-actions" style="justify-content:flex-end"><button class="btn btn-ghost btn-sm" data-ed="${e.id}">Editar</button><button class="btn btn-danger btn-sm" data-del="${e.id}">Borrar</button></div></td></tr>`}).join('');
+  view.innerHTML=`<div class="card"><div class="section-title"><h2>🚚 Entregas cargadas</h2><span class="muted">${fil.length} de ${state.entregas.length}</span></div>
+    <div class="filters" style="margin-bottom:14px">
+      <label class="field">Proveedor<select id="ef_prov"><option value="">Todos</option>${provOpts}</select></label>
+      <label class="field">Mes<select id="ef_mes"><option value="">Todos</option>${mesOpts}</select></label></div>
+    ${fil.length===0?`<div class="empty"><div class="big">🛋️</div>${state.entregas.length===0?'Todavía no cargaste ninguna entrega.':'No hay entregas con esos filtros.'}</div>`:
+    `<div class="table-wrap"><table><thead><tr><th class="left">Entrega</th><th class="left">Proveedor</th><th>Total</th><th>Devueltos</th><th>Det. chicos</th><th>Det. grandes</th><th>Sin detalle</th><th>% calidad</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`}</div>`;
+  $('ef_prov').onchange=e=>{state._fProv=e.target.value;vistaEntregas()};
+  $('ef_mes').onchange=e=>{state._fMes=e.target.value;vistaEntregas()};
+  view.querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>{state.editandoEnt=state.entregas.find(x=>x.id===b.dataset.ed);state.tab='cargar';render()});
+  view.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const e=state.entregas.find(x=>x.id===b.dataset.del);if(confirm('¿Borrar la entrega de '+e.proveedor+' del '+formatFecha(e.fechaEntrega)+'?')){setEntregas(state.entregas.filter(x=>x.id!==b.dataset.del));supaDelete('entrega',b.dataset.del).catch(avisoError);vistaEntregas()}});
+}
+
+// ---------- Tablero ----------
+function serie(){
+  const fil=state.entregas.filter(e=>!state.provFiltro||e.proveedor===state.provFiltro);
+  const fnC=state.periodo==='semanal'?(e=>claveSemana(e.fechaEntrega)):(e=>claveMes(e.fechaEntrega));
+  const fnE=state.periodo==='semanal'?etiquetaSemana:nombreMes;
+  return [...agrupar(fil,fnC).entries()].sort((a,b)=>a[0]<b[0]?-1:1).map(([c,items])=>{const r=resumir(items);return{clave:c,etiqueta:fnE(c),r,pctSin:pct(r.sinDetalle,r.total),pctCh:pct(r.detChicos,r.total),pctGr:pct(r.detGrandes,r.total),pctDev:pct(r.devueltos,r.total),indice:indiceCalidad(r)}});
+}
+function deltaHTML(v,inv){
+  if(v==null)return '<div class="delta flat">— sin período previo</div>';
+  const mejora=inv?v<0:v>0,igual=Math.abs(v)<0.05;const cls=igual?'flat':mejora?'up':'down';const fl=igual?'→':v>0?'▲':'▼';
+  return `<div class="delta ${cls}">${fl} ${Math.abs(v).toFixed(1)} vs anterior</div>`;
+}
+function lineChart(s){
+  if(!s.length)return'';
+  const W=720,H=240,pl=40,pb=28,pt=10,pr=12;const iw=W-pl-pr,ih=H-pt-pb;
+  const n=s.length;const xx=i=>pl+(n===1?iw/2:iw*i/(n-1));const yy=v=>pt+ih*(1-v/100);
+  const mkLine=(key,color,w)=>{const pts=s.map((p,i)=>xx(i)+','+yy(p[key])).join(' ');return `<polyline fill="none" stroke="${color}" stroke-width="${w}" points="${pts}"/>`+s.map((p,i)=>`<circle cx="${xx(i)}" cy="${yy(p[key])}" r="3" fill="${color}"/>`).join('')};
+  const grid=[0,25,50,75,100].map(v=>`<line x1="${pl}" y1="${yy(v)}" x2="${W-pr}" y2="${yy(v)}" stroke="#eef2f7"/><text x="${pl-6}" y="${yy(v)+4}" text-anchor="end" font-size="11" fill="#64748b">${v}%</text>`).join('');
+  const labs=s.map((p,i)=>`<text x="${xx(i)}" y="${H-8}" text-anchor="middle" font-size="11" fill="#64748b">${esc(p.etiqueta.length>10?p.etiqueta.slice(0,9)+'…':p.etiqueta)}</text>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:100%">${grid}${labs}${mkLine('pctSin',COL.sinDetalle,3)}${mkLine('pctDev',COL.devueltos,2)}</svg>`;
+}
+function barChart(s){
+  if(!s.length)return'';
+  const W=720,H=260,pl=36,pb=30,pt=10,pr=12;const iw=W-pl-pr,ih=H-pt-pb;
+  const max=Math.max(1,...s.map(p=>p.r.total));const n=s.length;
+  const bw=Math.min(60,iw/n*0.6);const step=iw/n;const yy=v=>pt+ih*(1-v/max);
+  let bars='';
+  s.forEach((p,i)=>{const cx=pl+step*i+step/2;let acc=0;
+    [['sinDetalle',COL.sinDetalle],['detChicos',COL.detChicos],['detGrandes',COL.detGrandes],['devueltos',COL.devueltos]].forEach(([k,c])=>{
+      const val=p.r[k];if(val<=0)return;const h=ih*val/max;const y=pt+ih-(acc+val)/max*ih;acc+=val;
+      bars+=`<rect x="${cx-bw/2}" y="${y}" width="${bw}" height="${h}" fill="${c}"/>`});
+    bars+=`<text x="${cx}" y="${H-10}" text-anchor="middle" font-size="11" fill="#64748b">${esc(p.etiqueta.length>10?p.etiqueta.slice(0,9)+'…':p.etiqueta)}</text>`;});
+  const grid=[0,.25,.5,.75,1].map(f=>{const v=Math.round(max*f);return `<line x1="${pl}" y1="${yy(v)}" x2="${W-pr}" y2="${yy(v)}" stroke="#eef2f7"/><text x="${pl-6}" y="${yy(v)+4}" text-anchor="end" font-size="11" fill="#64748b">${v}</text>`}).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:100%">${grid}${bars}</svg>`;
+}
+function vistaTablero(){
+  const taller=enTaller();const totalTaller=taller.reduce((a,t)=>a+t.taller,0);
+  if(state.entregas.length===0&&state.pedidos.length===0){view.innerHTML=`<div class="card"><div class="empty"><div class="big">📊</div>Cargá un pedido o una entrega y acá vas a ver la calidad, lo que queda en taller, la tendencia y el ranking.</div></div>`;return}
+  const s=serie();const u=s[s.length-1],pv=s[s.length-2];const d=k=>(u&&pv?u[k]-pv[k]:null);
+  const provOpts=state.proveedores.map(p=>`<option value="${esc(p.nombre)}" ${state.provFiltro===p.nombre?'selected':''}>${esc(p.nombre)}</option>`).join('');
+  const rank=[...agrupar(state.entregas,e=>e.proveedor).entries()].map(([nombre,items])=>{const r=resumir(items);return{nombre,r,pctSin:pct(r.sinDetalle,r.total),indice:indiceCalidad(r)}}).sort((a,b)=>b.indice-a.indice);
+  const cards=u?`<div class="grid grid-stats">
+    <div class="stat"><div class="label">Total que trajo</div><div class="value">${u.r.total}</div>${deltaHTML(pv?u.r.total-pv.r.total:null,false)}</div>
+    <div class="stat"><div class="label">Sin detalle</div><div class="value">${u.pctSin}<small>%</small></div>${deltaHTML(d('pctSin'),false)}</div>
+    <div class="stat"><div class="label">Con detalles</div><div class="value">${(u.pctCh+u.pctGr).toFixed(1)}<small>%</small></div>${deltaHTML(pv?(u.pctCh+u.pctGr)-(pv.pctCh+pv.pctGr):null,true)}</div>
+    <div class="stat"><div class="label">Devueltos</div><div class="value">${u.pctDev}<small>%</small></div>${deltaHTML(d('pctDev'),true)}</div>
+    <div class="stat taller"><div class="label">📦 En taller (total)</div><div class="value taller-num">${totalTaller}</div><div class="muted">pendiente de traer</div></div>
+  </div>`:`<div class="grid grid-stats"><div class="stat taller"><div class="label">📦 En taller (total)</div><div class="value taller-num">${totalTaller}</div><div class="muted">pendiente de traer</div></div></div>`;
+  const rankRows=rank.map((p,i)=>{const nv=nivelCalidad(p.pctSin);return `<tr><td class="left">${i+1}</td><td class="left"><strong>${esc(p.nombre)}</strong></td><td>${p.r.total}</td><td>${p.pctSin}%</td><td class="left"><span class="badge ${nv.c}">Calidad ${nv.l}</span></td><td><strong>${p.indice}</strong></td></tr>`}).join('');
+  const tallerRows=taller.filter(t=>t.pedido>0||t.traido>0).map(t=>`<tr><td class="left"><strong>${esc(t.nombre)}</strong></td><td>${t.pedido}</td><td>${t.traido}</td><td class="${t.taller===0?'taller-0':'taller-num'}">${t.taller===0?'✓ 0':t.taller}</td></tr>`).join('');
+  const leg=`<div class="legend"><span><span class="dot" style="background:${COL.sinDetalle}"></span> Sin detalle</span><span><span class="dot" style="background:${COL.detChicos}"></span> Det. chicos</span><span><span class="dot" style="background:${COL.detGrandes}"></span> Det. grandes</span><span><span class="dot" style="background:${COL.devueltos}"></span> Devueltos</span></div>`;
+  view.innerHTML=`<div class="card"><div class="section-title"><h2>📊 Tablero de calidad</h2>
+    <div class="toolbar"><div class="pill-group"><button id="pb_sem" class="${state.periodo==='semanal'?'active':''}">Semanal</button><button id="pb_men" class="${state.periodo==='mensual'?'active':''}">Mensual</button></div>
+      <select id="tb_prov" style="width:auto"><option value="">Todos los proveedores</option>${provOpts}</select></div></div>
+    <p class="muted" style="margin-top:0">${u?'Último período: <strong>'+esc(u.etiqueta)+'</strong>'+(state.provFiltro?' · '+esc(state.provFiltro):''):'Sin entregas en este período.'}</p>${cards}</div>
+    <div class="card"><h3>📦 En taller por proveedor (pedido − traído)</h3>
+      ${tallerRows?`<div class="table-wrap"><table><thead><tr><th class="left">Proveedor</th><th>Pedido</th><th>Trajo</th><th>Le queda en taller</th></tr></thead><tbody>${tallerRows}</tbody></table></div>`:'<p class="muted">Cargá pedidos y entregas para ver cuánto le queda por traer a cada uno.</p>'}</div>
+    <div class="card"><h3>Tendencia de calidad (% sin detalle vs % devueltos)</h3>${lineChart(s)}<p class="muted">Subir la línea verde = mejor calidad. Bajar la roja = menos devoluciones.</p></div>
+    <div class="card"><h3>Composición por período (cantidad de muebles)</h3>${barChart(s)}${leg}</div>
+    <div class="card"><h3>🏆 Ranking de proveedores (todo el historial)</h3><div class="table-wrap"><table><thead><tr><th class="left">#</th><th class="left">Proveedor</th><th>Total traído</th><th>% sin detalle</th><th class="left">Calidad</th><th>Índice</th></tr></thead><tbody>${rankRows}</tbody></table></div></div>`;
+  $('pb_sem').onclick=()=>{state.periodo='semanal';vistaTablero()};
+  $('pb_men').onclick=()=>{state.periodo='mensual';vistaTablero()};
+  $('tb_prov').onchange=e=>{state.provFiltro=e.target.value;vistaTablero()};
+}
+
+// ---------- Proveedores ----------
+function vistaProveedores(){
+  const rows=state.proveedores.map(p=>`<tr style="opacity:${p.activo?1:.5}">
+    <td class="left"><strong>${esc(p.nombre)}</strong></td>
+    <td><input type="number" min="0" value="${p.cupoSemanal||0}" data-cupo="${p.id}" style="width:90px;text-align:right"></td>
+    <td class="left">${p.activo?'✅ Activo':'⛔ Inactivo'}</td>
+    <td><button class="btn btn-ghost btn-sm" data-toggle="${p.id}">${p.activo?'Dar de baja':'Reactivar'}</button></td></tr>`).join('');
+  view.innerHTML=`<div class="card"><h2>👷 Proveedores</h2>
+    <div class="filters" style="margin-bottom:16px">
+      <label class="field">Nombre<input id="np_nombre" placeholder="Nuevo proveedor"></label>
+      <label class="field">Cupo semanal <span class="hint">(opcional)</span><input type="number" min="0" id="np_cupo" placeholder="0"></label>
+      <button class="btn btn-primary" id="np_add">Agregar</button></div>
+    <div class="error-msg" id="np_err" style="display:none"></div>
+    <div class="table-wrap"><table><thead><tr><th class="left">Proveedor</th><th>Cupo semanal</th><th class="left">Estado</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="muted">Dar de baja no borra el historial: las entregas viejas se siguen viendo en los reportes.</p></div>`;
+  $('np_add').onclick=()=>{const n=$('np_nombre').value.trim();const err=$('np_err');
+    if(!n){err.textContent='⚠️ Poné un nombre.';err.style.display='block';return}
+    if(state.proveedores.some(p=>p.nombre.toLowerCase()===n.toLowerCase())){err.textContent='⚠️ Ya existe ese proveedor.';err.style.display='block';return}
+    setProveedores([...state.proveedores,{id:nuevoId('p'),nombre:n,cupoSemanal:+$('np_cupo').value||0,activo:true}]);guardarProv();vistaProveedores()};
+  view.querySelectorAll('[data-toggle]').forEach(b=>b.onclick=()=>{setProveedores(state.proveedores.map(p=>p.id===b.dataset.toggle?{...p,activo:!p.activo}:p));guardarProv();vistaProveedores()});
+  view.querySelectorAll('[data-cupo]').forEach(inp=>inp.onchange=()=>{setProveedores(state.proveedores.map(p=>p.id===inp.dataset.cupo?{...p,cupoSemanal:+inp.value||0}:p));guardarProv()});
+}
+
+// ---------- Backup ----------
+$('btnBackup').onclick=()=>{const data={version:2,exportadoEn:new Date().toISOString(),proveedores:state.proveedores,pedidos:state.pedidos,entregas:state.entregas};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='backup-muebles-'+hoyISO()+'.json';a.click();URL.revokeObjectURL(url)};
+$('btnImport').onclick=()=>$('fileImport').click();
+$('fileImport').onchange=ev=>{const f=ev.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result);if(!confirm('Esto sube los datos del archivo a la nube (se combinan con los que ya haya). ¿Continuar?'))return;
+    if(Array.isArray(d.proveedores))setProveedores(d.proveedores);if(Array.isArray(d.pedidos))setPedidos(d.pedidos);if(Array.isArray(d.entregas))setEntregas(d.entregas);render();
+    banner('<span class="spin"></span> Subiendo a la nube…','load');
+    supaUpsertAll().then(()=>banner('✅ Datos subidos a la nube','ok')).catch(avisoError);}
+    catch(e){alert('No pude leer el archivo. ¿Es un archivo de backup válido?')}};
+  r.readAsText(f);ev.target.value=''};
+$('btnLogout').onclick=async()=>{try{await db.auth.signOut()}catch(e){}location.reload()};
+
+start();
+</script>
+</body>
 </html>
