@@ -6,7 +6,7 @@
 <title>Control de Muebles · Belgrano Home</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛋️</text></svg>" />
 <style>
-:root{--brand:#0f766e;--brand-dark:#115e59;--brand-soft:#ccfbf1;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f1f5f9;--card:#fff;--green:#16a34a;--yellow:#ca8a04;--orange:#ea580c;--red:#dc2626;--shadow:0 1px 3px rgba(15,23,42,.08),0 1px 2px rgba(15,23,42,.04)}
+:root{--brand:#0f766e;--brand-dark:#115e59;--brand-soft:#ccfbf1;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f1f5f9;--card:#fff;--green:#16a34a;--yellow:#ca8a04;--orange:#ea580c;--red:#dc2626;--blue:#2563eb;--shadow:0 1px 3px rgba(15,23,42,.08),0 1px 2px rgba(15,23,42,.04)}
 *{box-sizing:border-box}
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
 .app-header{background:linear-gradient(135deg,var(--brand),var(--brand-dark));color:#fff;padding:18px 16px}
@@ -22,11 +22,13 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Hel
 .card h2{margin:0 0 14px;font-size:17px}.card h3{margin:0 0 10px;font-size:15px;color:var(--muted);font-weight:600}
 .grid{display:grid;gap:14px}.grid-stats{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
 .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow)}
+.stat.taller{background:#eff6ff;border-color:#bfdbfe}
 .stat .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
 .stat .value{font-size:28px;font-weight:800;margin-top:6px}.stat .value small{font-size:14px;font-weight:600;color:var(--muted)}
 .stat .delta{font-size:13px;font-weight:700;margin-top:4px}
 .delta.up{color:var(--green)}.delta.down{color:var(--red)}.delta.flat{color:var(--muted)}
 .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+.linea{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
 label.field{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--ink)}
 label.field .hint{font-weight:400;color:var(--muted);font-size:12px}
 input,select{font:inherit;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);width:100%}
@@ -48,6 +50,7 @@ th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.03
 tbody tr:hover{background:#f8fafc}td.left,th.left{text-align:left}
 .badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700}
 .q-a{background:#dcfce7;color:#166534}.q-b{background:#fef9c3;color:#854d0e}.q-c{background:#ffedd5;color:#9a3412}.q-d{background:#fee2e2;color:#991b1b}
+.taller-num{font-weight:800;color:var(--blue)}.taller-0{color:var(--green)}
 .filters{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}.filters label.field{min-width:160px}
 .empty{text-align:center;color:var(--muted);padding:40px 20px}.empty .big{font-size:40px;margin-bottom:10px}
 .pill-group{display:inline-flex;background:var(--bg);border-radius:10px;padding:3px;gap:3px}
@@ -79,7 +82,7 @@ tbody tr:hover{background:#f8fafc}td.left,th.left{text-align:left}
 <script>
 "use strict";
 // ===================== Datos =====================
-const K_ENT='cm_entregas_v1', K_PROV='cm_proveedores_v1';
+const K_ENT='cm_entregas_v1', K_PROV='cm_proveedores_v1', K_PED='cm_pedidos_v1';
 const PROV_INI=[
   {id:'p_tony',nombre:'Tony',cupoSemanal:60,activo:true},
   {id:'p_mati',nombre:'Mati',cupoSemanal:30,activo:true},
@@ -93,6 +96,8 @@ function write(k,v){localStorage.setItem(k,JSON.stringify(v))}
 function nuevoId(p){return p+'_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7)}
 function getEntregas(){return read(K_ENT,[])}
 function setEntregas(l){write(K_ENT,l);state.entregas=l}
+function getPedidos(){return read(K_PED,[])}
+function setPedidos(l){write(K_PED,l);state.pedidos=l}
 function getProveedores(){let p=read(K_PROV,null);if(!p){write(K_PROV,PROV_INI);return PROV_INI.slice()}return p}
 function setProveedores(l){write(K_PROV,l);state.proveedores=l}
 
@@ -115,60 +120,106 @@ function indiceCalidad(r){if(!r.total)return 0;return Math.round((r.sinDetalle*1
 function nivelCalidad(p){if(p>=70)return{l:'A',c:'q-a'};if(p>=50)return{l:'B',c:'q-b'};if(p>=30)return{l:'C',c:'q-c'};return{l:'D',c:'q-d'}}
 function agrupar(es,fn){const m=new Map();for(const e of es){const k=fn(e);if(!k)continue;if(!m.has(k))m.set(k,[]);m.get(k).push(e)}return m}
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+// En taller por proveedor = pedido total - traido total (lo que le queda por traer)
+function enTaller(){
+  const m=new Map();
+  for(const p of state.pedidos){const k=p.proveedor;if(!m.has(k))m.set(k,{pedido:0,traido:0});m.get(k).pedido+=+p.cantidad||0}
+  for(const e of state.entregas){const k=e.proveedor;if(!m.has(k))m.set(k,{pedido:0,traido:0});m.get(k).traido+=+e.total||0}
+  return [...m.entries()].map(([nombre,v])=>({nombre,pedido:v.pedido,traido:v.traido,taller:Math.max(0,v.pedido-v.traido)})).sort((a,b)=>b.taller-a.taller);
+}
 
 // ===================== Estado / UI =====================
 const COL={sinDetalle:'#16a34a',detChicos:'#ca8a04',detGrandes:'#ea580c',devueltos:'#dc2626'};
-const state={tab:'tablero',entregas:getEntregas(),proveedores:getProveedores(),editando:null,periodo:'mensual',provFiltro:''};
-const TABS=[['tablero','📊 Tablero'],['cargar','➕ Cargar'],['entregas','📋 Entregas'],['proveedores','👷 Proveedores']];
+const state={tab:'tablero',entregas:getEntregas(),pedidos:getPedidos(),proveedores:getProveedores(),editandoEnt:null,editandoPed:null,modoCarga:'entrega',periodo:'mensual',provFiltro:''};
+const TABS=[['tablero','📊 Tablero'],['cargar','➕ Cargar'],['pedidos','📦 Pedidos'],['entregas','🚚 Entregas'],['proveedores','👷 Proveedores']];
 const $=id=>document.getElementById(id);
 const view=$('view');
 
 function renderTabs(){
   $('tabs').innerHTML=TABS.map(t=>`<button data-tab="${t[0]}" class="${state.tab===t[0]?'active':''}">${t[1]}</button>`).join('');
-  $('tabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{state.tab=b.dataset.tab;if(state.tab!=='cargar')state.editando=null;render()});
+  $('tabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{state.tab=b.dataset.tab;if(state.tab!=='cargar'){state.editandoEnt=null;state.editandoPed=null}render()});
 }
-function render(){renderTabs();({tablero:vistaTablero,cargar:vistaCargar,entregas:vistaEntregas,proveedores:vistaProveedores}[state.tab])();}
+function render(){renderTabs();({tablero:vistaTablero,cargar:vistaCargar,pedidos:vistaPedidos,entregas:vistaEntregas,proveedores:vistaProveedores}[state.tab])();}
 
-// ---------- Cargar ----------
+function provSelect(id,sel){const activos=state.proveedores.filter(p=>p.activo);
+  let o='<option value="">— elegir —</option>'+activos.map(p=>`<option value="${esc(p.nombre)}" ${sel===p.nombre?'selected':''}>${esc(p.nombre)}</option>`).join('');
+  if(sel&&!activos.some(p=>p.nombre===sel))o+=`<option value="${esc(sel)}" selected>${esc(sel)}</option>`;
+  return `<select id="${id}">${o}</select>`;
+}
+
+// ---------- Cargar (Pedido / Entrega) ----------
 function vistaCargar(){
-  const e=state.editando||{};const ed=!!state.editando;
-  const activos=state.proveedores.filter(p=>p.activo);
-  const opts=activos.map(p=>`<option value="${esc(p.nombre)}" ${e.proveedor===p.nombre?'selected':''}>${esc(p.nombre)}</option>`).join('');
-  view.innerHTML=`<form class="card" id="formE">
-    <h2>${ed?'✏️ Editar entrega':'➕ Cargar entrega'}</h2>
-    <div class="form-grid">
-      <label class="field">Proveedor<select id="f_prov"><option value="">— elegir —</option>${opts}</select></label>
-      <label class="field">Lugar / sucursal<input id="f_lugar" value="${esc(e.lugar||'')}" placeholder="Depósito, local…"></label>
-      <label class="field">Fecha de solicitud <span class="hint">(opcional)</span><input type="date" id="f_fsol" value="${esc(e.fechaSolicitud||'')}"></label>
+  if(state.editandoPed)state.modoCarga='pedido';
+  if(state.editandoEnt)state.modoCarga='entrega';
+  const modo=state.modoCarga;
+  const toggle=`<div class="pill-group" style="margin-bottom:16px">
+    <button id="mc_ent" class="${modo==='entrega'?'active':''}">🚚 Entrega (lo que trajo)</button>
+    <button id="mc_ped" class="${modo==='pedido'?'active':''}">📦 Pedido (lo que le encargás)</button></div>`;
+  if(modo==='pedido'){
+    const e=state.editandoPed||{};const ed=!!state.editandoPed;
+    view.innerHTML=`<form class="card" id="formP"><h2>${ed?'✏️ Editar pedido':'📦 Cargar pedido'}</h2>${toggle}
+      <div class="linea">
+        <label class="field">Proveedor${provSelect('p_prov',e.proveedor)}</label>
+        <label class="field">Fecha de solicitud<input type="date" id="p_fsol" value="${esc(e.fechaSolicitud||hoyISO())}"></label>
+        <label class="field">Cantidad pedida<input type="number" min="0" id="p_cant" value="${e.cantidad??''}" placeholder="0"></label>
+      </div>
+      <p class="muted" style="margin-bottom:0">Lo que le encargaste. Después, cuando lo trae, lo cargás en "Entrega" y el tablero te muestra cuánto le queda en el taller.</p>
+      <div class="error-msg" id="p_err" style="display:none"></div>
+      <div class="row-actions" style="margin-top:16px"><button type="submit" class="btn btn-primary">${ed?'Guardar cambios':'Agregar pedido'}</button>
+      ${ed?'<button type="button" class="btn btn-ghost" id="p_cancel">Cancelar</button>':''}</div></form>`;
+    $('mc_ent').onclick=()=>{state.editandoPed=null;state.modoCarga='entrega';vistaCargar()};
+    $('mc_ped').onclick=()=>{state.modoCarga='pedido';vistaCargar()};
+    if(ed)$('p_cancel').onclick=()=>{state.editandoPed=null;state.tab='pedidos';render()};
+    $('formP').onsubmit=ev=>{ev.preventDefault();const err=m=>{const el=$('p_err');el.textContent='⚠️ '+m;el.style.display='block'};
+      const prov=$('p_prov').value,fsol=$('p_fsol').value,cant=+$('p_cant').value||0;
+      if(!prov)return err('Elegí un proveedor.');if(!fsol)return err('Poné la fecha de solicitud.');if(cant<=0)return err('La cantidad pedida tiene que ser mayor a 0.');
+      const reg={id:(state.editandoPed&&state.editandoPed.id)||nuevoId('ped'),proveedor:prov,fechaSolicitud:fsol,cantidad:cant};
+      const l=state.pedidos.slice();const i=l.findIndex(x=>x.id===reg.id);if(i>=0)l[i]=reg;else l.push(reg);setPedidos(l);
+      if(ed){state.editandoPed=null;state.tab='pedidos'}render();};
+    return;
+  }
+  // modo entrega
+  const e=state.editandoEnt||{};const ed=!!state.editandoEnt;
+  view.innerHTML=`<form class="card" id="formE"><h2>${ed?'✏️ Editar entrega':'🚚 Cargar entrega'}</h2>${toggle}
+    <label class="field" style="margin-bottom:14px;max-width:320px">Proveedor${provSelect('f_prov',e.proveedor)}</label>
+    <div class="linea">
       <label class="field">Fecha de entrega<input type="date" id="f_fent" value="${esc(e.fechaEntrega||hoyISO())}"></label>
       <label class="field">Total que trajo<input type="number" min="0" id="f_total" value="${e.total??''}" placeholder="0"></label>
       <label class="field">Devueltos<input type="number" min="0" id="f_dev" value="${e.devueltos??''}" placeholder="0"></label>
-      <label class="field">Detalles chicos <span class="hint">(arregla en fábrica)</span><input type="number" min="0" id="f_dc" value="${e.detChicos??''}" placeholder="0"></label>
+      <label class="field">Detalles chicos<input type="number" min="0" id="f_dc" value="${e.detChicos??''}" placeholder="0"></label>
       <label class="field">Detalles grandes<input type="number" min="0" id="f_dg" value="${e.detGrandes??''}" placeholder="0"></label>
     </div>
     <div class="calc-box" style="margin-top:14px"><span>✅ Sin detalle (calculado solo)</span><span class="big" id="f_sd">0</span></div>
     <div class="error-msg" id="f_err" style="display:none"></div>
-    <div class="row-actions" style="margin-top:16px">
-      <button type="submit" class="btn btn-primary">${ed?'Guardar cambios':'Agregar entrega'}</button>
-      ${ed?'<button type="button" class="btn btn-ghost" id="f_cancel">Cancelar</button>':''}
-    </div></form>`;
+    <div class="row-actions" style="margin-top:16px"><button type="submit" class="btn btn-primary">${ed?'Guardar cambios':'Agregar entrega'}</button>
+    ${ed?'<button type="button" class="btn btn-ghost" id="f_cancel">Cancelar</button>':''}</div></form>`;
+  $('mc_ent').onclick=()=>{state.modoCarga='entrega';vistaCargar()};
+  $('mc_ped').onclick=()=>{state.editandoEnt=null;state.modoCarga='pedido';vistaCargar()};
   const recalc=()=>{$('f_sd').textContent=Math.max(0,(+$('f_total').value||0)-(+$('f_dev').value||0)-(+$('f_dc').value||0)-(+$('f_dg').value||0))};
   ['f_total','f_dev','f_dc','f_dg'].forEach(id=>$(id).oninput=recalc);recalc();
-  if(ed)$('f_cancel').onclick=()=>{state.editando=null;state.tab='entregas';render()};
-  $('formE').onsubmit=ev=>{ev.preventDefault();
-    const err=m=>{const el=$('f_err');el.textContent='⚠️ '+m;el.style.display='block'};
+  if(ed)$('f_cancel').onclick=()=>{state.editandoEnt=null;state.tab='entregas';render()};
+  $('formE').onsubmit=ev=>{ev.preventDefault();const err=m=>{const el=$('f_err');el.textContent='⚠️ '+m;el.style.display='block'};
     const prov=$('f_prov').value,fent=$('f_fent').value;
     const total=+$('f_total').value||0,dev=+$('f_dev').value||0,dc=+$('f_dc').value||0,dg=+$('f_dg').value||0;
-    if(!prov)return err('Elegí un proveedor.');
-    if(!fent)return err('Poné la fecha de entrega.');
-    if(total<=0)return err('El total que trajo tiene que ser mayor a 0.');
+    if(!prov)return err('Elegí un proveedor.');if(!fent)return err('Poné la fecha de entrega.');if(total<=0)return err('El total que trajo tiene que ser mayor a 0.');
     if(dev+dc+dg>total)return err('Devueltos + detalles ('+(dev+dc+dg)+') no puede superar el total que trajo ('+total+').');
-    const reg={id:(state.editando&&state.editando.id)||nuevoId('e'),proveedor:prov,lugar:$('f_lugar').value.trim(),fechaSolicitud:$('f_fsol').value||'',fechaEntrega:fent,total,devueltos:dev,detChicos:dc,detGrandes:dg};
-    const l=state.entregas.slice();const i=l.findIndex(x=>x.id===reg.id);
-    if(i>=0)l[i]=reg;else l.push(reg);setEntregas(l);
-    if(ed){state.editando=null;state.tab='entregas'}
-    render();
-  };
+    const reg={id:(state.editandoEnt&&state.editandoEnt.id)||nuevoId('e'),proveedor:prov,fechaEntrega:fent,total,devueltos:dev,detChicos:dc,detGrandes:dg};
+    const l=state.entregas.slice();const i=l.findIndex(x=>x.id===reg.id);if(i>=0)l[i]=reg;else l.push(reg);setEntregas(l);
+    if(ed){state.editandoEnt=null;state.tab='entregas'}render();};
+}
+
+// ---------- Pedidos ----------
+function vistaPedidos(){
+  const lista=state.pedidos.slice().sort((a,b)=>a.fechaSolicitud<b.fechaSolicitud?1:-1);
+  const rows=lista.map(p=>`<tr><td class="left">${formatFecha(p.fechaSolicitud)}</td><td class="left"><strong>${esc(p.proveedor)}</strong></td><td>${p.cantidad}</td>
+    <td><div class="row-actions" style="justify-content:flex-end"><button class="btn btn-ghost btn-sm" data-ed="${p.id}">Editar</button><button class="btn btn-danger btn-sm" data-del="${p.id}">Borrar</button></div></td></tr>`).join('');
+  view.innerHTML=`<div class="card"><div class="section-title"><h2>📦 Pedidos (lo que le encargaste)</h2>
+    <button class="btn btn-primary btn-sm" id="ped_nuevo">➕ Nuevo pedido</button></div>
+    ${lista.length===0?`<div class="empty"><div class="big">📦</div>Todavía no cargaste pedidos. Cargá uno para llevar la cuenta de lo que le queda en el taller.</div>`:
+    `<div class="table-wrap"><table><thead><tr><th class="left">Fecha de solicitud</th><th class="left">Proveedor</th><th>Cantidad pedida</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`}</div>`;
+  $('ped_nuevo').onclick=()=>{state.editandoPed=null;state.modoCarga='pedido';state.tab='cargar';render()};
+  view.querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>{state.editandoPed=state.pedidos.find(x=>x.id===b.dataset.ed);state.tab='cargar';render()});
+  view.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const p=state.pedidos.find(x=>x.id===b.dataset.del);if(confirm('¿Borrar el pedido de '+p.proveedor+' del '+formatFecha(p.fechaSolicitud)+'?')){setPedidos(state.pedidos.filter(x=>x.id!==b.dataset.del));vistaPedidos()}});
 }
 
 // ---------- Entregas ----------
@@ -180,21 +231,18 @@ function vistaEntregas(){
   const fil=state.entregas.filter(e=>(!state._fProv||e.proveedor===state._fProv)&&(!state._fMes||claveMes(e.fechaEntrega)===state._fMes)).sort((a,b)=>a.fechaEntrega<b.fechaEntrega?1:-1);
   let rows=fil.map(e=>{const sd=sinDetalle(e);return `<tr>
     <td class="left">${formatFecha(e.fechaEntrega)}</td><td class="left"><strong>${esc(e.proveedor)}</strong></td>
-    <td class="left">${esc(e.lugar)||'—'}</td><td>${e.fechaSolicitud?formatFecha(e.fechaSolicitud):'—'}</td>
     <td>${e.total}</td><td>${e.devueltos}</td><td>${e.detChicos}</td><td>${e.detGrandes}</td>
     <td><strong>${sd}</strong></td><td>${pct(sd,e.total)}%</td>
     <td><div class="row-actions" style="justify-content:flex-end"><button class="btn btn-ghost btn-sm" data-ed="${e.id}">Editar</button><button class="btn btn-danger btn-sm" data-del="${e.id}">Borrar</button></div></td></tr>`}).join('');
-  view.innerHTML=`<div class="card"><div class="section-title"><h2>📋 Entregas cargadas</h2><span class="muted">${fil.length} de ${state.entregas.length}</span></div>
+  view.innerHTML=`<div class="card"><div class="section-title"><h2>🚚 Entregas cargadas</h2><span class="muted">${fil.length} de ${state.entregas.length}</span></div>
     <div class="filters" style="margin-bottom:14px">
       <label class="field">Proveedor<select id="ef_prov"><option value="">Todos</option>${provOpts}</select></label>
-      <label class="field">Mes<select id="ef_mes"><option value="">Todos</option>${mesOpts}</select></label>
-    </div>
+      <label class="field">Mes<select id="ef_mes"><option value="">Todos</option>${mesOpts}</select></label></div>
     ${fil.length===0?`<div class="empty"><div class="big">🛋️</div>${state.entregas.length===0?'Todavía no cargaste ninguna entrega.':'No hay entregas con esos filtros.'}</div>`:
-    `<div class="table-wrap"><table><thead><tr><th class="left">Entrega</th><th class="left">Proveedor</th><th class="left">Lugar</th><th>Solicitud</th><th>Total</th><th>Devueltos</th><th>Det. chicos</th><th>Det. grandes</th><th>Sin detalle</th><th>% calidad</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`}
-  </div>`;
+    `<div class="table-wrap"><table><thead><tr><th class="left">Entrega</th><th class="left">Proveedor</th><th>Total</th><th>Devueltos</th><th>Det. chicos</th><th>Det. grandes</th><th>Sin detalle</th><th>% calidad</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`}</div>`;
   $('ef_prov').onchange=e=>{state._fProv=e.target.value;vistaEntregas()};
   $('ef_mes').onchange=e=>{state._fMes=e.target.value;vistaEntregas()};
-  view.querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>{state.editando=state.entregas.find(x=>x.id===b.dataset.ed);state.tab='cargar';render()});
+  view.querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>{state.editandoEnt=state.entregas.find(x=>x.id===b.dataset.ed);state.tab='cargar';render()});
   view.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const e=state.entregas.find(x=>x.id===b.dataset.del);if(confirm('¿Borrar la entrega de '+e.proveedor+' del '+formatFecha(e.fechaEntrega)+'?')){setEntregas(state.entregas.filter(x=>x.id!==b.dataset.del));vistaEntregas()}});
 }
 
@@ -208,7 +256,7 @@ function serie(){
 function deltaHTML(v,inv){
   if(v==null)return '<div class="delta flat">— sin período previo</div>';
   const mejora=inv?v<0:v>0,igual=Math.abs(v)<0.05;const cls=igual?'flat':mejora?'up':'down';const fl=igual?'→':v>0?'▲':'▼';
-  return `<div class="delta ${cls}">${fl} ${Math.abs(v).toFixed(1)} ${inv||cls!=='flat'?'pts':'pts'} vs anterior</div>`;
+  return `<div class="delta ${cls}">${fl} ${Math.abs(v).toFixed(1)} vs anterior</div>`;
 }
 function lineChart(s){
   if(!s.length)return'';
@@ -223,41 +271,38 @@ function barChart(s){
   if(!s.length)return'';
   const W=720,H=260,pl=36,pb=30,pt=10,pr=12;const iw=W-pl-pr,ih=H-pt-pb;
   const max=Math.max(1,...s.map(p=>p.r.total));const n=s.length;
-  const bw=Math.min(60,iw/n*0.6);const step=iw/n;
-  const yy=v=>pt+ih*(1-v/max);
+  const bw=Math.min(60,iw/n*0.6);const step=iw/n;const yy=v=>pt+ih*(1-v/max);
   let bars='';
   s.forEach((p,i)=>{const cx=pl+step*i+step/2;let acc=0;
     [['sinDetalle',COL.sinDetalle],['detChicos',COL.detChicos],['detGrandes',COL.detGrandes],['devueltos',COL.devueltos]].forEach(([k,c])=>{
       const val=p.r[k];if(val<=0)return;const h=ih*val/max;const y=pt+ih-(acc+val)/max*ih;acc+=val;
       bars+=`<rect x="${cx-bw/2}" y="${y}" width="${bw}" height="${h}" fill="${c}"/>`});
-    bars+=`<text x="${cx}" y="${H-10}" text-anchor="middle" font-size="11" fill="#64748b">${esc(p.etiqueta.length>10?p.etiqueta.slice(0,9)+'…':p.etiqueta)}</text>`;
-  });
+    bars+=`<text x="${cx}" y="${H-10}" text-anchor="middle" font-size="11" fill="#64748b">${esc(p.etiqueta.length>10?p.etiqueta.slice(0,9)+'…':p.etiqueta)}</text>`;});
   const grid=[0,.25,.5,.75,1].map(f=>{const v=Math.round(max*f);return `<line x1="${pl}" y1="${yy(v)}" x2="${W-pr}" y2="${yy(v)}" stroke="#eef2f7"/><text x="${pl-6}" y="${yy(v)+4}" text-anchor="end" font-size="11" fill="#64748b">${v}</text>`}).join('');
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:100%">${grid}${bars}</svg>`;
 }
 function vistaTablero(){
-  if(state.entregas.length===0){view.innerHTML=`<div class="card"><div class="empty"><div class="big">📊</div>Cargá tu primera entrega y acá vas a ver la calidad, la tendencia y el ranking de proveedores.</div></div>`;return}
-  const s=serie();const u=s[s.length-1],pv=s[s.length-2];
-  const d=k=>(u&&pv?u[k]-pv[k]:null);
+  const taller=enTaller();const totalTaller=taller.reduce((a,t)=>a+t.taller,0);
+  if(state.entregas.length===0&&state.pedidos.length===0){view.innerHTML=`<div class="card"><div class="empty"><div class="big">📊</div>Cargá un pedido o una entrega y acá vas a ver la calidad, lo que queda en taller, la tendencia y el ranking.</div></div>`;return}
+  const s=serie();const u=s[s.length-1],pv=s[s.length-2];const d=k=>(u&&pv?u[k]-pv[k]:null);
   const provOpts=state.proveedores.map(p=>`<option value="${esc(p.nombre)}" ${state.provFiltro===p.nombre?'selected':''}>${esc(p.nombre)}</option>`).join('');
-  // ranking sobre todo
   const rank=[...agrupar(state.entregas,e=>e.proveedor).entries()].map(([nombre,items])=>{const r=resumir(items);return{nombre,r,pctSin:pct(r.sinDetalle,r.total),indice:indiceCalidad(r)}}).sort((a,b)=>b.indice-a.indice);
   const cards=u?`<div class="grid grid-stats">
     <div class="stat"><div class="label">Total que trajo</div><div class="value">${u.r.total}</div>${deltaHTML(pv?u.r.total-pv.r.total:null,false)}</div>
     <div class="stat"><div class="label">Sin detalle</div><div class="value">${u.pctSin}<small>%</small></div>${deltaHTML(d('pctSin'),false)}</div>
     <div class="stat"><div class="label">Con detalles</div><div class="value">${(u.pctCh+u.pctGr).toFixed(1)}<small>%</small></div>${deltaHTML(pv?(u.pctCh+u.pctGr)-(pv.pctCh+pv.pctGr):null,true)}</div>
     <div class="stat"><div class="label">Devueltos</div><div class="value">${u.pctDev}<small>%</small></div>${deltaHTML(d('pctDev'),true)}</div>
-    <div class="stat"><div class="label">Índice de calidad</div><div class="value">${u.indice}<small>/100</small></div>${deltaHTML(d('indice'),false)}</div>
-  </div>`:'<p class="muted">Sin datos en este período.</p>';
+    <div class="stat taller"><div class="label">📦 En taller (total)</div><div class="value taller-num">${totalTaller}</div><div class="muted">pendiente de traer</div></div>
+  </div>`:`<div class="grid grid-stats"><div class="stat taller"><div class="label">📦 En taller (total)</div><div class="value taller-num">${totalTaller}</div><div class="muted">pendiente de traer</div></div></div>`;
   const rankRows=rank.map((p,i)=>{const nv=nivelCalidad(p.pctSin);return `<tr><td class="left">${i+1}</td><td class="left"><strong>${esc(p.nombre)}</strong></td><td>${p.r.total}</td><td>${p.pctSin}%</td><td class="left"><span class="badge ${nv.c}">Calidad ${nv.l}</span></td><td><strong>${p.indice}</strong></td></tr>`}).join('');
+  const tallerRows=taller.filter(t=>t.pedido>0||t.traido>0).map(t=>`<tr><td class="left"><strong>${esc(t.nombre)}</strong></td><td>${t.pedido}</td><td>${t.traido}</td><td class="${t.taller===0?'taller-0':'taller-num'}">${t.taller===0?'✓ 0':t.taller}</td></tr>`).join('');
   const leg=`<div class="legend"><span><span class="dot" style="background:${COL.sinDetalle}"></span> Sin detalle</span><span><span class="dot" style="background:${COL.detChicos}"></span> Det. chicos</span><span><span class="dot" style="background:${COL.detGrandes}"></span> Det. grandes</span><span><span class="dot" style="background:${COL.devueltos}"></span> Devueltos</span></div>`;
   view.innerHTML=`<div class="card"><div class="section-title"><h2>📊 Tablero de calidad</h2>
-    <div class="toolbar"><div class="pill-group">
-      <button id="pb_sem" class="${state.periodo==='semanal'?'active':''}">Semanal</button>
-      <button id="pb_men" class="${state.periodo==='mensual'?'active':''}">Mensual</button></div>
+    <div class="toolbar"><div class="pill-group"><button id="pb_sem" class="${state.periodo==='semanal'?'active':''}">Semanal</button><button id="pb_men" class="${state.periodo==='mensual'?'active':''}">Mensual</button></div>
       <select id="tb_prov" style="width:auto"><option value="">Todos los proveedores</option>${provOpts}</select></div></div>
-    <p class="muted" style="margin-top:0">${u?'Último período: <strong>'+esc(u.etiqueta)+'</strong>'+(state.provFiltro?' · '+esc(state.provFiltro):''):'Sin datos en este período.'}</p>
-    ${cards}</div>
+    <p class="muted" style="margin-top:0">${u?'Último período: <strong>'+esc(u.etiqueta)+'</strong>'+(state.provFiltro?' · '+esc(state.provFiltro):''):'Sin entregas en este período.'}</p>${cards}</div>
+    <div class="card"><h3>📦 En taller por proveedor (pedido − traído)</h3>
+      ${tallerRows?`<div class="table-wrap"><table><thead><tr><th class="left">Proveedor</th><th>Pedido</th><th>Trajo</th><th>Le queda en taller</th></tr></thead><tbody>${tallerRows}</tbody></table></div>`:'<p class="muted">Cargá pedidos y entregas para ver cuánto le queda por traer a cada uno.</p>'}</div>
     <div class="card"><h3>Tendencia de calidad (% sin detalle vs % devueltos)</h3>${lineChart(s)}<p class="muted">Subir la línea verde = mejor calidad. Bajar la roja = menos devoluciones.</p></div>
     <div class="card"><h3>Composición por período (cantidad de muebles)</h3>${barChart(s)}${leg}</div>
     <div class="card"><h3>🏆 Ranking de proveedores (todo el historial)</h3><div class="table-wrap"><table><thead><tr><th class="left">#</th><th class="left">Proveedor</th><th>Total traído</th><th>% sin detalle</th><th class="left">Calidad</th><th>Índice</th></tr></thead><tbody>${rankRows}</tbody></table></div></div>`;
@@ -290,13 +335,13 @@ function vistaProveedores(){
 }
 
 // ---------- Backup ----------
-$('btnBackup').onclick=()=>{const data={version:1,exportadoEn:new Date().toISOString(),proveedores:state.proveedores,entregas:state.entregas};
+$('btnBackup').onclick=()=>{const data={version:2,exportadoEn:new Date().toISOString(),proveedores:state.proveedores,pedidos:state.pedidos,entregas:state.entregas};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=url;a.download='backup-muebles-'+hoyISO()+'.json';a.click();URL.revokeObjectURL(url)};
 $('btnImport').onclick=()=>$('fileImport').click();
 $('fileImport').onchange=ev=>{const f=ev.target.files[0];if(!f)return;const r=new FileReader();
   r.onload=()=>{try{const d=JSON.parse(r.result);if(!confirm('Esto reemplaza los datos actuales por los del archivo. ¿Continuar?'))return;
-    if(Array.isArray(d.proveedores))setProveedores(d.proveedores);if(Array.isArray(d.entregas))setEntregas(d.entregas);render();alert('Backup importado correctamente.')}
+    if(Array.isArray(d.proveedores))setProveedores(d.proveedores);if(Array.isArray(d.pedidos))setPedidos(d.pedidos);if(Array.isArray(d.entregas))setEntregas(d.entregas);render();alert('Backup importado correctamente.')}
     catch(e){alert('No pude leer el archivo. ¿Es un backup válido?')}};
   r.readAsText(f);ev.target.value=''};
 
