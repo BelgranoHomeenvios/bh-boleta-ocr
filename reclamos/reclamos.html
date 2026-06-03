@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Reclamos · Belgrano Home</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📣</text></svg>" />
+<style>
+:root{--brand:#b91c1c;--brand-dark:#991b1b;--brand-soft:#fee2e2;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f1f5f9;--card:#fff;--green:#16a34a;--yellow:#ca8a04;--orange:#ea580c;--red:#dc2626;--blue:#2563eb;--shadow:0 1px 3px rgba(15,23,42,.08),0 1px 2px rgba(15,23,42,.04)}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+.app-header{background:linear-gradient(135deg,var(--brand),var(--brand-dark));color:#fff;padding:18px 16px}
+.app-header .wrap{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.app-header h1{font-size:20px;margin:0;font-weight:700}
+.app-header .sub{opacity:.85;font-size:13px;margin-top:2px}
+.app-header .logo{font-size:28px}.app-header .spacer{flex:1}
+.tabs{display:flex;gap:4px;max-width:1100px;margin:0 auto;padding:0 8px;overflow-x:auto}
+.tabs button{border:none;background:transparent;color:rgba(255,255,255,.8);padding:12px 16px;font-size:15px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap}
+.tabs button.active{color:#fff;border-bottom-color:#fff}
+.container{max-width:1100px;margin:0 auto;padding:20px 16px 60px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow);margin-bottom:18px}
+.card h2{margin:0 0 14px;font-size:17px}.card h3{margin:0 0 10px;font-size:15px;color:var(--muted);font-weight:600}
+.grid{display:grid;gap:14px}.grid-stats{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow)}
+.stat .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.stat .value{font-size:28px;font-weight:800;margin-top:6px}.stat .value small{font-size:14px;font-weight:600;color:var(--muted)}
+.stat.s-abierto{background:#fef2f2;border-color:#fecaca}
+.stat.s-espera{background:#fffbeb;border-color:#fde68a}
+.stat.s-prod{background:#eff6ff;border-color:#bfdbfe}
+.stat.s-cerrado{background:#f0fdf4;border-color:#bbf7d0}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+label.field{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--ink)}
+label.field .hint{font-weight:400;color:var(--muted);font-size:12px}
+input,select,textarea{font:inherit;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);width:100%}
+textarea{min-height:64px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--brand-soft);border-color:var(--brand)}
+.sub-h{font-size:13px;font-weight:700;color:var(--brand-dark);text-transform:uppercase;letter-spacing:.04em;margin:18px 0 2px}
+.btn{font:inherit;font-weight:700;cursor:pointer;border-radius:10px;padding:11px 18px;border:1px solid transparent}
+.btn-primary{background:var(--brand);color:#fff}.btn-primary:hover{background:var(--brand-dark)}
+.btn-ghost{background:#fff;border-color:var(--line);color:var(--ink)}.btn-ghost:hover{background:var(--bg)}
+.btn-danger{background:#fff;border-color:#fecaca;color:var(--red)}
+.btn-sm{padding:7px 12px;font-size:13px}
+.row-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.error-msg{color:var(--red);font-size:13px;font-weight:600;margin-top:8px}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:9px 11px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;font-weight:700;white-space:nowrap}
+tbody tr:hover{background:#f8fafc}
+.badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap}
+.e-abierto{background:#fee2e2;color:#991b1b}.e-espera{background:#fef9c3;color:#854d0e}.e-prod{background:#dbeafe;color:#1e40af}.e-cerrado{background:#dcfce7;color:#166534}
+.filters{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}.filters label.field{min-width:150px}
+.empty{text-align:center;color:var(--muted);padding:40px 20px}.empty .big{font-size:40px;margin-bottom:10px}
+.muted{color:var(--muted);font-size:13px}
+.section-title{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+.bars{display:flex;flex-direction:column;gap:8px}
+.bar-row{display:grid;grid-template-columns:130px 1fr 42px;gap:10px;align-items:center;font-size:13px}
+.bar-track{background:var(--bg);border-radius:6px;height:20px;overflow:hidden}
+.bar-fill{height:100%;border-radius:6px}
+.bar-row .n{text-align:right;font-weight:700}
+.bar-lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.charts-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px}
+.txt-clip{max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:600px){.stat .value{font-size:24px}.bar-row{grid-template-columns:100px 1fr 36px}}
+</style>
+</head>
+<body>
+<header class="app-header">
+  <div class="wrap">
+    <span class="logo">📣</span>
+    <div><h1>Reclamos</h1><div class="sub">Belgrano Home Envíos · seguimiento y estadísticas</div></div>
+    <span class="spacer"></span>
+    <div class="row-actions">
+      <button class="btn btn-ghost btn-sm" id="btnBackup">⬇️ Backup</button>
+      <button class="btn btn-ghost btn-sm" id="btnImport">⬆️ Importar</button>
+      <input type="file" id="fileImport" accept="application/json" hidden />
+    </div>
+  </div>
+  <nav class="tabs" id="tabs"></nav>
+</header>
+<main class="container" id="view"></main>
+
+<script>
+"use strict";
+const K_REC='rc_reclamos_v1';
+// Estados del ciclo del reclamo
+const ESTADOS=['ABIERTO','EN ESPERA','EN PRODUCCIÓN','CERRADO'];
+function estClass(e){return {'ABIERTO':'e-abierto','EN ESPERA':'e-espera','EN PRODUCCIÓN':'e-prod','CERRADO':'e-cerrado'}[e]||'e-abierto'}
+const RESPONSABLES=['1 FLETE','2 PROVEEDOR','3 FABRICA','4 CARPINTERO','5 NO TIENE SOLUCION','6 ASESORÍA'];
+const TIPOS_SOLUCION=['1- TRAE EL MUEBLE A FABRICA','2- VA EL FLETE A DOMICILIO','3- VA CARPINTERO A DOMICILIO','4- REINTEGRAMOS PARTE DEL DINERO','5- RECOMENDACIONES DE USO','6- CAMBIO DEL MUEBLE EN FABRICA','7- CAMBIO DEL MUEBLE EN DOMICILIO','8- OTROS'];
+const COSTOS=['SIN COSTO','COSTO BAJO','COSTO MEDIO','COSTO ALTO','DEVOLUCION'];
+// Sugerencias (se pueden escribir otras igual)
+const FLETES=['1 IVAN','2 FABIAN','3 JUAN','5 EXPRESO','7 MARCOS','8 RETIRO','9 PEDRO (jony)','10 LALO','11 MAURO'];
+const PROVEEDORES=['7 TONY','8 MATIAS','9 RAUL','10 HERNAN','11 MICHELLE','12 LUCIANO','13 VICENTE','2 PROVEEDOR','3 FABRICA'];
+const MUEBLES=['CÓMODAS','MESAS','MUEBLES DE TV','MESAS DE LUZ','ESCRITORIOS','APARADORES','MESAS RATONAS','BIBLIOTECAS','PLACARD','MODULARES','SILLAS','VAJILLEROS','CAMAS','RESPALDOS','BOTINEROS','COMEDOR','CHIFONIER','ESTANTE FLOTANTE'];
+const COL_COSTO={'SIN COSTO':'#16a34a','COSTO BAJO':'#65a30d','COSTO MEDIO':'#ca8a04','COSTO ALTO':'#dc2626','DEVOLUCION':'#7c3aed'};
+
+function read(k,f){try{const r=localStorage.getItem(k);return r?JSON.parse(r):f}catch(e){return f}}
+function write(k,v){localStorage.setItem(k,JSON.stringify(v))}
+function nuevoId(p){return p+'_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7)}
+function getReclamos(){return read(K_REC,[])}
+function setReclamos(l){write(K_REC,l);state.reclamos=l}
+
+const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+function parseFecha(iso){if(!iso)return null;const a=iso.split('-').map(Number);if(!a[0]||!a[1]||!a[2])return null;return new Date(a[0],a[1]-1,a[2])}
+function dosD(n){return String(n).padStart(2,'0')}
+function formatFecha(iso){const d=parseFecha(iso);return d?dosD(d.getDate())+'/'+dosD(d.getMonth()+1)+'/'+d.getFullYear():'—'}
+function hoyISO(){const d=new Date();return d.getFullYear()+'-'+dosD(d.getMonth()+1)+'-'+dosD(d.getDate())}
+function claveMes(iso){return iso?iso.slice(0,7):''}
+function nombreMes(c){if(!c)return'';const a=c.split('-').map(Number);return MESES[a[1]-1]+' '+a[0]}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function abierto(r){return r.estado!=='CERRADO'}
+function countBy(arr,fn){const m=new Map();for(const r of arr){let v=fn(r);if(v==null||String(v).trim()==='')continue;v=String(v).trim();m.set(v,(m.get(v)||0)+1)}return [...m.entries()].map(([label,n])=>({label,n})).sort((a,b)=>b.n-a.n)}
+
+const state={tab:'tablero',reclamos:getReclamos(),editando:null,_q:'',_fEstado:'',_fMes:''};
+const TABS=[['tablero','📊 Tablero'],['cargar','➕ Cargar reclamo'],['lista','📋 Reclamos']];
+const $=id=>document.getElementById(id);
+const view=$('view');
+
+function renderTabs(){
+  $('tabs').innerHTML=TABS.map(t=>`<button data-tab="${t[0]}" class="${state.tab===t[0]?'active':''}">${t[1]}</button>`).join('');
+  $('tabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{state.tab=b.dataset.tab;if(state.tab!=='cargar')state.editando=null;render()});
+}
+function render(){renderTabs();({tablero:vistaTablero,cargar:vistaCargar,lista:vistaLista}[state.tab])();}
+
+function dl(id,arr,extra){const vals=[...new Set([...(arr||[]),...extra])];return `<datalist id="${id}">${vals.map(v=>`<option value="${esc(v)}">`).join('')}</datalist>`}
+function opts(arr,sel){return arr.map(v=>`<option value="${esc(v)}" ${sel===v?'selected':''}>${esc(v)}</option>`).join('')}
+
+// ---------- Cargar ----------
+function vistaCargar(){
+  const r=state.editando||{};const ed=!!state.editando;
+  const muebleVals=[...new Set([...MUEBLES,...state.reclamos.map(x=>x.mueble).filter(Boolean)])];
+  const fleteVals=[...new Set([...FLETES,...state.reclamos.map(x=>x.flete).filter(Boolean)])];
+  const provVals=[...new Set([...PROVEEDORES,...state.reclamos.map(x=>x.proveedor).filter(Boolean)])];
+  view.innerHTML=`<form class="card" id="formR">
+    <h2>${ed?'✏️ Editar reclamo':'➕ Cargar reclamo'}</h2>
+    <div class="sub-h">Datos del reclamo</div>
+    <div class="form-grid">
+      <label class="field">Estado<select id="r_estado">${opts(ESTADOS,r.estado||'ABIERTO')}</select></label>
+      <label class="field">Fecha del reclamo<input type="date" id="r_fecha" value="${esc(r.fechaReclamo||hoyISO())}"></label>
+      <label class="field">Nombre del cliente<input id="r_nombre" value="${esc(r.nombre||'')}" placeholder="Nombre y apellido"></label>
+      <label class="field">Celular<input id="r_cel" value="${esc(r.celular||'')}" placeholder="11..."></label>
+      <label class="field">N° de orden<input id="r_orden" value="${esc(r.orden||'')}" placeholder="Ej: 3522"></label>
+    </div>
+    <div class="sub-h">Sobre el mueble y la entrega</div>
+    <div class="form-grid">
+      <label class="field">Mueble<input list="dl_mueble" id="r_mueble" value="${esc(r.mueble||'')}" placeholder="Cómoda, Mesa…"></label>
+      <label class="field">Fecha de entrega <span class="hint">(si se entregó)</span><input type="date" id="r_fent" value="${esc(r.fechaEntrega||'')}"></label>
+      <label class="field">Flete / Chofer<input list="dl_flete" id="r_flete" value="${esc(r.flete||'')}" placeholder="Quién entregó"></label>
+      <label class="field">Proveedor <span class="hint">(si se sabe)</span><input list="dl_prov" id="r_prov" value="${esc(r.proveedor||'')}" placeholder="Proveedor"></label>
+    </div>
+    <div class="sub-h">El problema</div>
+    <div class="form-grid">
+      <label class="field" style="grid-column:1/-1">Problema<textarea id="r_problema" placeholder="¿Cuál fue el inconveniente?">${esc(r.problema||'')}</textarea></label>
+    </div>
+    <div class="sub-h">La solución</div>
+    <div class="form-grid">
+      <label class="field">Responsable del problema<select id="r_respprob"><option value="">— sin definir —</option>${opts(RESPONSABLES,r.respProblema)}</select></label>
+      <label class="field">Tipo de solución<select id="r_tiposol"><option value="">— sin definir —</option>${opts(TIPOS_SOLUCION,r.tipoSolucion)}</select></label>
+      <label class="field">Responsable de la solución<select id="r_respsol"><option value="">— sin definir —</option>${opts(RESPONSABLES,r.respSolucion)}</select></label>
+      <label class="field">Costo de la solución<select id="r_costocat"><option value="">— sin definir —</option>${opts(COSTOS,r.costoCat)}</select></label>
+      <label class="field">Costo $ <span class="hint">(opcional)</span><input type="number" min="0" id="r_costomonto" value="${r.costoMonto??''}" placeholder="0"></label>
+    </div>
+    <div class="form-grid">
+      <label class="field" style="grid-column:1/-1">Observaciones<textarea id="r_obs" placeholder="Notas adicionales">${esc(r.observaciones||'')}</textarea></label>
+    </div>
+    <div class="error-msg" id="r_err" style="display:none"></div>
+    <div class="row-actions" style="margin-top:16px">
+      <button type="submit" class="btn btn-primary">${ed?'Guardar cambios':'Agregar reclamo'}</button>
+      ${ed?'<button type="button" class="btn btn-ghost" id="r_cancel">Cancelar</button>':''}
+    </div>
+    ${dl('dl_mueble',muebleVals,[])}${dl('dl_flete',fleteVals,[])}${dl('dl_prov',provVals,[])}
+  </form>`;
+  if(ed)$('r_cancel').onclick=()=>{state.editando=null;state.tab='lista';render()};
+  $('formR').onsubmit=ev=>{ev.preventDefault();const err=m=>{const el=$('r_err');el.textContent='⚠️ '+m;el.style.display='block'};
+    const nombre=$('r_nombre').value.trim();
+    if(!$('r_fecha').value)return err('Poné la fecha del reclamo.');
+    if(!nombre && !$('r_orden').value.trim())return err('Cargá al menos el nombre o el N° de orden.');
+    const reg={
+      id:(state.editando&&state.editando.id)||nuevoId('rec'),
+      estado:$('r_estado').value, fechaReclamo:$('r_fecha').value, nombre, celular:$('r_cel').value.trim(),
+      orden:$('r_orden').value.trim(), mueble:$('r_mueble').value.trim(), fechaEntrega:$('r_fent').value||'',
+      flete:$('r_flete').value.trim(), proveedor:$('r_prov').value.trim(), problema:$('r_problema').value.trim(),
+      respProblema:$('r_respprob').value, tipoSolucion:$('r_tiposol').value, respSolucion:$('r_respsol').value,
+      costoCat:$('r_costocat').value, costoMonto:($('r_costomonto').value!==''?+$('r_costomonto').value:''), observaciones:$('r_obs').value.trim(),
+    };
+    const l=state.reclamos.slice();const i=l.findIndex(x=>x.id===reg.id);if(i>=0)l[i]=reg;else l.push(reg);setReclamos(l);
+    if(ed){state.editando=null;state.tab='lista'}render();};
+}
+
+// ---------- Lista ----------
+function vistaLista(){
+  const meses=[...new Set(state.reclamos.map(r=>claveMes(r.fechaReclamo)).filter(Boolean))].sort().reverse();
+  const q=state._q.toLowerCase();
+  const fil=state.reclamos
+    .filter(r=>!state._fEstado||r.estado===state._fEstado)
+    .filter(r=>!state._fMes||claveMes(r.fechaReclamo)===state._fMes)
+    .filter(r=>!q||[r.nombre,r.orden,r.problema,r.mueble,r.flete,r.proveedor].some(v=>String(v||'').toLowerCase().includes(q)))
+    .sort((a,b)=>a.fechaReclamo<b.fechaReclamo?1:-1);
+  const rows=fil.map(r=>`<tr>
+    <td><span class="badge ${estClass(r.estado)}">${esc(r.estado)}</span></td>
+    <td>${formatFecha(r.fechaReclamo)}</td>
+    <td><strong>${esc(r.nombre)||'—'}</strong>${r.celular?'<br><span class="muted">'+esc(r.celular)+'</span>':''}</td>
+    <td>${esc(r.orden)||'—'}</td>
+    <td>${esc(r.mueble)||'—'}</td>
+    <td class="txt-clip" title="${esc(r.problema)}">${esc(r.problema)||'—'}</td>
+    <td>${esc(r.flete)||'—'}</td>
+    <td>${esc(r.proveedor)||'—'}</td>
+    <td>${esc(r.costoCat)||'—'}</td>
+    <td><div class="row-actions" style="justify-content:flex-end"><button class="btn btn-ghost btn-sm" data-ed="${r.id}">Editar</button><button class="btn btn-danger btn-sm" data-del="${r.id}">Borrar</button></div></td></tr>`).join('');
+  view.innerHTML=`<div class="card"><div class="section-title"><h2>📋 Reclamos</h2><span class="muted">${fil.length} de ${state.reclamos.length}</span></div>
+    <div class="filters" style="margin-bottom:14px">
+      <label class="field" style="min-width:220px">Buscar<input id="lq" value="${esc(state._q)}" placeholder="Nombre, orden, mueble, problema…"></label>
+      <label class="field">Estado<select id="lEstado"><option value="">Todos</option>${opts(ESTADOS,state._fEstado)}</select></label>
+      <label class="field">Mes<select id="lMes"><option value="">Todos</option>${meses.map(m=>`<option value="${m}" ${state._fMes===m?'selected':''}>${nombreMes(m)}</option>`).join('')}</select></label>
+    </div>
+    ${fil.length===0?`<div class="empty"><div class="big">📣</div>${state.reclamos.length===0?'Todavía no cargaste reclamos.':'No hay reclamos con esos filtros.'}</div>`:
+    `<div class="table-wrap"><table><thead><tr><th>Estado</th><th>Fecha</th><th>Cliente</th><th>Orden</th><th>Mueble</th><th>Problema</th><th>Flete</th><th>Proveedor</th><th>Costo</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`}
+  </div>`;
+  const lq=$('lq');lq.oninput=()=>{state._q=lq.value;const p=lq.selectionStart;vistaLista();const n=$('lq');n.focus();n.setSelectionRange(p,p)};
+  $('lEstado').onchange=e=>{state._fEstado=e.target.value;vistaLista()};
+  $('lMes').onchange=e=>{state._fMes=e.target.value;vistaLista()};
+  view.querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>{state.editando=state.reclamos.find(x=>x.id===b.dataset.ed);state.tab='cargar';render()});
+  view.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const r=state.reclamos.find(x=>x.id===b.dataset.del);if(confirm('¿Borrar el reclamo de '+(r.nombre||r.orden||'')+'?')){setReclamos(state.reclamos.filter(x=>x.id!==b.dataset.del));vistaLista()}});
+}
+
+// ---------- Tablero ----------
+function bars(items,color){
+  if(!items.length)return '<p class="muted">Sin datos todavía.</p>';
+  const max=Math.max(...items.map(i=>i.n));
+  return '<div class="bars">'+items.map(i=>{const c=typeof color==='function'?color(i.label):color;
+    return `<div class="bar-row"><span class="bar-lbl" title="${esc(i.label)}">${esc(i.label)}</span><div class="bar-track"><div class="bar-fill" style="width:${Math.round(i.n/max*100)}%;background:${c}"></div></div><span class="n">${i.n}</span></div>`}).join('')+'</div>';
+}
+function trendSVG(items){
+  if(!items.length)return '<p class="muted">Sin datos todavía.</p>';
+  const W=720,H=220,pl=30,pb=34,pt=10,pr=10;const iw=W-pl-pr,ih=H-pt-pb;
+  const max=Math.max(1,...items.map(i=>i.n));const n=items.length;const step=iw/n;const bw=Math.min(46,step*0.6);
+  const yy=v=>pt+ih*(1-v/max);
+  let bars='';
+  items.forEach((p,i)=>{const cx=pl+step*i+step/2;const h=ih*p.n/max;
+    bars+=`<rect x="${cx-bw/2}" y="${pt+ih-h}" width="${bw}" height="${h}" rx="3" fill="#b91c1c"/>`;
+    bars+=`<text x="${cx}" y="${pt+ih-h-4}" text-anchor="middle" font-size="11" fill="#0f172a" font-weight="700">${p.n}</text>`;
+    bars+=`<text x="${cx}" y="${H-12}" text-anchor="middle" font-size="10" fill="#64748b">${esc(p.label)}</text>`;});
+  const grid=[0,.5,1].map(f=>{const v=Math.round(max*f);return `<line x1="${pl}" y1="${yy(v)}" x2="${W-pr}" y2="${yy(v)}" stroke="#eef2f7"/><text x="${pl-4}" y="${yy(v)+4}" text-anchor="end" font-size="10" fill="#64748b">${v}</text>`}).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:100%">${grid}${bars}</svg>`;
+}
+function vistaTablero(){
+  const R=state.reclamos;
+  if(R.length===0){view.innerHTML=`<div class="card"><div class="empty"><div class="big">📊</div>Cargá tu primer reclamo y acá vas a ver el seguimiento por estado y las estadísticas (flete, mueble, proveedor, costos y tendencia).</div></div>`;return}
+  const fil=R.filter(r=>!state._fMes||claveMes(r.fechaReclamo)===state._fMes);
+  const cont=e=>fil.filter(r=>r.estado===e).length;
+  const abiertos=fil.filter(abierto).length, cerrados=cont('CERRADO');
+  const pctCerr=fil.length?Math.round(cerrados/fil.length*100):0;
+  const montos=fil.map(r=>+r.costoMonto||0).reduce((a,b)=>a+b,0);
+  const meses=[...new Set(R.map(r=>claveMes(r.fechaReclamo)).filter(Boolean))].sort().reverse();
+  // tendencia por mes (cronológica, últimos 12)
+  const porMes=countBy(R,r=>claveMes(r.fechaReclamo)).sort((a,b)=>a.label<b.label?-1:1).slice(-12).map(i=>({label:nombreMes(i.label).split(' ')[0].slice(0,3),n:i.n}));
+  view.innerHTML=`<div class="card"><div class="section-title"><h2>📊 Tablero de reclamos</h2>
+    <select id="tbMes" style="width:auto"><option value="">Todos los meses</option>${meses.map(m=>`<option value="${m}" ${state._fMes===m?'selected':''}>${nombreMes(m)}</option>`).join('')}</select></div>
+    <div class="grid grid-stats">
+      <div class="stat"><div class="label">Total reclamos</div><div class="value">${fil.length}</div></div>
+      <div class="stat s-abierto"><div class="label">🔴 Sin cerrar</div><div class="value">${abiertos}</div></div>
+      <div class="stat s-prod"><div class="label">🔵 En producción</div><div class="value">${cont('EN PRODUCCIÓN')}</div></div>
+      <div class="stat s-espera"><div class="label">🟡 En espera</div><div class="value">${cont('EN ESPERA')}</div></div>
+      <div class="stat s-cerrado"><div class="label">🟢 Cerrados</div><div class="value">${cerrados}<small> (${pctCerr}%)</small></div></div>
+      ${montos>0?`<div class="stat"><div class="label">💲 Costo total</div><div class="value">$${montos.toLocaleString('es-AR')}</div></div>`:''}
+    </div></div>
+    <div class="card"><h3>📅 Reclamos por mes</h3>${trendSVG(porMes)}</div>
+    <div class="charts-2">
+      <div class="card"><h3>🚚 Reclamos por flete / chofer</h3>${bars(countBy(fil,r=>r.flete),'#b91c1c')}</div>
+      <div class="card"><h3>🛋️ Reclamos por mueble</h3>${bars(countBy(fil,r=>r.mueble),'#ea580c')}</div>
+      <div class="card"><h3>🏭 Reclamos por proveedor</h3>${bars(countBy(fil,r=>r.proveedor),'#0f766e')}</div>
+      <div class="card"><h3>👤 Responsable del problema</h3>${bars(countBy(fil,r=>r.respProblema),'#7c3aed')}</div>
+      <div class="card"><h3>🛠️ Tipo de solución</h3>${bars(countBy(fil,r=>r.tipoSolucion),'#2563eb')}</div>
+      <div class="card"><h3>💲 Costo de las soluciones</h3>${bars(countBy(fil,r=>r.costoCat),l=>COL_COSTO[l]||'#64748b')}</div>
+    </div>`;
+  $('tbMes').onchange=e=>{state._fMes=e.target.value;vistaTablero()};
+}
+
+// ---------- Backup ----------
+$('btnBackup').onclick=()=>{const data={app:'reclamos',version:1,exportadoEn:new Date().toISOString(),reclamos:state.reclamos};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='backup-reclamos-'+hoyISO()+'.json';a.click();URL.revokeObjectURL(url)};
+$('btnImport').onclick=()=>$('fileImport').click();
+$('fileImport').onchange=ev=>{const f=ev.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result);if(!confirm('Esto reemplaza los reclamos actuales por los del archivo. ¿Continuar?'))return;
+    if(Array.isArray(d.reclamos))setReclamos(d.reclamos);render();alert('Backup importado correctamente.')}
+    catch(e){alert('No pude leer el archivo. ¿Es un backup válido?')}};
+  r.readAsText(f);ev.target.value=''};
+
+render();
+</script>
+</body>
+</html>
