@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Manual · Control de Muebles</title>
+<style>
+:root{--brand:#0f766e;--brand-dark:#115e59;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc;--blue:#2563eb}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.6}
+.wrap{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{background:linear-gradient(135deg,var(--brand),var(--brand-dark));color:#fff;border-radius:16px;padding:26px 24px;margin-bottom:24px}
+header h1{margin:0;font-size:26px}
+header p{margin:6px 0 0;opacity:.9}
+h2{color:var(--brand-dark);font-size:20px;margin:30px 0 8px;border-bottom:2px solid var(--line);padding-bottom:6px}
+h3{font-size:16px;margin:18px 0 4px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:14px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.step{display:flex;gap:12px;align-items:flex-start;margin:10px 0}
+.num{flex:0 0 28px;height:28px;background:var(--brand);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+.tag{display:inline-block;background:#ccfbf1;color:var(--brand-dark);font-weight:700;padding:2px 10px;border-radius:999px;font-size:14px}
+.box{background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;margin:12px 0}
+.warn{background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:12px 14px;margin:12px 0}
+.ok{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px;margin:12px 0}
+code{background:#f1f5f9;padding:2px 7px;border-radius:6px;font-size:.95em}
+table{width:100%;border-collapse:collapse;margin:10px 0}
+td,th{border:1px solid var(--line);padding:9px 11px;text-align:left;font-size:14px;vertical-align:top}
+th{background:#f1f5f9}
+a{color:var(--blue)}
+ul{margin:6px 0 6px 0;padding-left:22px}
+.big-link{font-size:18px;font-weight:700;word-break:break-all}
+@media print{body{background:#fff}.card,header{box-shadow:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>🛋️ Control de Muebles</h1>
+  <p>Manual sencillo de uso · Belgrano Home Envíos</p>
+</header>
+
+<h2>¿Para qué sirve?</h2>
+<div class="card">
+Es un programa para <strong>llevar el control de los muebles de cada proveedor</strong> y medir
+<strong>qué tan bien trabajan</strong>. Te permite saber:
+<ul>
+  <li>Cuántos muebles le <strong>pediste</strong> a cada proveedor y cuántos te <strong>trajo</strong>.</li>
+  <li>Cuántos vinieron <strong>perfectos</strong> (sin detalle), con <strong>detalles chicos</strong>, con <strong>detalles grandes</strong> o <strong>devueltos</strong>.</li>
+  <li>Cuántos muebles le <strong>quedan en el taller</strong> todavía por traer.</li>
+  <li>Si la <strong>calidad mejora o empeora</strong> mes a mes, y un <strong>ranking</strong> de proveedores.</li>
+</ul>
+</div>
+
+<h2>¿Cómo entro?</h2>
+<div class="card">
+Desde la compu o el celular, entrá a este link (guardalo en favoritos):
+<div class="box big-link">🌐 https://belgranohomeenvios.github.io/Proveedores/</div>
+No hay que instalar nada. Se abre como una página web normal.
+</div>
+
+<h2>Las 5 pestañas</h2>
+<table>
+  <tr><th>Pestaña</th><th>Para qué es</th></tr>
+  <tr><td>📊 <strong>Tablero</strong></td><td>El resumen: calidad del mes, comparación con el mes anterior, cuánto le queda en el taller a cada uno, gráficos y ranking.</td></tr>
+  <tr><td>➕ <strong>Cargar</strong></td><td>Donde anotás. Tiene dos modos: <span class="tag">📦 Pedido</span> y <span class="tag">🚚 Entrega</span>.</td></tr>
+  <tr><td>📦 <strong>Pedidos</strong></td><td>La lista de todo lo que le encargaste a cada proveedor.</td></tr>
+  <tr><td>🚚 <strong>Entregas</strong></td><td>La lista de todo lo que te trajeron.</td></tr>
+  <tr><td>👷 <strong>Proveedores</strong></td><td>Tus proveedores y su cupo semanal. Podés agregar o dar de baja.</td></tr>
+</table>
+
+<h2>Cómo se usa (paso a paso)</h2>
+
+<h3>1) Cuando le encargás muebles a un proveedor → cargá un PEDIDO</h3>
+<div class="card">
+  <div class="step"><div class="num">1</div><div>Andá a <strong>➕ Cargar</strong> y arriba elegí el modo <span class="tag">📦 Pedido</span>.</div></div>
+  <div class="step"><div class="num">2</div><div>Elegí el <strong>proveedor</strong>, poné la <strong>fecha de solicitud</strong> y la <strong>cantidad de muebles pedidos</strong>.</div></div>
+  <div class="step"><div class="num">3</div><div>Tocá <strong>Agregar pedido</strong>. Ej: le pediste <strong>10</strong> muebles a Tony.</div></div>
+</div>
+
+<h3>2) Cuando el proveedor trae los muebles → cargá una ENTREGA</h3>
+<div class="card">
+  <div class="step"><div class="num">1</div><div>En <strong>➕ Cargar</strong>, elegí el modo <span class="tag">🚚 Entrega</span>.</div></div>
+  <div class="step"><div class="num">2</div><div>Elegí el <strong>proveedor</strong> y la <strong>fecha de entrega</strong>.</div></div>
+  <div class="step"><div class="num">3</div><div>En la misma línea cargá: <strong>Total que trajo</strong>, <strong>Devueltos</strong>, <strong>Detalles chicos</strong> y <strong>Detalles grandes</strong>.</div></div>
+  <div class="step"><div class="num">4</div><div>El programa calcula solo los <strong>“Sin detalle”</strong> (los que vinieron perfectos). Tocá <strong>Agregar entrega</strong>.</div></div>
+</div>
+
+<h3>3) Mirá el resultado en el TABLERO</h3>
+<div class="card">
+Entrá a <strong>📊 Tablero</strong> y vas a ver todo automático:
+<ul>
+  <li><strong>% Sin detalle / Con detalles / Devueltos</strong> del último período, con una flecha que dice si <strong>mejoró</strong> (▲ verde) o <strong>empeoró</strong> (▼ rojo) respecto al anterior.</li>
+  <li><strong>📦 En taller:</strong> cuánto le queda por traer a cada uno. Ej: le pediste 10 a Tony y trajo 5 → <strong>le quedan 5 en el taller</strong>.</li>
+  <li>Gráficos de <strong>tendencia</strong> y un <strong>ranking</strong> de proveedores por calidad (A / B / C / D).</li>
+  <li>Arriba podés cambiar entre <strong>Semanal / Mensual</strong> y filtrar por proveedor.</li>
+</ul>
+</div>
+
+<h2>Conceptos rápidos</h2>
+<table>
+  <tr><th>Palabra</th><th>Qué significa</th></tr>
+  <tr><td><strong>Sin detalle</strong></td><td>Muebles que vinieron perfectos. Se calcula solo: <code>Total − Devueltos − Det. chicos − Det. grandes</code>.</td></tr>
+  <tr><td><strong>Detalles chicos</strong></td><td>Vienen con una falla menor (se arregla en fábrica).</td></tr>
+  <tr><td><strong>Detalles grandes</strong></td><td>Vienen con una falla importante.</td></tr>
+  <tr><td><strong>Devueltos</strong></td><td>Los que le devolviste al proveedor.</td></tr>
+  <tr><td><strong>En taller</strong></td><td>Lo que le pediste y todavía no trajo (<code>Pedido − Trajo</code>).</td></tr>
+  <tr><td><strong>Calidad A/B/C/D</strong></td><td>Nota automática según el % que vino sin detalle (A = muy bueno, D = malo).</td></tr>
+</table>
+
+<h2>⚠️ Lo más importante: el BACKUP</h2>
+<div class="warn">
+Los datos se guardan <strong>en el navegador de esta computadora</strong>. Para no perderlos nunca:
+<ul>
+  <li>Cada tanto tocá el botón <strong>⬇️ Backup</strong> (arriba a la derecha): te descarga un archivo con todos tus datos.</li>
+  <li>Guardá ese archivo en un lugar seguro (o mandátelo por mail).</li>
+  <li>Si cambiás de compu o se borra algo, tocá <strong>⬆️ Importar</strong> y subí ese archivo para recuperar todo.</li>
+</ul>
+</div>
+
+<div class="warn">
+<strong>Ojo:</strong> como los datos viven en cada navegador, <strong>abrí siempre el programa desde la misma computadora/navegador</strong>. Si lo abrís en el celular, ahí empieza vacío (son datos separados). Para pasar datos de un lado a otro: <strong>Backup</strong> en uno → <strong>Importar</strong> en el otro.
+</div>
+
+<div class="ok">
+✅ <strong>Consejo de uso diario:</strong> cargá el <strong>pedido</strong> cuando encargás, la <strong>entrega</strong> cuando llega, y revisá el <strong>Tablero</strong> una vez por semana para ver quién mejora y quién te debe muebles en el taller.
+</div>
+
+<p style="text-align:center;color:var(--muted);margin-top:30px;font-size:13px">Belgrano Home Envíos · Control de Muebles</p>
+</div>
+</body>
+</html>
