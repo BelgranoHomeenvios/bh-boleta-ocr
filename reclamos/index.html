@@ -92,6 +92,34 @@ tbody tr:hover{background:#f8fafc}
 .banner.ok{background:#16a34a}
 .spin{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp 1s linear infinite;vertical-align:-3px}
 @keyframes sp{to{transform:rotate(360deg)}}
+#compOverlay{position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:100;overflow:auto;padding:18px;display:none}
+.comp-sheet{max-width:800px;margin:0 auto;background:#fff;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.comp-toolbar{display:flex;gap:8px;justify-content:flex-end;padding:12px;position:sticky;top:0;background:#f8fafc;border-bottom:1px solid var(--line);border-radius:10px 10px 0 0}
+.doc{padding:26px 32px;color:#0f172a}
+.doc-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid var(--brand);padding-bottom:10px}
+.doc-brand{font-size:22px;font-weight:800;color:var(--brand-dark);line-height:1}
+.doc-brand small{display:block;font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.25em;margin-top:3px}
+.doc-note{font-size:11px;color:var(--muted);text-align:right;line-height:1.4}
+.doc-title{text-align:center;letter-spacing:.35em;margin:16px 0 2px;font-size:20px;font-weight:800}
+.doc-sub{text-align:center;color:var(--muted);font-size:13px;margin:0 0 16px}
+.doc-grid2{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.doc-cell{padding:8px 12px;border-bottom:1px solid var(--line)}
+.doc-cell:nth-child(odd){border-right:1px solid var(--line)}
+.doc-cell .k{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700}
+.doc-cell .v{font-size:15px;font-weight:600;min-height:20px}
+.doc-sec{margin-top:16px}
+.doc-sec h3{background:var(--brand-soft);color:var(--brand-dark);padding:6px 12px;border-radius:6px;font-size:12px;letter-spacing:.12em;margin:0 0 8px}
+.doc-box{border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-height:44px;font-size:14px;white-space:pre-wrap}
+.doc-firmas{display:grid;grid-template-columns:1fr 1fr;gap:50px;margin-top:54px}
+.doc-firma{border-top:1px solid #94a3b8;text-align:center;padding-top:6px;font-size:12px;color:var(--muted)}
+@media print{
+  body *{visibility:hidden}
+  #compOverlay,#compOverlay *{visibility:visible}
+  #compOverlay{position:absolute;inset:0;background:#fff;padding:0;display:block}
+  .comp-sheet{box-shadow:none;max-width:none;margin:0;border-radius:0}
+  .comp-toolbar{display:none!important}
+  @page{size:A4;margin:14mm}
+}
 @media(max-width:600px){.stat .value{font-size:24px}.bar-row{grid-template-columns:100px 1fr 36px}}
 </style>
 </head>
@@ -264,10 +292,12 @@ function vistaCargar(){
     <div class="error-msg" id="r_err" style="display:none"></div>
     <div class="row-actions" style="margin-top:16px">
       <button type="submit" class="btn btn-primary">${ed?'Guardar cambios':'Agregar reclamo'}</button>
+      ${ed?'<button type="button" class="btn btn-ghost" id="r_print">🧾 Comprobante</button>':''}
       ${ed?'<button type="button" class="btn btn-ghost" id="r_cancel">Cancelar</button>':''}
     </div>
     ${dl('dl_mueble',muebleVals,[])}${dl('dl_flete',fleteVals,[])}${dl('dl_prov',provVals,[])}
   </form>`;
+  if(ed)$('r_print').onclick=()=>mostrarComprobante(state.editando);
   if(ed)$('r_cancel').onclick=()=>{state.editando=null;state.tab='lista';render()};
   $('formR').onsubmit=ev=>{ev.preventDefault();const err=m=>{const el=$('r_err');el.textContent='⚠️ '+m;el.style.display='block'};
     const nombre=$('r_nombre').value.trim();
@@ -296,7 +326,7 @@ function vistaLista(){
     .filter(r=>!q||[r.nombre,r.orden,r.problema,r.mueble,r.flete,r.proveedor].some(v=>String(v||'').toLowerCase().includes(q)))
     .sort((a,b)=>a.fechaReclamo<b.fechaReclamo?1:-1);
   const rows=fil.map(r=>`<tr>
-    <td style="white-space:nowrap"><button class="act-btn" title="Editar" data-ed="${r.id}">✏️</button><button class="act-btn" title="Borrar" data-del="${r.id}">🗑️</button></td>
+    <td style="white-space:nowrap"><button class="act-btn" title="Editar" data-ed="${r.id}">✏️</button><button class="act-btn" title="Imprimir comprobante" data-print="${r.id}">🧾</button><button class="act-btn" title="Borrar" data-del="${r.id}">🗑️</button></td>
     <td><span class="badge ${estClass(r.estado)}">${esc(r.estado)}</span></td>
     <td style="white-space:nowrap">${formatFecha(r.fechaReclamo)}</td>
     <td><strong>${esc(r.nombre)||'—'}</strong></td>
@@ -317,6 +347,7 @@ function vistaLista(){
   $('lEstado').onchange=e=>{state._fEstado=e.target.value;vistaLista()};
   $('lMes').onchange=e=>{state._fMes=e.target.value;vistaLista()};
   view.querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>{state.editando=state.reclamos.find(x=>x.id===b.dataset.ed);state.tab='cargar';render()});
+  view.querySelectorAll('[data-print]').forEach(b=>b.onclick=()=>mostrarComprobante(state.reclamos.find(x=>x.id===b.dataset.print)));
   view.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const r=state.reclamos.find(x=>x.id===b.dataset.del);if(confirm('¿Borrar el reclamo de '+(r.nombre||r.orden||'')+'?')){setReclamos(state.reclamos.filter(x=>x.id!==b.dataset.del));supaDeleteReclamo(b.dataset.del).catch(avisoError);vistaLista()}});
 }
 
@@ -394,6 +425,47 @@ function vistaConfig(){
     const c={...state.config};c[k]=[...c[k],val];setConfig(c);supaUpsertConfig(c).catch(avisoError);vistaConfig()});
   view.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const [k,i]=b.dataset.del.split('|');if(!confirm('¿Borrar "'+state.config[k][+i]+'" de la lista?'))return;const c={...state.config};c[k]=c[k].filter((_,idx)=>idx!==+i);setConfig(c);supaUpsertConfig(c).catch(avisoError);vistaConfig()});
   view.querySelectorAll('[data-ren]').forEach(b=>b.onclick=()=>{const [k,i]=b.dataset.ren.split('|');const cur=state.config[k][+i];const nv=(prompt('Editar opción:',cur)||'').trim();if(!nv||nv===cur)return;const c={...state.config};c[k]=c[k].map((x,idx)=>idx===+i?nv:x);setConfig(c);supaUpsertConfig(c).catch(avisoError);vistaConfig()});
+}
+
+// ---------- Comprobante imprimible ----------
+function comprobanteHTML(r){
+  const cell=(k,v)=>`<div class="doc-cell"><div class="k">${k}</div><div class="v">${esc(v)||'—'}</div></div>`;
+  const costo=r.costoCat?(esc(r.costoCat)+((r.costoMonto!==''&&r.costoMonto!=null)?(' · $'+Number(r.costoMonto).toLocaleString('es-AR')):'')):'';
+  return `<div class="doc">
+    <div class="doc-head"><div class="doc-brand">Belgrano Home<small>ENVÍOS</small></div>
+      <div class="doc-note">Uso interno<br>Documento no válido como factura</div></div>
+    <div class="doc-title">R E C L A M O</div>
+    <div class="doc-sub">Estado: <b>${esc(r.estado)}</b></div>
+    <div class="doc-grid2">
+      ${cell('Fecha del reclamo',formatFecha(r.fechaReclamo))}
+      ${cell('N° de orden',r.orden)}
+      ${cell('Cliente',r.nombre)}
+      ${cell('Celular',r.celular)}
+      ${cell('Producto / Mueble',r.mueble)}
+      ${cell('Fecha de entrega',r.fechaEntrega?formatFecha(r.fechaEntrega):'')}
+      ${cell('Chofer / Flete',r.flete)}
+      ${cell('Proveedor',r.proveedor)}
+    </div>
+    <div class="doc-sec"><h3>DETALLES DEL PROBLEMA</h3><div class="doc-box">${esc(r.problema)||'—'}</div></div>
+    <div class="doc-sec"><h3>RESOLUCIÓN</h3><div class="doc-grid2">
+      ${cell('Responsable del problema',r.respProblema)}
+      ${cell('Tipo de solución',r.tipoSolucion)}
+      ${cell('Responsable de la solución',r.respSolucion)}
+      ${cell('Costo de la solución',costo)}
+    </div></div>
+    ${r.observaciones?`<div class="doc-sec"><h3>OBSERVACIONES</h3><div class="doc-box">${esc(r.observaciones)}</div></div>`:''}
+    <div class="doc-firmas"><div class="doc-firma">Firma cliente</div><div class="doc-firma">Firma responsable</div></div>
+  </div>`;
+}
+function mostrarComprobante(r){
+  if(!r)return;
+  let o=document.getElementById('compOverlay');if(!o){o=document.createElement('div');o.id='compOverlay';document.body.appendChild(o)}
+  o.innerHTML=`<div class="comp-sheet"><div class="comp-toolbar no-print">
+    <button class="btn btn-primary btn-sm" id="comp_print">🖨️ Imprimir / Guardar PDF</button>
+    <button class="btn btn-ghost btn-sm" id="comp_close">Cerrar</button></div>${comprobanteHTML(r)}</div>`;
+  o.style.display='block';
+  document.getElementById('comp_print').onclick=()=>window.print();
+  document.getElementById('comp_close').onclick=()=>{o.style.display='none'};
 }
 
 // ---------- Backup ----------
