@@ -213,6 +213,7 @@ async function entrarApp(){
     if(config){state.config=config;write(K_CFG,config)}else{await supaUpsertConfig(state.config)}
     ocultarBanner();
   }catch(e){state.reclamos=getReclamos();avisoError(e)}
+  await asignarNumerosFaltantes();
   const {data:{user}}=await db.auth.getUser();
   document.getElementById('userEmail').textContent='👤 '+(user?user.email:'');
   document.getElementById('topActions').style.display='flex';
@@ -235,6 +236,16 @@ function nombreMes(c){if(!c)return'';const a=c.split('-').map(Number);return MES
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 function abierto(r){return r.estado!=='CERRADO'}
 function countBy(arr,fn){const m=new Map();for(const r of arr){let v=fn(r);if(v==null||String(v).trim()==='')continue;v=String(v).trim();m.set(v,(m.get(v)||0)+1)}return [...m.entries()].map(([label,n])=>({label,n})).sort((a,b)=>b.n-a.n)}
+function nextNum(){let m=0;for(const r of state.reclamos){const n=+r.num||0;if(n>m)m=n}return m+1}
+async function asignarNumerosFaltantes(){
+  const sinNum=state.reclamos.filter(r=>!(+r.num>0));
+  if(!sinNum.length)return;
+  let max=state.reclamos.reduce((a,r)=>Math.max(a,+r.num||0),0);
+  sinNum.sort((a,b)=>{const fa=a.fechaReclamo||'',fb=b.fechaReclamo||'';return fa<fb?-1:fa>fb?1:(a.id<b.id?-1:1)});
+  for(const r of sinNum)r.num=++max;
+  write(K_REC,state.reclamos);
+  try{await supaUpsertMany(sinNum,null)}catch(e){avisoError(e)}
+}
 
 const state={tab:'tablero',reclamos:getReclamos(),config:getConfig(),editando:null,_q:'',_fEstado:'',_fMes:''};
 const TABS=[['tablero','📊 Tablero'],['cargar','➕ Cargar reclamo'],['lista','📋 Reclamos'],['config','⚙️ Configuración']];
@@ -305,6 +316,7 @@ function vistaCargar(){
     if(!nombre && !$('r_orden').value.trim())return err('Cargá al menos el nombre o el N° de orden.');
     const reg={
       id:(state.editando&&state.editando.id)||nuevoId('rec'),
+      num:(state.editando&&state.editando.num)||nextNum(),
       estado:$('r_estado').value, fechaReclamo:$('r_fecha').value, nombre, celular:$('r_cel').value.trim(),
       orden:$('r_orden').value.trim(), mueble:$('r_mueble').value.trim(), fechaEntrega:$('r_fent').value||'',
       flete:$('r_flete').value.trim(), proveedor:$('r_prov').value.trim(), problema:$('r_problema').value.trim(),
@@ -323,10 +335,11 @@ function vistaLista(){
   const fil=state.reclamos
     .filter(r=>{if(!state._fEstado)return true;if(state._fEstado==='__SINCERRAR__')return r.estado!=='CERRADO';return r.estado===state._fEstado})
     .filter(r=>!state._fMes||claveMes(r.fechaReclamo)===state._fMes)
-    .filter(r=>!q||[r.nombre,r.orden,r.problema,r.mueble,r.flete,r.proveedor].some(v=>String(v||'').toLowerCase().includes(q)))
+    .filter(r=>{if(!q)return true;if(q[0]==='#')return String(r.num||'')===q.slice(1).trim();return [r.num,r.nombre,r.orden,r.problema,r.mueble,r.flete,r.proveedor].some(v=>String(v||'').toLowerCase().includes(q))})
     .sort((a,b)=>a.fechaReclamo<b.fechaReclamo?1:-1);
   const rows=fil.map(r=>`<tr>
     <td style="white-space:nowrap"><button class="act-btn" title="Editar" data-ed="${r.id}">✏️</button><button class="act-btn" title="Imprimir comprobante" data-print="${r.id}">🧾</button><button class="act-btn" title="Borrar" data-del="${r.id}">🗑️</button></td>
+    <td><strong>${r.num?'#'+r.num:'—'}</strong></td>
     <td><span class="badge ${estClass(r.estado)}">${esc(r.estado)}</span></td>
     <td style="white-space:nowrap">${formatFecha(r.fechaReclamo)}</td>
     <td><strong>${esc(r.nombre)||'—'}</strong></td>
@@ -341,7 +354,7 @@ function vistaLista(){
       <label class="field">Mes<select id="lMes"><option value="">Todos</option>${meses.map(m=>`<option value="${m}" ${state._fMes===m?'selected':''}>${nombreMes(m)}</option>`).join('')}</select></label>
     </div>
     ${fil.length===0?`<div class="empty"><div class="big">📣</div>${state.reclamos.length===0?'Todavía no cargaste reclamos.':'No hay reclamos con esos filtros.'}</div>`:
-    `<div class="table-wrap"><table class="compact"><thead><tr><th></th><th>Estado</th><th>Fecha</th><th>Cliente</th><th>Orden</th><th>Mueble</th><th>Problema</th></tr></thead><tbody>${rows}</tbody></table></div>`}
+    `<div class="table-wrap"><table class="compact"><thead><tr><th></th><th>N°</th><th>Estado</th><th>Fecha</th><th>Cliente</th><th>Orden</th><th>Mueble</th><th>Problema</th></tr></thead><tbody>${rows}</tbody></table></div>`}
   </div>`;
   const lq=$('lq');lq.oninput=()=>{state._q=lq.value;const p=lq.selectionStart;vistaLista();const n=$('lq');n.focus();n.setSelectionRange(p,p)};
   $('lEstado').onchange=e=>{state._fEstado=e.target.value;vistaLista()};
@@ -435,7 +448,7 @@ function comprobanteHTML(r){
     <div class="doc-head"><div class="doc-brand">Belgrano Home<small>ENVÍOS</small></div>
       <div class="doc-note">Uso interno<br>Documento no válido como factura</div></div>
     <div class="doc-title">R E C L A M O</div>
-    <div class="doc-sub">Estado: <b>${esc(r.estado)}</b></div>
+    <div class="doc-sub">N° de reclamo <b>${r.num?'#'+r.num:'—'}</b> · Estado: <b>${esc(r.estado)}</b></div>
     <div class="doc-grid2">
       ${cell('Fecha del reclamo',formatFecha(r.fechaReclamo))}
       ${cell('N° de orden',r.orden)}
