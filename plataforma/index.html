@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Belgrano Home · Gestión</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%2316324f'/><text x='50' y='66' text-anchor='middle' font-size='44' font-weight='700' fill='white' font-family='sans-serif'>BH</text></svg>" />
+<style>
+/* ===== Sistema de diseño compartido (igual que CRM y Logística) ===== */
+:root{--navy:#16324f;--ink:#0f1a2a;--blue:#1e5fce;--blue-d:#1a51b0;--muted:#8a94a3;--sec:#5b6675;--line:#d9e0e8;--line2:#eef1f5;--bg:#f4f6f8;--card:#fff;--shadow:0 1px 2px rgba(15,26,42,.06),0 1px 3px rgba(15,26,42,.04)}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:'Public Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;display:flex;flex-direction:column}
+
+/* ===== Cabecera común de la plataforma ===== */
+.app-header{background:var(--navy);color:#fff;height:56px;padding:0 20px;display:flex;align-items:center;justify-content:space-between;flex:0 0 auto}
+.app-header .brand{display:flex;align-items:center;gap:12px}
+.app-header .logo{width:30px;height:30px;border-radius:6px;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
+.app-header .title{font-weight:700;font-size:15px;letter-spacing:-.01em}
+.app-header .title small{display:block;font-size:10.5px;font-weight:600;opacity:.7;letter-spacing:.04em;text-transform:uppercase}
+.app-nav{display:flex;gap:4px;margin-left:8px}
+.app-nav button{background:transparent;border:none;color:rgba(255,255,255,.75);font:inherit;font-size:13.5px;font-weight:600;padding:8px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+.app-nav button:hover{background:rgba(255,255,255,.10);color:#fff}
+.app-nav button.on{background:rgba(255,255,255,.16);color:#fff;font-weight:700}
+.app-nav button svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.app-user{display:flex;align-items:center;gap:12px}
+.app-user .who{text-align:right;line-height:1.2}
+.app-user .who b{font-size:13px;font-weight:700}
+.app-user .who small{display:block;font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.03em}
+.app-user .avatar{width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+.btn-logout{background:rgba(255,255,255,.15);color:#fff;border:none;font:inherit;font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:7px;cursor:pointer}
+.btn-logout:hover{background:rgba(255,255,255,.28)}
+
+/* ===== Zona de módulos (iframes) ===== */
+#moduleHost{flex:1 1 auto;position:relative;min-height:0}
+#moduleHost iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
+#moduleHost iframe.hidden{display:none}
+
+/* ===== Login ===== */
+#loginWrap{flex:1;display:flex;align-items:center;justify-content:center;background:#eef1f5;padding:20px}
+.login-card{background:#fff;border-radius:16px;box-shadow:0 10px 40px rgba(15,26,42,.12);padding:36px 34px;width:100%;max-width:380px;text-align:center}
+.login-logo{width:52px;height:52px;background:var(--navy);color:#fff;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;margin:0 auto 16px}
+.login-card h1{font-size:19px;color:var(--navy);margin:0 0 4px}
+.login-sub{color:#5b6675;font-size:13.5px;margin:0 0 22px}
+.login-lbl{display:block;text-align:left;font-size:12.5px;font-weight:700;color:#3a4453;margin:12px 0 5px}
+.login-card input{width:100%;height:44px;padding:0 12px;border:1px solid #d0d7e2;border-radius:9px;font:inherit;font-size:15px}
+.login-card input:focus{outline:none;border-color:var(--navy);box-shadow:0 0 0 3px rgba(22,50,79,.1)}
+.login-btn{width:100%;height:46px;margin-top:20px;background:var(--navy);color:#fff;border:none;border-radius:9px;font:inherit;font-size:15px;font-weight:700;cursor:pointer}
+.login-btn:hover{background:#1e3f5f}
+.login-btn:disabled{opacity:.7;cursor:default}
+.login-err{background:#fdecea;color:#b42318;font-size:13px;border-radius:8px;padding:9px 12px;margin-bottom:8px;text-align:left;display:none}
+.login-foot{color:#8a94a3;font-size:12px;margin:18px 0 0}
+
+/* Cartel de carga */
+.loading{flex:1;display:flex;align-items:center;justify-content:center;color:var(--sec);font-size:14px;font-weight:600}
+
+@media(max-width:640px){
+  .app-header{padding:0 12px}
+  .app-header .title small{display:none}
+  .app-nav button{padding:8px 10px}
+  .app-nav button .lbl{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- Se muestra mientras verificamos la sesión -->
+<div id="boot" class="loading">Cargando Belgrano Home…</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+"use strict";
+
+/* ============================================================
+   BELGRANO HOME · Plataforma de Gestión — Cascarón (Etapa 1)
+   ------------------------------------------------------------
+   Responsabilidad ÚNICA de este archivo:
+     1) Autenticación (login único con Supabase)
+     2) Navegación superior común (CRM / Logística / …)
+     3) Alojar cada módulo en su propio iframe (aislado)
+
+   NO contiene lógica de negocio. Cada módulo vive en
+   /modules/<nombre>/index.html y sigue siendo independiente.
+   ============================================================ */
+
+/* Reutilizamos el MISMO proyecto Supabase que ya usa Logística,
+   así el login es único: al entrar acá, el módulo de Logística
+   comparte la sesión automáticamente y no vuelve a pedir clave. */
+const SB_URL='https://iwrgivmqvzalzbfsnxvv.supabase.co';
+const SB_KEY='sb_publishable_700uBDWuIvX4swFDi5WXuw_iKEIbCzq';
+let sb=null;
+try{
+  sb=window.supabase.createClient(SB_URL,SB_KEY,{
+    auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+  });
+}catch(e){ console.error('No se pudo iniciar Supabase',e); }
+
+/* ---- Catálogo de módulos disponibles en la plataforma ---- */
+const MODULOS={
+  crm:{
+    nombre:'CRM',
+    src:'modules/crm/index.html',
+    icon:'<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>'
+  },
+  logistica:{
+    nombre:'Logística',
+    src:'modules/logistica/index.html',
+    icon:'<svg viewBox="0 0 24 24"><path d="M1 3h15v13H1zM16 8h4l3 3v5h-7"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>'
+  }
+};
+
+/* ---- Qué módulos ve cada rol ----
+   El ORDEN define cuál abre primero. Los permisos finos (qué puede
+   tocar dentro de cada módulo) los sigue resolviendo cada módulo por
+   su cuenta según el rol; acá sólo decidimos qué pestañas mostrar. */
+const ACCESO={
+  admin:     ['crm','logistica'],
+  direccion: ['crm','logistica'],
+  jony:      ['crm','logistica'],
+  vendedor:  ['crm','logistica'],   // Logística la ve en modo consulta
+  auditora:  ['crm','logistica'],
+  logistica: ['logistica','crm'],   // CRM en modo consulta
+  soporte:   ['logistica'],
+  deposito:  ['logistica'],
+  flete:     ['logistica']
+};
+const ACCESO_DEFAULT=['crm','logistica']; // rol desconocido: mostramos todo (permisivo en demo)
+
+let usuario=null;      // {email, nombre, rol}
+let moduloActivo=null; // clave del módulo visible
+const iframesCargados={}; // clave -> true (para no recargar al volver)
+
+/* ===================== Arranque ===================== */
+(async function init(){
+  if(!sb){ pantallaLogin('No hay conexión con el servidor. Revisá tu internet.'); return; }
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    if(session&&session.user){ await entrar(session.user); }
+    else{ pantallaLogin(); }
+  }catch(e){ console.error(e); pantallaLogin('No se pudo verificar la sesión. Probá de nuevo.'); }
+})();
+
+/* ===================== Login ===================== */
+function pantallaLogin(msgError){
+  document.body.innerHTML=`
+    <div id="loginWrap">
+      <div class="login-card">
+        <div class="login-logo">BH</div>
+        <h1>Belgrano Home</h1>
+        <p class="login-sub">Plataforma de gestión. Ingresá con tu cuenta.</p>
+        <div id="lg_err" class="login-err" style="${msgError?'display:block':''}">${msgError?esc(msgError):''}</div>
+        <label class="login-lbl">Email</label>
+        <input id="lg_email" type="email" autocomplete="username" placeholder="tucuenta@gmail.com">
+        <label class="login-lbl">Contraseña</label>
+        <input id="lg_pass" type="password" autocomplete="current-password" placeholder="Tu contraseña">
+        <button id="lg_btn" class="login-btn">Entrar</button>
+        <p class="login-foot">¿No podés entrar? Escribile a Brian para que revise tu usuario.</p>
+      </div>
+    </div>`;
+  const email=document.getElementById('lg_email');
+  const pass=document.getElementById('lg_pass');
+  const btn=document.getElementById('lg_btn');
+  btn.addEventListener('click',hacerLogin);
+  email.addEventListener('keydown',e=>{if(e.key==='Enter')pass.focus();});
+  pass.addEventListener('keydown',e=>{if(e.key==='Enter')hacerLogin();});
+}
+
+async function hacerLogin(){
+  const email=(document.getElementById('lg_email').value||'').trim().toLowerCase();
+  const pass=document.getElementById('lg_pass').value||'';
+  const btn=document.getElementById('lg_btn');
+  const err=document.getElementById('lg_err');
+  if(!email||!pass){ mostrarErr(err,'Escribí tu email y tu contraseña.'); return; }
+  btn.disabled=true; btn.textContent='Entrando…'; err.style.display='none';
+  try{
+    const {data,error}=await sb.auth.signInWithPassword({email,password:pass});
+    if(error){ mostrarErr(err,'Email o contraseña incorrectos.'); btn.disabled=false; btn.textContent='Entrar'; return; }
+    await entrar(data.user);
+  }catch(e){ console.error(e); mostrarErr(err,'No se pudo conectar. Probá de nuevo.'); btn.disabled=false; btn.textContent='Entrar'; }
+}
+function mostrarErr(el,msg){ el.textContent=msg; el.style.display='block'; }
+
+/* ===================== Entrar (ya autenticado) ===================== */
+async function entrar(user){
+  const email=(user.email||'').toLowerCase();
+  let rol=null, nombre=email;
+  try{
+    const {data}=await sb.from('usuarios_roles').select('rol,nombre').eq('email',email).maybeSingle();
+    if(data){ rol=data.rol; nombre=data.nombre||email; }
+  }catch(e){ console.warn('No se pudo leer el rol',e); }
+  usuario={email,nombre,rol};
+  construirApp();
+}
+
+/* ===================== Interfaz principal ===================== */
+function construirApp(){
+  const permitidos=(ACCESO[usuario.rol]||ACCESO_DEFAULT).filter(k=>MODULOS[k]);
+  const iniciales=(usuario.nombre||'?').trim().slice(0,2).toUpperCase();
+
+  document.body.innerHTML=`
+    <header class="app-header">
+      <div class="brand">
+        <div class="logo">BH</div>
+        <div class="title">Belgrano Home<small>Gestión</small></div>
+        <nav class="app-nav" id="appNav">
+          ${permitidos.map(k=>`
+            <button data-mod="${k}" onclick="abrirModulo('${k}')">
+              ${MODULOS[k].icon}<span class="lbl">${esc(MODULOS[k].nombre)}</span>
+            </button>`).join('')}
+        </nav>
+      </div>
+      <div class="app-user">
+        <div class="who"><b>${esc(usuario.nombre)}</b><small>${esc(usuario.rol||'sin rol')}</small></div>
+        <div class="avatar">${esc(iniciales)}</div>
+        <button class="btn-logout" onclick="cerrarSesion()">Salir</button>
+      </div>
+    </header>
+    <div id="moduleHost"></div>`;
+
+  // Abrimos el primer módulo permitido
+  if(permitidos.length){ abrirModulo(permitidos[0]); }
+  else{
+    document.getElementById('moduleHost').innerHTML=
+      '<div class="loading">Tu usuario no tiene módulos asignados. Avisale a Brian.</div>';
+  }
+}
+
+/* Muestra un módulo. Lo carga una sola vez (iframe) y luego sólo lo
+   muestra/oculta, así no se pierde el estado al cambiar de pestaña. */
+window.abrirModulo=function(clave){
+  if(!MODULOS[clave]) return;
+  moduloActivo=clave;
+  const host=document.getElementById('moduleHost');
+
+  if(!iframesCargados[clave]){
+    const fr=document.createElement('iframe');
+    fr.id='if_'+clave;
+    fr.src=MODULOS[clave].src;
+    fr.title=MODULOS[clave].nombre;
+    fr.setAttribute('allow','clipboard-write; geolocation');
+    host.appendChild(fr);
+    iframesCargados[clave]=true;
+  }
+
+  // Mostrar el activo, ocultar el resto
+  Array.from(host.querySelectorAll('iframe')).forEach(fr=>{
+    fr.classList.toggle('hidden', fr.id!=='if_'+clave);
+  });
+  // Marcar la pestaña activa
+  document.querySelectorAll('#appNav button').forEach(b=>{
+    b.classList.toggle('on', b.getAttribute('data-mod')===clave);
+  });
+};
+
+window.cerrarSesion=async function(){
+  try{ await sb.auth.signOut(); }catch(e){}
+  location.reload();
+};
+
+/* ---- utilidades ---- */
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+</script>
+</body>
+</html>
