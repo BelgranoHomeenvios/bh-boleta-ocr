@@ -214,6 +214,26 @@ function construirApp(){
     document.getElementById('moduleHost').innerHTML=
       '<div class="loading">Tu usuario no tiene módulos asignados. Avisale a Brian.</div>';
   }
+  iniciarPolish();
+}
+
+/* Mantiene escondida la barra propia de cada módulo aunque el módulo la
+   vuelva a mostrar tras su propio login (mismo patrón que el CRM usa por
+   dentro). Es presentación pura: no modifica el código del módulo. */
+let _polishOn=false;
+function iniciarPolish(){
+  if(_polishOn) return; _polishOn=true;
+  setInterval(()=>{
+    Object.keys(MODULOS).forEach(clave=>{
+      const fr=document.getElementById('if_'+clave);
+      if(!fr) return;
+      try{
+        const d=fr.contentDocument; if(!d) return;
+        const hdr=d.querySelector('.app-header'); if(hdr) hdr.style.setProperty('display','none','important');
+        if(clave==='crm'){ const mis=d.querySelector('.tabs .tab[data-tab="cola"]'); if(mis) mis.style.setProperty('display','none','important'); }
+      }catch(e){/* si el navegador lo bloquea, el módulo se ve con su barra */}
+    });
+  },500);
 }
 
 /* Muestra un módulo. Lo carga una sola vez (iframe) y luego sólo lo
