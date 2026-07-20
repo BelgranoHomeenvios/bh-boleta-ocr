@@ -105,7 +105,11 @@ const MODULOS={
   },
   logistica:{
     nombre:'Logística',
-    src:'modules/logistica/index.html',
+    /* Apunta a la Logística EN VIVO (GitHub Pages). Al estar en el mismo
+       dominio belgranohomeenvios.github.io que Be Soft, comparte la sesión de
+       Supabase (un solo login) y siempre muestra la versión actual de Lucas.
+       La copia local en modules/logistica/ queda solo como respaldo. */
+    src:'https://belgranohomeenvios.github.io/logistica/',
     icon:'<svg viewBox="0 0 24 24"><path d="M1 3h15v13H1zM16 8h4l3 3v5h-7"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>',
     hideCss:'.app-header{display:none!important}'
   }
