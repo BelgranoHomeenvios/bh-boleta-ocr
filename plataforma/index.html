@@ -253,8 +253,9 @@ window.abrirModulo=function(clave){
     fr.src=MODULOS[clave].src;
     fr.title=MODULOS[clave].nombre;
     fr.setAttribute('allow','clipboard-write; geolocation');
-    // Al terminar de cargar, escondemos la barra propia del módulo.
-    fr.addEventListener('load',()=>inyectarOverride(fr,MODULOS[clave].hideCss));
+    // Al terminar de cargar: escondemos su barra propia y, en el CRM,
+    // lo entramos automáticamente con el usuario de Be Soft.
+    fr.addEventListener('load',()=>{ inyectarOverride(fr,MODULOS[clave].hideCss); if(clave==='crm') autoEntrarCRM(fr); });
     host.appendChild(fr);
     iframesCargados[clave]=true;
   }
@@ -278,6 +279,40 @@ function inyectarOverride(iframe,css){
     if(!st){ st=doc.createElement('style'); st.id='__besoft_override'; doc.head.appendChild(st); }
     st.textContent=css;
   }catch(e){ /* si el navegador lo bloquea, el módulo se ve igual, solo con su barra */ }
+}
+
+/* Entra al CRM con el usuario ya logueado en Be Soft (sin volver a pedir
+   "elegí tu usuario"). Si el nombre coincide con un usuario del CRM, clickea
+   su tarjeta; y si es dirección/admin, abre "Panel de dirección". Best-effort:
+   si no hay coincidencia, el CRM muestra su propia lista como antes. */
+function autoEntrarCRM(fr){
+  if(!usuario||!usuario.nombre) return;
+  const nombre=usuario.nombre.trim().toLowerCase();
+  const esDir=['admin','direccion','jony'].includes(usuario.rol);
+  let tries=0;
+  (function go(){
+    try{
+      const d=fr.contentDocument;
+      if(d){
+        const sl=d.getElementById('screen-login');
+        const enLogin=sl && getComputedStyle(sl).display!=='none';
+        if(enLogin){
+          const cards=[].slice.call(d.querySelectorAll('.ucard'));
+          const card=cards.filter(c=>(c.textContent||'').trim().toLowerCase().indexOf(nombre)===0)[0];
+          if(card){ card.click(); }         // entra como ese usuario
+          else if(tries>8){ return; }       // no hay coincidencia: dejar su lista
+        }else{
+          // Ya adentro. Para dirección/admin, abrir Panel de dirección.
+          if(esDir){
+            const tab=[].slice.call(d.querySelectorAll('.tabs .tab')).filter(t=>/direcci/i.test(t.textContent))[0];
+            if(tab && !tab.classList.contains('active')){ tab.click(); }
+          }
+          return;
+        }
+      }
+    }catch(e){}
+    if(tries++<40) setTimeout(go,250);
+  })();
 }
 
 window.cerrarSesion=async function(){
