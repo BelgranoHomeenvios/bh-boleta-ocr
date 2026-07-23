@@ -111,9 +111,14 @@ const MODULOS={
        La copia local en modules/logistica/ queda solo como respaldo. */
     src:'https://belgranohomeenvios.github.io/logistica/',
     icon:'<svg viewBox="0 0 24 24"><path d="M1 3h15v13H1zM16 8h4l3 3v5h-7"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>',
-    hideCss:'.app-header{display:none!important}'
+    /* Escondemos su barra propia Y la barra "Modo admin · ver como"; el
+       control "ver como" lo replicamos arriba, en la fila de módulos. */
+    hideCss:'.app-header{display:none!important}.demobar{display:none!important}'
   }
 };
+
+/* Opciones del "Ver como" (mismas que la barra admin de Logística). */
+const VER_COMO=[['admin','Admin (vos)'],['direccion','Dirección'],['logistica','Logística (Lucas)'],['soporte','Soporte'],['deposito','Depósito'],['flete','Flete'],['vendedor','Vendedor']];
 
 /* ---- Qué módulos ve cada rol ---- */
 const ACCESO={
@@ -210,6 +215,12 @@ function construirApp(){
         <button data-mod="${k}" onclick="abrirModulo('${k}')">
           ${MODULOS[k].icon}<span>${esc(MODULOS[k].nombre)}</span>
         </button>`).join('')}
+      <label id="verComoWrap" style="display:none;margin-left:auto;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:var(--sec);padding-right:4px">
+        Ver como:
+        <select id="verComo" onchange="verComoCambio(this.value)" style="font:inherit;font-weight:700;padding:5px 8px;border-radius:7px;border:1px solid var(--line);color:var(--navy)">
+          ${VER_COMO.map(o=>`<option value="${o[0]}">${o[1]}</option>`).join('')}
+        </select>
+      </label>
     </nav>
     <div id="moduleHost"></div>`;
 
@@ -266,6 +277,21 @@ window.abrirModulo=function(clave){
   document.querySelectorAll('#appNav button').forEach(b=>{
     b.classList.toggle('on', b.getAttribute('data-mod')===clave);
   });
+  // "Ver como" solo para admin y solo en Logística (por ahora)
+  const vcw=document.getElementById('verComoWrap');
+  if(vcw) vcw.style.display=(clave==='logistica' && usuario && usuario.rol==='admin')?'inline-flex':'none';
+};
+
+/* Cambia la vista de Logística "como" otro rol, manejando su propio selector
+   interno (así reutilizamos su lógica sin tocar el módulo). */
+window.verComoCambio=function(valor){
+  const fr=document.getElementById('if_logistica');
+  if(!fr) return;
+  try{
+    const d=fr.contentDocument; if(!d) return;
+    const sel=d.getElementById('roleSel');
+    if(sel){ sel.value=valor; sel.dispatchEvent(new Event('change',{bubbles:true})); }
+  }catch(e){}
 };
 
 /* Inyecta un <style> dentro del iframe para esconder su encabezado
