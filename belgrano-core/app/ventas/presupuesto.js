@@ -41,12 +41,12 @@
       return !!(String(c.telefono).trim() || String(c.email).trim() || String(c.instagram).trim());
     },
 
-    render() {
-      const v = document.getElementById('view');
+    render(mount = 'view') {
+      const v = document.getElementById(mount);
       v.innerHTML = `
         <div class="row" style="margin-bottom:12px;align-items:flex-start">
           <div>
-            <div class="kick">Presupuestos</div>
+            <div class="kick">Ventas</div>
             <h1 class="h-title">Nueva cotización</h1>
           </div>
           <div class="sp"></div>

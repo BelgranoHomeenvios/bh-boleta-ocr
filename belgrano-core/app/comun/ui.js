@@ -30,6 +30,18 @@
       return `<div class="empty"><span class="spin"></span> ${UI.esc(txt)}</div>`;
     },
     vacio(txt) { return `<div class="empty">${UI.esc(txt)}</div>`; },
+    // Pill de estado a partir de un mapa {label, pill}.
+    estado(mapa, clave) {
+      const e = mapa?.[clave] || { label: clave || '—', pill: 'soft' };
+      return `<span class="pill ${e.pill}">${UI.esc(e.label)}</span>`;
+    },
+    // Cabecera de módulo: kick + título + subtítulo, con acciones a la derecha.
+    head(kick, titulo, sub, acciones = '') {
+      return `<div class="row" style="margin-bottom:16px;align-items:flex-start">
+        <div><div class="kick">${UI.esc(kick)}</div><h1 class="h-title">${UI.esc(titulo)}</h1>
+          ${sub ? `<div class="h-sub">${UI.esc(sub)}</div>` : ''}</div>
+        <div class="sp"></div>${acciones}</div>`;
+    },
     // Toast simple.
     aviso(txt, tipo = 'info') {
       let t = document.getElementById('_toast');

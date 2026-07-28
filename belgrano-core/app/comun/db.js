@@ -63,19 +63,43 @@
     ],
     // Órdenes de venta de ejemplo (para ver la vista antes de conectar).
     ordenes: [
-      { id: 2, numero: 'S00002', fecha: '2026-06-01', cliente: 'Abigail Galfre',   vendedor: 'Brian Singer', local: 'Belgrano 2020', total: 968000,   estado: 'facturada' },
-      { id: 1, numero: 'S00001', fecha: '2026-06-01', cliente: 'Abel Schoenmaker',  vendedor: 'Cristian',     local: 'Belgrano 2020', total: 1028500,  estado: 'por_facturar' },
-      { id: 3, numero: 'S00003', fecha: '2026-07-24', cliente: 'Bibiana',           vendedor: 'Ale',          local: 'Belgrano 2020', total: 516000,   estado: 'confirmada' },
+      { id: 2, numero: 'S00002', fecha: '2026-06-01', cliente: 'Abigail Galfre',   vendedor: 'Brian',    local: '2020', total: 968000,  estado: 'entregado' },
+      { id: 1, numero: 'S00001', fecha: '2026-06-01', cliente: 'Abel Schoenmaker',  vendedor: 'Cristian', local: '2020', total: 1028500, estado: 'produccion' },
+      { id: 3, numero: 'S00003', fecha: '2026-07-24', cliente: 'Bibiana',           vendedor: 'Ale',      local: '2020', total: 516000,  estado: 'confirmar' },
+      { id: 4, numero: 'S00004', fecha: '2026-07-26', cliente: 'Laura y Hernán',    vendedor: 'Cristian', local: '2299', total: 731250,  estado: 'logistica' },
+      { id: 5, numero: 'S00005', fecha: '2026-07-27', cliente: 'Diego',             vendedor: 'Sergio',   local: '2299', total: 733000,  estado: 'anulado' },
+    ],
+    // Cotizaciones de ejemplo.
+    cotizaciones: [
+      { id: 10, numero: 'C-4142', fecha: '2026-07-28', cliente: 'Paloma',          vendedor: 'Ale',      local: '2020', total: 490000, estado: 'borrador' },
+      { id: 11, numero: 'C-4141', fecha: '2026-07-27', cliente: 'Camila',          vendedor: 'Ale',      local: '2299', total: 425750, estado: 'aceptada' },
+      { id: 12, numero: 'C-4140', fecha: '2026-07-25', cliente: 'Jona',            vendedor: 'Nati',     local: '2020', total: 633700, estado: 'rechazada' },
+    ],
+    // Clientes de ejemplo (una fila por teléfono, como el CRM).
+    clientes: [
+      { id: 1, nombre: 'Bibiana',        telefono: '1161636645',    vendedor: 'Ale',      consultas: 2, concret: 2, seguim: 0, comprado: 1691700, ultima: 'Ayer' },
+      { id: 2, nombre: 'Victoria',       telefono: '5491168145568', vendedor: 'Ale',      consultas: 1, concret: 1, seguim: 0, comprado: 1520000, ultima: 'Hace 6 días' },
+      { id: 3, nombre: 'Liliana y Javier', telefono: '1151099144',  vendedor: 'Cristian', consultas: 1, concret: 1, seguim: 0, comprado: 1335750, ultima: 'Hace 2 días' },
+      { id: 4, nombre: 'Diego',          telefono: '5491131554640', vendedor: 'Cristian', consultas: 1, concret: 1, seguim: 0, comprado: 733000,  ultima: 'Hace 9 días' },
+      { id: 5, nombre: 'Paloma',         telefono: '5491141715700', vendedor: 'Ale',      consultas: 1, concret: 0, seguim: 1, comprado: 0,       ultima: 'Hoy' },
     ],
   };
 
-  // Estados de la orden → etiqueta y color del pill.
+  // Estados de la orden → etiqueta y color del pill (según el ciclo real).
   const ESTADO_ORDEN = {
-    presupuesto:  { label: 'Presupuesto',           pill: 'soft' },
-    confirmada:   { label: 'Confirmada',            pill: 'info' },
-    por_facturar: { label: 'Por facturar',          pill: 'warn' },
-    facturada:    { label: 'Facturado por completo', pill: 'ok' },
-    anulada:      { label: 'Anulada',               pill: 'crit' },
+    confirmar:   { label: 'Confirmar',   pill: 'warn' },
+    produccion:  { label: 'Producción',  pill: 'info' },
+    logistica:   { label: 'Logística',   pill: 'info' },
+    entregado:   { label: 'Entregado',   pill: 'ok' },
+    archivado:   { label: 'Archivado',   pill: 'soft' },
+    anulado:     { label: 'Anulado',     pill: 'crit' },
+    reclamo:     { label: 'Reclamo',     pill: 'crit' },
+  };
+  const ESTADO_COTIZ = {
+    borrador:  { label: 'Borrador',  pill: 'soft' },
+    aceptada:  { label: 'Aceptada',  pill: 'ok' },
+    rechazada: { label: 'Rechazada', pill: 'crit' },
+    vencida:   { label: 'Vencida',   pill: 'warn' },
   };
 
   // ---- API que usan los módulos ---------------------------------------
@@ -128,6 +152,25 @@
       const p = await cliente().from('producto').select('*', { count: 'exact', head: true }).eq('activo', true);
       const v = await cliente().from('variante').select('*', { count: 'exact', head: true }).eq('activo', true);
       return { productos: p.count ?? 0, variantes: v.count ?? 0 };
+    },
+
+    // ---- Ventas: órdenes, cotizaciones, clientes (demo por ahora) --------
+    ESTADO_ORDEN, ESTADO_COTIZ,
+
+    async ordenes({ texto = '' } = {}) {
+      const t = sinTilde(texto);
+      return DEMO.ordenes.filter(o => !t || sinTilde(o.cliente).includes(t) || sinTilde(o.numero).includes(t));
+    },
+    async cotizaciones({ texto = '' } = {}) {
+      const t = sinTilde(texto);
+      return DEMO.cotizaciones.filter(c => !t || sinTilde(c.cliente).includes(t) || sinTilde(c.numero).includes(t));
+    },
+    async clientes({ texto = '' } = {}) {
+      const t = sinTilde(texto);
+      return DEMO.clientes.filter(c => !t || sinTilde(c.nombre).includes(t) || sinTilde(c.telefono).includes(t));
+    },
+    async cliente(id) {
+      return DEMO.clientes.find(c => c.id === id) || null;
     },
   };
 

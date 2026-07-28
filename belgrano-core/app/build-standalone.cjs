@@ -11,7 +11,13 @@ const read = f => fs.readFileSync(path.join(DIR, f), 'utf8');
 
 const css = read('comun/estilos.css');
 // Orden de carga = el de index.html (db y ui antes que los módulos; app.js último).
-const scripts = ['comun/db.js', 'comun/ui.js', 'catalogo/catalogo.js', 'ventas/presupuesto.js', 'comun/app.js'];
+const scripts = [
+  'comun/db.js', 'comun/ui.js',
+  'catalogo/catalogo.js',
+  'ventas/presupuesto.js', 'ventas/cotizaciones.js', 'ventas/ordenes.js', 'ventas/clientes.js', 'ventas/ventas.js',
+  'modulos/produccion.js', 'modulos/esqueletos.js',
+  'comun/app.js',
+];
 
 const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

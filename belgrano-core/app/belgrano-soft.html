@@ -183,6 +183,45 @@ tr:hover td{background:var(--panel-2)}
       { id: 13, producto_id: 2, medida: '2.00', estructura: 'blanca', frente: 'paraiso', precio: 900000, atributos: { medida: '2.00', estructura: 'blanca', frente: 'paraiso', espejo: '2 espejos' } },
       { id: 14, producto_id: 3, medida: '1.00', estructura: 'blanca', frente: null,      precio: 300000, atributos: { medida: '1.00', estructura: 'blanca' } },
     ],
+    // Órdenes de venta de ejemplo (para ver la vista antes de conectar).
+    ordenes: [
+      { id: 2, numero: 'S00002', fecha: '2026-06-01', cliente: 'Abigail Galfre',   vendedor: 'Brian',    local: '2020', total: 968000,  estado: 'entregado' },
+      { id: 1, numero: 'S00001', fecha: '2026-06-01', cliente: 'Abel Schoenmaker',  vendedor: 'Cristian', local: '2020', total: 1028500, estado: 'produccion' },
+      { id: 3, numero: 'S00003', fecha: '2026-07-24', cliente: 'Bibiana',           vendedor: 'Ale',      local: '2020', total: 516000,  estado: 'confirmar' },
+      { id: 4, numero: 'S00004', fecha: '2026-07-26', cliente: 'Laura y Hernán',    vendedor: 'Cristian', local: '2299', total: 731250,  estado: 'logistica' },
+      { id: 5, numero: 'S00005', fecha: '2026-07-27', cliente: 'Diego',             vendedor: 'Sergio',   local: '2299', total: 733000,  estado: 'anulado' },
+    ],
+    // Cotizaciones de ejemplo.
+    cotizaciones: [
+      { id: 10, numero: 'C-4142', fecha: '2026-07-28', cliente: 'Paloma',          vendedor: 'Ale',      local: '2020', total: 490000, estado: 'borrador' },
+      { id: 11, numero: 'C-4141', fecha: '2026-07-27', cliente: 'Camila',          vendedor: 'Ale',      local: '2299', total: 425750, estado: 'aceptada' },
+      { id: 12, numero: 'C-4140', fecha: '2026-07-25', cliente: 'Jona',            vendedor: 'Nati',     local: '2020', total: 633700, estado: 'rechazada' },
+    ],
+    // Clientes de ejemplo (una fila por teléfono, como el CRM).
+    clientes: [
+      { id: 1, nombre: 'Bibiana',        telefono: '1161636645',    vendedor: 'Ale',      consultas: 2, concret: 2, seguim: 0, comprado: 1691700, ultima: 'Ayer' },
+      { id: 2, nombre: 'Victoria',       telefono: '5491168145568', vendedor: 'Ale',      consultas: 1, concret: 1, seguim: 0, comprado: 1520000, ultima: 'Hace 6 días' },
+      { id: 3, nombre: 'Liliana y Javier', telefono: '1151099144',  vendedor: 'Cristian', consultas: 1, concret: 1, seguim: 0, comprado: 1335750, ultima: 'Hace 2 días' },
+      { id: 4, nombre: 'Diego',          telefono: '5491131554640', vendedor: 'Cristian', consultas: 1, concret: 1, seguim: 0, comprado: 733000,  ultima: 'Hace 9 días' },
+      { id: 5, nombre: 'Paloma',         telefono: '5491141715700', vendedor: 'Ale',      consultas: 1, concret: 0, seguim: 1, comprado: 0,       ultima: 'Hoy' },
+    ],
+  };
+
+  // Estados de la orden → etiqueta y color del pill (según el ciclo real).
+  const ESTADO_ORDEN = {
+    confirmar:   { label: 'Confirmar',   pill: 'warn' },
+    produccion:  { label: 'Producción',  pill: 'info' },
+    logistica:   { label: 'Logística',   pill: 'info' },
+    entregado:   { label: 'Entregado',   pill: 'ok' },
+    archivado:   { label: 'Archivado',   pill: 'soft' },
+    anulado:     { label: 'Anulado',     pill: 'crit' },
+    reclamo:     { label: 'Reclamo',     pill: 'crit' },
+  };
+  const ESTADO_COTIZ = {
+    borrador:  { label: 'Borrador',  pill: 'soft' },
+    aceptada:  { label: 'Aceptada',  pill: 'ok' },
+    rechazada: { label: 'Rechazada', pill: 'crit' },
+    vencida:   { label: 'Vencida',   pill: 'warn' },
   };
 
   // ---- API que usan los módulos ---------------------------------------
@@ -236,6 +275,25 @@ tr:hover td{background:var(--panel-2)}
       const v = await cliente().from('variante').select('*', { count: 'exact', head: true }).eq('activo', true);
       return { productos: p.count ?? 0, variantes: v.count ?? 0 };
     },
+
+    // ---- Ventas: órdenes, cotizaciones, clientes (demo por ahora) --------
+    ESTADO_ORDEN, ESTADO_COTIZ,
+
+    async ordenes({ texto = '' } = {}) {
+      const t = sinTilde(texto);
+      return DEMO.ordenes.filter(o => !t || sinTilde(o.cliente).includes(t) || sinTilde(o.numero).includes(t));
+    },
+    async cotizaciones({ texto = '' } = {}) {
+      const t = sinTilde(texto);
+      return DEMO.cotizaciones.filter(c => !t || sinTilde(c.cliente).includes(t) || sinTilde(c.numero).includes(t));
+    },
+    async clientes({ texto = '' } = {}) {
+      const t = sinTilde(texto);
+      return DEMO.clientes.filter(c => !t || sinTilde(c.nombre).includes(t) || sinTilde(c.telefono).includes(t));
+    },
+    async cliente(id) {
+      return DEMO.clientes.find(c => c.id === id) || null;
+    },
   };
 
   global.DB = DB;
@@ -274,6 +332,18 @@ tr:hover td{background:var(--panel-2)}
       return `<div class="empty"><span class="spin"></span> ${UI.esc(txt)}</div>`;
     },
     vacio(txt) { return `<div class="empty">${UI.esc(txt)}</div>`; },
+    // Pill de estado a partir de un mapa {label, pill}.
+    estado(mapa, clave) {
+      const e = mapa?.[clave] || { label: clave || '—', pill: 'soft' };
+      return `<span class="pill ${e.pill}">${UI.esc(e.label)}</span>`;
+    },
+    // Cabecera de módulo: kick + título + subtítulo, con acciones a la derecha.
+    head(kick, titulo, sub, acciones = '') {
+      return `<div class="row" style="margin-bottom:16px;align-items:flex-start">
+        <div><div class="kick">${UI.esc(kick)}</div><h1 class="h-title">${UI.esc(titulo)}</h1>
+          ${sub ? `<div class="h-sub">${UI.esc(sub)}</div>` : ''}</div>
+        <div class="sp"></div>${acciones}</div>`;
+    },
     // Toast simple.
     aviso(txt, tipo = 'info') {
       let t = document.getElementById('_toast');
@@ -629,12 +699,12 @@ tr:hover td{background:var(--panel-2)}
       return !!(String(c.telefono).trim() || String(c.email).trim() || String(c.instagram).trim());
     },
 
-    render() {
-      const v = document.getElementById('view');
+    render(mount = 'view') {
+      const v = document.getElementById(mount);
       v.innerHTML = `
         <div class="row" style="margin-bottom:12px;align-items:flex-start">
           <div>
-            <div class="kick">Presupuestos</div>
+            <div class="kick">Ventas</div>
             <h1 class="h-title">Nueva cotización</h1>
           </div>
           <div class="sp"></div>
@@ -978,6 +1048,364 @@ tr:hover td{background:var(--panel-2)}
 
 </script><script>
 // =====================================================================
+//  Belgrano Soft · Cotizaciones (listado)
+//  Estados: borrador → aceptada (genera orden) · rechazada · vencida.
+// =====================================================================
+(function (global) {
+  const Cotizaciones = {
+    texto: '',
+    async render(mount = 'view') {
+      const v = document.getElementById(mount);
+      v.innerHTML = UI.head('Ventas', 'Cotizaciones',
+        'Cada vendedor ve las suyas; dirección y gestión ven todas.',
+        `<button class="btn primary" id="cz-nueva">+ Nueva cotización</button>`) +
+        `<div class="card pad" style="margin-bottom:14px">
+           <input id="cz-q" placeholder="Buscar por cliente o N°…" value="${UI.esc(this.texto)}">
+         </div>
+         <div id="cz-lista">${UI.spinner()}</div>`;
+      document.getElementById('cz-nueva').onclick = () => global.Ventas.setSub('nueva');
+      const q = document.getElementById('cz-q');
+      let t; q.oninput = () => { clearTimeout(t); t = setTimeout(() => { this.texto = q.value.trim(); this.pintar(); }, 200); };
+      this.pintar();
+    },
+    async pintar() {
+      const cont = document.getElementById('cz-lista');
+      try {
+        const cs = await global.DB.cotizaciones({ texto: this.texto });
+        cont.innerHTML = cs.length ? `<div class="card"><table>
+          <thead><tr><th>N°</th><th>Fecha</th><th>Cliente</th><th>Vendedor</th><th>Local</th>
+            <th style="text-align:right">Total</th><th>Estado</th></tr></thead>
+          <tbody>${cs.map(c => `<tr style="cursor:pointer" data-c="${c.id}">
+            <td><b>${UI.esc(c.numero)}</b></td><td class="muted">${UI.esc(c.fecha)}</td>
+            <td>${UI.esc(c.cliente)}</td><td>${UI.esc(c.vendedor)}</td><td class="muted">${UI.esc(c.local)}</td>
+            <td style="text-align:right" class="tnum"><b>${UI.pesos(c.total)}</b></td>
+            <td>${UI.estado(global.DB.ESTADO_COTIZ, c.estado)}</td></tr>`).join('')}</tbody></table></div>`
+          : UI.vacio('No hay cotizaciones para esa búsqueda.');
+        cont.querySelectorAll('[data-c]').forEach(tr => tr.onclick = () =>
+          UI.aviso('Abrir cotización: próximo paso', 'info'));
+      } catch (e) { cont.innerHTML = `<div class="banner warn">${UI.esc(e.message || e)}</div>`; }
+    },
+  };
+  global.Cotizaciones = Cotizaciones;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script><script>
+// =====================================================================
+//  Belgrano Soft · Órdenes de venta (listado)
+//  N° · Fecha · Cliente · Vendedor · Local · Total · Estado (ciclo real).
+//  Demo por ahora; después lee core.orden.
+// =====================================================================
+(function (global) {
+  const Ordenes = {
+    texto: '',
+    async render(mount = 'view') {
+      const v = document.getElementById(mount);
+      v.innerHTML = UI.head('Ventas', 'Órdenes de venta',
+        'El estado sigue el ciclo real: confirmar → producción → logística → entregado.',
+        `<button class="btn primary" id="ov-nueva">+ Nueva</button>`) +
+        `<div class="card pad" style="margin-bottom:14px">
+           <input id="ov-q" placeholder="Buscar por cliente o N°…" value="${UI.esc(this.texto)}">
+         </div>
+         <div id="ov-lista">${UI.spinner()}</div>`;
+      document.getElementById('ov-nueva').onclick = () => UI.aviso('Nueva orden: se arma desde una cotización aceptada', 'info');
+      const q = document.getElementById('ov-q');
+      let t; q.oninput = () => { clearTimeout(t); t = setTimeout(() => { this.texto = q.value.trim(); this.pintar(mount); }, 200); };
+      this.pintar(mount);
+    },
+    async pintar(mount) {
+      const cont = document.getElementById('ov-lista');
+      try {
+        const os = await global.DB.ordenes({ texto: this.texto });
+        cont.innerHTML = os.length ? `<div class="card"><table>
+          <thead><tr><th>N°</th><th>Fecha</th><th>Cliente</th><th>Vendedor</th><th>Local</th>
+            <th style="text-align:right">Total</th><th>Estado</th></tr></thead>
+          <tbody>${os.map(o => `<tr style="cursor:pointer" data-o="${o.id}">
+            <td><b>${UI.esc(o.numero)}</b></td><td class="muted">${UI.esc(o.fecha)}</td>
+            <td>${UI.esc(o.cliente)}</td><td>${UI.esc(o.vendedor)}</td><td class="muted">${UI.esc(o.local)}</td>
+            <td style="text-align:right" class="tnum"><b>${UI.pesos(o.total)}</b></td>
+            <td>${UI.estado(global.DB.ESTADO_ORDEN, o.estado)}</td></tr>`).join('')}</tbody></table></div>`
+          : UI.vacio('No hay órdenes para esa búsqueda.');
+        cont.querySelectorAll('[data-o]').forEach(tr => tr.onclick = () =>
+          UI.aviso('Detalle de la orden: próximo paso', 'info'));
+      } catch (e) { cont.innerHTML = `<div class="banner warn">${UI.esc(e.message || e)}</div>`; }
+    },
+  };
+  global.Ordenes = Ordenes;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script><script>
+// =====================================================================
+//  Belgrano Soft · Clientes (CRM)
+//  Una fila por identidad (teléfono/IG/mail), con su historial. Pensada
+//  para la recompra. Fusionar / archivar / varios teléfonos por cliente.
+// =====================================================================
+(function (global) {
+  const Clientes = {
+    texto: '',
+    async render(mount = 'view') {
+      this._mount = mount;
+      const v = document.getElementById(mount);
+      v.innerHTML = UI.head('Ventas', 'Clientes',
+        'Una fila por teléfono, con todo su historial. Cuando el cliente vuelve, acá está lo que pasó con él y quién lo tiene.',
+        `<button class="btn" id="cl-fusion">⇄ Fusionar</button>`) +
+        `<div class="card pad" style="margin-bottom:14px">
+           <input id="cl-q" placeholder="Buscar por nombre o teléfono…" value="${UI.esc(this.texto)}">
+         </div>
+         <div id="cl-lista">${UI.spinner()}</div>`;
+      document.getElementById('cl-fusion').onclick = () => UI.aviso('Fusionar clientes: próximo paso', 'info');
+      const q = document.getElementById('cl-q');
+      let t; q.oninput = () => { clearTimeout(t); t = setTimeout(() => { this.texto = q.value.trim(); this.pintar(); }, 200); };
+      this.pintar();
+    },
+    async pintar() {
+      const cont = document.getElementById('cl-lista');
+      try {
+        const cs = await global.DB.clientes({ texto: this.texto });
+        cont.innerHTML = cs.length ? `<div class="card"><table>
+          <thead><tr><th>Cliente</th><th>Teléfono</th><th>Vendedor</th>
+            <th style="text-align:center">Consultas</th><th style="text-align:center">Concret.</th>
+            <th style="text-align:center">Seguim.</th><th style="text-align:right">Comprado</th><th style="text-align:right">Última</th></tr></thead>
+          <tbody>${cs.map(c => `<tr style="cursor:pointer" data-cli="${c.id}">
+            <td><b>${UI.esc(c.nombre)}</b></td><td class="muted tnum">${UI.esc(c.telefono)}</td>
+            <td><span class="pill soft">${UI.esc(c.vendedor)}</span></td>
+            <td style="text-align:center" class="tnum">${c.consultas}</td>
+            <td style="text-align:center" class="tnum" style="color:var(--ok)">${c.concret || '—'}</td>
+            <td style="text-align:center" class="tnum">${c.seguim || '—'}</td>
+            <td style="text-align:right" class="tnum"><b>${c.comprado ? UI.pesos(c.comprado) : '—'}</b></td>
+            <td style="text-align:right" class="muted">${UI.esc(c.ultima)}</td></tr>`).join('')}</tbody></table></div>`
+          : UI.vacio('No hay clientes para esa búsqueda.');
+        cont.querySelectorAll('[data-cli]').forEach(tr => tr.onclick = () => this.detalle(Number(tr.dataset.cli)));
+      } catch (e) { cont.innerHTML = `<div class="banner warn">${UI.esc(e.message || e)}</div>`; }
+    },
+    async detalle(id) {
+      const c = await global.DB.cliente(id);
+      if (!c) return;
+      const v = document.getElementById(this._mount);
+      v.innerHTML = `
+        <button class="btn sm" id="cl-volver" style="margin-bottom:16px">← Clientes</button>
+        <div class="row" style="align-items:flex-start;margin-bottom:16px">
+          <div><h1 class="h-title">${UI.esc(c.nombre)} ⭐</h1>
+            <div class="h-sub tnum">${UI.esc(c.telefono)} · cliente desde jul 2026</div></div>
+          <div class="sp"></div>
+          <div style="text-align:right"><div class="big tnum" style="color:var(--ok)">${UI.pesos(c.comprado)}</div>
+            <div class="muted" style="font-size:12px">COMPRADO EN TOTAL</div></div>
+        </div>
+        <div class="wrap-row" style="margin-bottom:18px">
+          ${chip(c.consultas, 'Consultas')}${chip(c.concret, 'Ventas')}${chip(c.seguim, 'En seguim.')}
+          <div class="card pad" style="text-align:center"><b style="color:var(--brand-ink)">Potable</b><div class="muted" style="font-size:11px">OPORTUNIDAD</div></div>
+        </div>
+        <div class="card">
+          <div style="padding:12px 14px;border-bottom:1px solid var(--line)"><b style="color:var(--navy)">Historial de atenciones</b></div>
+          ${histo('27 jul', 'entregado', 'Local · atendió Ale', 'N° 4309', 516000, 'Intervino Brian (venta compartida $516.000 / $516.000)')}
+          ${histo('24 jul', 'entregado', 'Local · atendió Cristian', 'N° 4308', 516000, 'TIENE QUE CHEQUEAR MEDIDAS')}
+          <div class="empty" style="padding:20px">Demo — el historial real sale de las atenciones del cliente.</div>
+        </div>`;
+      document.getElementById('cl-volver').onclick = () => this.render(this._mount);
+
+      function chip(n, txt) {
+        return `<div class="card pad" style="text-align:center;min-width:96px"><div class="big tnum">${n || 0}</div><div class="muted" style="font-size:11px;text-transform:uppercase">${txt}</div></div>`;
+      }
+      function histo(fecha, estado, quien, num, monto, nota) {
+        return `<div style="padding:12px 14px;border-bottom:1px solid var(--line-soft)">
+          <div class="row"><span class="muted" style="min-width:64px">${fecha}</span>
+            ${UI.estado(global.DB.ESTADO_ORDEN, estado)}<span class="muted">${UI.esc(quien)}</span>
+            <span class="muted">${UI.esc(num)}</span><div class="sp"></div><b class="tnum">${UI.pesos(monto)}</b></div>
+          <div class="muted" style="font-size:12px;margin-top:4px;padding-left:64px">🏳️ ${UI.esc(nota)}</div></div>`;
+      }
+    },
+  };
+  global.Clientes = Clientes;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script><script>
+// =====================================================================
+//  Belgrano Soft · Ventas (contenedor)
+//  Agrupa las tres puntas del mostrador en sub-solapas: la nueva
+//  cotización, el listado de cotizaciones, las órdenes de venta y los
+//  clientes. Es la misma historia: una atención → un presupuesto → una venta.
+// =====================================================================
+(function (global) {
+  const SUBS = [
+    { k: 'nueva',        label: 'Nueva cotización', render: m => global.Presupuesto.render(m) },
+    { k: 'cotizaciones', label: 'Cotizaciones',     render: m => global.Cotizaciones.render(m) },
+    { k: 'ordenes',      label: 'Órdenes de venta', render: m => global.Ordenes.render(m) },
+    { k: 'clientes',     label: 'Clientes',         render: m => global.Clientes.render(m) },
+  ];
+
+  const Ventas = {
+    sub: 'nueva',
+    render() {
+      const v = document.getElementById('view');
+      v.innerHTML = `
+        <div class="subnav" id="ventas-subnav">
+          ${SUBS.map(s => `<button data-sub="${s.k}">${s.label}</button>`).join('')}
+        </div>
+        <div id="ventas-view"></div>
+        <style>
+          .subnav{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:18px;border-bottom:1px solid var(--line)}
+          .subnav button{border:0;background:transparent;color:var(--ink-soft);font-weight:650;font-size:14px;
+            padding:10px 14px;cursor:pointer;border-bottom:2.5px solid transparent;margin-bottom:-1px}
+          .subnav button:hover{color:var(--brand)}
+          .subnav button[aria-current="true"]{color:var(--brand);border-bottom-color:var(--brand)}
+        </style>`;
+      v.querySelectorAll('[data-sub]').forEach(b => b.onclick = () => this.setSub(b.dataset.sub));
+      this.setSub(this.sub);
+    },
+    setSub(k) {
+      this.sub = k;
+      document.querySelectorAll('#ventas-subnav button').forEach(b =>
+        b.setAttribute('aria-current', b.dataset.sub === k));
+      const s = SUBS.find(x => x.k === k) || SUBS[0];
+      document.getElementById('ventas-view').innerHTML = '';
+      s.render('ventas-view');
+    },
+  };
+
+  global.Ventas = Ventas;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script><script>
+// =====================================================================
+//  Belgrano Soft · Producción
+//  Tablero por estado, según el ciclo real: a producir → pedido →
+//  producción → recibido → listo. Editar acá requiere autorización.
+// =====================================================================
+(function (global) {
+  const COLS = [
+    { k: 'a_producir', label: 'A producir' },
+    { k: 'pedido',     label: 'Pedido' },
+    { k: 'produccion', label: 'Producción' },
+    { k: 'recibido',   label: 'Recibido' },
+    { k: 'listo',      label: 'Listo → Logística' },
+  ];
+  const DEMO = [
+    { num: 'S00001', cliente: 'Abel Schoenmaker', mueble: 'Placard Oliver 2.00', col: 'produccion' },
+    { num: 'S00003', cliente: 'Bibiana',          mueble: 'Cómoda Amberes 1.20', col: 'a_producir' },
+    { num: 'S00007', cliente: 'Andrea',           mueble: 'Mesa de luz Oslo',    col: 'pedido' },
+    { num: 'S00009', cliente: 'Camila',           mueble: 'Respaldo Milán',      col: 'recibido' },
+    { num: 'S00011', cliente: 'Huego',            mueble: 'Vajillero Nórdico',   col: 'listo' },
+  ];
+
+  const Produccion = {
+    render() {
+      const v = document.getElementById('view');
+      v.innerHTML = UI.head('Producción', 'Tablero de fabricación',
+        'Editar una orden en producción requiere autorización — no lo hace el vendedor.') +
+        `<div class="kanban">${COLS.map(c => `
+          <div class="kcol">
+            <div class="kcol-h">${c.label}<span class="kcount">${DEMO.filter(d => d.col === c.k).length}</span></div>
+            ${DEMO.filter(d => d.col === c.k).map(d => `
+              <div class="kcard">
+                <div class="row"><b>${UI.esc(d.num)}</b><div class="sp"></div><span class="muted" style="font-size:12px">${UI.esc(d.cliente)}</span></div>
+                <div style="font-size:13px;margin-top:4px">${UI.esc(d.mueble)}</div>
+              </div>`).join('') || '<div class="muted" style="font-size:12px;padding:8px 4px">—</div>'}
+          </div>`).join('')}</div>
+        <style>
+          .kanban{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;overflow-x:auto}
+          @media(max-width:900px){.kanban{grid-template-columns:repeat(5,minmax(180px,1fr))}}
+          .kcol{background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:10px;min-height:160px}
+          .kcol-h{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:800;
+            text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);padding:2px 4px 10px}
+          .kcount{background:var(--brand-soft);color:var(--brand-ink);border-radius:20px;padding:1px 8px;font-size:11px}
+          .kcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;box-shadow:var(--shadow)}
+          .kcard b{color:var(--navy)}
+        </style>`;
+    },
+  };
+  global.Produccion = Produccion;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script><script>
+// =====================================================================
+//  Belgrano Soft · Esqueletos de módulos
+//  Pantallas base para ver la arquitectura completa. Cada una muestra de
+//  qué se va a encargar y, cuando ayuda, una tabla/vista de ejemplo con
+//  la forma que va a tener. Se profundizan una por una más adelante.
+// =====================================================================
+(function (global) {
+  const DB = () => global.DB;
+
+  const ESQ = {
+    caja: {
+      kick: 'Caja', titulo: 'Cobros y señas',
+      sub: 'El cobro pertenece al cliente y se imputa a todas sus órdenes en conjunto. La seña mínima habitual es el 30%.',
+      demo: () => tabla(
+        ['Fecha', 'Cliente', 'Forma', 'Monto', 'Imputado a'],
+        [['28/07', 'Bibiana', 'Transferencia', '$155.000', 'S00003'],
+         ['27/07', 'Camila', 'Efectivo', '$120.000', 'S00009 · S00011'],
+         ['26/07', 'Diego', 'Tarjeta', '$220.000', 'S00005']],
+        [3, 3, 3, 'r', 3]),
+    },
+    logistica: {
+      kick: 'Logística', titulo: 'Entregas', sub: 'Órdenes listas para entregar, con flete y zona. De acá pasan a "entregado".',
+      demo: () => tabla(
+        ['N°', 'Cliente', 'Zona', 'Flete', 'Estado'],
+        [['S00004', 'Laura y Hernán', 'Zona Sur', 'Incluido', pill('info', 'A coordinar')],
+         ['S00002', 'Abigail Galfre', 'CABA', 'No incluido', pill('ok', 'Entregado')]],
+        [3, 3, 3, 3, 3]),
+    },
+    reclamos: {
+      kick: 'Reclamos', titulo: 'Posventa', sub: 'Un reclamo levanta la orden desde archivado/entregado/producción y, al resolverse, vuelve a su estado.',
+      demo: () => tabla(
+        ['N°', 'Cliente', 'Motivo', 'Abre', 'Estado'],
+        [['S00002', 'Abigail Galfre', 'Falta un tornillo', '28/07', pill('warn', 'Abierto')],
+         ['S00001', 'Abel Schoenmaker', 'Rayón en la tapa', '25/07', pill('info', 'En gestión')]],
+        [3, 3, 3, 3, 3]),
+    },
+    abastecimiento: {
+      kick: 'Abastecimiento', titulo: 'Proveedores y pedidos', sub: 'Un pedido abierto por proveedor. Las líneas atadas al mismo proveedor viajan juntas.',
+      demo: () => tabla(
+        ['Proveedor', 'Pedido', 'Líneas', 'Estado'],
+        [['Vicente', 'P-102', '8', pill('info', 'Abierto')],
+         ['Maderas del Sur', 'P-101', '3', pill('ok', 'Recibido')]],
+        [3, 3, 'r', 3]),
+    },
+    facturas: {
+      kick: 'Facturas', titulo: 'Facturación', sub: 'Belgrano Soft no factura: marca "facturado". La factura se hace en Nacional Soft y después se incorpora.',
+      demo: () => tabla(
+        ['N° Orden', 'Cliente', 'DNI/CUIT', 'Total', 'Estado'],
+        [['S00002', 'Abigail Galfre', '27-xxxxxxxx-3', '$968.000', pill('ok', 'Facturado')],
+         ['S00001', 'Abel Schoenmaker', '—', '$1.028.500', pill('warn', 'Pendiente')]],
+        [3, 3, 3, 'r', 3]),
+    },
+    reportes: {
+      kick: 'Reportes', titulo: 'Dirección', sub: 'Ventas por vendedor y local, comisiones, embudo de consultas, recompra. Se arma más adelante.',
+      demo: () => `<div class="empty">📊 Los tableros de dirección se diseñan en una etapa siguiente.</div>`,
+    },
+    config: {
+      kick: 'Configuración', titulo: 'Usuarios y reglas', sub: 'Roles y permisos por módulo, locales, vendedores, reglas de precio por término de pago.',
+      demo: () => tabla(
+        ['Regla', 'Valor'],
+        [['Descuento efectivo', '35% sobre lista'],
+         ['Seña mínima', '30%'],
+         ['Recargo tarjeta', 'según cuotas (a definir)'],
+         ['Locales', '2299 · 2020 · 699']],
+        [3, 3]),
+    },
+  };
+
+  function pill(t, txt) { return `<span class="pill ${t}">${txt}</span>`; }
+  function tabla(cols, filas, aligns) {
+    const th = cols.map((c, i) => `<th style="text-align:${aligns[i] === 'r' ? 'right' : 'left'}">${c}</th>`).join('');
+    const tb = filas.map(f => `<tr>${f.map((cel, i) =>
+      `<td style="text-align:${aligns[i] === 'r' ? 'right' : 'left'}">${cel}</td>`).join('')}</tr>`).join('');
+    return `<div class="card"><table><thead><tr>${th}</tr></thead><tbody>${tb}</tbody></table></div>
+      <p class="note" style="color:var(--muted);font-size:12px;margin-top:8px">Ejemplo de la forma que va a tener — datos de muestra.</p>`;
+  }
+
+  const Esq = {
+    render(clave) {
+      const m = ESQ[clave];
+      const v = document.getElementById('view');
+      if (!m) { v.innerHTML = UI.vacio('Módulo en construcción.'); return; }
+      v.innerHTML = UI.head(m.kick, m.titulo, m.sub) + m.demo();
+    },
+  };
+  global.Esq = Esq;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script><script>
+// =====================================================================
 //  Belgrano Soft · shell
 //  Selector "ver como" (sin login todavía) + navegación por rol.
 //  Cada rol ve solo sus solapas. El login real llega después.
@@ -985,13 +1413,25 @@ tr:hover td{background:var(--panel-2)}
 (function (global) {
   // Qué solapas ve cada rol. La clave es el módulo; el label lo que se lee.
   const MODULOS = {
-    catalogo:   { label: 'Catálogo',    render: () => global.Catalogo.render() },
-    presupuesto:{ label: 'Presupuestos',render: () => global.Presupuesto.render() },
+    ventas:         { label: 'Ventas',         render: () => global.Ventas.render() },
+    catalogo:       { label: 'Catálogo',       render: () => global.Catalogo.render() },
+    caja:           { label: 'Caja',           render: () => global.Esq.render('caja') },
+    produccion:     { label: 'Producción',     render: () => global.Produccion.render() },
+    logistica:      { label: 'Logística',      render: () => global.Esq.render('logistica') },
+    reclamos:       { label: 'Reclamos',       render: () => global.Esq.render('reclamos') },
+    abastecimiento: { label: 'Abastecimiento', render: () => global.Esq.render('abastecimiento') },
+    facturas:       { label: 'Facturas',       render: () => global.Esq.render('facturas') },
+    reportes:       { label: 'Reportes',       render: () => global.Esq.render('reportes') },
+    config:         { label: 'Configuración',  render: () => global.Esq.render('config') },
   };
+  // Los 6 roles y qué módulos ve cada uno (permisos finos: se afinan después).
   const ROLES = {
-    vendedor:   { label: 'Vendedor',            tabs: ['presupuesto', 'catalogo'] },
-    produccion: { label: 'Producción · Iara',   tabs: ['catalogo'] },
-    direccion:  { label: 'Dirección · Brian',   tabs: ['catalogo', 'presupuesto'] },
+    vendedor:      { label: 'Vendedor',              tabs: ['ventas', 'catalogo', 'produccion', 'logistica'] },
+    direccion:     { label: 'Dirección',             tabs: ['ventas', 'catalogo', 'caja', 'produccion', 'logistica', 'reclamos', 'abastecimiento', 'facturas', 'reportes', 'config'] },
+    administrativo:{ label: 'Administrativo',        tabs: ['ventas', 'facturas', 'caja', 'catalogo'] },
+    prod:          { label: 'Encargado de Producción', tabs: ['produccion', 'abastecimiento', 'catalogo'] },
+    logi:          { label: 'Logística',             tabs: ['logistica', 'reclamos', 'catalogo'] },
+    gestion:       { label: 'Gestión de Cliente',    tabs: ['ventas', 'catalogo'] },
   };
 
   const App = {

@@ -6,13 +6,25 @@
 (function (global) {
   // Qué solapas ve cada rol. La clave es el módulo; el label lo que se lee.
   const MODULOS = {
-    catalogo:   { label: 'Catálogo',    render: () => global.Catalogo.render() },
-    presupuesto:{ label: 'Presupuestos',render: () => global.Presupuesto.render() },
+    ventas:         { label: 'Ventas',         render: () => global.Ventas.render() },
+    catalogo:       { label: 'Catálogo',       render: () => global.Catalogo.render() },
+    caja:           { label: 'Caja',           render: () => global.Esq.render('caja') },
+    produccion:     { label: 'Producción',     render: () => global.Produccion.render() },
+    logistica:      { label: 'Logística',      render: () => global.Esq.render('logistica') },
+    reclamos:       { label: 'Reclamos',       render: () => global.Esq.render('reclamos') },
+    abastecimiento: { label: 'Abastecimiento', render: () => global.Esq.render('abastecimiento') },
+    facturas:       { label: 'Facturas',       render: () => global.Esq.render('facturas') },
+    reportes:       { label: 'Reportes',       render: () => global.Esq.render('reportes') },
+    config:         { label: 'Configuración',  render: () => global.Esq.render('config') },
   };
+  // Los 6 roles y qué módulos ve cada uno (permisos finos: se afinan después).
   const ROLES = {
-    vendedor:   { label: 'Vendedor',            tabs: ['presupuesto', 'catalogo'] },
-    produccion: { label: 'Producción · Iara',   tabs: ['catalogo'] },
-    direccion:  { label: 'Dirección · Brian',   tabs: ['catalogo', 'presupuesto'] },
+    vendedor:      { label: 'Vendedor',              tabs: ['ventas', 'catalogo', 'produccion', 'logistica'] },
+    direccion:     { label: 'Dirección',             tabs: ['ventas', 'catalogo', 'caja', 'produccion', 'logistica', 'reclamos', 'abastecimiento', 'facturas', 'reportes', 'config'] },
+    administrativo:{ label: 'Administrativo',        tabs: ['ventas', 'facturas', 'caja', 'catalogo'] },
+    prod:          { label: 'Encargado de Producción', tabs: ['produccion', 'abastecimiento', 'catalogo'] },
+    logi:          { label: 'Logística',             tabs: ['logistica', 'reclamos', 'catalogo'] },
+    gestion:       { label: 'Gestión de Cliente',    tabs: ['ventas', 'catalogo'] },
   };
 
   const App = {
