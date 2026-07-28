@@ -33,12 +33,19 @@
     return _cli;
   }
 
-  // ---- Modo demo: unos productos para ver la UI sin conexión -----------
+  // ---- Modo demo: árbol + productos para ver la UI sin conexión --------
   const DEMO = {
+    categorias: [
+      { id: 1, nombre: 'DORMITORIO', padre_id: null, nivel: 2 },
+      { id: 2, nombre: 'CÓMODAS',    padre_id: 1,    nivel: 3 },
+      { id: 3, nombre: 'PLACARD',    padre_id: 1,    nivel: 3 },
+      { id: 4, nombre: 'LIVING',     padre_id: null, nivel: 2 },
+      { id: 5, nombre: 'MESAS RATONAS', padre_id: 4, nivel: 3 },
+    ],
     productos: [
-      { id: 1, categoria: 'ESPACIOS', nombre: 'CÓMODA AMBERES 55', publicado_tn: true },
-      { id: 2, categoria: 'ESPACIOS', nombre: 'PLACARD OLIVER', publicado_tn: true },
-      { id: 3, categoria: 'FUNCIÓN', nombre: 'MESA RATONA NORUEGA', publicado_tn: false },
+      { id: 1, categoria_id: 2, nombre: 'CÓMODA AMBERES 55', publicado_tn: true },
+      { id: 2, categoria_id: 3, nombre: 'PLACARD OLIVER', publicado_tn: true },
+      { id: 3, categoria_id: 5, nombre: 'MESA RATONA NORUEGA', publicado_tn: false },
     ],
     variantes: [
       { id: 11, producto_id: 1, medida: '1.20', estructura: 'blanca', frente: 'paraiso', precio: 425750, atributos: { medida: '1.20', estructura: 'blanca', frente: 'paraiso' } },
@@ -53,29 +60,31 @@
     modo() { return hayConexion() ? 'supabase' : 'demo'; },
     DEFAULT_URL, cfg, guardarCfg, hayConexion,
 
-    // Productos: búsqueda por texto + categoría, con conteo de variantes.
-    async productos({ texto = '', categoria = '', limite = 60 } = {}) {
+    // El árbol de categorías (ambiente → tipo de mueble).
+    async arbolCategorias() {
+      if (!hayConexion()) return DEMO.categorias;
+      const { data, error } = await cliente().from('categoria')
+        .select('id,nombre,padre_id,nivel').eq('activa', true).order('nombre');
+      if (error) throw error;
+      return data || [];
+    },
+
+    // Productos: por categoría (tipo de mueble) o por texto libre.
+    async productos({ texto = '', categoriaId = null, limite = 200 } = {}) {
       if (!hayConexion()) {
         let ps = DEMO.productos.filter(p =>
-          (!texto || (p.nombre + p.categoria).toLowerCase().includes(texto.toLowerCase())) &&
-          (!categoria || p.categoria === categoria));
+          (!texto || p.nombre.toLowerCase().includes(texto.toLowerCase())) &&
+          (categoriaId == null || p.categoria_id === categoriaId));
         return ps.map(p => ({ ...p, variantes: DEMO.variantes.filter(v => v.producto_id === p.id).length }));
       }
       let q = cliente().from('producto')
-        .select('id,categoria,nombre,publicado_tn,variante(count)')
+        .select('id,categoria_id,nombre,publicado_tn,variante(count)')
         .eq('activo', true).order('nombre').limit(limite);
       if (texto) q = q.ilike('nombre', `%${texto}%`);
-      if (categoria) q = q.eq('categoria', categoria);
+      if (categoriaId != null) q = q.eq('categoria_id', categoriaId);
       const { data, error } = await q;
       if (error) throw error;
       return (data || []).map(p => ({ ...p, variantes: p.variante?.[0]?.count ?? 0 }));
-    },
-
-    async categorias() {
-      if (!hayConexion()) return [...new Set(DEMO.productos.map(p => p.categoria))];
-      const { data, error } = await cliente().from('producto').select('categoria').eq('activo', true);
-      if (error) throw error;
-      return [...new Set((data || []).map(d => d.categoria).filter(Boolean))].sort();
     },
 
     async variantes(productoId) {

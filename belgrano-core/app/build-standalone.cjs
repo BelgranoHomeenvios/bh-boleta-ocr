@@ -1,0 +1,29 @@
+#!/usr/bin/env node
+// =====================================================================
+//  Genera catalogo-standalone.html concatenando CSS + JS de la app.
+//  Un solo archivo para abrir con doble clic, sin servidor.
+//  Uso:  node build-standalone.js
+// =====================================================================
+const fs = require('fs');
+const path = require('path');
+const DIR = __dirname;
+const read = f => fs.readFileSync(path.join(DIR, f), 'utf8');
+
+const css = read('comun/estilos.css');
+// Orden de carga = el de index.html (db y ui antes que los módulos; app.js último).
+const scripts = ['comun/db.js', 'comun/ui.js', 'catalogo/catalogo.js', 'ventas/presupuesto.js', 'comun/app.js'];
+
+const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Belgrano Soft · Catálogo</title>
+<style>
+${css}
+</style></head><body>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+${scripts.map(read).join('\n</script><script>\n')}
+</script></body></html>
+`;
+
+fs.writeFileSync(path.join(DIR, 'catalogo-standalone.html'), html);
+console.log('catalogo-standalone.html regenerado (' + html.length.toLocaleString() + ' bytes)');
