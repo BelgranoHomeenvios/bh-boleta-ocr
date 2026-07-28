@@ -1,0 +1,534 @@
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Belgrano Soft · Catálogo</title>
+<style>
+/* =====================================================================
+   Belgrano Soft · sistema visual común
+   Navy/azul + estados con color. Un solo lugar para todos los módulos.
+   ===================================================================== */
+:root{
+  --bg:#eef1f6; --panel:#fff; --panel-2:#f7f9fc; --ink:#141a26; --ink-soft:#54607a;
+  --line:#dbe1ec; --line-soft:#e8ecf3;
+  --navy:#1c2b4a; --brand:#2f6fed; --brand-soft:#e6eefc; --brand-ink:#1b4fd0;
+  --ok:#128a5b; --ok-bg:#e2f3ea; --warn:#b5730f; --warn-bg:#f8eeda;
+  --crit:#c53b3b; --crit-bg:#fbe6e6; --muted:#7d8aa3;
+  --shadow:0 1px 2px rgba(20,26,38,.06),0 4px 16px rgba(20,26,38,.05);
+  --r:12px;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0d111b; --panel:#151b2a; --panel-2:#111726; --ink:#eaeef7; --ink-soft:#9aa6c0;
+    --line:#26304a; --line-soft:#1e2740; --navy:#dbe3f4; --brand:#5b8dff;
+    --brand-soft:#1a2540; --brand-ink:#9dbcff; --ok:#43c98d; --ok-bg:#13291f;
+    --warn:#e0a53c; --warn-bg:#2c2413; --crit:#f0736f; --crit-bg:#2c1717; --muted:#7f8cab;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 22px rgba(0,0,0,.28);
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--bg); color:var(--ink); font-variant-numeric:tabular-nums;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  line-height:1.5; -webkit-font-smoothing:antialiased;
+}
+.tnum{font-variant-numeric:tabular-nums}
+h1,h2,h3{margin:0; letter-spacing:-.01em}
+button{font:inherit}
+a{color:var(--brand)}
+
+/* Shell */
+#top{
+  position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:14px;
+  background:var(--navy); color:#fff; padding:10px 18px; box-shadow:var(--shadow);
+}
+@media (prefers-color-scheme:dark){ #top{color:#0d111b} }
+#top .brand{font-weight:800; letter-spacing:-.02em; font-size:15px; display:flex; align-items:center; gap:8px}
+#top .brand .m{opacity:.6; font-weight:500}
+#top .sp{flex:1}
+#top .verComo{display:flex; align-items:center; gap:8px; font-size:13px}
+#top select{
+  font:inherit; font-size:13px; padding:6px 10px; border-radius:8px; border:1px solid transparent;
+  background:rgba(255,255,255,.15); color:inherit; font-weight:600;
+}
+@media (prefers-color-scheme:dark){ #top select{background:rgba(0,0,0,.15)} }
+#top select option{color:#141a26}
+
+#nav{
+  display:flex; gap:4px; overflow-x:auto; background:var(--panel); border-bottom:1px solid var(--line);
+  padding:0 12px; position:sticky; top:44px; z-index:15;
+}
+#nav button{
+  border:0; background:transparent; color:var(--ink-soft); font-weight:600; font-size:14px;
+  padding:13px 14px; cursor:pointer; border-bottom:2.5px solid transparent; white-space:nowrap;
+}
+#nav button:hover{color:var(--brand)}
+#nav button[aria-current="true"]{color:var(--brand); border-bottom-color:var(--brand)}
+#nav button:focus-visible{outline:2px solid var(--brand); outline-offset:-2px}
+
+#view{max-width:1100px; margin:0 auto; padding:22px 18px 80px}
+
+/* Bits */
+.card{background:var(--panel); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow)}
+.pad{padding:16px}
+.row{display:flex; align-items:center; gap:12px}
+.wrap-row{display:flex; flex-wrap:wrap; gap:10px}
+.sp{flex:1}
+.muted{color:var(--muted)}
+.h-title{font-size:22px; font-weight:800; color:var(--navy)}
+.h-sub{color:var(--ink-soft); margin-top:4px; font-size:14px}
+.kick{font-size:11px; letter-spacing:.13em; text-transform:uppercase; color:var(--brand); font-weight:700}
+
+input,select,textarea{
+  font:inherit; font-size:14px; padding:9px 12px; border:1px solid var(--line);
+  border-radius:9px; background:var(--panel); color:var(--ink); width:100%;
+}
+input:focus,select:focus,textarea:focus{outline:none; border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-soft)}
+label.fld{display:block}
+label.fld .lbl{display:block; font-size:12px; color:var(--muted); margin-bottom:5px; font-weight:600}
+
+.btn{
+  font-weight:650; font-size:14px; padding:9px 16px; border-radius:9px; cursor:pointer;
+  border:1px solid var(--line); background:var(--panel); color:var(--ink); transition:.15s;
+}
+.btn:hover{border-color:var(--brand); color:var(--brand)}
+.btn.primary{background:var(--brand); border-color:var(--brand); color:#fff}
+.btn.primary:hover{background:var(--brand-ink); color:#fff}
+.btn:disabled{opacity:.5; cursor:not-allowed}
+.btn.sm{padding:6px 11px; font-size:13px}
+
+.pill{font-size:11px; font-weight:700; padding:3px 9px; border-radius:6px; white-space:nowrap; display:inline-block}
+.pill.ok{background:var(--ok-bg); color:var(--ok)}
+.pill.warn{background:var(--warn-bg); color:var(--warn)}
+.pill.crit{background:var(--crit-bg); color:var(--crit)}
+.pill.info{background:var(--brand-soft); color:var(--brand)}
+.pill.soft{background:var(--line-soft); color:var(--ink-soft)}
+
+table{width:100%; border-collapse:collapse; font-size:14px}
+th{text-align:left; font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); font-weight:700; padding:10px 12px; border-bottom:1px solid var(--line)}
+td{padding:11px 12px; border-bottom:1px solid var(--line-soft)}
+tr:hover td{background:var(--panel-2)}
+
+.empty{text-align:center; padding:48px 20px; color:var(--muted)}
+.spin{display:inline-block; width:16px; height:16px; border:2px solid var(--line); border-top-color:var(--brand); border-radius:50%; animation:sp .7s linear infinite; vertical-align:-3px}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){ .spin{animation:none} }
+
+.banner{padding:10px 14px; border-radius:9px; font-size:13px; margin-bottom:16px}
+.banner.warn{background:var(--warn-bg); color:var(--warn)}
+.banner.info{background:var(--brand-soft); color:var(--brand-ink)}
+</style></head><body>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// =====================================================================
+//  Belgrano Soft · capa de datos
+//  Una sola puerta a Supabase. Si no hay conexión configurada, la app
+//  igual arranca en modo DEMO con unos productos de ejemplo, así se puede
+//  ver la interfaz antes de conectar la base.
+// =====================================================================
+(function (global) {
+  const CFG_KEY = 'bh_supabase_cfg';
+
+  // La URL del proyecto Belgrano Soft ya la sabemos; la anon key es pública
+  // (va en el frontend) pero la carga la persona la primera vez, para no
+  // dejarla escrita en el repo.
+  const DEFAULT_URL = 'https://qwbdhpevgirsmfxqlgtg.supabase.co';
+
+  function cfg() {
+    try { return JSON.parse(localStorage.getItem(CFG_KEY)) || {}; }
+    catch { return {}; }
+  }
+  function guardarCfg(url, key) {
+    localStorage.setItem(CFG_KEY, JSON.stringify({ url: url || DEFAULT_URL, key }));
+  }
+  function hayConexion() { return !!cfg().key && !!global.supabase; }
+
+  let _cli = null;
+  function cliente() {
+    if (_cli) return _cli;
+    const c = cfg();
+    if (!c.key || !global.supabase) return null;
+    // El catálogo vive en el esquema core.
+    _cli = global.supabase.createClient(c.url || DEFAULT_URL, c.key, {
+      db: { schema: 'core' },
+    });
+    return _cli;
+  }
+
+  // ---- Modo demo: unos productos para ver la UI sin conexión -----------
+  const DEMO = {
+    productos: [
+      { id: 1, categoria: 'ESPACIOS', nombre: 'CÓMODA AMBERES 55', publicado_tn: true },
+      { id: 2, categoria: 'ESPACIOS', nombre: 'PLACARD OLIVER', publicado_tn: true },
+      { id: 3, categoria: 'FUNCIÓN', nombre: 'MESA RATONA NORUEGA', publicado_tn: false },
+    ],
+    variantes: [
+      { id: 11, producto_id: 1, medida: '1.20', estructura: 'blanca', frente: 'paraiso', precio: 425750, atributos: { medida: '1.20', estructura: 'blanca', frente: 'paraiso' } },
+      { id: 12, producto_id: 1, medida: '1.20', estructura: 'negra',  frente: 'blanca',  precio: 406250, atributos: { medida: '1.20', estructura: 'negra', frente: 'blanca' } },
+      { id: 13, producto_id: 2, medida: '2.00', estructura: 'blanca', frente: 'paraiso', precio: 900000, atributos: { medida: '2.00', estructura: 'blanca', frente: 'paraiso', espejo: '2 espejos' } },
+      { id: 14, producto_id: 3, medida: '1.00', estructura: 'blanca', frente: null,      precio: 300000, atributos: { medida: '1.00', estructura: 'blanca' } },
+    ],
+  };
+
+  // ---- API que usan los módulos ---------------------------------------
+  const DB = {
+    modo() { return hayConexion() ? 'supabase' : 'demo'; },
+    DEFAULT_URL, cfg, guardarCfg, hayConexion,
+
+    // Productos: búsqueda por texto + categoría, con conteo de variantes.
+    async productos({ texto = '', categoria = '', limite = 60 } = {}) {
+      if (!hayConexion()) {
+        let ps = DEMO.productos.filter(p =>
+          (!texto || (p.nombre + p.categoria).toLowerCase().includes(texto.toLowerCase())) &&
+          (!categoria || p.categoria === categoria));
+        return ps.map(p => ({ ...p, variantes: DEMO.variantes.filter(v => v.producto_id === p.id).length }));
+      }
+      let q = cliente().from('producto')
+        .select('id,categoria,nombre,publicado_tn,variante(count)')
+        .eq('activo', true).order('nombre').limit(limite);
+      if (texto) q = q.ilike('nombre', `%${texto}%`);
+      if (categoria) q = q.eq('categoria', categoria);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data || []).map(p => ({ ...p, variantes: p.variante?.[0]?.count ?? 0 }));
+    },
+
+    async categorias() {
+      if (!hayConexion()) return [...new Set(DEMO.productos.map(p => p.categoria))];
+      const { data, error } = await cliente().from('producto').select('categoria').eq('activo', true);
+      if (error) throw error;
+      return [...new Set((data || []).map(d => d.categoria).filter(Boolean))].sort();
+    },
+
+    async variantes(productoId) {
+      if (!hayConexion()) return DEMO.variantes.filter(v => v.producto_id === productoId);
+      const { data, error } = await cliente().from('variante')
+        .select('id,medida,estructura,frente,precio,atributos,sku,tn_variant_id')
+        .eq('producto_id', productoId).eq('activo', true)
+        .order('medida').order('estructura').order('frente');
+      if (error) throw error;
+      return data || [];
+    },
+
+    async totales() {
+      if (!hayConexion()) return { productos: DEMO.productos.length, variantes: DEMO.variantes.length };
+      const p = await cliente().from('producto').select('*', { count: 'exact', head: true }).eq('activo', true);
+      const v = await cliente().from('variante').select('*', { count: 'exact', head: true }).eq('activo', true);
+      return { productos: p.count ?? 0, variantes: v.count ?? 0 };
+    },
+  };
+
+  global.DB = DB;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script><script>
+// =====================================================================
+//  Belgrano Soft · helpers de interfaz
+// =====================================================================
+(function (global) {
+  const UI = {
+    // Escape para no romper el HTML con nombres que traen comillas/símbolos.
+    esc(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    },
+    // Pesos argentinos, sin decimales.
+    pesos(n) {
+      const x = Number(n) || 0;
+      return '$' + x.toLocaleString('es-AR', { maximumFractionDigits: 0 });
+    },
+    // Los tres ejes + la bolsa, como texto legible: "1.20 · blanca · paraiso".
+    ejes(v) {
+      const base = [v.medida, v.estructura, v.frente].filter(Boolean);
+      const extra = Object.entries(v.atributos || {})
+        .filter(([k]) => !['medida', 'estructura', 'frente'].includes(k))
+        .map(([, val]) => val);
+      return [...base, ...extra].join(' · ') || '—';
+    },
+    // Los atributos de la bolsa que NO son los tres ejes, para mostrarlos aparte.
+    extras(v) {
+      return Object.entries(v.atributos || {})
+        .filter(([k]) => !['medida', 'estructura', 'frente'].includes(k));
+    },
+    spinner(txt = 'Cargando…') {
+      return `<div class="empty"><span class="spin"></span> ${UI.esc(txt)}</div>`;
+    },
+    vacio(txt) { return `<div class="empty">${UI.esc(txt)}</div>`; },
+    // Toast simple.
+    aviso(txt, tipo = 'info') {
+      let t = document.getElementById('_toast');
+      if (!t) {
+        t = document.createElement('div');
+        t.id = '_toast';
+        t.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:99;padding:11px 18px;border-radius:10px;font-weight:600;font-size:14px;box-shadow:0 6px 22px rgba(0,0,0,.2);transition:.2s';
+        document.body.appendChild(t);
+      }
+      const col = { info: ['#2f6fed', '#fff'], ok: ['#128a5b', '#fff'], warn: ['#b5730f', '#fff'], crit: ['#c53b3b', '#fff'] }[tipo] || ['#2f6fed', '#fff'];
+      t.style.background = col[0]; t.style.color = col[1];
+      t.textContent = txt; t.style.opacity = '1';
+      clearTimeout(UI._tt);
+      UI._tt = setTimeout(() => { t.style.opacity = '0'; }, 2400);
+    },
+  };
+  global.UI = UI;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script><script>
+// =====================================================================
+//  Belgrano Soft · Catálogo
+//  Buscar productos, ver sus variantes con los tres ejes + la bolsa.
+//  Es el cimiento del presupuesto: de acá se eligen los muebles.
+// =====================================================================
+(function (global) {
+  const Catalogo = {
+    estado: { texto: '', categoria: '', abierto: null },
+
+    async render() {
+      const v = document.getElementById('view');
+      v.innerHTML = `
+        <div class="row" style="margin-bottom:18px">
+          <div>
+            <div class="kick">Catálogo</div>
+            <h1 class="h-title">Productos</h1>
+            <div class="h-sub" id="cat-sub">Cargando…</div>
+          </div>
+          <div class="sp"></div>
+        </div>
+        <div class="card pad" style="margin-bottom:16px">
+          <div class="wrap-row">
+            <label class="fld" style="flex:2; min-width:220px">
+              <span class="lbl">Buscar</span>
+              <input id="cat-q" placeholder="Amberes, placard, mesa…" value="${UI.esc(this.estado.texto)}">
+            </label>
+            <label class="fld" style="flex:1; min-width:160px">
+              <span class="lbl">Categoría</span>
+              <select id="cat-cat"><option value="">Todas</option></select>
+            </label>
+          </div>
+        </div>
+        <div id="cat-lista">${UI.spinner()}</div>`;
+
+      // Aviso si estamos en modo demo (sin conexión a la base real).
+      if (global.DB.modo() === 'demo') {
+        v.insertAdjacentHTML('afterbegin',
+          `<div class="banner info" id="cat-demo">Modo demo — mostrando productos de ejemplo.
+           <a href="#" id="cat-conectar">Conectar Belgrano Soft</a> para ver el catálogo real.</div>`);
+        document.getElementById('cat-conectar').onclick = e => { e.preventDefault(); this.modalConexion(); };
+      }
+
+      const q = document.getElementById('cat-q');
+      let t; q.oninput = () => { clearTimeout(t); t = setTimeout(() => { this.estado.texto = q.value.trim(); this.cargar(); }, 250); };
+      document.getElementById('cat-cat').onchange = e => { this.estado.categoria = e.target.value; this.cargar(); };
+
+      this.cargarCategorias();
+      this.cargar();
+    },
+
+    async cargarCategorias() {
+      try {
+        const cats = await global.DB.categorias();
+        const sel = document.getElementById('cat-cat');
+        if (!sel) return;
+        sel.innerHTML = '<option value="">Todas</option>' +
+          cats.map(c => `<option value="${UI.esc(c)}"${c === this.estado.categoria ? ' selected' : ''}>${UI.esc(c)}</option>`).join('');
+      } catch (e) { /* silencioso: la búsqueda sigue andando */ }
+    },
+
+    async cargar() {
+      const cont = document.getElementById('cat-lista');
+      cont.innerHTML = UI.spinner();
+      try {
+        const [prods, tot] = await Promise.all([
+          global.DB.productos({ texto: this.estado.texto, categoria: this.estado.categoria }),
+          global.DB.totales().catch(() => null),
+        ]);
+        const sub = document.getElementById('cat-sub');
+        if (sub && tot) sub.textContent = `${tot.productos.toLocaleString('es-AR')} productos · ${tot.variantes.toLocaleString('es-AR')} variantes`;
+        if (!prods.length) { cont.innerHTML = UI.vacio('No hay productos para esa búsqueda.'); return; }
+        cont.innerHTML = `<div class="card"><table>
+          <thead><tr><th>Producto</th><th>Categoría</th><th style="text-align:right">Variantes</th><th></th></tr></thead>
+          <tbody>${prods.map(p => this.filaProducto(p)).join('')}</tbody></table></div>`;
+        cont.querySelectorAll('[data-prod]').forEach(tr =>
+          tr.onclick = () => this.toggle(Number(tr.dataset.prod)));
+      } catch (e) {
+        cont.innerHTML = `<div class="banner warn">No se pudo leer el catálogo: ${UI.esc(e.message || e)}</div>`;
+      }
+    },
+
+    filaProducto(p) {
+      const tn = p.publicado_tn ? '<span class="pill ok">TN</span>' : '<span class="pill soft">interno</span>';
+      return `<tr data-prod="${p.id}" style="cursor:pointer">
+        <td><b>${UI.esc(p.nombre)}</b> ${tn}</td>
+        <td class="muted">${UI.esc(p.categoria || '—')}</td>
+        <td style="text-align:right" class="tnum">${p.variantes}</td>
+        <td style="text-align:right" class="muted">ver ›</td>
+      </tr>`;
+    },
+
+    async toggle(prodId) {
+      // Si ya está abierto debajo, cerrarlo.
+      const existe = document.getElementById('var-' + prodId);
+      if (existe) { existe.remove(); return; }
+      const tr = document.querySelector(`[data-prod="${prodId}"]`);
+      const fila = document.createElement('tr');
+      fila.id = 'var-' + prodId;
+      fila.innerHTML = `<td colspan="4" style="background:var(--panel-2)">${UI.spinner('Variantes…')}</td>`;
+      tr.after(fila);
+      try {
+        const vars = await global.DB.variantes(prodId);
+        fila.querySelector('td').innerHTML = this.tablaVariantes(vars);
+      } catch (e) {
+        fila.querySelector('td').innerHTML = `<div class="banner warn">${UI.esc(e.message || e)}</div>`;
+      }
+    },
+
+    tablaVariantes(vars) {
+      if (!vars.length) return UI.vacio('Este producto todavía no tiene variantes cargadas.');
+      return `<table style="margin:2px 0">
+        <thead><tr><th>Medida</th><th>Estructura</th><th>Frente</th><th>Otros</th><th style="text-align:right">Precio</th></tr></thead>
+        <tbody>${vars.map(v => {
+          const extras = UI.extras(v).map(([k, val]) =>
+            `<span class="pill soft">${UI.esc(k)}: ${UI.esc(val)}</span>`).join(' ') || '<span class="muted">—</span>';
+          return `<tr>
+            <td class="tnum">${UI.esc(v.medida || '—')}</td>
+            <td>${UI.esc(v.estructura || '—')}</td>
+            <td>${UI.esc(v.frente || '—')}</td>
+            <td>${extras}</td>
+            <td style="text-align:right"><b class="tnum">${UI.pesos(v.precio)}</b></td>
+          </tr>`;
+        }).join('')}</tbody></table>`;
+    },
+
+    modalConexion() {
+      const c = global.DB.cfg();
+      const html = `
+        <div style="position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:50;display:grid;place-items:center;padding:20px" id="mdl">
+          <div class="card pad" style="max-width:460px;width:100%">
+            <h3 class="h-title" style="font-size:18px">Conectar Belgrano Soft</h3>
+            <p class="h-sub">Pegá la <b>anon key</b> de tu proyecto (Settings → API → Project API keys → anon public). Es pública, va en el frontend.</p>
+            <label class="fld" style="margin-top:14px"><span class="lbl">URL del proyecto</span>
+              <input id="mc-url" value="${UI.esc(c.url || global.DB.DEFAULT_URL)}"></label>
+            <label class="fld" style="margin-top:12px"><span class="lbl">anon key</span>
+              <input id="mc-key" placeholder="eyJ…" value="${UI.esc(c.key || '')}"></label>
+            <div class="row" style="margin-top:18px;justify-content:flex-end;gap:10px">
+              <button class="btn" id="mc-cancel">Cancelar</button>
+              <button class="btn primary" id="mc-ok">Conectar</button>
+            </div>
+          </div>
+        </div>`;
+      document.body.insertAdjacentHTML('beforeend', html);
+      const cerrar = () => document.getElementById('mdl').remove();
+      document.getElementById('mc-cancel').onclick = cerrar;
+      document.getElementById('mc-ok').onclick = () => {
+        const url = document.getElementById('mc-url').value.trim();
+        const key = document.getElementById('mc-key').value.trim();
+        if (!key) { UI.aviso('Falta la anon key', 'warn'); return; }
+        global.DB.guardarCfg(url, key);
+        UI.aviso('Conectado. Recargando…', 'ok');
+        setTimeout(() => location.reload(), 600);
+      };
+    },
+  };
+
+  global.Catalogo = Catalogo;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script><script>
+// =====================================================================
+//  Belgrano Soft · Presupuestos  (próximo módulo)
+//  Placeholder: la solapa ya existe; la pantalla se construye después
+//  del catálogo, porque el presupuesto elige muebles del catálogo.
+// =====================================================================
+(function (global) {
+  global.Presupuesto = {
+    render() {
+      document.getElementById('view').innerHTML = `
+        <div class="kick">Presupuestos</div>
+        <h1 class="h-title" style="margin-bottom:8px">Armar un presupuesto</h1>
+        <div class="card pad">
+          <p class="muted" style="margin:0">Este módulo se construye a continuación del catálogo.
+          Va a reusar el buscador de productos para elegir los muebles, con los dos precios
+          (efectivo / tarjeta), la marca de suma / no suma, y el paso de convertirlo en orden.</p>
+        </div>`;
+    },
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+</script><script>
+// =====================================================================
+//  Belgrano Soft · shell
+//  Selector "ver como" (sin login todavía) + navegación por rol.
+//  Cada rol ve solo sus solapas. El login real llega después.
+// =====================================================================
+(function (global) {
+  // Qué solapas ve cada rol. La clave es el módulo; el label lo que se lee.
+  const MODULOS = {
+    catalogo:   { label: 'Catálogo',    render: () => global.Catalogo.render() },
+    presupuesto:{ label: 'Presupuestos',render: () => global.Presupuesto.render() },
+  };
+  const ROLES = {
+    vendedor:   { label: 'Vendedor',            tabs: ['presupuesto', 'catalogo'] },
+    produccion: { label: 'Producción · Iara',   tabs: ['catalogo'] },
+    direccion:  { label: 'Dirección · Brian',   tabs: ['catalogo', 'presupuesto'] },
+  };
+
+  const App = {
+    rol: 'vendedor',
+    tab: null,
+
+    async init() {
+      this.montarShell();
+      // Si no hay conexión configurada, ofrecer conectar (una sola vez).
+      if (!global.DB.hayConexion()) this.pedirConexion();
+      this.setRol(localStorage.getItem('bh_rol') || 'vendedor');
+    },
+
+    montarShell() {
+      document.body.innerHTML = `
+        <div id="top">
+          <div class="brand">Belgrano&nbsp;Soft <span class="m" id="modo"></span></div>
+          <div class="sp"></div>
+          <div class="verComo">
+            <span style="opacity:.7">Ver como</span>
+            <select id="selRol"></select>
+          </div>
+        </div>
+        <nav id="nav"></nav>
+        <main id="view"></main>`;
+      const sel = document.getElementById('selRol');
+      sel.innerHTML = Object.entries(ROLES)
+        .map(([k, r]) => `<option value="${k}">${UI.esc(r.label)}</option>`).join('');
+      sel.onchange = () => this.setRol(sel.value);
+      document.getElementById('modo').textContent =
+        global.DB.modo() === 'demo' ? '· demo' : '';
+    },
+
+    setRol(rol) {
+      if (!ROLES[rol]) rol = 'vendedor';
+      this.rol = rol;
+      localStorage.setItem('bh_rol', rol);
+      document.getElementById('selRol').value = rol;
+      const tabs = ROLES[rol].tabs;
+      document.getElementById('nav').innerHTML = tabs
+        .map(t => `<button data-tab="${t}">${UI.esc(MODULOS[t].label)}</button>`).join('');
+      document.querySelectorAll('#nav button').forEach(b =>
+        b.onclick = () => this.setTab(b.dataset.tab));
+      this.setTab(tabs.includes(this.tab) ? this.tab : tabs[0]);
+    },
+
+    setTab(tab) {
+      this.tab = tab;
+      document.querySelectorAll('#nav button').forEach(b =>
+        b.setAttribute('aria-current', b.dataset.tab === tab));
+      document.getElementById('view').innerHTML = '';
+      MODULOS[tab].render();
+    },
+
+    pedirConexion() {
+      const v = document.getElementById('view');
+      // Se muestra en la primera pantalla; no bloquea el modo demo.
+      setTimeout(() => {
+        if (global.DB.hayConexion()) return;
+      }, 0);
+    },
+  };
+
+  global.App = App;
+  if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded', () => App.init());
+})(typeof window !== 'undefined' ? window : globalThis);
+</script></body></html>

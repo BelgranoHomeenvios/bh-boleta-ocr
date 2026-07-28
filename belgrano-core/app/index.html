@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Belgrano Soft</title>
+  <link rel="stylesheet" href="comun/estilos.css">
+</head>
+<body>
+  <!-- El shell (comun/app.js) reemplaza el body al arrancar. -->
+
+  <!-- Cliente de Supabase (CDN). El front lo carga desde el hosting, no
+       desde un artifact, así que el CDN está permitido. -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Infraestructura común -->
+  <script src="comun/db.js"></script>
+  <script src="comun/ui.js"></script>
+
+  <!-- Módulos -->
+  <script src="catalogo/catalogo.js"></script>
+  <script src="ventas/presupuesto.js"></script>
+
+  <!-- El shell arranca último -->
+  <script src="comun/app.js"></script>
+</body>
+</html>
