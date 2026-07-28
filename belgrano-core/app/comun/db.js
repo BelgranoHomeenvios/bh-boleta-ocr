@@ -61,6 +61,21 @@
       { id: 13, producto_id: 2, medida: '2.00', estructura: 'blanca', frente: 'paraiso', precio: 900000, atributos: { medida: '2.00', estructura: 'blanca', frente: 'paraiso', espejo: '2 espejos' } },
       { id: 14, producto_id: 3, medida: '1.00', estructura: 'blanca', frente: null,      precio: 300000, atributos: { medida: '1.00', estructura: 'blanca' } },
     ],
+    // Órdenes de venta de ejemplo (para ver la vista antes de conectar).
+    ordenes: [
+      { id: 2, numero: 'S00002', fecha: '2026-06-01', cliente: 'Abigail Galfre',   vendedor: 'Brian Singer', local: 'Belgrano 2020', total: 968000,   estado: 'facturada' },
+      { id: 1, numero: 'S00001', fecha: '2026-06-01', cliente: 'Abel Schoenmaker',  vendedor: 'Cristian',     local: 'Belgrano 2020', total: 1028500,  estado: 'por_facturar' },
+      { id: 3, numero: 'S00003', fecha: '2026-07-24', cliente: 'Bibiana',           vendedor: 'Ale',          local: 'Belgrano 2020', total: 516000,   estado: 'confirmada' },
+    ],
+  };
+
+  // Estados de la orden → etiqueta y color del pill.
+  const ESTADO_ORDEN = {
+    presupuesto:  { label: 'Presupuesto',           pill: 'soft' },
+    confirmada:   { label: 'Confirmada',            pill: 'info' },
+    por_facturar: { label: 'Por facturar',          pill: 'warn' },
+    facturada:    { label: 'Facturado por completo', pill: 'ok' },
+    anulada:      { label: 'Anulada',               pill: 'crit' },
   };
 
   // ---- API que usan los módulos ---------------------------------------
