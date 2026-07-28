@@ -15,7 +15,7 @@ const scripts = [
   'comun/db.js', 'comun/ui.js',
   'catalogo/catalogo.js',
   'ventas/presupuesto.js', 'ventas/cotizaciones.js', 'ventas/ordenes.js', 'ventas/clientes.js', 'ventas/ventas.js',
-  'modulos/produccion.js', 'modulos/esqueletos.js',
+  'modulos/inicio.js', 'modulos/produccion.js', 'modulos/esqueletos.js',
   'comun/app.js',
 ];
 

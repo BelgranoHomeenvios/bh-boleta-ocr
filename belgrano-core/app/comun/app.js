@@ -6,6 +6,7 @@
 (function (global) {
   // Qué solapas ve cada rol. La clave es el módulo; el label lo que se lee.
   const MODULOS = {
+    inicio:         { label: 'Inicio',         render: () => global.Inicio.render() },
     ventas:         { label: 'Ventas',         render: () => global.Ventas.render() },
     catalogo:       { label: 'Catálogo',       render: () => global.Catalogo.render() },
     caja:           { label: 'Caja',           render: () => global.Esq.render('caja') },
@@ -20,7 +21,7 @@
   // Los 6 roles y qué módulos ve cada uno (permisos finos: se afinan después).
   const ROLES = {
     vendedor:      { label: 'Vendedor',              tabs: ['ventas', 'catalogo', 'produccion', 'logistica'] },
-    direccion:     { label: 'Dirección',             tabs: ['ventas', 'catalogo', 'caja', 'produccion', 'logistica', 'reclamos', 'abastecimiento', 'facturas', 'reportes', 'config'] },
+    direccion:     { label: 'Dirección',             tabs: ['inicio', 'ventas', 'catalogo', 'caja', 'produccion', 'logistica', 'reclamos', 'abastecimiento', 'facturas', 'reportes', 'config'] },
     administrativo:{ label: 'Administrativo',        tabs: ['ventas', 'facturas', 'caja', 'catalogo'] },
     prod:          { label: 'Encargado de Producción', tabs: ['produccion', 'abastecimiento', 'catalogo'] },
     logi:          { label: 'Logística',             tabs: ['logistica', 'reclamos', 'catalogo'] },
@@ -28,14 +29,14 @@
   };
 
   const App = {
-    rol: 'vendedor',
+    rol: 'direccion',
     tab: null,
 
     async init() {
       this.montarShell();
       // Si no hay conexión configurada, ofrecer conectar (una sola vez).
       if (!global.DB.hayConexion()) this.pedirConexion();
-      this.setRol(localStorage.getItem('bh_rol') || 'vendedor');
+      this.setRol(localStorage.getItem('bh_rol') || 'direccion');
     },
 
     montarShell() {
