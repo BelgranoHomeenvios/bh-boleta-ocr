@@ -61,6 +61,25 @@ create table if not exists staging.mapeo_eje (
   eje         text not null check (eje in ('medida','estructura','frente','complemento','ignorar'))
 );
 
+-- Si la tabla ya existía de una corrida anterior, su check no conoce el
+-- cuarto eje. `create table if not exists` no toca la que ya está, así que
+-- el constraint se reemplaza a mano.
+do $$
+declare c text;
+begin
+  select conname into c
+    from pg_constraint
+   where conrelid = 'staging.mapeo_eje'::regclass
+     and contype = 'c'
+     and pg_get_constraintdef(oid) not like '%complemento%';
+  if c is not null then
+    execute format('alter table staging.mapeo_eje drop constraint %I', c);
+    alter table staging.mapeo_eje
+      add constraint mapeo_eje_eje_check
+      check (eje in ('medida','estructura','frente','complemento','ignorar'));
+  end if;
+end $$;
+
 -- Los tres primeros son los nombres REALES que usa Tienda Nube, tomados del
 -- diagnóstico. El resto son variantes previsibles, por si aparecen en otras
 -- categorías. El match es case-insensitive y sobre el nombre ya recortado,
