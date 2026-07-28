@@ -4,10 +4,13 @@
 //  variantes. O búsqueda directa por texto. Es el cimiento del presupuesto.
 // =====================================================================
 (function (global) {
+  const VISTA_KEY = 'bh_catalogo_vista';
   const Catalogo = {
     arbol: [],           // categorías cargadas
     ruta: [],            // breadcrumb: [{id,nombre}] hasta la categoría actual
     texto: '',           // búsqueda libre
+    vista: (() => { try { return localStorage.getItem(VISTA_KEY) || 'bloques'; } catch { return 'bloques'; } })(),
+    _prods: null,        // últimos productos pintados (para re-render al cambiar de vista)
 
     async render() {
       const v = document.getElementById('view');
@@ -23,9 +26,22 @@
             <span class="lbl">Buscar en todo el catálogo</span>
             <input id="cat-q" placeholder="Amberes, oliver, mesa…" value="${UI.esc(this.texto)}">
           </label>
+          <div class="vista-tog" role="group" aria-label="Formato de vista" style="align-self:flex-end">
+            <button id="v-bloques" title="Bloques" aria-label="Bloques">▦</button>
+            <button id="v-lista"   title="Listado" aria-label="Listado">☰</button>
+          </div>
         </div>
         <div id="cat-crumb"></div>
-        <div id="cat-lista">${UI.spinner()}</div>`;
+        <div id="cat-lista">${UI.spinner()}</div>
+        <style>
+          .vista-tog{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
+          .vista-tog button{border:0;background:transparent;padding:8px 12px;cursor:pointer;font-size:16px;color:var(--muted);line-height:1}
+          .vista-tog button+button{border-left:1px solid var(--line)}
+          .vista-tog button.on{background:var(--brand-soft);color:var(--brand-ink)}
+        </style>`;
+      this.pintarTog();
+      document.getElementById('v-bloques').onclick = () => this.setVista('bloques');
+      document.getElementById('v-lista').onclick   = () => this.setVista('lista');
 
       if (global.DB.modo() === 'demo') {
         v.insertAdjacentHTML('afterbegin',
@@ -102,11 +118,11 @@
       // Es una hoja (tipo de mueble): mostramos sus productos.
       cont.innerHTML = UI.spinner();
       try {
-        const prods = await global.DB.productos({ categoriaId: actual });
-        cont.innerHTML = this.tablaProductos(prods,
+        this._prods = await global.DB.productos({ categoriaId: actual });
+        this.pintarProductos(cont,
           actual ? 'Este tipo de mueble no tiene productos.' : 'Elegí un ambiente para empezar.');
-        this.enganchar(cont);
       } catch (e) {
+        this._prods = null;
         cont.innerHTML = `<div class="banner warn">No se pudo leer: ${UI.esc(e.message || e)}</div>`;
       }
     },
@@ -117,16 +133,41 @@
       const cont = document.getElementById('cat-lista');
       cont.innerHTML = UI.spinner();
       try {
-        const prods = await global.DB.productos({ texto: this.texto });
-        cont.innerHTML = this.tablaProductos(prods, 'No hay productos para esa búsqueda.');
-        this.enganchar(cont);
+        this._prods = await global.DB.productos({ texto: this.texto });
+        this.pintarProductos(cont, 'No hay productos para esa búsqueda.');
       } catch (e) {
+        this._prods = null;
         cont.innerHTML = `<div class="banner warn">${UI.esc(e.message || e)}</div>`;
       }
     },
 
-    tablaProductos(prods, vacio) {
-      if (!prods.length) return UI.vacio(vacio);
+    // Cambia entre bloques/listado y re-pinta lo que haya sin volver a la base.
+    setVista(v) {
+      if (v === this.vista) return;
+      this.vista = v;
+      try { localStorage.setItem(VISTA_KEY, v); } catch {}
+      this.pintarTog();
+      const cont = document.getElementById('cat-lista');
+      if (this._prods) this.pintarProductos(cont, 'Sin productos.');
+    },
+
+    pintarTog() {
+      const b = document.getElementById('v-bloques'), l = document.getElementById('v-lista');
+      if (!b || !l) return;
+      b.className = this.vista === 'bloques' ? 'on' : '';
+      l.className = this.vista === 'lista' ? 'on' : '';
+    },
+
+    // Dispatcher: pinta la lista de productos en el formato elegido.
+    pintarProductos(cont, vacio) {
+      const prods = this._prods || [];
+      cont.innerHTML = prods.length
+        ? (this.vista === 'lista' ? this.htmlLista(prods) : this.htmlBloques(prods))
+        : UI.vacio(vacio);
+      this.enganchar(cont);
+    },
+
+    htmlLista(prods) {
       return `<div class="card"><table>
         <thead><tr><th>Producto</th><th style="text-align:right">Variantes</th><th></th></tr></thead>
         <tbody>${prods.map(p => {
@@ -138,9 +179,49 @@
         }).join('')}</tbody></table></div>`;
     },
 
+    htmlBloques(prods) {
+      return `<div class="grid-prod">${prods.map(p => {
+        const tn = p.publicado_tn ? '<span class="pill ok">TN</span>' : '<span class="pill soft">interno</span>';
+        return `<button class="prod-tile" data-prod="${p.id}">
+            <div class="prod-top"><span class="prod-n">${UI.esc(p.nombre)}</span> ${tn}</div>
+            <div class="prod-meta"><b class="tnum">${p.variantes}</b> variantes</div>
+          </button>`;
+      }).join('')}</div>
+        <div id="cat-detalle"></div>
+        <style>
+          .grid-prod{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+          .prod-tile{display:flex;flex-direction:column;gap:8px;align-items:flex-start;padding:16px;
+            border:1px solid var(--line);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);
+            cursor:pointer;text-align:left;transition:.15s}
+          .prod-tile:hover{border-color:var(--brand);transform:translateY(-1px)}
+          .prod-tile.on{border-color:var(--brand);background:var(--brand-soft)}
+          .prod-top{display:flex;align-items:center;gap:8px}
+          .prod-n{font-weight:650;color:var(--navy)}
+          .prod-meta{color:var(--muted);font-size:13px}
+        </style>`;
+    },
+
     enganchar(cont) {
-      cont.querySelectorAll('[data-prod]').forEach(tr =>
-        tr.onclick = () => this.toggle(Number(tr.dataset.prod)));
+      cont.querySelectorAll('[data-prod]').forEach(el =>
+        el.onclick = () => this.vista === 'lista'
+          ? this.toggle(Number(el.dataset.prod))
+          : this.abrirDetalle(Number(el.dataset.prod), el));
+    },
+
+    // Vista bloques: las variantes van a un panel debajo de la grilla.
+    async abrirDetalle(prodId, tile) {
+      const det = document.getElementById('cat-detalle');
+      const yaAbierto = tile.classList.contains('on');
+      document.querySelectorAll('.prod-tile.on').forEach(t => t.classList.remove('on'));
+      if (yaAbierto) { det.innerHTML = ''; return; }
+      tile.classList.add('on');
+      det.innerHTML = `<div class="card pad" style="margin-top:12px">${UI.spinner('Variantes…')}</div>`;
+      try {
+        const vars = await global.DB.variantes(prodId);
+        det.innerHTML = `<div class="card pad" style="margin-top:12px">${this.tablaVariantes(vars)}</div>`;
+      } catch (e) {
+        det.innerHTML = `<div class="banner warn" style="margin-top:12px">${UI.esc(e.message || e)}</div>`;
+      }
     },
 
     async toggle(prodId) {
