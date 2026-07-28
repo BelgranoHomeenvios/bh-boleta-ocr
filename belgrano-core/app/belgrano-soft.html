@@ -134,6 +134,12 @@ tr:hover td{background:var(--panel-2)}
   // dejarla escrita en el repo.
   const DEFAULT_URL = 'https://qwbdhpevgirsmfxqlgtg.supabase.co';
 
+  // Saca tildes y pasa a minúscula: "CÓMODA" → "comoda". Así la búsqueda
+  // reconoce todo aunque la persona no ponga el acento.
+  function sinTilde(s) {
+    return String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+  }
+
   function cfg() {
     try { return JSON.parse(localStorage.getItem(CFG_KEY)) || {}; }
     catch { return {}; }
@@ -196,15 +202,18 @@ tr:hover td{background:var(--panel-2)}
     // Productos: por categoría (tipo de mueble) o por texto libre.
     async productos({ texto = '', categoriaId = null, limite = 200 } = {}) {
       if (!hayConexion()) {
+        const t = sinTilde(texto);
         let ps = DEMO.productos.filter(p =>
-          (!texto || p.nombre.toLowerCase().includes(texto.toLowerCase())) &&
+          (!t || sinTilde(p.nombre).includes(t)) &&
           (categoriaId == null || p.categoria_id === categoriaId));
         return ps.map(p => ({ ...p, variantes: DEMO.variantes.filter(v => v.producto_id === p.id).length }));
       }
       let q = cliente().from('producto')
         .select('id,categoria_id,nombre,publicado_tn,variante(count)')
         .eq('activo', true).order('nombre').limit(limite);
-      if (texto) q = q.ilike('nombre', `%${texto}%`);
+      // Búsqueda sin tildes: se compara contra nombre_norm (columna generada,
+      // ver migración busqueda_sin_tilde.sql). Así "comoda" encuentra "CÓMODA".
+      if (texto) q = q.ilike('nombre_norm', `%${sinTilde(texto)}%`);
       if (categoriaId != null) q = q.eq('categoria_id', categoriaId);
       const { data, error } = await q;
       if (error) throw error;
