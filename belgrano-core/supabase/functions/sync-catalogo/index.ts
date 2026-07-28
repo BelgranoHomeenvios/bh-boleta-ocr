@@ -67,6 +67,31 @@ Deno.serve(async (req) => {
     const catalogo: Record<string, unknown>[] = [];
     const vistos = new Set<number>();
 
+    // ---- ÁRBOL DE CATEGORÍAS -------------------------------------------
+    // Tienda Nube tiene el árbol: cada categoría con su padre. De acá sale
+    // la jerarquía madre → mueble que el catálogo necesita.
+    const categorias: Record<string, unknown>[] = [];
+    if (conCatalogo) {
+      for (let cp = 1; cp <= 50; cp++) {
+        const cu = `https://api.tiendanube.com/v1/${TN_STORE_ID}/categories` +
+          `?per_page=200&page=${cp}&fields=id,name,parent`;
+        const cr = await fetch(cu, { headers: tnHeaders });
+        if (cr.status === 404 && cp > 1) break;
+        if (!cr.ok) break;
+        const cats = await cr.json();
+        if (!Array.isArray(cats) || cats.length === 0) break;
+        for (const c of cats) {
+          categorias.push({
+            tn_id: c.id,
+            nombre: txt(c.name),
+            parent_id: c.parent || null,   // TN usa 0 para raíz; se guarda null
+            actualizado: ahora,
+          });
+        }
+        if (cats.length < 200) break;
+      }
+    }
+
     let page = 1;
     for (; page <= 500; page++) {
       const url = `https://api.tiendanube.com/v1/${TN_STORE_ID}/products` +
@@ -84,7 +109,11 @@ Deno.serve(async (req) => {
 
       for (const p of productos) {
         const nombre = txt(p.name);
-        const cat = Array.isArray(p.categories) && p.categories.length ? p.categories[0] : null;
+        const cats = Array.isArray(p.categories) ? p.categories : [];
+        const cat = cats.length ? cats[0] : null;
+        // Todas las categorías del producto, para que la migración elija la
+        // más específica (la hoja) usando el árbol.
+        const categoria_ids = cats.map((c: { id: number }) => c.id);
         const atributos = Array.isArray(p.attributes) ? p.attributes.map(txt) : [];
 
         for (const v of (p.variants ?? [])) {
@@ -97,6 +126,7 @@ Deno.serve(async (req) => {
             nombre,
             categoria: cat ? txt(cat.name) : null,
             categoria_id: cat?.id ?? null,
+            categoria_ids,
             atributos,
             valores: Array.isArray(v.values) ? v.values.map(txt) : [],
             sku: v.sku ?? null,
@@ -112,6 +142,14 @@ Deno.serve(async (req) => {
 
     const db = createClient(SUPABASE_URL, SERVICE_KEY).schema("staging");
 
+    // El árbol de categorías primero (si se pidió catálogo).
+    if (categorias.length) {
+      const { error } = await db
+        .from("tn_categoria")
+        .upsert(categorias, { onConflict: "tn_id" });
+      if (error) throw error;
+    }
+
     for (let i = 0; i < catalogo.length; i += 500) {
       const { error } = await db
         .from("tn_catalogo")
@@ -119,7 +157,12 @@ Deno.serve(async (req) => {
       if (error) throw error;
     }
 
-    return json({ ok: true, variantes: catalogo.length, paginas: page });
+    return json({
+      ok: true,
+      variantes: catalogo.length,
+      categorias: categorias.length,
+      paginas: page,
+    });
   } catch (e) {
     console.error("sync-catalogo:", e);
     // Los errores de supabase-js no son instancias de Error: son objetos
