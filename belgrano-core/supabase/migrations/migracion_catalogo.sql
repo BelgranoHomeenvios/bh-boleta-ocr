@@ -115,6 +115,16 @@ insert into staging.mapeo_atributo (atributo_tn, canonico) values
   -- → COLUMNA frente (color del frente/puertas)
   ('FRENTE','frente'), ('FRENTES','frente'), ('COLOR DE FRENTE','frente'),
   ('Frente','frente'), ('COLOR DE FRENTES','frente'),
+  -- → CLAVES DE BOLSA unificadas (sinónimos que no van a columna pero
+  --   conviene juntar para que dos variantes iguales colapsen)
+  ('ESPEJOS','espejo'), ('ESPEJO','espejo'), ('ALTURA DEL ESPEJO','espejo_altura'),
+  ('TAPIZADOS','tapizado'), ('TAPIZADO','tapizado'), ('TELA','tapizado'),
+  ('FORMA DE ENTREGA','forma_entrega'),
+  ('PATAS','pata'), ('PATA','pata'),
+  ('DETALLES','detalle'), ('DETALLE','detalle'),
+  ('ESTANTES','estante'), ('ESTANTE','estante'),
+  ('MÓDULO','modulo'), ('MODULO','modulo'), ('HUECOS','hueco'), ('HUECO','hueco'),
+  ('FRENTES','frente_extra'),
   -- → IGNORAR (basura de e-commerce, no describe la variante)
   ('MUEBLES EN IMAGEN','ignorar'),   -- lista de muebles de una foto de ambiente
   ('Talle','ignorar'),               -- residuo de plantilla de ropa
@@ -164,18 +174,22 @@ group by variant_id;
 -- 5 · MIGRACIÓN
 -- =====================================================================
 
--- 5.1 · PRODUCTOS (uno por product_id de Tienda Nube)
+-- 5.1 · PRODUCTOS (uno por categoría + nombre)
+-- Tienda Nube a veces tiene el mismo producto cargado dos veces, con
+-- product_id distinto pero mismo nombre. Se agrupa por (categoría, nombre),
+-- no por product_id, para que colapsen en un solo producto de Core en vez
+-- de chocar entre sí. Las variantes de ambos matchean por nombre.
 insert into core.producto (categoria, nombre, tipo, publicado_tn, tn_product_id, activo)
 select
   coalesce(nullif(trim(t.categoria),''),'Sin categoría'),
-  trim(t.nombre),
+  min(trim(t.nombre))            as nombre,   -- una forma; el resto son mismo mueble
   'estandar',
   bool_or(coalesce(t.publicado,false)),
-  t.product_id::text,
+  max(t.product_id)::text,                    -- uno cualquiera; el vínculo real es por nombre
   true
 from staging.tn_catalogo t
 where nullif(trim(t.nombre),'') is not null
-group by t.product_id, t.categoria, t.nombre
+group by coalesce(nullif(trim(t.categoria),''),'Sin categoría'), lower(trim(t.nombre))
 on conflict (categoria, lower(nombre)) do update
   set publicado_tn = excluded.publicado_tn,
       tn_product_id = excluded.tn_product_id;
@@ -238,7 +252,8 @@ select p.nombre,
        count(*) - count(distinct md5(b.bolsa::text))  as colapsadas
 from staging.tn_catalogo t
 join staging.tn_bolsa b on b.variant_id = t.variant_id
-join core.producto p on p.tn_product_id = t.product_id::text
+join core.producto p on p.categoria = coalesce(nullif(trim(t.categoria),''),'Sin categoría')
+                     and lower(p.nombre) = lower(trim(t.nombre))
 group by p.nombre
 having count(*) <> count(distinct md5(b.bolsa::text))
 order by colapsadas desc
