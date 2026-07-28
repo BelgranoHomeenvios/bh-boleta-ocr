@@ -1,0 +1,210 @@
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Presupuesto · 3 opciones</title>
+<style>
+:root{
+  --bg:#eef1f6; --panel:#fff; --panel-2:#f7f9fc; --ink:#141a26; --ink-soft:#54607a;
+  --line:#dbe1ec; --line-soft:#e8ecf3;
+  --navy:#1c2b4a; --brand:#2f6fed; --brand-soft:#e6eefc; --brand-ink:#1b4fd0;
+  --ok:#128a5b; --ok-bg:#e2f3ea; --warn:#b5730f; --warn-bg:#f8eeda;
+  --crit:#c53b3b; --crit-bg:#fbe6e6; --muted:#7d8aa3;
+  --shadow:0 1px 2px rgba(20,26,38,.06),0 4px 16px rgba(20,26,38,.05); --r:12px;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0d111b; --panel:#151b2a; --panel-2:#111726; --ink:#eaeef7; --ink-soft:#9aa6c0;
+  --line:#26304a; --line-soft:#1e2740; --navy:#dbe3f4; --brand:#5b8dff;
+  --brand-soft:#1a2540; --brand-ink:#9dbcff; --ok:#43c98d; --ok-bg:#13291f;
+  --warn:#e0a53c; --warn-bg:#2c2413; --crit:#f0736f; --crit-bg:#2c1717; --muted:#7f8cab;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 22px rgba(0,0,0,.28);
+}}
+*{box-sizing:border-box} html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-variant-numeric:tabular-nums;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
+.tnum{font-variant-numeric:tabular-nums} h1,h2,h3{margin:0;letter-spacing:-.01em} button{font:inherit}
+#top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;background:var(--navy);color:#fff;padding:10px 18px;box-shadow:var(--shadow)}
+@media (prefers-color-scheme:dark){#top{color:#0d111b}}
+#top .brand{font-weight:800;letter-spacing:-.02em;font-size:15px;display:flex;align-items:center;gap:8px}
+#top .brand .m{opacity:.6;font-weight:500} #top .sp{flex:1} #top .verComo{font-size:13px;opacity:.85}
+.wrap{max-width:1120px;margin:0 auto;padding:22px 18px 80px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.pad{padding:16px} .row{display:flex;align-items:center;gap:12px} .sp{flex:1} .muted{color:var(--muted)}
+.h-title{font-size:22px;font-weight:800;color:var(--navy)} .h-sub{color:var(--ink-soft);margin-top:4px;font-size:14px}
+.kick{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--brand);font-weight:700}
+input,select{font:inherit;font-size:14px;padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink);width:100%}
+label.fld{display:block} label.fld .lbl{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;font-weight:600}
+.btn{font-weight:650;font-size:14px;padding:9px 16px;border-radius:9px;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink);transition:.15s}
+.btn:hover{border-color:var(--brand);color:var(--brand)} .btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.primary:hover{background:var(--brand-ink)} .btn.sm{padding:6px 11px;font-size:13px}
+.pill{font-size:11px;font-weight:700;padding:3px 9px;border-radius:6px;white-space:nowrap;display:inline-block}
+.pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.soft{background:var(--line-soft);color:var(--ink-soft)} .pill.info{background:var(--brand-soft);color:var(--brand)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:10px 12px;border-bottom:1px solid var(--line)}
+td{padding:11px 12px;border-bottom:1px solid var(--line-soft)} tr:hover td{background:var(--panel-2)}
+
+/* Selector de opción */
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.tabs button{border:1px solid var(--line);background:var(--panel);color:var(--ink-soft);font-weight:650;font-size:14px;padding:10px 16px;border-radius:10px;cursor:pointer}
+.tabs button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.opt{display:none} .opt.on{display:block}
+.nota{font-size:13px;color:var(--ink-soft);background:var(--brand-soft);border-radius:10px;padding:12px 14px;margin-bottom:18px}
+.nota b{color:var(--brand-ink)}
+
+/* Cabecera de presupuesto reutilizable */
+.presu-head{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-bottom:16px}
+@media(max-width:640px){.presu-head{grid-template-columns:1fr}}
+
+/* Líneas del presupuesto */
+.lin{display:grid;grid-template-columns:1fr auto auto auto auto;gap:10px;align-items:center;padding:11px 12px;border-bottom:1px solid var(--line-soft)}
+.lin:hover{background:var(--panel-2)}
+.lin .n{font-weight:650;color:var(--navy)} .lin .v{font-size:12px;color:var(--muted)}
+.lin .pr{text-align:right;font-weight:650} .lin .pr small{display:block;font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase}
+.sw{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft);cursor:pointer;white-space:nowrap}
+.sw .b{width:34px;height:19px;border-radius:20px;background:var(--brand);position:relative;transition:.15s}
+.sw .b::after{content:"";position:absolute;top:2px;right:2px;width:15px;height:15px;border-radius:50%;background:#fff}
+.sw.off .b{background:var(--line)} .sw.off .b::after{left:2px;right:auto}
+.x{color:var(--muted);cursor:pointer;font-size:16px;border:0;background:transparent;padding:4px}
+.foot{display:flex;align-items:center;gap:20px;padding:16px;border-top:2px solid var(--line);flex-wrap:wrap}
+.tot{font-size:13px;color:var(--muted)} .tot b{display:block;font-size:20px;color:var(--navy)}
+
+/* Buscador incremental (A) */
+.busq-res{border:1px solid var(--brand);border-radius:11px;margin-top:8px;overflow:hidden;box-shadow:var(--shadow)}
+.busq-res .prod{padding:11px 14px;font-weight:650;color:var(--navy);border-bottom:1px solid var(--line-soft);background:var(--panel-2)}
+.busq-res .varo{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line-soft)}
+.busq-res .varo:last-child{border-bottom:0}
+.chips{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+
+/* Split (B) */
+.split{display:grid;grid-template-columns:1fr 1fr;gap:16px} @media(max-width:820px){.split{grid-template-columns:1fr}}
+.crumb{font-size:13px;color:var(--muted);margin-bottom:12px} .crumb b{color:var(--navy)}
+.pcard{border:1px solid var(--line);border-radius:11px;padding:12px;margin-bottom:8px}
+.pcard.open{border-color:var(--brand)}
+.pcard .t{display:flex;align-items:center;gap:8px;font-weight:650;color:var(--navy);cursor:pointer}
+.pcard .vr{display:flex;align-items:center;gap:8px;padding:8px 4px;border-top:1px solid var(--line-soft);font-size:13px;margin-top:8px}
+
+/* Modal (C) */
+.dim{position:relative;background:rgba(20,26,38,.35);border-radius:12px;padding:26px;margin-top:14px}
+.win{max-width:520px;margin:0 auto}
+</style></head><body>
+
+<div id="top">
+  <div class="brand">Belgrano Soft <span class="m">· presupuesto</span></div>
+  <div class="sp"></div>
+  <div class="verComo">Ver como: Vendedor</div>
+</div>
+
+<div class="wrap">
+  <div class="kick">Mockup para decidir</div>
+  <h1 class="h-title" style="margin:4px 0 4px">Cómo agregar muebles a un presupuesto</h1>
+  <p class="h-sub" style="margin-bottom:18px">Tres formas de la misma pantalla. Tocá cada botón para compararlas. Son maquetas: los botones no hacen nada todavía.</p>
+
+  <div class="tabs">
+    <button class="on" data-t="a">A · Buscador incremental</button>
+    <button data-t="b">B · Catálogo al costado</button>
+    <button data-t="c">C · Modal "Agregar mueble"</button>
+  </div>
+
+  <!-- ================= OPCIÓN A ================= -->
+  <section class="opt on" id="opt-a">
+    <div class="nota"><b>Opción A.</b> Un solo campo arriba. Escribís, elegís producto y variante, se suma como línea. Lo más rápido para el vendedor que ya sabe qué quiere.</div>
+
+    <div class="presu-head">
+      <label class="fld"><span class="lbl">Cliente</span><select><option>Martínez, Laura — 11 5555-2020</option></select></label>
+      <label class="fld"><span class="lbl">Vendedor</span><select><option>Sofía</option></select></label>
+      <label class="fld"><span class="lbl">Fecha</span><input value="28/07/2026"></label>
+    </div>
+
+    <div class="card pad" style="margin-bottom:16px">
+      <label class="fld"><span class="lbl">Agregar mueble</span><input value="amberes" style="border-color:var(--brand)"></label>
+      <div class="busq-res">
+        <div class="prod">CÓMODA AMBERES 55 <span class="pill ok" style="margin-left:6px">TN</span></div>
+        <div class="varo"><div class="chips"><span class="pill soft">1.20</span><span class="pill soft">blanca</span><span class="pill soft">paraíso</span></div><b class="tnum">$425.750</b><button class="btn sm primary">+ Agregar</button></div>
+        <div class="varo"><div class="chips"><span class="pill soft">1.20</span><span class="pill soft">negra</span><span class="pill soft">blanca</span></div><b class="tnum">$406.250</b><button class="btn sm">+ Agregar</button></div>
+        <div class="varo"><div class="chips"><span class="pill soft">1.40</span><span class="pill soft">blanca</span><span class="pill soft">paraíso</span></div><b class="tnum">$489.900</b><button class="btn sm">+ Agregar</button></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="padding:12px 14px;font-weight:700;color:var(--navy);border-bottom:1px solid var(--line)">Presupuesto — 3 líneas</div>
+      <div class="lin"><div><div class="n">CÓMODA AMBERES 55</div><div class="v">1.20 · blanca · paraíso</div></div>
+        <div class="pr"><small>efectivo</small>$425.750</div><div class="pr"><small>tarjeta</small>$489.600</div>
+        <span class="sw"><span class="b"></span>suma</span><button class="x">✕</button></div>
+      <div class="lin"><div><div class="n">MESA DE LUZ OSLO</div><div class="v">colgante · blanca · 1 cajón</div></div>
+        <div class="pr"><small>efectivo</small>$118.400</div><div class="pr"><small>tarjeta</small>$136.100</div>
+        <span class="sw"><span class="b"></span>suma</span><button class="x">✕</button></div>
+      <div class="lin"><div><div class="n">FLETE — Zona Sur</div><div class="v">entrega a domicilio</div></div>
+        <div class="pr"><small>efectivo</small>$35.000</div><div class="pr"><small>tarjeta</small>$35.000</div>
+        <span class="sw off"><span class="b"></span>no suma</span><button class="x">✕</button></div>
+      <div class="foot"><div class="tot">Total efectivo <b class="tnum">$579.150</b></div><div class="tot">Total tarjeta <b class="tnum">$660.700</b></div><div class="sp"></div><button class="btn">Guardar</button><button class="btn primary">Convertir en venta →</button></div>
+    </div>
+  </section>
+
+  <!-- ================= OPCIÓN B ================= -->
+  <section class="opt" id="opt-b">
+    <div class="nota"><b>Opción B.</b> Pantalla partida. Navegás el catálogo a la izquierda (el mismo árbol y bloques que ya tenés) y el presupuesto se arma a la derecha. Ideal para mostrarle opciones al cliente en el local.</div>
+
+    <div class="presu-head" style="grid-template-columns:1fr 1fr 1fr">
+      <label class="fld"><span class="lbl">Cliente</span><select><option>Martínez, Laura — 11 5555-2020</option></select></label>
+      <label class="fld"><span class="lbl">Vendedor</span><select><option>Sofía</option></select></label>
+      <label class="fld"><span class="lbl">Fecha</span><input value="28/07/2026"></label>
+    </div>
+
+    <div class="split">
+      <div class="card pad">
+        <div class="crumb">Todo › DORMITORIO › <b>CÓMODAS</b></div>
+        <div class="pcard open">
+          <div class="t">CÓMODA AMBERES 55 <span class="pill ok">TN</span><span class="sp"></span><span class="muted" style="font-size:12px">6 variantes ▾</span></div>
+          <div class="vr"><div class="chips" style="flex:1"><span class="pill soft">1.20</span><span class="pill soft">blanca</span><span class="pill soft">paraíso</span></div><b class="tnum">$425.750</b><button class="btn sm primary">+</button></div>
+          <div class="vr"><div class="chips" style="flex:1"><span class="pill soft">1.20</span><span class="pill soft">negra</span><span class="pill soft">blanca</span></div><b class="tnum">$406.250</b><button class="btn sm">+</button></div>
+        </div>
+        <div class="pcard"><div class="t">CÓMODA OLIVER 60 <span class="pill ok">TN</span><span class="sp"></span><span class="muted" style="font-size:12px">4 variantes ▸</span></div></div>
+        <div class="pcard"><div class="t">CÓMODA NÓRDICA 90 <span class="pill soft">interno</span><span class="sp"></span><span class="muted" style="font-size:12px">3 variantes ▸</span></div></div>
+      </div>
+
+      <div class="card">
+        <div style="padding:12px 14px;font-weight:700;color:var(--navy);border-bottom:1px solid var(--line)">Presupuesto — 2 líneas</div>
+        <div class="lin" style="grid-template-columns:1fr auto auto"><div><div class="n">CÓMODA AMBERES 55</div><div class="v">1.20 · blanca · paraíso</div></div><div class="pr"><small>efectivo</small>$425.750</div><button class="x">✕</button></div>
+        <div class="lin" style="grid-template-columns:1fr auto auto"><div><div class="n">RESPALDO MILÁN</div><div class="v">2 plazas · lino gris</div></div><div class="pr"><small>efectivo</small>$210.000</div><button class="x">✕</button></div>
+        <div class="foot" style="gap:14px"><div class="tot">Efectivo <b class="tnum">$635.750</b></div><div class="tot">Tarjeta <b class="tnum">$725.900</b></div><div class="sp"></div><button class="btn primary sm">Convertir en venta →</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= OPCIÓN C ================= -->
+  <section class="opt" id="opt-c">
+    <div class="nota"><b>Opción C.</b> El presupuesto queda limpio. El botón "Agregar mueble" abre el catálogo en una ventana; elegís, se cierra y volvés. El catálogo aparece sólo cuando lo necesitás.</div>
+
+    <div class="presu-head">
+      <label class="fld"><span class="lbl">Cliente</span><select><option>Martínez, Laura — 11 5555-2020</option></select></label>
+      <label class="fld"><span class="lbl">Vendedor</span><select><option>Sofía</option></select></label>
+      <label class="fld"><span class="lbl">Fecha</span><input value="28/07/2026"></label>
+    </div>
+
+    <div class="card">
+      <div class="row" style="padding:12px 14px;border-bottom:1px solid var(--line)"><div style="font-weight:700;color:var(--navy)">Presupuesto — 1 línea</div><div class="sp"></div><button class="btn primary sm">+ Agregar mueble</button></div>
+      <div class="lin"><div><div class="n">CÓMODA AMBERES 55</div><div class="v">1.20 · blanca · paraíso</div></div>
+        <div class="pr"><small>efectivo</small>$425.750</div><div class="pr"><small>tarjeta</small>$489.600</div>
+        <span class="sw"><span class="b"></span>suma</span><button class="x">✕</button></div>
+      <div class="foot"><div class="tot">Total efectivo <b class="tnum">$425.750</b></div><div class="tot">Total tarjeta <b class="tnum">$489.600</b></div><div class="sp"></div><button class="btn primary">Convertir en venta →</button></div>
+    </div>
+
+    <div class="dim"><div class="win card pad">
+      <div class="row" style="margin-bottom:12px"><h3 style="color:var(--navy)">Elegir mueble</h3><div class="sp"></div><button class="x" style="font-size:20px">✕</button></div>
+      <input value="amberes" style="border-color:var(--brand);margin-bottom:10px">
+      <div class="busq-res">
+        <div class="prod">CÓMODA AMBERES 55 <span class="pill ok" style="margin-left:6px">TN</span></div>
+        <div class="varo"><div class="chips"><span class="pill soft">1.20</span><span class="pill soft">blanca</span><span class="pill soft">paraíso</span></div><b class="tnum">$425.750</b><button class="btn sm primary">Elegir</button></div>
+        <div class="varo"><div class="chips"><span class="pill soft">1.40</span><span class="pill soft">blanca</span><span class="pill soft">paraíso</span></div><b class="tnum">$489.900</b><button class="btn sm">Elegir</button></div>
+      </div>
+    </div></div>
+  </section>
+</div>
+
+<script>
+  document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('on'));
+    document.querySelectorAll('.opt').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    document.getElementById('opt-' + b.dataset.t).classList.add('on');
+  });
+</script>
+</body></html>
