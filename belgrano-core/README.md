@@ -8,6 +8,9 @@ en el SQL Editor.
 | `bloque1_v3.sql` | Esquemas · agente · cliente · catálogo · unidad · orden · línea · grupos · parámetros · autorización · evento |
 | `bloque2_plata.sql` | Numeración · cobro · imputación · caja · rendición · devolución · cesión · bloqueo financiero |
 | `bloque3_abastecimiento.sql` | Proveedor · pedido · tanda · recepción · fabricación interna · cuenta corriente · compras y gastos |
+| `bloque4_logistica_entregas_reclamos.sql` | Motivos · zonas y peajes · viaje · envío · entrega · fallidas · reclamos |
+| `bloque1b_semilla_agentes.sql` | Personas, roles y cajas personales |
+| `bloque4b_semilla_choferes_proveedores.sql` | Choferes y carpinteros reales |
 
 Probado contra PostgreSQL 16.13: ambos corren limpio y pasan las pruebas de
 negocio (pago doble, sobrepago, pagador tercero, dólares con cotización
@@ -30,9 +33,16 @@ RLS definido. El SQL Editor entra por debajo de la API y alcanza para probar.
 
 ## Pendiente
 
-- **Bloque 4** — RLS y permisos finos
-- **Logística y entregas** — bloqueado: falta el documento de la Sección 8
-- **Facturación** — bloqueado: falta el documento
+- **Bloque 5** — RLS y permisos finos
+- **Migración del catálogo** desde `rentabilidad.tn_catalogo` de Belgrano Cost
+- **Facturación** — bloqueado: falta el documento de diseño
+
+## Sobre la Sección 8
+
+El documento de logística nunca existió, pero el módulo está en producción.
+Los estados, los tipos de flete, las ventanas horarias, los peajes por
+localidad y los motivos tipificados del bloque 4 salen del código de esa app,
+no de una reconstrucción.
 
 ## Reglas verificadas contra Postgres
 
