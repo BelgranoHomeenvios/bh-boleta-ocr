@@ -122,6 +122,12 @@ Deno.serve(async (req) => {
     return json({ ok: true, variantes: catalogo.length, paginas: page });
   } catch (e) {
     console.error("sync-catalogo:", e);
-    return json({ ok: false, error: e instanceof Error ? e.message : String(e) });
+    // Los errores de supabase-js no son instancias de Error: son objetos
+    // {message, details, hint, code}. String() sobre eso da "[object
+    // Object]", que no dice nada. Se serializa el objeto entero.
+    const msg = e instanceof Error ? e.message
+              : (e && typeof e === "object") ? JSON.stringify(e)
+              : String(e);
+    return json({ ok: false, error: msg });
   }
 });
