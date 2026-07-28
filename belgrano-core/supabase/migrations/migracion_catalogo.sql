@@ -58,7 +58,7 @@ create table if not exists staging.tn_catalogo (
 
 create table if not exists staging.mapeo_eje (
   atributo_tn text primary key,
-  eje         text not null check (eje in ('medida','estructura','frente','ignorar'))
+  eje         text not null check (eje in ('medida','estructura','frente','complemento','ignorar'))
 );
 
 -- Los tres primeros son los nombres REALES que usa Tienda Nube, tomados del
@@ -66,23 +66,31 @@ create table if not exists staging.mapeo_eje (
 -- categorías. El match es case-insensitive y sobre el nombre ya recortado,
 -- así que "MEDIDAS DEL FRENTE " y "MEDIDAS DEL FRENTE" caen en la misma fila.
 insert into staging.mapeo_eje (atributo_tn, eje) values
-  -- Eje 1 · MEDIDA
-  ('MEDIDAS DEL FRENTE', 'medida'),     -- ← el real
+  -- Eje 1 · MEDIDA. Tienda Nube usa tres nombres para lo mismo.
+  ('MEDIDAS DEL FRENTE', 'medida'),
+  ('MEDIDAS',            'medida'),
+  ('MEDIDA',             'medida'),
   ('Medida',             'medida'),
-  ('Medidas',            'medida'),
   ('Tamaño',             'medida'),
-  ('Ancho',              'medida'),
-  -- Eje 2 · ESTRUCTURA
-  ('ESTRUCTURA',         'estructura'), -- ← el real
-  ('Color',              'estructura'), -- cuando el producto tiene un solo color
+  -- Eje 2 · ESTRUCTURA. Es el material o color del cuerpo del mueble.
+  ('ESTRUCTURA',         'estructura'),
+  ('TIPO DE MELAMINA',   'estructura'),
+  ('TAPIZADOS',          'estructura'),   -- CUERINA · LINO · PANA
   ('Material',           'estructura'),
   -- Eje 3 · FRENTES / DETALLES / TAPAS
-  ('DETALLE',            'frente'),     -- ← el real (valores: TAPA BLANCA, ...)
+  ('DETALLE',            'frente'),
   ('Tapa',               'frente'),
   ('Frente',             'frente'),
   ('Frentes',            'frente'),
   ('Terminación',        'frente'),
-  ('Terminacion',        'frente')
+  ('Terminacion',        'frente'),
+  -- Eje 4 · COMPLEMENTO. Configuración que no es ninguna de las tres.
+  ('ESPEJO',             'complemento'),  -- 1 / 2 / 3 / SIN ESPEJO
+  ('ESPEJOS',            'complemento'),  -- mismo atributo, otro nombre
+  ('FORMA DE ENTREGA',   'complemento'),  -- ARMADA · DESARMADA
+  ('Color',              'estructura'),  -- en lámparas y macetas el color ES el cuerpo
+  -- 'Talle' es residuo de la plantilla de e-commerce de ropa: se ignora.
+  ('Talle',              'ignorar')
 on conflict (atributo_tn) do nothing;
 
 comment on table staging.mapeo_eje is
@@ -100,12 +108,22 @@ comment on table staging.mapeo_eje is
 -- el prefijo NO fuera redundante, se saca de esta tabla y ese valor se
 -- guarda entero.
 -- ---------------------------------------------------------------------
+-- Interruptor del SKU. Mientras esté en false, la migración no inventa
+-- códigos: el formato se decide aparte y recién ahí se prende.
+create table if not exists staging.opcion (
+  clave text primary key,
+  valor boolean not null
+);
+insert into staging.opcion (clave, valor) values ('generar_sku', false)
+on conflict (clave) do nothing;
+
 create table if not exists staging.prefijo_redundante (
   prefijo text primary key
 );
 
 insert into staging.prefijo_redundante (prefijo) values
-  ('ESTRUCTURA'), ('TAPA'), ('DETALLE'), ('FRENTE'), ('MEDIDA'), ('COLOR')
+  ('ESTRUCTURA'), ('TAPA'), ('DETALLE'), ('FRENTE'), ('MEDIDA'), ('COLOR'),
+  ('TIPO DE MELAMINA'), ('MELAMINA')
 on conflict (prefijo) do nothing;
 
 create or replace function staging.limpiar_valor(p_valor text)
@@ -130,6 +148,15 @@ returns text language sql immutable as $$
 $$;
 
 -- ---------------------------------------------------------------------
+-- SKU GENERADO  ·  ⚠ PROVISORIO — el formato se define aparte
+--
+-- Poner un SKU ahora y cambiarlo después es caro: queda impreso en
+-- etiquetas y referenciado en pedidos viejos. Por eso la migración lo deja
+-- en NULL por defecto (ver staging.generar_sku más abajo) y la variante se
+-- identifica mientras tanto por tn_variant_id, que ya es único y estable.
+--
+-- Cuando el formato esté definido, se prende el flag y se corre de nuevo.
+-- ---------------------------------------------------------------------
 -- SKU GENERADO
 -- Tienda Nube no trae SKU. Se arma uno estable y legible con el formato ya
 -- definido: CATEGORIA-PRODUCTO-ESTRUCTURA-FRENTE-MEDIDA, tres letras cada
@@ -137,18 +164,21 @@ $$;
 -- ---------------------------------------------------------------------
 create or replace function staging.sku_generado(
   p_categoria text, p_producto text,
-  p_medida text, p_estructura text, p_frente text
+  p_medida text, p_estructura text, p_frente text, p_complemento text default null
 ) returns text language sql immutable as $$
+  -- array_remove solo saca NULL, no cadenas vacías: sin el nullif de cada
+  -- parte, un producto sin frente deja el SKU con guiones colgando
+  -- (FUN-LAM-BLA--). Cada parte se anula si queda vacía.
   select upper(array_to_string(array_remove(array[
-    -- 3 letras de la categoría
-    substr(regexp_replace(staging.unaccent_simple(p_categoria), '[^A-Za-z]','','g'),1,3),
+    nullif(substr(regexp_replace(staging.unaccent_simple(p_categoria), '[^A-Za-z]','','g'),1,3), ''),
     -- 3 letras del producto MÁS sus dígitos: sin los dígitos, "Amberes 70" y
     -- "Amberes 55" dan el mismo código y colisionan.
-    substr(regexp_replace(staging.unaccent_simple(p_producto),  '[^A-Za-z]','','g'),1,3)
-      || regexp_replace(coalesce(p_producto,''), '[^0-9]','','g'),
-    substr(regexp_replace(staging.unaccent_simple(p_estructura),'[^A-Za-z]','','g'),1,3),
-    substr(regexp_replace(staging.unaccent_simple(p_frente),    '[^A-Za-z]','','g'),1,3),
-    nullif(regexp_replace(coalesce(p_medida,''), '[^0-9]','','g'),'')
+    nullif(substr(regexp_replace(staging.unaccent_simple(p_producto), '[^A-Za-z]','','g'),1,3)
+      || regexp_replace(coalesce(p_producto,''), '[^0-9]','','g'), ''),
+    nullif(substr(regexp_replace(staging.unaccent_simple(p_estructura),'[^A-Za-z0-9]','','g'),1,3), ''),
+    nullif(substr(regexp_replace(staging.unaccent_simple(p_frente),    '[^A-Za-z0-9]','','g'),1,3), ''),
+    nullif(substr(regexp_replace(staging.unaccent_simple(p_complemento),'[^A-Za-z0-9]','','g'),1,3), ''),
+    nullif(regexp_replace(coalesce(p_medida,''), '[^0-9]','','g'), '')
   ], null), '-'));
 $$;
 
@@ -175,7 +205,8 @@ select
   p.variant_id,
   max(p.valor) filter (where m.eje = 'medida')     as medida,
   max(p.valor) filter (where m.eje = 'estructura') as estructura,
-  max(p.valor) filter (where m.eje = 'frente')     as frente,
+  max(p.valor) filter (where m.eje = 'frente')      as frente,
+  max(p.valor) filter (where m.eje = 'complemento') as complemento,
   -- Atributos que no mapean a ningún eje. Si esto no queda vacío, hay que
   -- completar staging.mapeo_eje antes de dar la migración por buena.
   string_agg(distinct p.atributo, ', ')
@@ -215,29 +246,43 @@ on conflict (categoria, lower(nombre)) do update
 -- El precio vive en la variante. Sin proporciones ni fórmulas entre
 -- variantes: cada combinación tiene el suyo.
 insert into core.variante
-  (producto_id, medida, estructura, frente, sku, tn_variant_id, precio, precio_ts, activo)
+  (producto_id, medida, estructura, frente, complemento, sku, tn_variant_id, precio, precio_ts, activo)
 select
-  x.producto_id, x.medida, x.estructura, x.frente,
+  x.producto_id, x.medida, x.estructura, x.frente, x.complemento,
   -- Si dos variantes generaran el mismo SKU, la segunda lleva el variant_id
   -- pegado. El SKU tiene que ser único porque es la clave de inventario.
-  case when x.rn = 1 then x.sku else x.sku || '-' || x.variant_id end,
+  case when x.sku is null then null
+       when x.rn = 1     then x.sku
+       else x.sku || '-' || x.variant_id end,
   x.variant_id::text, x.precio, x.precio_ts, true
 from (
   select
     p.id                    as producto_id,
     nullif(e.medida,'')     as medida,
     nullif(e.estructura,'') as estructura,
-    nullif(e.frente,'')     as frente,
+    nullif(e.frente,'')      as frente,
+    nullif(e.complemento,'') as complemento,
     t.variant_id,
     t.precio,
     coalesce(t.actualizado, now()) as precio_ts,
-    coalesce(nullif(trim(t.sku),''), staging.sku_generado(
-      coalesce(nullif(trim(t.categoria),''),'GEN'), trim(t.nombre),
-      e.medida, e.estructura, e.frente))                        as sku,
+    case when (select valor from staging.opcion where clave='generar_sku')
+         then coalesce(nullif(trim(t.sku),''), staging.sku_generado(
+                coalesce(nullif(trim(t.categoria),''),'GEN'), trim(t.nombre),
+                e.medida, e.estructura, e.frente, e.complemento))
+         else nullif(trim(t.sku),'')                            -- solo el de TN, si lo hubiera
+    end                                                         as sku,
+    -- Dos variantes de Tienda Nube pueden caer en la misma combinación de
+    -- ejes: pasa cuando un atributo no mapea y quedan indistinguibles. Sin
+    -- esto, el upsert falla con "cannot affect row a second time". Se queda
+    -- la de variant_id más bajo y la otra se lista en la verificación 5.6.
+    row_number() over (
+      partition by p.id, coalesce(e.medida,''), coalesce(e.estructura,''),
+                   coalesce(e.frente,''), coalesce(e.complemento,'')
+      order by t.variant_id)                                    as rn_eje,
     row_number() over (
       partition by coalesce(nullif(trim(t.sku),''), staging.sku_generado(
         coalesce(nullif(trim(t.categoria),''),'GEN'), trim(t.nombre),
-        e.medida, e.estructura, e.frente))
+        e.medida, e.estructura, e.frente, e.complemento))
       order by t.variant_id)                                    as rn
   from staging.tn_catalogo t
   join staging.tn_ejes e on e.variant_id = t.variant_id
@@ -246,7 +291,9 @@ from (
     and lower(p.nombre) = lower(trim(t.nombre))
   where nullif(trim(t.nombre),'') is not null
 ) x
-on conflict (producto_id, coalesce(medida,''), coalesce(estructura,''), coalesce(frente,''))
+where x.rn_eje = 1
+on conflict (producto_id, coalesce(medida,''), coalesce(estructura,''),
+             coalesce(frente,''), coalesce(complemento,''))
 do update set
   precio        = excluded.precio,
   precio_ts     = excluded.precio_ts,
@@ -279,16 +326,28 @@ select t.variant_id, t.nombre, t.atributos, t.valores
 from staging.tn_catalogo t
 join staging.tn_ejes e on e.variant_id = t.variant_id
 where e.medida is null and e.estructura is null and e.frente is null
+  and e.complemento is null
   and jsonb_array_length(coalesce(t.atributos,'[]'::jsonb)) > 0
 limit 20;
 
+-- 5.6 · ⚠ VARIANTES DESCARTADAS por caer en la misma combinación de ejes.
+-- Si devuelve filas, Tienda Nube tiene variantes que Core no puede
+-- distinguir: o falta mapear un atributo, o están duplicadas en el origen.
+select t.product_id, t.nombre, count(*) as variantes_tn,
+       count(distinct (e.medida, e.estructura, e.frente, e.complemento)) as combinaciones,
+       count(*) - count(distinct (e.medida, e.estructura, e.frente, e.complemento)) as descartadas
+from staging.tn_catalogo t
+join staging.tn_ejes e on e.variant_id = t.variant_id
+group by t.product_id, t.nombre
+having count(*) > count(distinct (e.medida, e.estructura, e.frente, e.complemento));
+
 -- 5.4 · Colisiones: dos variantes de TN que caen en la misma combinación
-select p.nombre, v.medida, v.estructura, v.frente, count(*) as veces
+select p.nombre, v.medida, v.estructura, v.frente, v.complemento, count(*) as veces
 from core.variante v join core.producto p on p.id = v.producto_id
-group by 1,2,3,4 having count(*) > 1;
+group by 1,2,3,4,5 having count(*) > 1;
 
 -- 5.5 · Muestra final, como se va a ver en el sistema
-select p.categoria, p.nombre, v.medida, v.estructura, v.frente, v.precio, v.sku
+select p.categoria, p.nombre, v.medida, v.estructura, v.frente, v.complemento, v.precio, v.sku
 from core.variante v join core.producto p on p.id = v.producto_id
-order by p.categoria, p.nombre, v.medida, v.estructura, v.frente
+order by p.categoria, p.nombre, v.medida, v.estructura, v.frente, v.complemento
 limit 25;
