@@ -17,6 +17,23 @@
 
 create schema if not exists staging;
 
+-- ---------------------------------------------------------------------
+-- Compatibilidad con corridas anteriores.
+--
+-- Este script evolucionó: la vista de ejes sumó una columna y la función
+-- de SKU sumó un parámetro. Ni `create or replace view` ni `create or
+-- replace function` pueden con eso —la vista no admite reordenar columnas
+-- y la función crearía una sobrecarga ambigua—, así que los objetos que
+-- cambiaron de forma se borran antes de recrearse.
+--
+-- Se borran solo definiciones, nunca datos.
+-- ---------------------------------------------------------------------
+drop view     if exists staging.tn_ejes;
+drop function if exists staging.sku_generado(text,text,text,text,text);
+drop function if exists staging.sku_generado(text,text,text,text,text,text);
+drop function if exists staging.limpiar_valor(text);
+drop function if exists staging.unaccent_simple(text);
+
 
 -- =====================================================================
 -- 1 · ESPEJO DEL CATÁLOGO DE TIENDA NUBE
