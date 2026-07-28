@@ -102,6 +102,9 @@
     vencida:   { label: 'Vencida',   pill: 'warn' },
   };
 
+  // Serie de órdenes creadas en la sesión (demo). Arranca donde termina la muestra.
+  let _seqOrden = 5;
+
   // ---- API que usan los módulos ---------------------------------------
   const DB = {
     modo() { return hayConexion() ? 'supabase' : 'demo'; },
@@ -156,6 +159,36 @@
 
     // ---- Ventas: órdenes, cotizaciones, clientes (demo por ahora) --------
     ESTADO_ORDEN, ESTADO_COTIZ,
+
+    // Listas de apoyo (demo).
+    vendedores() { return ['Ale', 'Cristian', 'Sergio', 'Nati', 'Brian']; },
+    locales() {
+      return [
+        { k: '2299', label: 'Verano 2299' },
+        { k: '2020', label: 'Belgrano 2020' },
+        { k: '699',  label: 'Zavaleta 699 (depósito)' },
+      ];
+    },
+
+    // Crea una orden a partir de una cotización aceptada. Nace en "confirmar"
+    // (a la espera de la seña). Numeración provisional: OV-<local>-<serie>.
+    crearOrden(data) {
+      _seqOrden += 1;
+      const orden = {
+        id: 1000 + _seqOrden,
+        numero: `OV-${data.local}-${String(_seqOrden).padStart(4, '0')}`,
+        fecha: data.fecha,
+        cliente: data.cliente,
+        vendedor: data.vendedor,
+        local: data.local,
+        total: data.total,
+        estado: 'confirmar',
+        lineas: data.lineas || [],
+        termino: data.termino,
+      };
+      DEMO.ordenes.unshift(orden);
+      return orden;
+    },
 
     async ordenes({ texto = '' } = {}) {
       const t = sinTilde(texto);
