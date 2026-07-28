@@ -235,6 +235,52 @@ on conflict (producto_id, md5(atributos::text)) do update set
 
 
 -- =====================================================================
+-- 5.3 · CATEGORÍAS  (solo si existe core.categoria — bloque 6)
+-- Se arma la rama ESPACIOS y se cuelga cada producto de su tipo de mueble.
+-- =====================================================================
+do $$
+begin
+  if to_regclass('core.categoria') is null then return; end if;
+  if to_regclass('staging.tn_categoria') is null then return; end if;
+
+  -- El árbol de ESPACIOS: la raíz y todo lo que desciende de ella.
+  with recursive rama as (
+    select tn_id, nombre, parent_id, 1 as nivel
+      from staging.tn_categoria
+     where lower(nombre) = 'espacios' and parent_id is null
+    union all
+    select c.tn_id, c.nombre, c.parent_id, r.nivel + 1
+      from staging.tn_categoria c join rama r on c.parent_id = r.tn_id
+  )
+  insert into core.categoria (tn_id, nombre, nivel)
+  select tn_id, nombre, nivel from rama
+  on conflict (tn_id) do update set nombre = excluded.nombre, nivel = excluded.nivel;
+
+  -- Enlazar cada categoría con su padre (segunda pasada, ya con los id de core).
+  update core.categoria c
+     set padre_id = p.id
+    from staging.tn_categoria s
+    join core.categoria p on p.tn_id = s.parent_id
+   where c.tn_id = s.tn_id;
+
+  -- Cada producto → su tipo de mueble: de todas sus categorías de Tienda Nube,
+  -- la más profunda que esté en la rama ESPACIOS (el join filtra las
+  -- comerciales, porque core.categoria solo tiene ESPACIOS).
+  update core.producto pr
+     set categoria_id = sub.cat_id
+    from (
+      select lower(trim(t.nombre)) as nom,
+             (array_agg(c.id order by c.nivel desc, c.id))[1] as cat_id
+        from staging.tn_catalogo t
+        cross join lateral jsonb_array_elements(coalesce(t.categoria_ids,'[]'::jsonb)) cid
+        join core.categoria c on c.tn_id = (cid #>> '{}')::bigint
+       group by lower(trim(t.nombre))
+    ) sub
+   where lower(pr.nombre) = sub.nom;
+end $$;
+
+
+-- =====================================================================
 -- 6 · VERIFICACIONES
 -- =====================================================================
 
