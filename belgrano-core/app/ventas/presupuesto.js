@@ -298,7 +298,7 @@
           m.remove();
           this.reset();
           UI.aviso(`Orden ${orden.numero} creada en estado Confirmar`, 'ok');
-          if (global.Ventas) global.Ventas.setSub('ordenes');
+          global.App.goSub('ventas', 'ordenes');
         };
       });
     },

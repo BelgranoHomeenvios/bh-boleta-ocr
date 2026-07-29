@@ -1,152 +1,102 @@
 // =====================================================================
-//  Belgrano Soft · Panel de Dirección (inicio)
-//  La vista completa: KPIs, órdenes por estado, embudo de consultas,
-//  top vendedores y accesos rápidos a cada módulo. Dirección ve todo.
-//  Demo por ahora; después agrega desde core / finanzas.
+//  Belgrano Soft · Home de Dirección
+//  El "resumen del día": primero las alarmas (lo que hay que resolver),
+//  después los KPIs ejecutivos, el pipeline con historia, los pendientes
+//  priorizados y la actividad reciente. Cada rol tendrá su propio Home.
 // =====================================================================
 (function (global) {
-  // Colores de ESTADO (status, reservados) para la barra de órdenes.
-  const COLOR = {
-    confirmar: 'var(--warn)', produccion: 'var(--brand)', logistica: '#6b8bd6',
-    entregado: 'var(--ok)', archivado: 'var(--muted)', anulado: 'var(--crit)', reclamo: 'var(--crit)',
-  };
-
   const Inicio = {
-    async render() {
-      const v = document.getElementById('view');
-      const [ordenes, cotis, clientes] = await Promise.all([
-        global.DB.ordenes(), global.DB.cotizaciones(), global.DB.clientes(),
+    async render(mount = 'view') {
+      const v = document.getElementById(mount);
+      const W = global.Widgets;
+
+      const alarmas = W.alarmas([
+        { tono: 'crit', em: '🚚', titulo: '3 entregas demoradas', detalle: 'Programadas para hoy', rt: 'Hoy' },
+        { tono: 'warn', em: '📦', titulo: '2 pedidos sin proveedor', detalle: 'Sin confirmar', rt: '6 días' },
+        { tono: 'warn', em: '👤', titulo: '5 clientes esperando', detalle: 'Sin respuesta', rt: '4 días' },
+        { tono: 'crit', em: '💳', titulo: 'Caja sin rendir', detalle: 'Cristian', rt: '3 días' },
+        { tono: 'warn', em: '🛠️', titulo: '1 reclamo vencido', detalle: 'R-125', rt: 'Vencido' },
       ]);
 
-      const ventas = ordenes.reduce((a, o) => a + o.total, 0);
-      const abiertas = ordenes.filter(o => !['entregado', 'archivado', 'anulado'].includes(o.estado)).length;
-      const enSeguim = clientes.filter(c => c.seguim > 0).length;
-      const totConsultas = clientes.reduce((a, c) => a + c.consultas, 0);
-      const totVentas = clientes.reduce((a, c) => a + c.concret, 0);
-      const porCobrar = Math.round(ventas * 0.28); // demo: ~saldo pendiente
+      const kpis = W.kpis([
+        { lab: 'Ventas hoy', em: '💵', tono: 'ok', val: '$1.256.000', foot: 'Ayer: $1.102.000 · <span class="up">▲ 14%</span>' },
+        { lab: 'Ventas del mes', em: '📈', tono: 'info', val: '$28.450.000', foot: 'Objetivo: $35.000.000 · 81%', obj: 81 },
+        { lab: 'Margen promedio', em: '📊', tono: 'info', val: '32,5%', foot: 'Últimos 30 días · <span class="up">▲ 2,1 pp</span>' },
+        { lab: 'Órdenes abiertas', em: '🧾', tono: 'soft', val: '18', foot: '12 en producción' },
+        { lab: 'Por cobrar', em: '💰', tono: 'warn', val: '$4.890.750', foot: '6 órdenes' },
+        { lab: 'Reclamos abiertos', em: '🛠️', tono: 'crit', val: '7', foot: '<span class="down">2 vencidos</span>' },
+      ]);
 
-      // Órdenes por estado (para la barra segmentada).
-      const estados = {};
-      ordenes.forEach(o => { estados[o.estado] = (estados[o.estado] || 0) + 1; });
-      const totOrd = ordenes.length || 1;
+      const pipeline = W.pipeline([
+        { label: 'Confirmar', n: 8, monto: '$2.150.000' },
+        { label: 'Producción', n: 12, monto: '$6.240.000', hot: true },
+        { label: 'Control', n: 7, monto: '$3.180.000' },
+        { label: 'Listo', n: 5, monto: '$2.480.000' },
+        { label: 'Logística', n: 6, monto: '$3.210.000' },
+        { label: 'Entregadas', n: 34, monto: '$11.190.000' },
+      ]);
 
-      // Top vendedores por monto.
-      const vend = {};
-      ordenes.forEach(o => { vend[o.vendedor] = (vend[o.vendedor] || 0) + o.total; });
-      const top = Object.entries(vend).sort((a, b) => b[1] - a[1]).slice(0, 4);
-      const maxV = top[0]?.[1] || 1;
+      const pendientes = W.pendientes([
+        { em: '🚚', tono: 'crit', titulo: 'Entrega #E-2381', detalle: 'Programada para hoy · Sin chofer asignado', rt: 'Hoy' },
+        { em: '📦', tono: 'warn', titulo: 'Pedido a Dumbo', detalle: 'Hace 6 días sin confirmación', rt: '6 días' },
+        { em: '👤', tono: 'warn', titulo: 'Cliente: Juan Pérez', detalle: 'Esperando respuesta desde el 08/08', rt: '4 días' },
+        { em: '🛠️', tono: 'crit', titulo: 'Reclamo #R-125', detalle: 'Vencido desde el 10/08', rt: 'Vencido' },
+        { em: '💳', tono: 'warn', titulo: 'Caja de Cristian', detalle: 'Sin rendir desde el 09/08', rt: '3 días' },
+      ]);
+
+      const actividad = W.timeline([
+        { h: '09:35', tono: 'ok', texto: '<b>Cristian</b> convirtió un presupuesto en orden #O-3421' },
+        { h: '09:18', tono: 'info', texto: 'Producción recibió 15 mesas de luz de Lionel' },
+        { h: '09:05', tono: 'ok', texto: 'Entrega realizada en Belgrano CABA · #E-2378' },
+        { h: '08:47', tono: 'crit', texto: 'Ingresó un reclamo #R-126 por mueble golpeado' },
+        { h: '08:32', tono: 'info', texto: 'Nueva consulta de WhatsApp · 11 3456 6789' },
+        { h: '08:21', tono: 'warn', texto: 'Se autorizó precio a medida en orden #O-3420' },
+      ]);
+
+      const entregas = `<table><thead><tr><th>Hora</th><th>Entrega</th><th>Cliente</th><th>Estado</th></tr></thead><tbody>
+        ${[['08:00', 'E-2381', 'Juan Pérez', ['crit', 'Sin chofer']], ['10:00', 'E-2382', 'María García', ['warn', 'En preparación']],
+           ['12:30', 'E-2383', 'Roberto López', ['info', 'En ruta']], ['15:00', 'E-2384', 'Ana Torres', ['soft', 'Programada']]]
+          .map(r => `<tr><td class="tnum">${r[0]}</td><td><b>#${r[1]}</b></td><td>${r[2]}</td><td><span class="pill ${r[3][0]}">${r[3][1]}</span></td></tr>`).join('')}
+        </tbody></table>`;
+
+      const prodEstado = W.embudo([
+        { label: 'En producción', val: 12 }, { label: 'Control', val: 7 },
+        { label: 'Listos', val: 5 }, { label: 'A reparar', val: 2 },
+      ]);
+
+      const top = `<table><tbody>${[['Bibliotecas Borges 1,20', '$5.240.000'], ['Aparador Amberes', '$3.980.000'],
+        ['Mesa de Luz Estocolmo', '$3.120.000'], ['Respaldo Foster Queen', '$2.850.000'], ['Silla Meier', '$2.420.000']]
+        .map((p, i) => `<tr><td style="width:22px" class="muted">${i + 1}</td><td><b>${p[0]}</b></td><td style="text-align:right" class="tnum">${p[1]}</td></tr>`).join('')}</tbody></table>`;
 
       v.innerHTML = `
-        ${UI.head('Dirección', 'Panel', 'Todo el negocio de un vistazo. Dirección entra a cada módulo.',
-          `<div class="per"><button class="on">Hoy</button><button>7 días</button><button>30 días</button></div>`)}
-
-        <div class="kpis">
-          ${tile('Ventas (demo)', UI.pesos(ventas), 'ok')}
-          ${tile('Órdenes abiertas', abiertas, 'info')}
-          ${tile('Por cobrar / señas', UI.pesos(porCobrar), 'warn')}
-          ${tile('En seguimiento', enSeguim, 'soft')}
+        <div class="row" style="align-items:flex-start;margin-bottom:4px">
+          <div><div class="greet">¡Buen día, Brian! 👋</div>
+            <div class="greet-sub">Resumen del día · ${fecha()}</div></div>
+          <div class="sp"></div>
+          <button class="btn sm">⚙ Configurar mi inicio</button>
         </div>
-
-        <div class="cols2">
-          <div class="card pad">
-            <h3 class="ph">Órdenes por estado</h3>
-            <div class="barseg">${Object.entries(estados).map(([k, n]) =>
-              `<span style="flex:${n};background:${COLOR[k] || 'var(--muted)'}" title="${lbl(k)}: ${n}"></span>`).join('')}</div>
-            <div class="leg">${Object.entries(estados).map(([k, n]) =>
-              `<span class="li"><span class="dot" style="background:${COLOR[k] || 'var(--muted)'}"></span>${lbl(k)}
-               <b class="tnum">${n}</b></span>`).join('')}</div>
-            <div class="muted" style="font-size:12px;margin-top:6px">${totOrd} órdenes en total.</div>
-          </div>
-
-          <div class="card pad">
-            <h3 class="ph">Embudo de consultas</h3>
-            <div class="funnel">
-              ${fstep('Consultas', totConsultas, 100)}
-              ${fstep('Cotizaciones', cotis.length, Math.round(cotis.length / Math.max(totConsultas, 1) * 100))}
-              ${fstep('Ventas', totVentas, Math.round(totVentas / Math.max(totConsultas, 1) * 100))}
-            </div>
-          </div>
+        ${alarmas}
+        ${kpis}
+        <div class="cols3" style="margin-top:14px">
+          ${W.card('Pipeline de órdenes', pipeline + `<div class="muted" style="font-size:12px;margin-top:10px">72 órdenes en total · $28.450.000</div>`)}
+          ${W.card('Pendientes que requieren atención', pendientes, 'Ver todos los pendientes')}
+          ${W.card('Actividad reciente', actividad, 'Ver toda la actividad')}
         </div>
-
-        <div class="card pad" style="margin-top:14px">
-          <h3 class="ph">Top vendedores</h3>
-          <table><tbody>${top.map(([nombre, monto]) => `<tr>
-            <td style="width:120px"><b>${UI.esc(nombre)}</b></td>
-            <td><div class="vbar"><span style="width:${Math.round(monto / maxV * 100)}%"></span></div></td>
-            <td style="text-align:right" class="tnum"><b>${UI.pesos(monto)}</b></td></tr>`).join('')}</tbody></table>
-        </div>
-
-        <h3 class="ph" style="margin:22px 0 10px">Ir a…</h3>
-        <div class="qa">
-          ${qa('ventas', '🧾', 'Ventas', 'Cotizar, órdenes, clientes')}
-          ${qa('catalogo', '🪑', 'Catálogo', 'Productos y variantes')}
-          ${qa('caja', '💵', 'Caja', 'Cobros y señas')}
-          ${qa('produccion', '🏭', 'Producción', 'Tablero de fabricación')}
-          ${qa('logistica', '🚚', 'Logística', 'Entregas')}
-          ${qa('reclamos', '🛠️', 'Reclamos', 'Posventa')}
-          ${qa('abastecimiento', '📦', 'Abastecimiento', 'Proveedores y pedidos')}
-          ${qa('facturas', '📄', 'Facturas', 'Marcado + Nacional Soft')}
-          ${qa('reportes', '📊', 'Reportes', 'Tableros de dirección')}
-          ${qa('config', '⚙️', 'Configuración', 'Usuarios y reglas')}
-        </div>
-
-        <style>
-          .per{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
-          .per button{border:0;background:var(--panel);color:var(--muted);padding:7px 12px;font-size:13px;cursor:pointer}
-          .per button+button{border-left:1px solid var(--line)}
-          .per button.on{background:var(--brand-soft);color:var(--brand-ink);font-weight:700}
-          .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
-          @media(max-width:720px){.kpis{grid-template-columns:1fr 1fr}}
-          .kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow)}
-          .kpi .lab{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
-          .kpi .val{font-size:26px;font-weight:800;color:var(--navy);margin-top:6px;letter-spacing:-.02em}
-          .kpi .accent{height:3px;border-radius:3px;margin-top:12px}
-          .cols2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-          @media(max-width:720px){.cols2{grid-template-columns:1fr}}
-          .ph{margin:0 0 12px;color:var(--navy);font-size:15px}
-          .barseg{display:flex;gap:2px;height:26px;border-radius:8px;overflow:hidden}
-          .barseg span{display:block}
-          .leg{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px}
-          .leg .li{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-soft)}
-          .leg .dot{width:10px;height:10px;border-radius:3px;display:inline-block}
-          .funnel{display:flex;flex-direction:column;gap:8px}
-          .fst{display:flex;align-items:center;gap:10px}
-          .fst .fn{width:110px;font-size:13px;color:var(--ink-soft)}
-          .fst .fbar{flex:1;height:22px;background:var(--panel-2);border-radius:7px;overflow:hidden}
-          .fst .fbar span{display:block;height:100%;background:var(--brand);border-radius:7px}
-          .fst .fv{width:38px;text-align:right;font-weight:700;color:var(--navy)}
-          .vbar{height:12px;background:var(--panel-2);border-radius:6px;overflow:hidden}
-          .vbar span{display:block;height:100%;background:var(--brand);border-radius:6px}
-          .qa{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
-          .qacard{display:flex;gap:10px;align-items:flex-start;padding:14px;border:1px solid var(--line);border-radius:12px;
-            background:var(--panel);box-shadow:var(--shadow);cursor:pointer;text-align:left;transition:.15s}
-          .qacard:hover{border-color:var(--brand);transform:translateY(-1px)}
-          .qacard .em{font-size:22px;line-height:1}
-          .qacard b{color:var(--navy);display:block;font-size:14px}
-          .qacard span{font-size:12px;color:var(--muted)}
-        </style>`;
-
-      v.querySelectorAll('[data-go]').forEach(b => b.onclick = () => global.App.setTab(b.dataset.go));
-      v.querySelectorAll('.per button').forEach(b => b.onclick = () => {
-        v.querySelectorAll('.per button').forEach(x => x.classList.remove('on')); b.classList.add('on');
-      });
-
-      function tile(lab, val, tone) {
-        const c = { ok: 'var(--ok)', info: 'var(--brand)', warn: 'var(--warn)', soft: 'var(--muted)' }[tone];
-        return `<div class="kpi"><div class="lab">${lab}</div><div class="val tnum">${val}</div>
-          <div class="accent" style="background:${c}"></div></div>`;
-      }
-      function fstep(nombre, val, pct) {
-        return `<div class="fst"><span class="fn">${nombre}</span>
-          <div class="fbar"><span style="width:${Math.max(6, Math.min(100, pct))}%"></span></div>
-          <span class="fv tnum">${val}</span></div>`;
-      }
-      function qa(key, em, tit, desc) {
-        return `<button class="qacard" data-go="${key}"><span class="em">${em}</span>
-          <span><b>${tit}</b><span>${desc}</span></span></button>`;
-      }
-      function lbl(k) { return (global.DB.ESTADO_ORDEN[k]?.label) || k; }
+        <div class="cols3" style="margin-top:14px">
+          ${W.card('Entregas de hoy', entregas, 'Ver todas las entregas')}
+          ${W.card('Producción — estado actual', prodEstado, 'Ir al tablero de producción')}
+          ${W.card('Top productos del mes', top, 'Ver reporte completo')}
+        </div>`;
     },
   };
+
+  function fecha() {
+    try {
+      const d = new Date();
+      const s = new Intl.DateTimeFormat('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(d);
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    } catch { return ''; }
+  }
+
   global.Inicio = Inicio;
 })(typeof window !== 'undefined' ? window : globalThis);

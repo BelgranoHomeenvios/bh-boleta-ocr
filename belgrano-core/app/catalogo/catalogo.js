@@ -12,8 +12,8 @@
     vista: (() => { try { return localStorage.getItem(VISTA_KEY) || 'bloques'; } catch { return 'bloques'; } })(),
     _prods: null,        // últimos productos pintados (para re-render al cambiar de vista)
 
-    async render() {
-      const v = document.getElementById('view');
+    async render(mount = 'view') {
+      const v = document.getElementById(mount);
       v.innerHTML = `
         <div class="row" style="margin-bottom:16px">
           <div>

@@ -14,7 +14,7 @@
            <input id="cz-q" placeholder="Buscar por cliente o N°…" value="${UI.esc(this.texto)}">
          </div>
          <div id="cz-lista">${UI.spinner()}</div>`;
-      document.getElementById('cz-nueva').onclick = () => global.Ventas.setSub('nueva');
+      document.getElementById('cz-nueva').onclick = () => global.App.goSub('ventas', 'nueva');
       const q = document.getElementById('cz-q');
       let t; q.oninput = () => { clearTimeout(t); t = setTimeout(() => { this.texto = q.value.trim(); this.pintar(); }, 200); };
       this.pintar();

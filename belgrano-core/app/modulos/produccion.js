@@ -20,8 +20,8 @@
   ];
 
   const Produccion = {
-    render() {
-      const v = document.getElementById('view');
+    render(mount = 'view') {
+      const v = document.getElementById(mount);
       v.innerHTML = UI.head('Producción', 'Tablero de fabricación',
         'Editar una orden en producción requiere autorización — no lo hace el vendedor.') +
         `<div class="kanban">${COLS.map(c => `

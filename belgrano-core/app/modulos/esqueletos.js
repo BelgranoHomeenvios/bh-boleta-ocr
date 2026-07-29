@@ -76,11 +76,20 @@
   }
 
   const Esq = {
-    render(clave) {
+    render(clave, mount = 'view') {
       const m = ESQ[clave];
-      const v = document.getElementById('view');
+      const v = document.getElementById(mount);
       if (!m) { v.innerHTML = UI.vacio('Módulo en construcción.'); return; }
       v.innerHTML = UI.head(m.kick, m.titulo, m.sub) + m.demo();
+    },
+    // Sub-módulo genérico todavía sin construir: título + nota + forma prevista.
+    sub(mount, titulo, desc) {
+      document.getElementById(mount).innerHTML =
+        UI.head(titulo.split('·')[0].trim(), titulo, desc || '') +
+        `<div class="card pad"><div class="empty" style="padding:40px 20px">
+          🧩 <b style="color:var(--navy)">${UI.esc(titulo)}</b><br>
+          <span class="muted">Esta vista se construye en su etapa. La arquitectura ya la contempla.</span>
+        </div></div>`;
     },
   };
   global.Esq = Esq;

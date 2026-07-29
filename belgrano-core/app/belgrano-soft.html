@@ -36,36 +36,56 @@ h1,h2,h3{margin:0; letter-spacing:-.01em}
 button{font:inherit}
 a{color:var(--brand)}
 
-/* Shell */
-#top{
-  position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:14px;
-  background:var(--navy); color:#fff; padding:10px 18px; box-shadow:var(--shadow);
-}
-@media (prefers-color-scheme:dark){ #top{color:#0d111b} }
-#top .brand{font-weight:800; letter-spacing:-.02em; font-size:15px; display:flex; align-items:center; gap:8px}
-#top .brand .m{opacity:.6; font-weight:500}
-#top .sp{flex:1}
-#top .verComo{display:flex; align-items:center; gap:8px; font-size:13px}
-#top select{
-  font:inherit; font-size:13px; padding:6px 10px; border-radius:8px; border:1px solid transparent;
-  background:rgba(255,255,255,.15); color:inherit; font-weight:600;
-}
-@media (prefers-color-scheme:dark){ #top select{background:rgba(0,0,0,.15)} }
-#top select option{color:#141a26}
+/* ===== Shell con sidebar izquierdo + topbar ===== */
+.lay{display:grid; grid-template-columns:248px 1fr; min-height:100vh}
+.side{background:var(--panel); border-right:1px solid var(--line); position:sticky; top:0; height:100vh;
+  overflow-y:auto; display:flex; flex-direction:column; z-index:30}
+.side .brandbox{display:flex; align-items:center; gap:10px; padding:16px 16px 12px}
+.side .logo{width:30px; height:30px; border-radius:8px; background:var(--brand); color:#fff; font-weight:800;
+  display:grid; place-items:center; font-size:16px}
+.side .brandbox b{color:var(--navy); font-weight:800; letter-spacing:-.02em; display:block; font-size:14px; line-height:1.1}
+.side .brandbox .m{color:var(--muted); font-size:11px}
+.side nav{display:flex; flex-direction:column; gap:2px; padding:6px 10px}
+.side .sect{font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-weight:800; padding:14px 14px 6px}
+.navi{display:flex; align-items:center; gap:11px; padding:9px 12px; border-radius:10px; color:var(--ink-soft);
+  font-weight:600; font-size:14px; cursor:pointer; border:0; background:transparent; text-align:left; width:100%}
+.navi:hover{background:var(--panel-2); color:var(--brand)}
+.navi[aria-current="true"]{background:var(--brand-soft); color:var(--brand-ink); font-weight:700}
+.navi .ic{width:20px; text-align:center; font-size:15px; flex:none}
+.navi .kbd{margin-left:auto; font-size:11px; color:var(--muted); border:1px solid var(--line); border-radius:5px; padding:0 5px}
+.navi:focus-visible{outline:2px solid var(--brand); outline-offset:-2px}
+.side .grow{flex:1}
 
-#nav{
-  display:flex; gap:4px; overflow-x:auto; background:var(--panel); border-bottom:1px solid var(--line);
-  padding:0 12px; position:sticky; top:44px; z-index:15;
-}
-#nav button{
-  border:0; background:transparent; color:var(--ink-soft); font-weight:600; font-size:14px;
-  padding:13px 14px; cursor:pointer; border-bottom:2.5px solid transparent; white-space:nowrap;
-}
-#nav button:hover{color:var(--brand)}
-#nav button[aria-current="true"]{color:var(--brand); border-bottom-color:var(--brand)}
-#nav button:focus-visible{outline:2px solid var(--brand); outline-offset:-2px}
+.main{min-width:0; display:flex; flex-direction:column}
+.tbar{position:sticky; top:0; z-index:25; display:flex; align-items:center; gap:12px; padding:10px 20px;
+  background:var(--panel); border-bottom:1px solid var(--line)}
+.tbar .ham{display:none; border:0; background:transparent; font-size:20px; cursor:pointer; color:var(--ink)}
+.tbar .search{flex:1; max-width:560px; position:relative}
+.tbar .search input{background:var(--panel-2); border-color:transparent; padding-left:36px}
+.tbar .search .mag{position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--muted)}
+.tbar .search .kbd{position:absolute; right:10px; top:50%; transform:translateY(-50%); font-size:11px; color:var(--muted);
+  border:1px solid var(--line); border-radius:5px; padding:1px 6px; background:var(--panel)}
+.tbar .sp{flex:1}
+.tbar .verComo{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-soft)}
+.tbar select{font:inherit; font-size:13px; padding:7px 10px; border-radius:9px; border:1px solid var(--line);
+  background:var(--panel); color:var(--ink); font-weight:600; width:auto}
+.tbar .ic-btn{position:relative; border:1px solid var(--line); background:var(--panel); width:36px; height:36px;
+  border-radius:10px; cursor:pointer; font-size:15px}
+.tbar .ic-btn .dot{position:absolute; top:-4px; right:-4px; min-width:16px; height:16px; border-radius:9px;
+  background:var(--crit); color:#fff; font-size:10px; font-weight:800; display:grid; place-items:center; padding:0 3px}
+.tbar .avatar{width:36px; height:36px; border-radius:10px; background:var(--navy); color:#fff; font-weight:800;
+  display:grid; place-items:center; font-size:13px}
+@media (prefers-color-scheme:dark){ .tbar .avatar{color:#0d111b} }
 
-#view{max-width:1100px; margin:0 auto; padding:22px 18px 80px}
+#view{padding:22px 24px 80px; max-width:1400px; width:100%; margin:0 auto}
+
+@media(max-width:860px){
+  .lay{grid-template-columns:1fr}
+  .side{position:fixed; left:0; top:0; width:248px; transform:translateX(-100%); transition:.2s; box-shadow:var(--shadow)}
+  body.sideopen .side{transform:none}
+  .tbar .ham{display:block}
+  .tbar .search .kbd{display:none}
+}
 
 /* Bits */
 .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow)}
@@ -116,6 +136,70 @@ tr:hover td{background:var(--panel-2)}
 .banner{padding:10px 14px; border-radius:9px; font-size:13px; margin-bottom:16px}
 .banner.warn{background:var(--warn-bg); color:var(--warn)}
 .banner.info{background:var(--brand-soft); color:var(--brand-ink)}
+
+/* ===== Sub-navegación de módulo (segundo nivel) ===== */
+.modlay{display:grid; grid-template-columns:210px 1fr; gap:22px; align-items:start}
+.subside{position:sticky; top:78px; display:flex; flex-direction:column; gap:2px}
+.subside .subttl{font-size:17px; font-weight:800; color:var(--navy); padding:2px 12px 10px; letter-spacing:-.01em}
+.subnavi{display:flex; align-items:center; gap:9px; padding:8px 12px; border-radius:9px; color:var(--ink-soft);
+  font-weight:600; font-size:14px; cursor:pointer; border:0; background:transparent; text-align:left; width:100%}
+.subnavi:hover{background:var(--panel); color:var(--brand)}
+.subnavi[aria-current="true"]{background:var(--panel); color:var(--brand-ink); box-shadow:var(--shadow); font-weight:700}
+.subnavi .tag{margin-left:auto}
+.modbody{min-width:0}
+@media(max-width:820px){
+  .modlay{grid-template-columns:1fr}
+  .subside{position:static; flex-direction:row; overflow-x:auto; gap:4px; padding-bottom:8px; border-bottom:1px solid var(--line)}
+  .subside .subttl{display:none}
+  .subnavi{white-space:nowrap; width:auto}
+}
+
+/* ===== Componentes de dashboard ===== */
+.greet{font-size:26px; font-weight:800; color:var(--navy); letter-spacing:-.02em}
+.greet-sub{color:var(--ink-soft); margin-top:2px}
+.alerts{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; margin:16px 0}
+.alert{display:flex; align-items:center; gap:11px; padding:12px 14px; border-radius:12px; border:1px solid var(--line);
+  background:var(--panel); box-shadow:var(--shadow); cursor:pointer; border-left-width:4px}
+.alert:hover{transform:translateY(-1px); transition:.15s}
+.alert.crit{border-left-color:var(--crit)} .alert.warn{border-left-color:var(--warn)}
+.alert.ok{border-left-color:var(--ok)} .alert.info{border-left-color:var(--brand)}
+.alert .em{font-size:18px} .alert b{display:block; color:var(--navy); font-size:14px} .alert span{font-size:12px; color:var(--muted)}
+.alert .rt{margin-left:auto; font-size:12px; font-weight:700}
+.alert.crit .rt{color:var(--crit)} .alert.warn .rt{color:var(--warn)}
+
+.kpis{display:grid; grid-template-columns:repeat(6,1fr); gap:12px}
+@media(max-width:1150px){.kpis{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:560px){.kpis{grid-template-columns:1fr 1fr}}
+.kpi{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:15px; box-shadow:var(--shadow)}
+.kpi .top{display:flex; align-items:center; gap:8px; color:var(--muted); font-size:12px; font-weight:600}
+.kpi .top .em{width:24px; height:24px; border-radius:7px; display:grid; place-items:center; font-size:13px}
+.kpi .val{font-size:23px; font-weight:800; color:var(--navy); margin-top:8px; letter-spacing:-.02em}
+.kpi .foot{font-size:12px; color:var(--muted); margin-top:3px}
+.kpi .foot .up{color:var(--ok); font-weight:700} .kpi .foot .down{color:var(--crit); font-weight:700}
+.kpi .obj{height:5px; background:var(--panel-2); border-radius:3px; margin-top:9px; overflow:hidden}
+.kpi .obj span{display:block; height:100%; background:var(--brand); border-radius:3px}
+
+.pipe{display:flex; gap:6px; align-items:stretch; overflow-x:auto; padding-bottom:4px}
+.pstep{flex:1; min-width:118px; border:1px solid var(--line); border-radius:12px; padding:12px 10px; text-align:center; background:var(--panel-2)}
+.pstep .pl{font-size:12px; font-weight:700; color:var(--ink-soft)}
+.pstep .pn{font-size:24px; font-weight:800; color:var(--navy); margin:4px 0} .pstep .pm{font-size:11px; color:var(--muted)}
+.pstep.hot{border-color:var(--brand); background:var(--brand-soft)}
+.pipe .arr{align-self:center; color:var(--muted); font-size:14px; flex:none}
+
+.embudo{display:flex; flex-direction:column; gap:9px}
+.erow{display:flex; align-items:center; gap:10px}
+.erow .en{width:104px; font-size:13px; color:var(--ink-soft)}
+.erow .eb{flex:1; height:20px; background:var(--panel-2); border-radius:6px; overflow:hidden}
+.erow .eb span{display:block; height:100%; background:var(--brand); border-radius:6px}
+.erow .ev{width:96px; text-align:right; font-size:13px} .erow .ev b{color:var(--navy)} .erow .ev small{color:var(--muted)}
+
+.tl{display:flex; flex-direction:column}
+.tl .ev{display:flex; gap:10px; padding:8px 0; border-bottom:1px solid var(--line-soft); font-size:13px}
+.tl .ev:last-child{border-bottom:0} .tl .ev .h{color:var(--muted); min-width:46px; font-size:12px} .tl .ev .d{width:8px; height:8px; border-radius:50%; margin-top:5px; flex:none}
+.cols3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px} @media(max-width:980px){.cols3{grid-template-columns:1fr}}
+.pcard{background:var(--panel); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow); padding:16px}
+.pcard h3{margin:0 0 12px; color:var(--navy); font-size:15px}
+.pcard .more{display:inline-block; margin-top:10px; font-size:13px; color:var(--brand); cursor:pointer; font-weight:600}
 
 </style></head><body>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -398,6 +482,83 @@ tr:hover td{background:var(--panel-2)}
 
 </script><script>
 // =====================================================================
+//  Belgrano Soft · Widgets de dashboard
+//  Bloques reutilizables por el Home y por el Resumen de cada módulo:
+//  alarmas, KPIs, pipeline, embudo, timeline. Todos devuelven HTML.
+// =====================================================================
+(function (global) {
+  const TONE = { ok: 'var(--ok)', info: 'var(--brand)', warn: 'var(--warn)', crit: 'var(--crit)', soft: 'var(--muted)' };
+  const TONE_BG = { ok: 'var(--ok-bg)', info: 'var(--brand-soft)', warn: 'var(--warn-bg)', crit: 'var(--crit-bg)', soft: 'var(--line-soft)' };
+
+  const Widgets = {
+    // Fila de alarmas: [{tono,em,titulo,detalle,rt}]
+    alarmas(items) {
+      if (!items || !items.length) return '';
+      return `<div class="alerts">${items.map(a => `
+        <div class="alert ${a.tono || 'info'}">
+          <span class="em">${a.em || '•'}</span>
+          <div><b>${UI.esc(a.titulo)}</b><span>${UI.esc(a.detalle || '')}</span></div>
+          ${a.rt ? `<span class="rt">${UI.esc(a.rt)}</span>` : ''}
+        </div>`).join('')}</div>`;
+    },
+
+    // KPIs: [{lab,val,em,tono,foot,obj}]  (obj = 0..100 para barra de objetivo)
+    kpis(items) {
+      return `<div class="kpis">${items.map(k => `
+        <div class="kpi">
+          <div class="top">${k.em ? `<span class="em" style="background:${TONE_BG[k.tono] || 'var(--line-soft)'};color:${TONE[k.tono] || 'var(--muted)'}">${k.em}</span>` : ''}${UI.esc(k.lab)}</div>
+          <div class="val tnum">${k.val}</div>
+          ${k.foot ? `<div class="foot">${k.foot}</div>` : ''}
+          ${k.obj != null ? `<div class="obj"><span style="width:${Math.max(0, Math.min(100, k.obj))}%"></span></div>` : ''}
+        </div>`).join('')}</div>`;
+    },
+
+    // Pipeline con flechas: [{label,n,monto,hot}]
+    pipeline(pasos) {
+      return `<div class="pipe">${pasos.map((p, i) => `
+        <div class="pstep ${p.hot ? 'hot' : ''}"><div class="pl">${UI.esc(p.label)}</div>
+          <div class="pn tnum">${p.n}</div><div class="pm tnum">${p.monto || ''}</div></div>
+        ${i < pasos.length - 1 ? '<span class="arr">→</span>' : ''}`).join('')}</div>`;
+    },
+
+    // Embudo: [{label,val,pct}]  pct 0..100 (ancho); muestra val y %
+    embudo(rows) {
+      const base = rows[0]?.val || 1;
+      return `<div class="embudo">${rows.map(r => {
+        const ancho = Math.max(4, Math.round((r.val / base) * 100));
+        return `<div class="erow"><span class="en">${UI.esc(r.label)}</span>
+          <div class="eb"><span style="width:${ancho}%"></span></div>
+          <span class="ev"><b class="tnum">${r.val}</b>${r.pct != null ? ` <small>${r.pct}%</small>` : ''}</span></div>`;
+      }).join('')}</div>`;
+    },
+
+    // Timeline de actividad: [{h,tono,texto}]
+    timeline(items) {
+      return `<div class="tl">${items.map(e => `
+        <div class="ev"><span class="h tnum">${UI.esc(e.h)}</span>
+          <span class="d" style="background:${TONE[e.tono] || 'var(--brand)'}"></span>
+          <span>${e.texto}</span></div>`).join('')}</div>`;
+    },
+
+    // Lista de "pendientes que requieren atención": [{em,tono,titulo,detalle,rt}]
+    pendientes(items) {
+      return items.map(p => `<div class="ev" style="display:flex;gap:11px;padding:10px 0;border-bottom:1px solid var(--line-soft);align-items:flex-start">
+        <span style="font-size:16px">${p.em || '•'}</span>
+        <div style="flex:1"><b style="color:var(--navy);font-size:14px">${UI.esc(p.titulo)}</b>
+          <div class="muted" style="font-size:12px">${UI.esc(p.detalle || '')}</div></div>
+        ${p.rt ? `<span style="font-size:12px;font-weight:700;color:${TONE[p.tono] || 'var(--muted)'}">${UI.esc(p.rt)}</span>` : ''}</div>`).join('');
+    },
+
+    card(titulo, cuerpo, more) {
+      return `<div class="pcard"><h3>${UI.esc(titulo)}</h3>${cuerpo}${more ? `<span class="more">${UI.esc(more)} →</span>` : ''}</div>`;
+    },
+  };
+
+  global.Widgets = Widgets;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script><script>
+// =====================================================================
 //  Belgrano Soft · Catálogo
 //  Navegación como en Tienda Nube: ambiente → tipo de mueble → modelo →
 //  variantes. O búsqueda directa por texto. Es el cimiento del presupuesto.
@@ -411,8 +572,8 @@ tr:hover td{background:var(--panel-2)}
     vista: (() => { try { return localStorage.getItem(VISTA_KEY) || 'bloques'; } catch { return 'bloques'; } })(),
     _prods: null,        // últimos productos pintados (para re-render al cambiar de vista)
 
-    async render() {
-      const v = document.getElementById('view');
+    async render(mount = 'view') {
+      const v = document.getElementById(mount);
       v.innerHTML = `
         <div class="row" style="margin-bottom:16px">
           <div>
@@ -989,7 +1150,7 @@ tr:hover td{background:var(--panel-2)}
           m.remove();
           this.reset();
           UI.aviso(`Orden ${orden.numero} creada en estado Confirmar`, 'ok');
-          if (global.Ventas) global.Ventas.setSub('ordenes');
+          global.App.goSub('ventas', 'ordenes');
         };
       });
     },
@@ -1092,7 +1253,7 @@ tr:hover td{background:var(--panel-2)}
            <input id="cz-q" placeholder="Buscar por cliente o N°…" value="${UI.esc(this.texto)}">
          </div>
          <div id="cz-lista">${UI.spinner()}</div>`;
-      document.getElementById('cz-nueva').onclick = () => global.Ventas.setSub('nueva');
+      document.getElementById('cz-nueva').onclick = () => global.App.goSub('ventas', 'nueva');
       const q = document.getElementById('cz-q');
       let t; q.oninput = () => { clearTimeout(t); t = setTimeout(() => { this.texto = q.value.trim(); this.pintar(); }, 200); };
       this.pintar();
@@ -1248,203 +1409,235 @@ tr:hover td{background:var(--panel-2)}
 
 </script><script>
 // =====================================================================
-//  Belgrano Soft · Ventas (contenedor)
-//  Agrupa las tres puntas del mostrador en sub-solapas: la nueva
-//  cotización, el listado de cotizaciones, las órdenes de venta y los
-//  clientes. Es la misma historia: una atención → un presupuesto → una venta.
+//  Belgrano Soft · Home de Dirección
+//  El "resumen del día": primero las alarmas (lo que hay que resolver),
+//  después los KPIs ejecutivos, el pipeline con historia, los pendientes
+//  priorizados y la actividad reciente. Cada rol tendrá su propio Home.
 // =====================================================================
 (function (global) {
-  const SUBS = [
-    { k: 'nueva',        label: 'Nueva cotización', render: m => global.Presupuesto.render(m) },
-    { k: 'cotizaciones', label: 'Cotizaciones',     render: m => global.Cotizaciones.render(m) },
-    { k: 'ordenes',      label: 'Órdenes de venta', render: m => global.Ordenes.render(m) },
-    { k: 'clientes',     label: 'Clientes',         render: m => global.Clientes.render(m) },
-  ];
+  const Inicio = {
+    async render(mount = 'view') {
+      const v = document.getElementById(mount);
+      const W = global.Widgets;
 
-  const Ventas = {
-    sub: 'nueva',
-    render() {
-      const v = document.getElementById('view');
+      const alarmas = W.alarmas([
+        { tono: 'crit', em: '🚚', titulo: '3 entregas demoradas', detalle: 'Programadas para hoy', rt: 'Hoy' },
+        { tono: 'warn', em: '📦', titulo: '2 pedidos sin proveedor', detalle: 'Sin confirmar', rt: '6 días' },
+        { tono: 'warn', em: '👤', titulo: '5 clientes esperando', detalle: 'Sin respuesta', rt: '4 días' },
+        { tono: 'crit', em: '💳', titulo: 'Caja sin rendir', detalle: 'Cristian', rt: '3 días' },
+        { tono: 'warn', em: '🛠️', titulo: '1 reclamo vencido', detalle: 'R-125', rt: 'Vencido' },
+      ]);
+
+      const kpis = W.kpis([
+        { lab: 'Ventas hoy', em: '💵', tono: 'ok', val: '$1.256.000', foot: 'Ayer: $1.102.000 · <span class="up">▲ 14%</span>' },
+        { lab: 'Ventas del mes', em: '📈', tono: 'info', val: '$28.450.000', foot: 'Objetivo: $35.000.000 · 81%', obj: 81 },
+        { lab: 'Margen promedio', em: '📊', tono: 'info', val: '32,5%', foot: 'Últimos 30 días · <span class="up">▲ 2,1 pp</span>' },
+        { lab: 'Órdenes abiertas', em: '🧾', tono: 'soft', val: '18', foot: '12 en producción' },
+        { lab: 'Por cobrar', em: '💰', tono: 'warn', val: '$4.890.750', foot: '6 órdenes' },
+        { lab: 'Reclamos abiertos', em: '🛠️', tono: 'crit', val: '7', foot: '<span class="down">2 vencidos</span>' },
+      ]);
+
+      const pipeline = W.pipeline([
+        { label: 'Confirmar', n: 8, monto: '$2.150.000' },
+        { label: 'Producción', n: 12, monto: '$6.240.000', hot: true },
+        { label: 'Control', n: 7, monto: '$3.180.000' },
+        { label: 'Listo', n: 5, monto: '$2.480.000' },
+        { label: 'Logística', n: 6, monto: '$3.210.000' },
+        { label: 'Entregadas', n: 34, monto: '$11.190.000' },
+      ]);
+
+      const pendientes = W.pendientes([
+        { em: '🚚', tono: 'crit', titulo: 'Entrega #E-2381', detalle: 'Programada para hoy · Sin chofer asignado', rt: 'Hoy' },
+        { em: '📦', tono: 'warn', titulo: 'Pedido a Dumbo', detalle: 'Hace 6 días sin confirmación', rt: '6 días' },
+        { em: '👤', tono: 'warn', titulo: 'Cliente: Juan Pérez', detalle: 'Esperando respuesta desde el 08/08', rt: '4 días' },
+        { em: '🛠️', tono: 'crit', titulo: 'Reclamo #R-125', detalle: 'Vencido desde el 10/08', rt: 'Vencido' },
+        { em: '💳', tono: 'warn', titulo: 'Caja de Cristian', detalle: 'Sin rendir desde el 09/08', rt: '3 días' },
+      ]);
+
+      const actividad = W.timeline([
+        { h: '09:35', tono: 'ok', texto: '<b>Cristian</b> convirtió un presupuesto en orden #O-3421' },
+        { h: '09:18', tono: 'info', texto: 'Producción recibió 15 mesas de luz de Lionel' },
+        { h: '09:05', tono: 'ok', texto: 'Entrega realizada en Belgrano CABA · #E-2378' },
+        { h: '08:47', tono: 'crit', texto: 'Ingresó un reclamo #R-126 por mueble golpeado' },
+        { h: '08:32', tono: 'info', texto: 'Nueva consulta de WhatsApp · 11 3456 6789' },
+        { h: '08:21', tono: 'warn', texto: 'Se autorizó precio a medida en orden #O-3420' },
+      ]);
+
+      const entregas = `<table><thead><tr><th>Hora</th><th>Entrega</th><th>Cliente</th><th>Estado</th></tr></thead><tbody>
+        ${[['08:00', 'E-2381', 'Juan Pérez', ['crit', 'Sin chofer']], ['10:00', 'E-2382', 'María García', ['warn', 'En preparación']],
+           ['12:30', 'E-2383', 'Roberto López', ['info', 'En ruta']], ['15:00', 'E-2384', 'Ana Torres', ['soft', 'Programada']]]
+          .map(r => `<tr><td class="tnum">${r[0]}</td><td><b>#${r[1]}</b></td><td>${r[2]}</td><td><span class="pill ${r[3][0]}">${r[3][1]}</span></td></tr>`).join('')}
+        </tbody></table>`;
+
+      const prodEstado = W.embudo([
+        { label: 'En producción', val: 12 }, { label: 'Control', val: 7 },
+        { label: 'Listos', val: 5 }, { label: 'A reparar', val: 2 },
+      ]);
+
+      const top = `<table><tbody>${[['Bibliotecas Borges 1,20', '$5.240.000'], ['Aparador Amberes', '$3.980.000'],
+        ['Mesa de Luz Estocolmo', '$3.120.000'], ['Respaldo Foster Queen', '$2.850.000'], ['Silla Meier', '$2.420.000']]
+        .map((p, i) => `<tr><td style="width:22px" class="muted">${i + 1}</td><td><b>${p[0]}</b></td><td style="text-align:right" class="tnum">${p[1]}</td></tr>`).join('')}</tbody></table>`;
+
       v.innerHTML = `
-        <div class="subnav" id="ventas-subnav">
-          ${SUBS.map(s => `<button data-sub="${s.k}">${s.label}</button>`).join('')}
+        <div class="row" style="align-items:flex-start;margin-bottom:4px">
+          <div><div class="greet">¡Buen día, Brian! 👋</div>
+            <div class="greet-sub">Resumen del día · ${fecha()}</div></div>
+          <div class="sp"></div>
+          <button class="btn sm">⚙ Configurar mi inicio</button>
         </div>
-        <div id="ventas-view"></div>
-        <style>
-          .subnav{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:18px;border-bottom:1px solid var(--line)}
-          .subnav button{border:0;background:transparent;color:var(--ink-soft);font-weight:650;font-size:14px;
-            padding:10px 14px;cursor:pointer;border-bottom:2.5px solid transparent;margin-bottom:-1px}
-          .subnav button:hover{color:var(--brand)}
-          .subnav button[aria-current="true"]{color:var(--brand);border-bottom-color:var(--brand)}
-        </style>`;
-      v.querySelectorAll('[data-sub]').forEach(b => b.onclick = () => this.setSub(b.dataset.sub));
-      this.setSub(this.sub);
-    },
-    setSub(k) {
-      this.sub = k;
-      document.querySelectorAll('#ventas-subnav button').forEach(b =>
-        b.setAttribute('aria-current', b.dataset.sub === k));
-      const s = SUBS.find(x => x.k === k) || SUBS[0];
-      document.getElementById('ventas-view').innerHTML = '';
-      s.render('ventas-view');
+        ${alarmas}
+        ${kpis}
+        <div class="cols3" style="margin-top:14px">
+          ${W.card('Pipeline de órdenes', pipeline + `<div class="muted" style="font-size:12px;margin-top:10px">72 órdenes en total · $28.450.000</div>`)}
+          ${W.card('Pendientes que requieren atención', pendientes, 'Ver todos los pendientes')}
+          ${W.card('Actividad reciente', actividad, 'Ver toda la actividad')}
+        </div>
+        <div class="cols3" style="margin-top:14px">
+          ${W.card('Entregas de hoy', entregas, 'Ver todas las entregas')}
+          ${W.card('Producción — estado actual', prodEstado, 'Ir al tablero de producción')}
+          ${W.card('Top productos del mes', top, 'Ver reporte completo')}
+        </div>`;
     },
   };
 
-  global.Ventas = Ventas;
+  function fecha() {
+    try {
+      const d = new Date();
+      const s = new Intl.DateTimeFormat('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(d);
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    } catch { return ''; }
+  }
+
+  global.Inicio = Inicio;
 })(typeof window !== 'undefined' ? window : globalThis);
 
 </script><script>
 // =====================================================================
-//  Belgrano Soft · Panel de Dirección (inicio)
-//  La vista completa: KPIs, órdenes por estado, embudo de consultas,
-//  top vendedores y accesos rápidos a cada módulo. Dirección ve todo.
-//  Demo por ahora; después agrega desde core / finanzas.
+//  Belgrano Soft · Resumen de módulo
+//  Cada módulo aterriza acá: un mini-dashboard con las alarmas y los KPIs
+//  propios de ese módulo. Config por módulo; la forma es siempre la misma.
 // =====================================================================
 (function (global) {
-  // Colores de ESTADO (status, reservados) para la barra de órdenes.
-  const COLOR = {
-    confirmar: 'var(--warn)', produccion: 'var(--brand)', logistica: '#6b8bd6',
-    entregado: 'var(--ok)', archivado: 'var(--muted)', anulado: 'var(--crit)', reclamo: 'var(--crit)',
-  };
-
-  const Inicio = {
-    async render() {
-      const v = document.getElementById('view');
-      const [ordenes, cotis, clientes] = await Promise.all([
-        global.DB.ordenes(), global.DB.cotizaciones(), global.DB.clientes(),
-      ]);
-
-      const ventas = ordenes.reduce((a, o) => a + o.total, 0);
-      const abiertas = ordenes.filter(o => !['entregado', 'archivado', 'anulado'].includes(o.estado)).length;
-      const enSeguim = clientes.filter(c => c.seguim > 0).length;
-      const totConsultas = clientes.reduce((a, c) => a + c.consultas, 0);
-      const totVentas = clientes.reduce((a, c) => a + c.concret, 0);
-      const porCobrar = Math.round(ventas * 0.28); // demo: ~saldo pendiente
-
-      // Órdenes por estado (para la barra segmentada).
-      const estados = {};
-      ordenes.forEach(o => { estados[o.estado] = (estados[o.estado] || 0) + 1; });
-      const totOrd = ordenes.length || 1;
-
-      // Top vendedores por monto.
-      const vend = {};
-      ordenes.forEach(o => { vend[o.vendedor] = (vend[o.vendedor] || 0) + o.total; });
-      const top = Object.entries(vend).sort((a, b) => b[1] - a[1]).slice(0, 4);
-      const maxV = top[0]?.[1] || 1;
-
-      v.innerHTML = `
-        ${UI.head('Dirección', 'Panel', 'Todo el negocio de un vistazo. Dirección entra a cada módulo.',
-          `<div class="per"><button class="on">Hoy</button><button>7 días</button><button>30 días</button></div>`)}
-
-        <div class="kpis">
-          ${tile('Ventas (demo)', UI.pesos(ventas), 'ok')}
-          ${tile('Órdenes abiertas', abiertas, 'info')}
-          ${tile('Por cobrar / señas', UI.pesos(porCobrar), 'warn')}
-          ${tile('En seguimiento', enSeguim, 'soft')}
-        </div>
-
-        <div class="cols2">
-          <div class="card pad">
-            <h3 class="ph">Órdenes por estado</h3>
-            <div class="barseg">${Object.entries(estados).map(([k, n]) =>
-              `<span style="flex:${n};background:${COLOR[k] || 'var(--muted)'}" title="${lbl(k)}: ${n}"></span>`).join('')}</div>
-            <div class="leg">${Object.entries(estados).map(([k, n]) =>
-              `<span class="li"><span class="dot" style="background:${COLOR[k] || 'var(--muted)'}"></span>${lbl(k)}
-               <b class="tnum">${n}</b></span>`).join('')}</div>
-            <div class="muted" style="font-size:12px;margin-top:6px">${totOrd} órdenes en total.</div>
-          </div>
-
-          <div class="card pad">
-            <h3 class="ph">Embudo de consultas</h3>
-            <div class="funnel">
-              ${fstep('Consultas', totConsultas, 100)}
-              ${fstep('Cotizaciones', cotis.length, Math.round(cotis.length / Math.max(totConsultas, 1) * 100))}
-              ${fstep('Ventas', totVentas, Math.round(totVentas / Math.max(totConsultas, 1) * 100))}
-            </div>
-          </div>
-        </div>
-
-        <div class="card pad" style="margin-top:14px">
-          <h3 class="ph">Top vendedores</h3>
-          <table><tbody>${top.map(([nombre, monto]) => `<tr>
-            <td style="width:120px"><b>${UI.esc(nombre)}</b></td>
-            <td><div class="vbar"><span style="width:${Math.round(monto / maxV * 100)}%"></span></div></td>
-            <td style="text-align:right" class="tnum"><b>${UI.pesos(monto)}</b></td></tr>`).join('')}</tbody></table>
-        </div>
-
-        <h3 class="ph" style="margin:22px 0 10px">Ir a…</h3>
-        <div class="qa">
-          ${qa('ventas', '🧾', 'Ventas', 'Cotizar, órdenes, clientes')}
-          ${qa('catalogo', '🪑', 'Catálogo', 'Productos y variantes')}
-          ${qa('caja', '💵', 'Caja', 'Cobros y señas')}
-          ${qa('produccion', '🏭', 'Producción', 'Tablero de fabricación')}
-          ${qa('logistica', '🚚', 'Logística', 'Entregas')}
-          ${qa('reclamos', '🛠️', 'Reclamos', 'Posventa')}
-          ${qa('abastecimiento', '📦', 'Abastecimiento', 'Proveedores y pedidos')}
-          ${qa('facturas', '📄', 'Facturas', 'Marcado + Nacional Soft')}
-          ${qa('reportes', '📊', 'Reportes', 'Tableros de dirección')}
-          ${qa('config', '⚙️', 'Configuración', 'Usuarios y reglas')}
-        </div>
-
-        <style>
-          .per{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
-          .per button{border:0;background:var(--panel);color:var(--muted);padding:7px 12px;font-size:13px;cursor:pointer}
-          .per button+button{border-left:1px solid var(--line)}
-          .per button.on{background:var(--brand-soft);color:var(--brand-ink);font-weight:700}
-          .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
-          @media(max-width:720px){.kpis{grid-template-columns:1fr 1fr}}
-          .kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow)}
-          .kpi .lab{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
-          .kpi .val{font-size:26px;font-weight:800;color:var(--navy);margin-top:6px;letter-spacing:-.02em}
-          .kpi .accent{height:3px;border-radius:3px;margin-top:12px}
-          .cols2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-          @media(max-width:720px){.cols2{grid-template-columns:1fr}}
-          .ph{margin:0 0 12px;color:var(--navy);font-size:15px}
-          .barseg{display:flex;gap:2px;height:26px;border-radius:8px;overflow:hidden}
-          .barseg span{display:block}
-          .leg{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px}
-          .leg .li{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-soft)}
-          .leg .dot{width:10px;height:10px;border-radius:3px;display:inline-block}
-          .funnel{display:flex;flex-direction:column;gap:8px}
-          .fst{display:flex;align-items:center;gap:10px}
-          .fst .fn{width:110px;font-size:13px;color:var(--ink-soft)}
-          .fst .fbar{flex:1;height:22px;background:var(--panel-2);border-radius:7px;overflow:hidden}
-          .fst .fbar span{display:block;height:100%;background:var(--brand);border-radius:7px}
-          .fst .fv{width:38px;text-align:right;font-weight:700;color:var(--navy)}
-          .vbar{height:12px;background:var(--panel-2);border-radius:6px;overflow:hidden}
-          .vbar span{display:block;height:100%;background:var(--brand);border-radius:6px}
-          .qa{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
-          .qacard{display:flex;gap:10px;align-items:flex-start;padding:14px;border:1px solid var(--line);border-radius:12px;
-            background:var(--panel);box-shadow:var(--shadow);cursor:pointer;text-align:left;transition:.15s}
-          .qacard:hover{border-color:var(--brand);transform:translateY(-1px)}
-          .qacard .em{font-size:22px;line-height:1}
-          .qacard b{color:var(--navy);display:block;font-size:14px}
-          .qacard span{font-size:12px;color:var(--muted)}
-        </style>`;
-
-      v.querySelectorAll('[data-go]').forEach(b => b.onclick = () => global.App.setTab(b.dataset.go));
-      v.querySelectorAll('.per button').forEach(b => b.onclick = () => {
-        v.querySelectorAll('.per button').forEach(x => x.classList.remove('on')); b.classList.add('on');
-      });
-
-      function tile(lab, val, tone) {
-        const c = { ok: 'var(--ok)', info: 'var(--brand)', warn: 'var(--warn)', soft: 'var(--muted)' }[tone];
-        return `<div class="kpi"><div class="lab">${lab}</div><div class="val tnum">${val}</div>
-          <div class="accent" style="background:${c}"></div></div>`;
-      }
-      function fstep(nombre, val, pct) {
-        return `<div class="fst"><span class="fn">${nombre}</span>
-          <div class="fbar"><span style="width:${Math.max(6, Math.min(100, pct))}%"></span></div>
-          <span class="fv tnum">${val}</span></div>`;
-      }
-      function qa(key, em, tit, desc) {
-        return `<button class="qacard" data-go="${key}"><span class="em">${em}</span>
-          <span><b>${tit}</b><span>${desc}</span></span></button>`;
-      }
-      function lbl(k) { return (global.DB.ESTADO_ORDEN[k]?.label) || k; }
+  const CFG = {
+    ventas: {
+      titulo: 'Ventas', sub: 'El mostrador de un vistazo.',
+      kpis: [
+        { lab: 'Ventas del mes', em: '💵', tono: 'ok', val: '$28.450.000', foot: 'Objetivo 81%', obj: 81 },
+        { lab: 'Ventas de hoy', em: '📈', tono: 'info', val: '$1.256.000', foot: '<span class="up">▲ 14%</span> vs ayer' },
+        { lab: 'Órdenes abiertas', em: '🧾', tono: 'soft', val: '18', foot: '12 en producción' },
+        { lab: 'Por cobrar', em: '💰', tono: 'warn', val: '$4.890.750', foot: '6 órdenes' },
+        { lab: 'Presupuestos abiertos', em: '📄', tono: 'soft', val: '23', foot: '$6.120.000' },
+        { lab: 'Ticket promedio', em: '🎟️', tono: 'info', val: '$978.000', foot: '<span class="up">▲ 6%</span> 30 días' },
+      ],
+      pipeline: [
+        { label: 'A confirmar', n: 8, monto: '$3.210.000' }, { label: 'Producción', n: 12, monto: '$6.240.000', hot: true },
+        { label: 'Control/Listo', n: 7, monto: '$3.180.000' }, { label: 'Logística', n: 6, monto: '$3.210.000' },
+        { label: 'Entregadas', n: 34, monto: '$11.190.000' },
+      ],
+      embudo: [
+        { label: 'Consultas', val: 182, pct: null }, { label: 'Cotizaciones', val: 74, pct: 40.7 },
+        { label: 'Señadas', val: 28, pct: 37.8 }, { label: 'Órdenes', val: 21, pct: 75.0 }, { label: 'Entregadas', val: 16, pct: 76.2 },
+      ],
+    },
+    crm: {
+      titulo: 'CRM', sub: 'Una fila por cliente; pensado para la recompra.',
+      kpis: [
+        { lab: 'Clientes', em: '👥', tono: 'info', val: '6.393', foot: '1.100 ya compraron' },
+        { lab: 'Consultas del mes', em: '💬', tono: 'soft', val: '182' },
+        { lab: 'En seguimiento', em: '⏳', tono: 'warn', val: '28', foot: 'esperando respuesta' },
+        { lab: 'Recompra', em: '🔁', tono: 'ok', val: '17%', foot: 'de los que compraron' },
+      ],
+    },
+    catalogo: {
+      titulo: 'Catálogo', sub: 'Salud del catálogo y precios.',
+      alarmas: [
+        { tono: 'warn', em: '🏷️', titulo: '18 sin costo', detalle: 'no calculan margen' },
+        { tono: 'warn', em: '💱', titulo: '7 con precio desactualizado', detalle: 'revisar contra Tienda Nube' },
+        { tono: 'info', em: '📋', titulo: '15 pendientes de revisión' },
+      ],
+      kpis: [
+        { lab: 'Productos', em: '🪑', tono: 'info', val: '631' }, { lab: 'Publicados TN', em: '🛒', tono: 'ok', val: '312' },
+        { lab: 'Sin costo', em: '🏷️', tono: 'warn', val: '18' }, { lab: 'Precio desactualizado', em: '💱', tono: 'warn', val: '7' },
+        { lab: 'Sin proveedor', em: '📦', tono: 'soft', val: '23' }, { lab: 'A revisar', em: '📋', tono: 'warn', val: '15' },
+      ],
+    },
+    produccion: {
+      titulo: 'Producción', sub: 'Lo que hay que fabricar hoy.',
+      alarmas: [
+        { tono: 'crit', em: '⏰', titulo: '12 atrasadas', detalle: 'pasaron su fecha' },
+        { tono: 'warn', em: '🪵', titulo: '7 esperando materiales' },
+        { tono: 'crit', em: '⛔', titulo: '3 bloqueadas' },
+      ],
+      kpis: [
+        { lab: 'En proceso', em: '🏭', tono: 'ok', val: '48' }, { lab: 'Atrasadas', em: '⏰', tono: 'crit', val: '12' },
+        { lab: 'Esperando materiales', em: '🪵', tono: 'warn', val: '7' }, { lab: 'Capacidad', em: '📊', tono: 'info', val: '92%', obj: 92 },
+      ],
+    },
+    compras: {
+      titulo: 'Compras', sub: 'Órdenes de compra y proveedores.',
+      kpis: [
+        { lab: 'OC pendientes', em: '🛒', tono: 'info', val: '12' }, { lab: 'Proveedores demorados', em: '🐢', tono: 'warn', val: '5' },
+        { lab: 'Comprometido', em: '💸', tono: 'soft', val: '$18.500.000' }, { lab: 'Recepciones hoy', em: '📥', tono: 'ok', val: '3' },
+      ],
+    },
+    inventario: {
+      titulo: 'Inventario', sub: 'Stock, movimientos y reservas.',
+      kpis: [
+        { lab: 'SKUs', em: '📦', tono: 'info', val: '1.240' }, { lab: 'Bajo mínimo', em: '⚠️', tono: 'warn', val: '32' },
+        { lab: 'Reservados', em: '🔒', tono: 'soft', val: '88' }, { lab: 'Sin ubicación', em: '❓', tono: 'warn', val: '12' },
+      ],
+    },
+    logistica: {
+      titulo: 'Logística', sub: 'La agenda de entregas del día.',
+      alarmas: [
+        { tono: 'crit', em: '🚚', titulo: '3 entregas demoradas', rt: 'hoy' },
+        { tono: 'warn', em: '🧑‍✈️', titulo: '1 entrega sin chofer' },
+      ],
+      kpis: [
+        { lab: 'Entregas hoy', em: '🚚', tono: 'info', val: '6' }, { lab: 'Próximas 7 días', em: '📅', tono: 'soft', val: '14' },
+        { lab: 'Retiros', em: '🏬', tono: 'soft', val: '3' }, { lab: 'Demoradas', em: '⏰', tono: 'crit', val: '3' },
+      ],
+    },
+    tesoreria: {
+      titulo: 'Tesorería', sub: 'Cobros, señas y rendiciones.',
+      kpis: [
+        { lab: 'Caja disponible', em: '💵', tono: 'ok', val: '$2.310.000' }, { lab: 'Por cobrar', em: '💰', tono: 'warn', val: '$4.890.750' },
+        { lab: 'Señas del mes', em: '🧾', tono: 'info', val: '$3.120.000' }, { lab: 'Sin rendir', em: '📤', tono: 'warn', val: '2' },
+      ],
+    },
+    reclamos: {
+      titulo: 'Reclamos', sub: 'Posventa y su urgencia.',
+      alarmas: [{ tono: 'crit', em: '🛠️', titulo: '2 reclamos vencidos', detalle: 'requieren respuesta ya', rt: 'vencido' }],
+      kpis: [
+        { lab: 'Abiertos', em: '🛠️', tono: 'warn', val: '7' }, { lab: 'Vencidos', em: '⏰', tono: 'crit', val: '2' },
+        { lab: 'En gestión', em: '🔧', tono: 'info', val: '3' }, { lab: 'Resueltos (mes)', em: '✅', tono: 'ok', val: '15' },
+      ],
+    },
+    config: {
+      titulo: 'Configuración', sub: 'Usuarios, roles, locales y reglas.',
+      kpis: [
+        { lab: 'Usuarios', em: '👤', tono: 'info', val: '9' }, { lab: 'Roles', em: '🔑', tono: 'soft', val: '6' },
+        { lab: 'Locales', em: '🏬', tono: 'soft', val: '3' }, { lab: 'Reglas de precio', em: '⚖️', tono: 'soft', val: '4' },
+      ],
     },
   };
-  global.Inicio = Inicio;
+
+  const Resumen = {
+    render(mount, modulo) {
+      const c = CFG[modulo] || { titulo: modulo, sub: '', kpis: [] };
+      const W = global.Widgets;
+      let extra = '';
+      if (c.pipeline) extra += `<div style="margin-top:14px">${W.card('Pipeline de órdenes', W.pipeline(c.pipeline))}</div>`;
+      if (c.embudo) extra += `<div style="margin-top:14px">${W.card('Conversión del embudo (30 días)', W.embudo(c.embudo))}</div>`;
+      document.getElementById(mount).innerHTML =
+        UI.head(c.titulo, 'Resumen', c.sub) +
+        (c.alarmas ? W.alarmas(c.alarmas) : '') +
+        W.kpis(c.kpis) + extra;
+    },
+    tiene(modulo) { return !!CFG[modulo]; },
+  };
+
+  global.Resumen = Resumen;
 })(typeof window !== 'undefined' ? window : globalThis);
 
 </script><script>
@@ -1470,8 +1663,8 @@ tr:hover td{background:var(--panel-2)}
   ];
 
   const Produccion = {
-    render() {
-      const v = document.getElementById('view');
+    render(mount = 'view') {
+      const v = document.getElementById(mount);
       v.innerHTML = UI.head('Producción', 'Tablero de fabricación',
         'Editar una orden en producción requiere autorización — no lo hace el vendedor.') +
         `<div class="kanban">${COLS.map(c => `
@@ -1577,11 +1770,20 @@ tr:hover td{background:var(--panel-2)}
   }
 
   const Esq = {
-    render(clave) {
+    render(clave, mount = 'view') {
       const m = ESQ[clave];
-      const v = document.getElementById('view');
+      const v = document.getElementById(mount);
       if (!m) { v.innerHTML = UI.vacio('Módulo en construcción.'); return; }
       v.innerHTML = UI.head(m.kick, m.titulo, m.sub) + m.demo();
+    },
+    // Sub-módulo genérico todavía sin construir: título + nota + forma prevista.
+    sub(mount, titulo, desc) {
+      document.getElementById(mount).innerHTML =
+        UI.head(titulo.split('·')[0].trim(), titulo, desc || '') +
+        `<div class="card pad"><div class="empty" style="padding:40px 20px">
+          🧩 <b style="color:var(--navy)">${UI.esc(titulo)}</b><br>
+          <span class="muted">Esta vista se construye en su etapa. La arquitectura ya la contempla.</span>
+        </div></div>`;
     },
   };
   global.Esq = Esq;
@@ -1589,93 +1791,236 @@ tr:hover td{background:var(--panel-2)}
 
 </script><script>
 // =====================================================================
-//  Belgrano Soft · shell
-//  Selector "ver como" (sin login todavía) + navegación por rol.
-//  Cada rol ve solo sus solapas. El login real llega después.
+//  Belgrano Soft · Núcleo del shell
+//  Plataforma de módulos independientes con un mismo Core. Navegación de
+//  DOS niveles: el rail primario elige el módulo; al entrar, la sub-nav
+//  cambia por completo a la de ese módulo. Cada módulo aterriza en su
+//  Resumen (nunca directo en una tabla). "Los módulos resuelven un trabajo."
+//  Login real y permisos finos: después. Hoy, selector "Ver como".
 // =====================================================================
 (function (global) {
-  // Qué solapas ve cada rol. La clave es el módulo; el label lo que se lee.
+  const S = (k, label, r) => ({ k, label, r });
+  const skel = label => (m) => global.Esq.sub(m, label);
+  const resumen = key => (m) => global.Resumen.render(m, key);
+
+  // Nivel 1 (macro) + nivel 2 (sub-navegación de cada módulo).
   const MODULOS = {
-    inicio:         { label: 'Inicio',         render: () => global.Inicio.render() },
-    ventas:         { label: 'Ventas',         render: () => global.Ventas.render() },
-    catalogo:       { label: 'Catálogo',       render: () => global.Catalogo.render() },
-    caja:           { label: 'Caja',           render: () => global.Esq.render('caja') },
-    produccion:     { label: 'Producción',     render: () => global.Produccion.render() },
-    logistica:      { label: 'Logística',      render: () => global.Esq.render('logistica') },
-    reclamos:       { label: 'Reclamos',       render: () => global.Esq.render('reclamos') },
-    abastecimiento: { label: 'Abastecimiento', render: () => global.Esq.render('abastecimiento') },
-    facturas:       { label: 'Facturas',       render: () => global.Esq.render('facturas') },
-    reportes:       { label: 'Reportes',       render: () => global.Esq.render('reportes') },
-    config:         { label: 'Configuración',  render: () => global.Esq.render('config') },
+    dashboard: { label: 'Inicio', icon: '🏠', home: true, r: m => global.Inicio.render(m) },
+
+    crm: { label: 'CRM', icon: '💬', subs: [
+      S('resumen', 'Resumen', resumen('crm')),
+      S('clientes', 'Clientes', m => global.Clientes.render(m)),
+      S('consultas', 'Consultas', skel('Consultas / atenciones')),
+      S('seguimientos', 'Seguimientos', skel('Seguimientos')),
+      S('fusiones', 'Fusionar', skel('Fusionar clientes')),
+    ]},
+
+    ventas: { label: 'Ventas', icon: '💰', subs: [
+      S('resumen', 'Resumen', resumen('ventas')),
+      S('nueva', 'Nueva cotización', m => global.Presupuesto.render(m)),
+      S('presupuestos', 'Presupuestos', m => global.Cotizaciones.render(m)),
+      S('ordenes', 'Órdenes', m => global.Ordenes.render(m)),
+      S('clientes', 'Clientes', m => global.Clientes.render(m)),
+      S('agenda', 'Agenda', skel('Agenda de ventas')),
+      S('cobros', 'Cobros', skel('Cobros de ventas')),
+      S('comisiones', 'Comisiones', skel('Comisiones')),
+      S('indicadores', 'Indicadores', skel('Indicadores de ventas')),
+    ]},
+
+    catalogo: { label: 'Catálogo', icon: '🪑', subs: [
+      S('resumen', 'Resumen', resumen('catalogo')),
+      S('productos', 'Productos', m => global.Catalogo.render(m)),
+      S('familias', 'Familias', skel('Familias')),
+      S('variantes', 'Variantes', skel('Variantes')),
+      S('materiales', 'Materiales', skel('Materiales')),
+      S('colores', 'Colores', skel('Colores')),
+      S('herrajes', 'Herrajes', skel('Herrajes')),
+      S('accesorios', 'Accesorios', skel('Accesorios')),
+      S('versiones', 'Versiones', skel('Versiones / importaciones')),
+    ]},
+
+    produccion: { label: 'Producción', icon: '🏭', subs: [
+      S('resumen', 'Resumen', resumen('produccion')),
+      S('ordenes', 'Órdenes', m => global.Produccion.render(m)),
+      S('cola', 'Cola de trabajo', skel('Cola de trabajo')),
+      S('planificacion', 'Planificación', skel('Planificación')),
+      S('sectores', 'Sectores', skel('Sectores')),
+      S('operarios', 'Operarios', skel('Operarios')),
+      S('capacidad', 'Capacidad', skel('Capacidad')),
+      S('incidencias', 'Incidencias', skel('Incidencias')),
+      S('calidad', 'Control de calidad', skel('Control de calidad')),
+      S('historial', 'Historial', skel('Historial')),
+    ]},
+
+    compras: { label: 'Compras', icon: '🛒', subs: [
+      S('resumen', 'Resumen', resumen('compras')),
+      S('oc', 'Órdenes de compra', skel('Órdenes de compra')),
+      S('recepciones', 'Recepciones', skel('Recepciones')),
+      S('proveedores', 'Proveedores', skel('Proveedores')),
+      S('comparador', 'Comparador', skel('Comparador de precios')),
+      S('pendientes', 'Pendientes', skel('Pendientes')),
+      S('historial', 'Historial', skel('Historial')),
+      S('indicadores', 'Indicadores', skel('Indicadores')),
+    ]},
+
+    inventario: { label: 'Inventario', icon: '📦', subs: [
+      S('resumen', 'Resumen', resumen('inventario')),
+      S('stock', 'Stock', skel('Stock')),
+      S('movimientos', 'Movimientos', skel('Movimientos')),
+      S('ubicaciones', 'Ubicaciones', skel('Ubicaciones')),
+      S('reservas', 'Reservas', skel('Reservas')),
+      S('conteos', 'Conteos', skel('Conteos')),
+      S('ajustes', 'Ajustes', skel('Ajustes')),
+      S('alertas', 'Alertas', skel('Alertas')),
+      S('historial', 'Historial', skel('Historial')),
+    ]},
+
+    logistica: { label: 'Logística', icon: '🚚', subs: [
+      S('resumen', 'Resumen', resumen('logistica')),
+      S('agenda', 'Agenda', skel('Agenda de entregas')),
+      S('entregas', 'Entregas', skel('Entregas')),
+      S('proximas', 'Próximas', skel('Próximas entregas')),
+      S('choferes', 'Choferes', skel('Choferes')),
+      S('vehiculos', 'Vehículos', skel('Vehículos')),
+      S('mapa', 'Mapa', skel('Mapa de entregas')),
+      S('indicadores', 'Indicadores', skel('Indicadores')),
+    ]},
+
+    tesoreria: { label: 'Tesorería', icon: '💳', subs: [
+      S('resumen', 'Resumen', resumen('tesoreria')),
+      S('cobros', 'Cobros', skel('Cobros')),
+      S('senas', 'Señas', skel('Señas')),
+      S('rendiciones', 'Rendiciones', skel('Rendiciones')),
+      S('cajas', 'Cajas', skel('Cajas')),
+      S('movimientos', 'Movimientos', skel('Movimientos')),
+      S('facturas', 'Facturas', skel('Facturas · Nacional Soft')),
+      S('indicadores', 'Indicadores', skel('Indicadores')),
+    ]},
+
+    reclamos: { label: 'Reclamos', icon: '🛠️', subs: [
+      S('resumen', 'Resumen', resumen('reclamos')),
+      S('abiertos', 'Abiertos', skel('Reclamos abiertos')),
+      S('gestion', 'En gestión', skel('En gestión')),
+      S('resueltos', 'Resueltos', skel('Resueltos')),
+      S('motivos', 'Motivos', skel('Motivos')),
+      S('indicadores', 'Indicadores', skel('Indicadores')),
+    ]},
+
+    config: { label: 'Configuración', icon: '⚙️', subs: [
+      S('resumen', 'Resumen', resumen('config')),
+      S('usuarios', 'Usuarios', skel('Usuarios')),
+      S('roles', 'Roles y permisos', skel('Roles y permisos')),
+      S('locales', 'Locales', skel('Locales')),
+      S('vendedores', 'Vendedores', skel('Vendedores')),
+      S('precios', 'Reglas de precio', skel('Reglas de precio por término')),
+      S('series', 'Series y numeración', skel('Series y numeración')),
+    ]},
   };
-  // Los 6 roles y qué módulos ve cada uno (permisos finos: se afinan después).
+
+  // Cada rol ve un subconjunto de módulos. Permisos finos: se afinan después.
   const ROLES = {
-    vendedor:      { label: 'Vendedor',              tabs: ['ventas', 'catalogo', 'produccion', 'logistica'] },
-    direccion:     { label: 'Dirección',             tabs: ['inicio', 'ventas', 'catalogo', 'caja', 'produccion', 'logistica', 'reclamos', 'abastecimiento', 'facturas', 'reportes', 'config'] },
-    administrativo:{ label: 'Administrativo',        tabs: ['ventas', 'facturas', 'caja', 'catalogo'] },
-    prod:          { label: 'Encargado de Producción', tabs: ['produccion', 'abastecimiento', 'catalogo'] },
-    logi:          { label: 'Logística',             tabs: ['logistica', 'reclamos', 'catalogo'] },
-    gestion:       { label: 'Gestión de Cliente',    tabs: ['ventas', 'catalogo'] },
+    direccion:      { label: 'Dirección',              tabs: ['dashboard', 'crm', 'ventas', 'catalogo', 'produccion', 'compras', 'inventario', 'logistica', 'tesoreria', 'reclamos', 'config'] },
+    vendedor:       { label: 'Vendedor',               tabs: ['dashboard', 'ventas', 'crm', 'catalogo'] },
+    administrativo: { label: 'Administrativo',         tabs: ['dashboard', 'ventas', 'tesoreria', 'compras', 'catalogo', 'reclamos'] },
+    prod:           { label: 'Encargado de Producción', tabs: ['dashboard', 'produccion', 'inventario', 'compras', 'catalogo'] },
+    logi:           { label: 'Logística',              tabs: ['dashboard', 'logistica', 'reclamos'] },
+    gestion:        { label: 'Gestión de Cliente',     tabs: ['dashboard', 'crm', 'ventas'] },
   };
 
   const App = {
     rol: 'direccion',
     tab: null,
+    _sub: {},   // recuerda la última sub-solapa por módulo
 
     async init() {
       this.montarShell();
-      // Si no hay conexión configurada, ofrecer conectar (una sola vez).
-      if (!global.DB.hayConexion()) this.pedirConexion();
       this.setRol(localStorage.getItem('bh_rol') || 'direccion');
     },
 
     montarShell() {
       document.body.innerHTML = `
-        <div id="top">
-          <div class="brand">Belgrano&nbsp;Soft <span class="m" id="modo"></span></div>
-          <div class="sp"></div>
-          <div class="verComo">
-            <span style="opacity:.7">Ver como</span>
-            <select id="selRol"></select>
+        <div class="lay">
+          <aside class="side" id="side">
+            <div class="brandbox"><span class="logo">B</span><div><b>Belgrano Soft</b><span class="m">· demo</span></div></div>
+            <nav id="nav"></nav>
+            <div class="grow"></div>
+            <div class="sect">Atajos</div>
+            <nav style="padding:0 10px 14px">
+              <button class="navi" data-atajo="orden"><span class="ic">＋</span>Nueva orden<span class="kbd">N</span></button>
+              <button class="navi" data-atajo="cliente"><span class="ic">＋</span>Nuevo cliente<span class="kbd">C</span></button>
+              <button class="navi" data-atajo="cobro"><span class="ic">＄</span>Cobro rápido<span class="kbd">R</span></button>
+            </nav>
+          </aside>
+          <div class="main">
+            <div class="tbar">
+              <button class="ham" id="ham">☰</button>
+              <div class="search"><span class="mag">🔍</span><input placeholder="Buscar órdenes, clientes, productos…"><span class="kbd">⌘K</span></div>
+              <div class="sp"></div>
+              <div class="verComo"><span class="muted">Ver como</span><select id="selRol"></select></div>
+              <button class="ic-btn" title="Notificaciones">🔔<span class="dot">8</span></button>
+              <div class="avatar" title="Brian · Dirección">BJ</div>
+            </div>
+            <main id="view"></main>
           </div>
-        </div>
-        <nav id="nav"></nav>
-        <main id="view"></main>`;
+        </div>`;
+
       const sel = document.getElementById('selRol');
-      sel.innerHTML = Object.entries(ROLES)
-        .map(([k, r]) => `<option value="${k}">${UI.esc(r.label)}</option>`).join('');
+      sel.innerHTML = Object.entries(ROLES).map(([k, r]) => `<option value="${k}">${UI.esc(r.label)}</option>`).join('');
       sel.onchange = () => this.setRol(sel.value);
-      document.getElementById('modo').textContent =
-        global.DB.modo() === 'demo' ? '· demo' : '';
+      document.getElementById('ham').onclick = () => document.body.classList.toggle('sideopen');
+      document.querySelectorAll('[data-atajo]').forEach(b => b.onclick = () => {
+        const a = b.dataset.atajo;
+        if (a === 'orden') this.goSub('ventas', 'nueva');
+        else if (a === 'cliente') this.goSub('crm', 'clientes');
+        else if (a === 'cobro') this.goSub('tesoreria', 'cobros');
+      });
     },
 
     setRol(rol) {
-      if (!ROLES[rol]) rol = 'vendedor';
+      if (!ROLES[rol]) rol = 'direccion';
       this.rol = rol;
       localStorage.setItem('bh_rol', rol);
       document.getElementById('selRol').value = rol;
       const tabs = ROLES[rol].tabs;
-      document.getElementById('nav').innerHTML = tabs
-        .map(t => `<button data-tab="${t}">${UI.esc(MODULOS[t].label)}</button>`).join('');
-      document.querySelectorAll('#nav button').forEach(b =>
-        b.onclick = () => this.setTab(b.dataset.tab));
+      const nav = document.getElementById('nav');
+      nav.innerHTML = tabs.map(t =>
+        `<button class="navi" data-tab="${t}"><span class="ic">${MODULOS[t].icon}</span>${UI.esc(MODULOS[t].label)}</button>`).join('');
+      nav.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => this.setTab(b.dataset.tab));
       this.setTab(tabs.includes(this.tab) ? this.tab : tabs[0]);
     },
 
-    setTab(tab) {
-      this.tab = tab;
-      document.querySelectorAll('#nav button').forEach(b =>
-        b.setAttribute('aria-current', b.dataset.tab === tab));
-      document.getElementById('view').innerHTML = '';
-      MODULOS[tab].render();
+    setTab(key) {
+      this.tab = key;
+      document.querySelectorAll('#nav [data-tab]').forEach(b => b.setAttribute('aria-current', b.dataset.tab === key));
+      document.body.classList.remove('sideopen');
+      const mod = MODULOS[key];
+      const view = document.getElementById('view');
+      if (!mod) { view.innerHTML = UI.vacio('Módulo no encontrado.'); return; }
+      if (mod.home || !mod.subs) { view.innerHTML = '<div id="mview"></div>'; mod.r('mview'); return; }
+
+      const cur = this._sub[key] || mod.subs[0].k;
+      view.innerHTML = `<div class="modlay">
+        <aside class="subside"><div class="subttl">${UI.esc(mod.label)}</div>
+          ${mod.subs.map(s => `<button class="subnavi" data-sub="${s.k}">${UI.esc(s.label)}</button>`).join('')}
+        </aside><div class="modbody" id="mview"></div></div>`;
+      view.querySelectorAll('[data-sub]').forEach(b => b.onclick = () => this.goSub(key, b.dataset.sub));
+      this._renderSub(key, cur);
     },
 
-    pedirConexion() {
-      const v = document.getElementById('view');
-      // Se muestra en la primera pantalla; no bloquea el modo demo.
-      setTimeout(() => {
-        if (global.DB.hayConexion()) return;
-      }, 0);
+    _renderSub(key, subK) {
+      const mod = MODULOS[key];
+      const s = mod.subs.find(x => x.k === subK) || mod.subs[0];
+      this._sub[key] = s.k;
+      document.querySelectorAll('#view [data-sub]').forEach(b => b.setAttribute('aria-current', b.dataset.sub === s.k));
+      const mv = document.getElementById('mview');
+      if (mv) mv.innerHTML = '';
+      s.r('mview');
+    },
+
+    // Navegar a un módulo y una sub-solapa concreta (para atajos y saltos entre módulos).
+    goSub(key, subK) {
+      if (this.tab !== key) { this._sub[key] = subK; this.setTab(key); }
+      else this._renderSub(key, subK);
     },
   };
 

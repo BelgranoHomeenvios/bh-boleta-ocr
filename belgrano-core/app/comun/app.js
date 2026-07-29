@@ -1,91 +1,234 @@
 // =====================================================================
-//  Belgrano Soft · shell
-//  Selector "ver como" (sin login todavía) + navegación por rol.
-//  Cada rol ve solo sus solapas. El login real llega después.
+//  Belgrano Soft · Núcleo del shell
+//  Plataforma de módulos independientes con un mismo Core. Navegación de
+//  DOS niveles: el rail primario elige el módulo; al entrar, la sub-nav
+//  cambia por completo a la de ese módulo. Cada módulo aterriza en su
+//  Resumen (nunca directo en una tabla). "Los módulos resuelven un trabajo."
+//  Login real y permisos finos: después. Hoy, selector "Ver como".
 // =====================================================================
 (function (global) {
-  // Qué solapas ve cada rol. La clave es el módulo; el label lo que se lee.
+  const S = (k, label, r) => ({ k, label, r });
+  const skel = label => (m) => global.Esq.sub(m, label);
+  const resumen = key => (m) => global.Resumen.render(m, key);
+
+  // Nivel 1 (macro) + nivel 2 (sub-navegación de cada módulo).
   const MODULOS = {
-    inicio:         { label: 'Inicio',         render: () => global.Inicio.render() },
-    ventas:         { label: 'Ventas',         render: () => global.Ventas.render() },
-    catalogo:       { label: 'Catálogo',       render: () => global.Catalogo.render() },
-    caja:           { label: 'Caja',           render: () => global.Esq.render('caja') },
-    produccion:     { label: 'Producción',     render: () => global.Produccion.render() },
-    logistica:      { label: 'Logística',      render: () => global.Esq.render('logistica') },
-    reclamos:       { label: 'Reclamos',       render: () => global.Esq.render('reclamos') },
-    abastecimiento: { label: 'Abastecimiento', render: () => global.Esq.render('abastecimiento') },
-    facturas:       { label: 'Facturas',       render: () => global.Esq.render('facturas') },
-    reportes:       { label: 'Reportes',       render: () => global.Esq.render('reportes') },
-    config:         { label: 'Configuración',  render: () => global.Esq.render('config') },
+    dashboard: { label: 'Inicio', icon: '🏠', home: true, r: m => global.Inicio.render(m) },
+
+    crm: { label: 'CRM', icon: '💬', subs: [
+      S('resumen', 'Resumen', resumen('crm')),
+      S('clientes', 'Clientes', m => global.Clientes.render(m)),
+      S('consultas', 'Consultas', skel('Consultas / atenciones')),
+      S('seguimientos', 'Seguimientos', skel('Seguimientos')),
+      S('fusiones', 'Fusionar', skel('Fusionar clientes')),
+    ]},
+
+    ventas: { label: 'Ventas', icon: '💰', subs: [
+      S('resumen', 'Resumen', resumen('ventas')),
+      S('nueva', 'Nueva cotización', m => global.Presupuesto.render(m)),
+      S('presupuestos', 'Presupuestos', m => global.Cotizaciones.render(m)),
+      S('ordenes', 'Órdenes', m => global.Ordenes.render(m)),
+      S('clientes', 'Clientes', m => global.Clientes.render(m)),
+      S('agenda', 'Agenda', skel('Agenda de ventas')),
+      S('cobros', 'Cobros', skel('Cobros de ventas')),
+      S('comisiones', 'Comisiones', skel('Comisiones')),
+      S('indicadores', 'Indicadores', skel('Indicadores de ventas')),
+    ]},
+
+    catalogo: { label: 'Catálogo', icon: '🪑', subs: [
+      S('resumen', 'Resumen', resumen('catalogo')),
+      S('productos', 'Productos', m => global.Catalogo.render(m)),
+      S('familias', 'Familias', skel('Familias')),
+      S('variantes', 'Variantes', skel('Variantes')),
+      S('materiales', 'Materiales', skel('Materiales')),
+      S('colores', 'Colores', skel('Colores')),
+      S('herrajes', 'Herrajes', skel('Herrajes')),
+      S('accesorios', 'Accesorios', skel('Accesorios')),
+      S('versiones', 'Versiones', skel('Versiones / importaciones')),
+    ]},
+
+    produccion: { label: 'Producción', icon: '🏭', subs: [
+      S('resumen', 'Resumen', resumen('produccion')),
+      S('ordenes', 'Órdenes', m => global.Produccion.render(m)),
+      S('cola', 'Cola de trabajo', skel('Cola de trabajo')),
+      S('planificacion', 'Planificación', skel('Planificación')),
+      S('sectores', 'Sectores', skel('Sectores')),
+      S('operarios', 'Operarios', skel('Operarios')),
+      S('capacidad', 'Capacidad', skel('Capacidad')),
+      S('incidencias', 'Incidencias', skel('Incidencias')),
+      S('calidad', 'Control de calidad', skel('Control de calidad')),
+      S('historial', 'Historial', skel('Historial')),
+    ]},
+
+    compras: { label: 'Compras', icon: '🛒', subs: [
+      S('resumen', 'Resumen', resumen('compras')),
+      S('oc', 'Órdenes de compra', skel('Órdenes de compra')),
+      S('recepciones', 'Recepciones', skel('Recepciones')),
+      S('proveedores', 'Proveedores', skel('Proveedores')),
+      S('comparador', 'Comparador', skel('Comparador de precios')),
+      S('pendientes', 'Pendientes', skel('Pendientes')),
+      S('historial', 'Historial', skel('Historial')),
+      S('indicadores', 'Indicadores', skel('Indicadores')),
+    ]},
+
+    inventario: { label: 'Inventario', icon: '📦', subs: [
+      S('resumen', 'Resumen', resumen('inventario')),
+      S('stock', 'Stock', skel('Stock')),
+      S('movimientos', 'Movimientos', skel('Movimientos')),
+      S('ubicaciones', 'Ubicaciones', skel('Ubicaciones')),
+      S('reservas', 'Reservas', skel('Reservas')),
+      S('conteos', 'Conteos', skel('Conteos')),
+      S('ajustes', 'Ajustes', skel('Ajustes')),
+      S('alertas', 'Alertas', skel('Alertas')),
+      S('historial', 'Historial', skel('Historial')),
+    ]},
+
+    logistica: { label: 'Logística', icon: '🚚', subs: [
+      S('resumen', 'Resumen', resumen('logistica')),
+      S('agenda', 'Agenda', skel('Agenda de entregas')),
+      S('entregas', 'Entregas', skel('Entregas')),
+      S('proximas', 'Próximas', skel('Próximas entregas')),
+      S('choferes', 'Choferes', skel('Choferes')),
+      S('vehiculos', 'Vehículos', skel('Vehículos')),
+      S('mapa', 'Mapa', skel('Mapa de entregas')),
+      S('indicadores', 'Indicadores', skel('Indicadores')),
+    ]},
+
+    tesoreria: { label: 'Tesorería', icon: '💳', subs: [
+      S('resumen', 'Resumen', resumen('tesoreria')),
+      S('cobros', 'Cobros', skel('Cobros')),
+      S('senas', 'Señas', skel('Señas')),
+      S('rendiciones', 'Rendiciones', skel('Rendiciones')),
+      S('cajas', 'Cajas', skel('Cajas')),
+      S('movimientos', 'Movimientos', skel('Movimientos')),
+      S('facturas', 'Facturas', skel('Facturas · Nacional Soft')),
+      S('indicadores', 'Indicadores', skel('Indicadores')),
+    ]},
+
+    reclamos: { label: 'Reclamos', icon: '🛠️', subs: [
+      S('resumen', 'Resumen', resumen('reclamos')),
+      S('abiertos', 'Abiertos', skel('Reclamos abiertos')),
+      S('gestion', 'En gestión', skel('En gestión')),
+      S('resueltos', 'Resueltos', skel('Resueltos')),
+      S('motivos', 'Motivos', skel('Motivos')),
+      S('indicadores', 'Indicadores', skel('Indicadores')),
+    ]},
+
+    config: { label: 'Configuración', icon: '⚙️', subs: [
+      S('resumen', 'Resumen', resumen('config')),
+      S('usuarios', 'Usuarios', skel('Usuarios')),
+      S('roles', 'Roles y permisos', skel('Roles y permisos')),
+      S('locales', 'Locales', skel('Locales')),
+      S('vendedores', 'Vendedores', skel('Vendedores')),
+      S('precios', 'Reglas de precio', skel('Reglas de precio por término')),
+      S('series', 'Series y numeración', skel('Series y numeración')),
+    ]},
   };
-  // Los 6 roles y qué módulos ve cada uno (permisos finos: se afinan después).
+
+  // Cada rol ve un subconjunto de módulos. Permisos finos: se afinan después.
   const ROLES = {
-    vendedor:      { label: 'Vendedor',              tabs: ['ventas', 'catalogo', 'produccion', 'logistica'] },
-    direccion:     { label: 'Dirección',             tabs: ['inicio', 'ventas', 'catalogo', 'caja', 'produccion', 'logistica', 'reclamos', 'abastecimiento', 'facturas', 'reportes', 'config'] },
-    administrativo:{ label: 'Administrativo',        tabs: ['ventas', 'facturas', 'caja', 'catalogo'] },
-    prod:          { label: 'Encargado de Producción', tabs: ['produccion', 'abastecimiento', 'catalogo'] },
-    logi:          { label: 'Logística',             tabs: ['logistica', 'reclamos', 'catalogo'] },
-    gestion:       { label: 'Gestión de Cliente',    tabs: ['ventas', 'catalogo'] },
+    direccion:      { label: 'Dirección',              tabs: ['dashboard', 'crm', 'ventas', 'catalogo', 'produccion', 'compras', 'inventario', 'logistica', 'tesoreria', 'reclamos', 'config'] },
+    vendedor:       { label: 'Vendedor',               tabs: ['dashboard', 'ventas', 'crm', 'catalogo'] },
+    administrativo: { label: 'Administrativo',         tabs: ['dashboard', 'ventas', 'tesoreria', 'compras', 'catalogo', 'reclamos'] },
+    prod:           { label: 'Encargado de Producción', tabs: ['dashboard', 'produccion', 'inventario', 'compras', 'catalogo'] },
+    logi:           { label: 'Logística',              tabs: ['dashboard', 'logistica', 'reclamos'] },
+    gestion:        { label: 'Gestión de Cliente',     tabs: ['dashboard', 'crm', 'ventas'] },
   };
 
   const App = {
     rol: 'direccion',
     tab: null,
+    _sub: {},   // recuerda la última sub-solapa por módulo
 
     async init() {
       this.montarShell();
-      // Si no hay conexión configurada, ofrecer conectar (una sola vez).
-      if (!global.DB.hayConexion()) this.pedirConexion();
       this.setRol(localStorage.getItem('bh_rol') || 'direccion');
     },
 
     montarShell() {
       document.body.innerHTML = `
-        <div id="top">
-          <div class="brand">Belgrano&nbsp;Soft <span class="m" id="modo"></span></div>
-          <div class="sp"></div>
-          <div class="verComo">
-            <span style="opacity:.7">Ver como</span>
-            <select id="selRol"></select>
+        <div class="lay">
+          <aside class="side" id="side">
+            <div class="brandbox"><span class="logo">B</span><div><b>Belgrano Soft</b><span class="m">· demo</span></div></div>
+            <nav id="nav"></nav>
+            <div class="grow"></div>
+            <div class="sect">Atajos</div>
+            <nav style="padding:0 10px 14px">
+              <button class="navi" data-atajo="orden"><span class="ic">＋</span>Nueva orden<span class="kbd">N</span></button>
+              <button class="navi" data-atajo="cliente"><span class="ic">＋</span>Nuevo cliente<span class="kbd">C</span></button>
+              <button class="navi" data-atajo="cobro"><span class="ic">＄</span>Cobro rápido<span class="kbd">R</span></button>
+            </nav>
+          </aside>
+          <div class="main">
+            <div class="tbar">
+              <button class="ham" id="ham">☰</button>
+              <div class="search"><span class="mag">🔍</span><input placeholder="Buscar órdenes, clientes, productos…"><span class="kbd">⌘K</span></div>
+              <div class="sp"></div>
+              <div class="verComo"><span class="muted">Ver como</span><select id="selRol"></select></div>
+              <button class="ic-btn" title="Notificaciones">🔔<span class="dot">8</span></button>
+              <div class="avatar" title="Brian · Dirección">BJ</div>
+            </div>
+            <main id="view"></main>
           </div>
-        </div>
-        <nav id="nav"></nav>
-        <main id="view"></main>`;
+        </div>`;
+
       const sel = document.getElementById('selRol');
-      sel.innerHTML = Object.entries(ROLES)
-        .map(([k, r]) => `<option value="${k}">${UI.esc(r.label)}</option>`).join('');
+      sel.innerHTML = Object.entries(ROLES).map(([k, r]) => `<option value="${k}">${UI.esc(r.label)}</option>`).join('');
       sel.onchange = () => this.setRol(sel.value);
-      document.getElementById('modo').textContent =
-        global.DB.modo() === 'demo' ? '· demo' : '';
+      document.getElementById('ham').onclick = () => document.body.classList.toggle('sideopen');
+      document.querySelectorAll('[data-atajo]').forEach(b => b.onclick = () => {
+        const a = b.dataset.atajo;
+        if (a === 'orden') this.goSub('ventas', 'nueva');
+        else if (a === 'cliente') this.goSub('crm', 'clientes');
+        else if (a === 'cobro') this.goSub('tesoreria', 'cobros');
+      });
     },
 
     setRol(rol) {
-      if (!ROLES[rol]) rol = 'vendedor';
+      if (!ROLES[rol]) rol = 'direccion';
       this.rol = rol;
       localStorage.setItem('bh_rol', rol);
       document.getElementById('selRol').value = rol;
       const tabs = ROLES[rol].tabs;
-      document.getElementById('nav').innerHTML = tabs
-        .map(t => `<button data-tab="${t}">${UI.esc(MODULOS[t].label)}</button>`).join('');
-      document.querySelectorAll('#nav button').forEach(b =>
-        b.onclick = () => this.setTab(b.dataset.tab));
+      const nav = document.getElementById('nav');
+      nav.innerHTML = tabs.map(t =>
+        `<button class="navi" data-tab="${t}"><span class="ic">${MODULOS[t].icon}</span>${UI.esc(MODULOS[t].label)}</button>`).join('');
+      nav.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => this.setTab(b.dataset.tab));
       this.setTab(tabs.includes(this.tab) ? this.tab : tabs[0]);
     },
 
-    setTab(tab) {
-      this.tab = tab;
-      document.querySelectorAll('#nav button').forEach(b =>
-        b.setAttribute('aria-current', b.dataset.tab === tab));
-      document.getElementById('view').innerHTML = '';
-      MODULOS[tab].render();
+    setTab(key) {
+      this.tab = key;
+      document.querySelectorAll('#nav [data-tab]').forEach(b => b.setAttribute('aria-current', b.dataset.tab === key));
+      document.body.classList.remove('sideopen');
+      const mod = MODULOS[key];
+      const view = document.getElementById('view');
+      if (!mod) { view.innerHTML = UI.vacio('Módulo no encontrado.'); return; }
+      if (mod.home || !mod.subs) { view.innerHTML = '<div id="mview"></div>'; mod.r('mview'); return; }
+
+      const cur = this._sub[key] || mod.subs[0].k;
+      view.innerHTML = `<div class="modlay">
+        <aside class="subside"><div class="subttl">${UI.esc(mod.label)}</div>
+          ${mod.subs.map(s => `<button class="subnavi" data-sub="${s.k}">${UI.esc(s.label)}</button>`).join('')}
+        </aside><div class="modbody" id="mview"></div></div>`;
+      view.querySelectorAll('[data-sub]').forEach(b => b.onclick = () => this.goSub(key, b.dataset.sub));
+      this._renderSub(key, cur);
     },
 
-    pedirConexion() {
-      const v = document.getElementById('view');
-      // Se muestra en la primera pantalla; no bloquea el modo demo.
-      setTimeout(() => {
-        if (global.DB.hayConexion()) return;
-      }, 0);
+    _renderSub(key, subK) {
+      const mod = MODULOS[key];
+      const s = mod.subs.find(x => x.k === subK) || mod.subs[0];
+      this._sub[key] = s.k;
+      document.querySelectorAll('#view [data-sub]').forEach(b => b.setAttribute('aria-current', b.dataset.sub === s.k));
+      const mv = document.getElementById('mview');
+      if (mv) mv.innerHTML = '';
+      s.r('mview');
+    },
+
+    // Navegar a un módulo y una sub-solapa concreta (para atajos y saltos entre módulos).
+    goSub(key, subK) {
+      if (this.tab !== key) { this._sub[key] = subK; this.setTab(key); }
+      else this._renderSub(key, subK);
     },
   };
 
