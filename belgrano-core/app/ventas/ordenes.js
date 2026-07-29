@@ -34,7 +34,7 @@
             <td>${UI.estado(global.DB.ESTADO_ORDEN, o.estado)}</td></tr>`).join('')}</tbody></table></div>`
           : UI.vacio('No hay órdenes para esa búsqueda.');
         cont.querySelectorAll('[data-o]').forEach(tr => tr.onclick = () =>
-          UI.aviso('Detalle de la orden: próximo paso', 'info'));
+          global.OrdenDetalle.render(mount, null, () => this.render(mount)));
       } catch (e) { cont.innerHTML = `<div class="banner warn">${UI.esc(e.message || e)}</div>`; }
     },
   };
