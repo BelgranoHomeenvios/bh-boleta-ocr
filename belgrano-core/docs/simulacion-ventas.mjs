@@ -15,28 +15,39 @@ const ahora = () => new Date().toISOString();
 
 // ---------- Catálogo DECLARATIVO de condiciones -----------------------
 function senaVal(o) {
-  if (o.excepcionSena) return { ok: true, esperado: 0.30, valor: 1, excepcion: true };
   const pagado = o.cobros.filter(c => c.estado === 'validado').reduce((a, c) => a + c.monto, 0);
-  return { ok: pagado >= o.total * 0.30, esperado: 0.30, valor: o.total ? +(pagado / o.total).toFixed(2) : 0 };
+  const valor = o.total ? +(pagado / o.total).toFixed(2) : 0;
+  const exc = (o.excepciones || []).find(e => e.regla === 'sena_fabricacion');
+  if (exc) return { ok: true, esperado: 0.30, valor, excepcion: true, autorizadaPor: exc.autorizadaPor };
+  return { ok: pagado >= o.total * 0.30, esperado: 0.30, valor };
 }
 
 const COND_ORDEN = [
   { clave: 'cliente',            resp: 'Vendedor',       check: o => !!(o.cliente?.tel || o.cliente?.ig || o.cliente?.mail) },
   { clave: 'vend_local',         resp: 'Vendedor',       check: o => !!o.vendedor && !!o.local },
   { clave: 'pago',               resp: 'Vendedor',       check: o => !!o.termino },
-  { clave: 'sena',               resp: 'Tesorería',      check: o => senaVal(o).ok, detalle: o => senaVal(o) },
   { clave: 'aceptada',           resp: 'Vendedor',       check: o => o.cotizacionAceptada && o.version != null },
   { clave: 'lineas_valid',       resp: 'Vendedor',       check: o => o.lineas.length > 0 && o.lineas.every(l => l.producto && l.destinoPreliminar) },
   { clave: 'sin_bloqueos_orden', resp: 'Administración', check: o => !o.bloqueos.some(b => b.alcance === 'orden' && b.activo !== false) },
 ];
+// La seña del 30% NO es condición de la orden: es condición de liberación
+// EXCLUSIVA de las líneas cuya estrategia es fabricación (asumir el costo de
+// fabricar). Stock / entrega inmediata NO se bloquea por seña.
+const requiereFabricacion = l => ['fabricacion_interna', 'fabricacion_tercerizada'].includes(l.estrategia);
 const COND_LINEA = [
-  { clave: 'producto', resp: 'Vendedor',       check: l => !!l.producto },
-  { clave: 'medida',   resp: 'Vendedor',       check: l => !l.requiereMedida || l.medidaConfirmada },
-  { clave: 'precio',   resp: 'Administración', check: l => !l.requiereAutorizacion || l.precioAutorizado },
-  { clave: 'obs',      resp: 'Administración', check: l => !l.tieneObs || l.obsVerificada },
-  { clave: 'destino',  resp: 'Ventas',         check: l => !!l.estrategia },
-  { clave: 'mods',     resp: 'Administración', check: l => !l.modPendiente },
+  { clave: 'producto',        resp: 'Vendedor',       check: l => !!l.producto },
+  { clave: 'medida',          resp: 'Vendedor',       check: l => !l.requiereMedida || l.medidaConfirmada },
+  { clave: 'precio',          resp: 'Administración', check: l => !l.requiereAutorizacion || l.precioAutorizado },
+  { clave: 'obs',             resp: 'Administración', check: l => !l.tieneObs || l.obsVerificada },
+  { clave: 'destino',         resp: 'Ventas',         check: l => !!l.estrategia },
+  { clave: 'mods',            resp: 'Administración', check: l => !l.modPendiente },
+  { clave: 'sena_fabricacion', resp: 'Tesorería/Dirección', check: (l, o) => !requiereFabricacion(l) || senaVal(o).ok, detalle: (l, o) => senaVal(o) },
 ];
+
+// Info de bloqueo por condición: alcance + acciones que guían al usuario.
+const BLOQUEO_INFO = {
+  sena_fabricacion: { alcance: 'fabricacion', motivo: 'La fabricación requiere una seña mínima del 30%.', acciones: ['registrar_pago', 'solicitar_autorizacion'] },
+};
 
 // estrategia → efectos operativos (idempotentes, uno por tipo)
 const EFECTOS = {
@@ -61,13 +72,14 @@ function nuevoCtx() {
   return { eventos, evidencia, registry, emit(evento, payload = {}) { eventos.push({ evento, payload }); } };
 }
 
-function evalChecks(defs, obj, ctx, sobre, disparadoPor, actorEvento) {
+function evalChecks(defs, obj, ctx, sobre, disparadoPor, actorEvento, orden) {
   return defs.map(c => {
-    const ok = c.check(obj);
-    const det = c.detalle ? c.detalle(obj) : {};
+    const ok = c.check(obj, orden);
+    const det = c.detalle ? c.detalle(obj, orden) : {};
     ctx.evidencia.push({
       sobre, regla: c.clave, versionRegla: RV, resultado: ok, responsable: c.resp,
-      esperado: det.esperado, valor: det.valor, disparadoPor, actor: actorEvento || 'sistema', evaluadoEn: ahora(),
+      esperado: det.esperado, valor: det.valor, excepcion: det.excepcion, autorizadaPor: det.autorizadaPor,
+      disparadoPor, actor: actorEvento || 'sistema', evaluadoEn: ahora(),
     });
     return { clave: c.clave, resp: c.resp, ok };
   });
@@ -76,7 +88,7 @@ function evalChecks(defs, obj, ctx, sobre, disparadoPor, actorEvento) {
 // Transición comercial de la orden, centralizada.
 function transicionOrden(o, ctx, disparadoPor) {
   if (['cerrada', 'cancelada'].includes(o.estadoComercial)) return;
-  const rO = evalChecks(COND_ORDEN, o, ctx, 'orden', disparadoPor);
+  const rO = evalChecks(COND_ORDEN, o, ctx, 'orden', disparadoPor, undefined, o);
   const ordenOk = rO.every(c => c.ok);
   const hayTrabajo = o.lineas.some(l => l.objetosOperativos.length > 0);
 
@@ -107,17 +119,29 @@ function evaluar(o, ctx, disparadoPor = 'manual') {
   transicionOrden(o, ctx, disparadoPor);
   const ordenBloqueada = o.bloqueos.some(b => b.motivo === 'reversion');
   for (const l of o.lineas) {
-    if (l.habilitacion === 'liberada') continue;      // reversión se maneja a nivel orden
-    if (ordenBloqueada) continue;                     // orden frenada: no liberar más
-    const rL = evalChecks(COND_LINEA, l, ctx, 'linea:' + l.id, disparadoPor);
+    const rL = evalChecks(COND_LINEA, l, ctx, 'linea:' + l.id, disparadoPor, undefined, o);
     const lineaOk = rL.every(c => c.ok);
+
+    if (l.habilitacion === 'liberada') {
+      // Reversión a nivel LÍNEA: si cae una condición y ya hay trabajo, no se
+      // desibera en silencio.
+      if (!lineaOk && l.objetosOperativos.length && !l.bloqueos.some(b => b.motivo === 'reversion')) {
+        const causa = rL.find(c => !c.ok)?.clave || 'condicion';
+        l.bloqueos.push({ alcance: 'linea', motivo: 'reversion', clave: causa, resp: 'Dirección', accion: 'cancelar o modificar' });
+        ctx.emit('impacto.detectado', { linea: l.id, causa });
+        ctx.emit('accion.requerida', { linea: l.id, tipoAccion: 'cancelacion_o_modificacion' });
+      }
+      continue;
+    }
+    if (ordenBloqueada) continue; // orden frenada: no liberar nuevas líneas
+
     if (o.estadoComercial === 'confirmada' && lineaOk) {
       l.habilitacion = 'liberada'; l.bloqueos = [];
       ctx.emit('linea.liberada', { linea: l.id });
       generarEfectos(o, l, ctx);
     } else {
       l.habilitacion = 'bloqueada';
-      l.bloqueos = rL.filter(c => !c.ok).map(c => ({ alcance: 'liberacion', clave: c.clave, resp: c.resp }));
+      l.bloqueos = rL.filter(c => !c.ok).map(c => ({ clave: c.clave, resp: c.resp, ...(BLOQUEO_INFO[c.clave] || { alcance: 'liberacion' }) }));
     }
   }
 }
@@ -146,6 +170,24 @@ function anularPago(o, ctx) {
   evaluar(o, ctx, 'pago.anulado'); // la transición central decide impacto vs. volver a A confirmar
 }
 
+// Paso 1 · El vendedor NO puede aceptar por su cuenta: SOLICITA la excepción.
+// Salta el pedido de autorización a Dirección; queda pendiente.
+function solicitarExcepcion(o, regla, { solicitadaPor, motivo }, ctx) {
+  o.solicitudes.push({ regla, solicitadaPor, motivo, estado: 'pendiente', responsable: 'Dirección', fecha: ahora() });
+  ctx.emit('autorizacion.requerida', { regla, solicitadaPor, motivo, responsable: 'Dirección' });
+}
+// Paso 2 · Dirección AUTORIZA (o rechaza). Al autorizar, la excepción queda
+// REGISTRADA y reevalúa: confirma y libera por debajo del mínimo — para
+// fabricar o para entrega inmediata por igual.
+function autorizarExcepcion(o, regla, { autorizadaPor }, ctx) {
+  const sol = o.solicitudes.find(s => s.regla === regla && s.estado === 'pendiente');
+  if (sol) sol.estado = 'aprobada';
+  const sv = regla === 'sena' ? senaVal(o) : {};
+  o.excepciones.push({ regla, esperado: sv.esperado, valorReal: sv.valor, autorizadaPor, motivo: sol?.motivo, fecha: ahora() });
+  ctx.emit('excepcion.autorizada', { regla, autorizadaPor, valorReal: sv.valor });
+  evaluar(o, ctx, 'excepcion.autorizada');
+}
+
 // ---------- Impresión -------------------------------------------------
 const linea = (t = '') => console.log(t);
 function trace(ctx) { ctx.eventos.forEach(e => linea('    • ' + e.evento + '  ' + JSON.stringify(e.payload))); }
@@ -153,10 +195,10 @@ function estado(o) {
   linea(`    Orden ${o.id}: ${o.estadoComercial.toUpperCase()}` + (o.bloqueos.length ? `  ⛔orden:${o.bloqueos.map(b => b.clave).join(',')}` : ''));
   o.lineas.forEach(l => linea(`      ├─ ${l.id} (${l.tipo}): ${l.habilitacion}/${l.cumplimiento}` +
     (l.objetosOperativos.length ? ` → ${l.objetosOperativos.map(x => x.tipoObjeto).join(' + ')}` : '') +
-    (l.bloqueos.length ? `  ⛔ ${l.bloqueos.map(b => b.clave + '/' + b.alcance).join(', ')}` : '')));
+    (l.bloqueos.length ? `  ⛔ ${l.bloqueos.map(b => b.clave + '/' + b.alcance + (b.acciones ? ' [' + b.acciones.join('|') + ']' : '')).join(', ')}` : '')));
 }
 function mkLinea(x) { return { habilitacion: 'pendiente', cumplimiento: 'sin_iniciar', bloqueos: [], objetosOperativos: [], ...x }; }
-function mkOrden(x) { return { estadoComercial: 'borrador', version: 1, cobros: [], bloqueos: [], ...x }; }
+function mkOrden(x) { return { estadoComercial: 'borrador', version: 1, cobros: [], bloqueos: [], excepciones: [], solicitudes: [], ...x }; }
 
 // =====================================================================
 linea('\n══════ CASO 1 · Orden completamente liberada ══════');
@@ -200,7 +242,7 @@ linea('\n══════ CASO 3 · Seña revocada con trabajo ya generado ═
   anularPago(o, ctx);
   linea('  Tras anular el pago:'); estado(o);
   linea('  Eventos:'); trace(ctx);
-  const ev = ctx.evidencia.filter(e => e.regla === 'sena').pop();
+  const ev = ctx.evidencia.filter(e => e.regla === 'sena_fabricacion').pop();
   linea('  Evidencia (última de la regla "sena"): ' + JSON.stringify({ regla: ev.regla, v: ev.versionRegla, esperado: ev.esperado, valor: ev.valor, resultado: ev.resultado, disparadoPor: ev.disparadoPor }));
   linea('  → No desibera en silencio: impacto + acción requerida.');
 }
@@ -226,11 +268,35 @@ linea('\n══════ CASO 5 · Pierde condición ANTES de generar trabajo
   ] });
   const ctx = nuevoCtx();
   registrarCobro(o, { monto: 150000, estado: 'validado' }, ctx);
-  linea('  Tras la seña (confirmada, sin trabajo — L1 bloqueada):'); estado(o);
-  anularPago(o, ctx);
-  linea('  Tras anular el pago:'); estado(o);
+  linea('  Confirmada (L1 bloqueada por autorización, sin trabajo):'); estado(o);
+  // Se reabre la cotización (condición de ORDEN cae, sin trabajo generado)
+  o.cotizacionAceptada = false; ctx.emit('cotizacion.reabierta', { orden: o.id });
+  evaluar(o, ctx, 'cotizacion.reabierta');
+  linea('  Tras reabrir la cotización:'); estado(o);
   linea('  Eventos:'); trace(ctx);
-  linea('  → Sin trabajo operativo, la orden vuelve sola a A CONFIRMAR (sin impacto).');
+  linea('  → Cae una condición de ORDEN sin trabajo → vuelve sola a A CONFIRMAR.');
+}
+
+linea('\n══════ CASO 6 · Seña < 30% con autorización de Dirección ══════');
+{
+  const o = mkOrden({ id: 'OV-2020-0045', total: 800000, cliente: { tel: '1155550045' }, vendedor: 'Ale', local: '2020', termino: 'efectivo', cotizacionAceptada: true, lineas: [
+    mkLinea({ id: 'L1', tipo: 'a fabricar', producto: 'Placard Oliver', destinoPreliminar: 'fabrica', estrategia: 'fabricacion_interna' }),
+    mkLinea({ id: 'L2', tipo: 'estándar', producto: 'Cómoda Amberes', destinoPreliminar: 'stock', estrategia: 'stock' }), // entrega inmediata
+  ] });
+  const ctx = nuevoCtx();
+  registrarCobro(o, { monto: 160000, estado: 'validado' }, ctx); // 20% — no alcanza el 30%
+  linea('  Con seña del 20% (no alcanza):'); estado(o);
+  // El vendedor NO puede aceptar solo: solicita autorización → salta el pedido
+  solicitarExcepcion(o, 'sena_fabricacion', { solicitadaPor: 'Ale', motivo: 'entrega inmediata, cliente confiable' }, ctx);
+  linea('  El vendedor solicita aceptar sin el 30% → salta autorización a Dirección.'); estado(o);
+  // Dirección autoriza → queda registrada y libera (fabricar y entrega inmediata)
+  autorizarExcepcion(o, 'sena_fabricacion', { autorizadaPor: 'Dirección' }, ctx);
+  linea('  Dirección autoriza → confirma y libera (incluye entrega inmediata):'); estado(o);
+  linea('  Eventos:'); trace(ctx);
+  const exc = o.excepciones.find(e => e.regla === 'sena_fabricacion');
+  linea('  Excepción registrada: ' + JSON.stringify({ regla: exc.regla, esperado: exc.esperado, valorReal: exc.valorReal, autorizadaPor: exc.autorizadaPor, motivo: exc.motivo }));
+  const ev = ctx.evidencia.filter(e => e.regla === 'sena_fabricacion').pop();
+  linea('  Evidencia "sena": ' + JSON.stringify({ resultado: ev.resultado, valor: ev.valor, excepcion: ev.excepcion, autorizadaPor: ev.autorizadaPor, disparadoPor: ev.disparadoPor }));
 }
 
 linea('\n(Motor v2 — endurecido para casos reales antes de construir la interfaz.)');

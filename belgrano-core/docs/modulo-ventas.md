@@ -73,7 +73,6 @@ tercerizada · Compras · Logística**.
 ✓ Cliente identificado (tel/IG/mail)
 ✓ Vendedor y local definidos
 ✓ Condición de pago definida
-✓ Seña mínima cumplida — o excepción autorizada
 ✓ Cotización aceptada · versión de precio congelada
 ✓ Líneas comerciales válidas (identificadas, con destino preliminar)
 ✓ Sin bloqueos de alcance "orden"
@@ -81,6 +80,8 @@ tercerizada · Compras · Logística**.
 > **Confirmar la orden NO exige que todas las líneas estén liberadas.** "Líneas
 > comerciales válidas" = suficientemente definidas para existir como compromiso
 > comercial. Una orden **Confirmada puede tener líneas Bloqueadas**.
+> **La seña del 30% NO es condición de la orden** (se puede vender y reservar stock
+> sin seña) — ver 5.3.
 ### 5.3 · Condiciones de cada LÍNEA (para Liberar)
 ```
 ✓ Producto o descripción completos
@@ -90,7 +91,14 @@ tercerizada · Compras · Logística**.
 ✓ Destino operativo definido
 ✓ Disponibilidad o necesidad identificada
 ✓ Modificaciones pendientes resueltas
+✓ Seña 30% — SOLO si la estrategia es fabricación (interna/tercerizada)
 ```
+> **Regla de negocio (seña):** "No necesito seña para vender, necesito seña para
+> asumir el costo de fabricar." El 30% es condición de liberación **exclusiva de las
+> líneas de fabricación**. Stock / entrega inmediata **no** se bloquea por seña. Si
+> falta, se bloquea **solo esa línea** (alcance `fabricacion`) con dos acciones:
+> **registrar pago** o **solicitar autorización** (excepción de Dirección, registrada).
+
 Cada cambio de condición (seña, autorización, medida) hace que el motor **reevalúe** y
 libere / mantenga bloqueada **cada línea** por separado.
 
