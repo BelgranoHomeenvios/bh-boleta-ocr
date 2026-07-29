@@ -1520,7 +1520,7 @@ tr:hover td{background:var(--panel-2)}
 (function (global) {
   const CFG = {
     ventas: {
-      titulo: 'Ventas', sub: 'El mostrador de un vistazo.',
+      titulo: 'Ventas', sub: '¿Qué necesita mi atención en ventas hoy?',
       kpis: [
         { lab: 'Ventas del mes', em: '💵', tono: 'ok', val: '$28.450.000', foot: 'Objetivo 81%', obj: 81 },
         { lab: 'Ventas de hoy', em: '📈', tono: 'info', val: '$1.256.000', foot: '<span class="up">▲ 14%</span> vs ayer' },
@@ -1540,7 +1540,7 @@ tr:hover td{background:var(--panel-2)}
       ],
     },
     crm: {
-      titulo: 'CRM', sub: 'Una fila por cliente; pensado para la recompra.',
+      titulo: 'CRM', sub: '¿A qué clientes tengo que responder o seguir hoy?',
       kpis: [
         { lab: 'Clientes', em: '👥', tono: 'info', val: '6.393', foot: '1.100 ya compraron' },
         { lab: 'Consultas del mes', em: '💬', tono: 'soft', val: '182' },
@@ -1549,7 +1549,7 @@ tr:hover td{background:var(--panel-2)}
       ],
     },
     catalogo: {
-      titulo: 'Catálogo', sub: 'Salud del catálogo y precios.',
+      titulo: 'Catálogo', sub: '¿Qué productos necesitan revisión de costo o precio?',
       alarmas: [
         { tono: 'warn', em: '🏷️', titulo: '18 sin costo', detalle: 'no calculan margen' },
         { tono: 'warn', em: '💱', titulo: '7 con precio desactualizado', detalle: 'revisar contra Tienda Nube' },
@@ -1562,7 +1562,7 @@ tr:hover td{background:var(--panel-2)}
       ],
     },
     produccion: {
-      titulo: 'Producción', sub: 'Lo que hay que fabricar hoy.',
+      titulo: 'Producción', sub: '¿Qué muebles tengo que fabricar primero?',
       alarmas: [
         { tono: 'crit', em: '⏰', titulo: '12 atrasadas', detalle: 'pasaron su fecha' },
         { tono: 'warn', em: '🪵', titulo: '7 esperando materiales' },
@@ -1574,21 +1574,21 @@ tr:hover td{background:var(--panel-2)}
       ],
     },
     compras: {
-      titulo: 'Compras', sub: 'Órdenes de compra y proveedores.',
+      titulo: 'Compras', sub: '¿Qué tengo que comprar hoy?',
       kpis: [
         { lab: 'OC pendientes', em: '🛒', tono: 'info', val: '12' }, { lab: 'Proveedores demorados', em: '🐢', tono: 'warn', val: '5' },
         { lab: 'Comprometido', em: '💸', tono: 'soft', val: '$18.500.000' }, { lab: 'Recepciones hoy', em: '📥', tono: 'ok', val: '3' },
       ],
     },
     inventario: {
-      titulo: 'Inventario', sub: 'Stock, movimientos y reservas.',
+      titulo: 'Inventario', sub: '¿Qué me está faltando y qué tengo inmovilizado?',
       kpis: [
         { lab: 'SKUs', em: '📦', tono: 'info', val: '1.240' }, { lab: 'Bajo mínimo', em: '⚠️', tono: 'warn', val: '32' },
         { lab: 'Reservados', em: '🔒', tono: 'soft', val: '88' }, { lab: 'Sin ubicación', em: '❓', tono: 'warn', val: '12' },
       ],
     },
     logistica: {
-      titulo: 'Logística', sub: 'La agenda de entregas del día.',
+      titulo: 'Logística', sub: '¿Qué entregas corren riesgo hoy?',
       alarmas: [
         { tono: 'crit', em: '🚚', titulo: '3 entregas demoradas', rt: 'hoy' },
         { tono: 'warn', em: '🧑‍✈️', titulo: '1 entrega sin chofer' },
@@ -1599,14 +1599,14 @@ tr:hover td{background:var(--panel-2)}
       ],
     },
     tesoreria: {
-      titulo: 'Tesorería', sub: 'Cobros, señas y rendiciones.',
+      titulo: 'Tesorería', sub: '¿Qué tengo que cobrar y qué pagar esta semana?',
       kpis: [
         { lab: 'Caja disponible', em: '💵', tono: 'ok', val: '$2.310.000' }, { lab: 'Por cobrar', em: '💰', tono: 'warn', val: '$4.890.750' },
         { lab: 'Señas del mes', em: '🧾', tono: 'info', val: '$3.120.000' }, { lab: 'Sin rendir', em: '📤', tono: 'warn', val: '2' },
       ],
     },
     reclamos: {
-      titulo: 'Reclamos', sub: 'Posventa y su urgencia.',
+      titulo: 'Reclamos', sub: '¿Qué reclamos no pueden esperar?',
       alarmas: [{ tono: 'crit', em: '🛠️', titulo: '2 reclamos vencidos', detalle: 'requieren respuesta ya', rt: 'vencido' }],
       kpis: [
         { lab: 'Abiertos', em: '🛠️', tono: 'warn', val: '7' }, { lab: 'Vencidos', em: '⏰', tono: 'crit', val: '2' },
@@ -1614,7 +1614,7 @@ tr:hover td{background:var(--panel-2)}
       ],
     },
     config: {
-      titulo: 'Configuración', sub: 'Usuarios, roles, locales y reglas.',
+      titulo: 'Configuración', sub: '¿Qué reglas rigen hoy el sistema?',
       kpis: [
         { lab: 'Usuarios', em: '👤', tono: 'info', val: '9' }, { lab: 'Roles', em: '🔑', tono: 'soft', val: '6' },
         { lab: 'Locales', em: '🏬', tono: 'soft', val: '3' }, { lab: 'Reglas de precio', em: '⚖️', tono: 'soft', val: '4' },
