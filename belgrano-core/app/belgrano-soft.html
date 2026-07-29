@@ -43,9 +43,9 @@ a{color:var(--brand)}
 .appbar .logo{width:28px; height:28px; border-radius:6px; background:rgba(255,255,255,.14); display:flex;
   align-items:center; justify-content:center; font-weight:800; font-size:12px; flex:none}
 .appbar .brand{font-weight:800; font-size:14px; flex:none; white-space:nowrap}
-.appbar .mods{display:flex; gap:3px; margin-left:6px; overflow-x:auto; flex:1 1 auto; min-width:0; scrollbar-width:none}
+.appbar .mods{display:flex; gap:2px; margin-left:5px; overflow-x:auto; flex:1 1 auto; min-width:0; scrollbar-width:none}
 .appbar .mods::-webkit-scrollbar{display:none}
-.appbar .modpill{font:inherit; font-size:12px; font-weight:700; border:0; padding:5px 9px; border-radius:16px;
+.appbar .modpill{font:inherit; font-size:11.5px; font-weight:700; border:0; padding:5px 8px; border-radius:15px;
   cursor:pointer; white-space:nowrap; background:rgba(255,255,255,.08); color:rgba(255,255,255,.72)}
 .appbar .modpill:hover{background:rgba(255,255,255,.2); color:#fff}
 .appbar .modpill[aria-current="true"]{background:#fff; color:var(--navy)}
@@ -430,6 +430,15 @@ tr:hover td{background:var(--panel-2)}
     },
     _orden(id) { return DEMO.ordenes.find(o => String(o.id) === String(id)); },
 
+    // Transferencias declaradas que todavía no se acreditaron en el banco.
+    async transferenciasPendientes() {
+      const out = [];
+      DEMO.ordenes.forEach(o => (o.cobros || []).forEach(c => {
+        if (c.estado === 'pendiente_banco') out.push({ orden: o, cobro: c });
+      }));
+      return out;
+    },
+
     // Recalcula seña/saldo de una orden: SOLO cuenta lo cobrado de verdad
     // (efectivo rendido + transferencia acreditada en banco).
     _recalc(o) {
@@ -513,13 +522,16 @@ tr:hover td{background:var(--panel-2)}
         (!grupo || (GRUPO_ESTADO[grupo] || []).includes(o.estado)) &&
         (!vendedor || o.vendedor === vendedor));
     },
-    // "Mis pendientes": consultas de cualquier módulo hacia dirección, en un solo lugar.
+    // "Mis pendientes": consultas/decisiones de cualquier módulo hacia mí, en un
+    // solo lugar. destino = a dónde me lleva "Resolver". urgente = pide decisión.
     async misPendientes() {
       return [
-        { modulo: 'Producción', tono: 'warn', texto: 'Iara pregunta si la Mesa Noruega (S00020) puede cambiar de veta', desde: 'hace 2 h' },
-        { modulo: 'Logística',  tono: 'crit', texto: 'Entrega E-2381 sin chofer para hoy — ¿reprogramo?',            desde: 'hoy' },
-        { modulo: 'Ventas',     tono: 'info', texto: 'Ale pide autorizar precio a medida en S00021',                 desde: 'hace 2 días' },
-        { modulo: 'Tesorería',  tono: 'warn', texto: 'Cristian dejó una seña sin rendir',                            desde: 'hace 3 días' },
+        { id: 'p1', modulo: 'Ventas',     tono: 'crit', urgente: true,  texto: 'Ale pide autorizar precio a medida en S00021',          quien: 'Ale',      desde: 'hace 2 días', destino: { modulo: 'ventas', sub: 'aconfirmar' } },
+        { id: 'p2', modulo: 'Logística',  tono: 'crit', urgente: true,  texto: 'Entrega E-2381 sin chofer para hoy — ¿reprogramo?',      quien: 'Depósito', desde: 'hoy',         destino: { modulo: 'logistica', sub: 'agenda' } },
+        { id: 'p3', modulo: 'Producción', tono: 'warn', urgente: false, texto: 'Iara pregunta si la Mesa Noruega (S00020) puede cambiar de veta', quien: 'Iara', desde: 'hace 2 h',    destino: { modulo: 'produccion', sub: 'resumen' } },
+        { id: 'p4', modulo: 'Tesorería',  tono: 'warn', urgente: false, texto: 'Cristian dejó una seña sin rendir',                      quien: 'Cristian', desde: 'hace 3 días', destino: { modulo: 'tesoreria', sub: 'senas' } },
+        { id: 'p5', modulo: 'Compras',    tono: 'info', urgente: false, texto: 'Proveedor Maderas del Sur subió el MDF 12% — ¿actualizo lista?', quien: 'Compras', desde: 'ayer',   destino: { modulo: 'compras', sub: 'comparador' } },
+        { id: 'p6', modulo: 'Reclamos',   tono: 'warn', urgente: false, texto: 'Reclamo R-118: mesa con veta distinta a la del showroom',  quien: 'Nati',     desde: 'ayer',        destino: { modulo: 'reclamos', sub: 'abiertos' } },
       ];
     },
     // KPIs del tablero de ventas (demo).
@@ -1963,7 +1975,7 @@ tr:hover td{background:var(--panel-2)}
     async render(mount = 'view') {
       this._mount = mount;
       const v = document.getElementById(mount);
-      const [st, pend] = await Promise.all([global.DB.estadisticasVentas(), global.DB.misPendientes()]);
+      const st = await global.DB.estadisticasVentas();
       const W = global.Widgets;
 
       v.innerHTML = `
@@ -1987,28 +1999,15 @@ tr:hover td{background:var(--panel-2)}
           { lab: 'Ticket promedio', em: '🎟️', tono: 'info', val: UI.pesos(st.ticket), foot: st.operaciones + ' operaciones' },
         ])}
 
-        <div class="vp-cols">
-          <div class="pcard" style="margin-top:14px">
-            <div class="row" style="margin-bottom:8px"><h3 style="margin:0;color:var(--navy);font-size:15px">Boletas</h3><div class="sp"></div>
-              <select id="vp-vend" class="vp-vend"><option value="">Todos los vendedores</option>
-                ${global.DB.vendedores().map(x => `<option ${this.vendedor === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
-              <input id="vp-q" placeholder="Cliente o N°…" style="width:160px">
-            </div>
-            <div class="chips" id="vp-chips">${FILTROS.map(f =>
-              `<button class="chip ${this.grupo === f.k ? 'on' : ''}" data-g="${f.k}">${f.label}</button>`).join('')}</div>
-            <div id="vp-tabla" style="margin-top:10px">${UI.spinner()}</div>
+        <div class="pcard" style="margin-top:14px">
+          <div class="row" style="margin-bottom:8px"><h3 style="margin:0;color:var(--navy);font-size:15px">Boletas</h3><div class="sp"></div>
+            <select id="vp-vend" class="vp-vend"><option value="">Todos los vendedores</option>
+              ${global.DB.vendedores().map(x => `<option ${this.vendedor === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
+            <input id="vp-q" placeholder="Cliente o N°…" style="width:160px">
           </div>
-
-          <div class="pcard" style="margin-top:14px">
-            <div class="row" style="margin-bottom:6px"><h3 style="margin:0;color:var(--navy);font-size:15px">Mis pendientes</h3>
-              <span class="pill warn" style="margin-left:8px">${pend.length}</span></div>
-            <div class="muted" style="font-size:12px;margin-bottom:8px">Consultas de cualquier módulo, en un solo lugar.</div>
-            ${pend.map(p => `<div class="pend">
-              <span class="pill ${p.tono}">${UI.esc(p.modulo)}</span>
-              <div style="flex:1"><div style="font-size:13px">${UI.esc(p.texto)}</div>
-                <div class="muted" style="font-size:11px">${UI.esc(p.desde)}</div></div></div>`).join('')}
-            <span class="more" style="margin-top:8px;display:inline-block;color:var(--brand);font-size:13px;cursor:pointer">Ver todos →</span>
-          </div>
+          <div class="chips" id="vp-chips">${FILTROS.map(f =>
+            `<button class="chip ${this.grupo === f.k ? 'on' : ''}" data-g="${f.k}">${f.label}</button>`).join('')}</div>
+          <div id="vp-tabla" style="margin-top:10px">${UI.spinner()}</div>
         </div>
 
         <style>
@@ -2016,14 +2015,10 @@ tr:hover td{background:var(--panel-2)}
           .per button{border:0;background:var(--panel);color:var(--muted);padding:7px 12px;font-size:13px;cursor:pointer}
           .per button+button{border-left:1px solid var(--line)}
           .per button.on{background:var(--brand-soft);color:var(--brand-ink);font-weight:700}
-          .vp-cols{display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:start}
-          @media(max-width:960px){.vp-cols{grid-template-columns:1fr}}
           .vp-vend{width:auto;font-size:13px;padding:7px 10px}
           .chips{display:flex;gap:6px;flex-wrap:wrap}
           .chip{border:1px solid var(--line);background:var(--panel);color:var(--ink-soft);font-size:13px;font-weight:600;padding:6px 12px;border-radius:20px;cursor:pointer}
           .chip.on{background:var(--brand);border-color:var(--brand);color:#fff}
-          .pend{display:flex;gap:9px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line-soft)}
-          .pend:last-of-type{border-bottom:0}
         </style>`;
 
       document.getElementById('vp-venta').onclick = () => global.App.goSub('ventas', 'nueva');
@@ -2240,8 +2235,9 @@ tr:hover td{background:var(--panel-2)}
     // Confirmación bancaria: Administración/Dirección acredita la transferencia,
     // carga CUIT + N° de comprobante + monto acreditado. No permite duplicar
     // un comprobante ya cargado (un cliente puede mandar 2 comprobantes).
-    modalConfirmarBanco(o, cobroId) {
+    modalConfirmarBanco(o, cobroId, after) {
       const c = (o.cobros || []).find(x => x.id === cobroId); if (!c) return;
+      after = after || (() => { this.pintarTabla(); this.modalSenas(o); });
       const ov = this._shell(`
         <div style="padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px">
           <span>🏦</span><b>Confirmar transferencia en banco</b>
@@ -2279,8 +2275,7 @@ tr:hover td{background:var(--panel-2)}
         } catch (e) { UI.aviso(e.message || String(e), 'crit'); return; }
         UI.aviso('Transferencia acreditada en ' + o.numero, 'ok');
         cerrar();
-        this.pintarTabla();
-        this.modalSenas(o);
+        after();
       };
     },
 
@@ -2514,6 +2509,96 @@ tr:hover td{background:var(--panel-2)}
   }
 
   global.Inicio = Inicio;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script><script>
+// =====================================================================
+//  Belgrano Soft · Mis pendientes (tablero de comando)
+//  Todo lo que alguien necesita de mí, de cualquier módulo, en un solo
+//  lugar. Antes vivía como una tarjeta dentro de Ventas; ahora es su propio
+//  módulo arriba: entro, veo qué requiere mi decisión y resuelvo saltando
+//  al módulo que corresponde. Exception-oriented: sólo lo que pide acción.
+// =====================================================================
+(function (global) {
+  const Pendientes = {
+    modulo: '', _mount: 'view',
+
+    async render(mount = 'view') {
+      this._mount = mount;
+      this._todos = await global.DB.misPendientes();
+      const v = document.getElementById(mount);
+      const W = global.Widgets;
+      const todos = this._todos;
+      const urgentes = todos.filter(p => p.urgente).length;
+      const hoy = todos.filter(p => /hoy/i.test(p.desde)).length;
+      const modulos = [...new Set(todos.map(p => p.modulo))];
+
+      v.innerHTML = UI.head('Tablero de comando', 'Mis pendientes',
+        'Todo lo que necesitan de vos, de cualquier módulo, en un solo lugar. Resolvé sin perder el hilo.') +
+        W.kpis([
+          { lab: 'Pendientes', em: '📌', tono: 'soft', val: todos.length },
+          { lab: 'Necesitan tu decisión', em: '🚨', tono: 'crit', val: urgentes },
+          { lab: 'Para hoy', em: '⏰', tono: 'warn', val: hoy },
+          { lab: 'Módulos involucrados', em: '🧩', tono: 'info', val: modulos.length },
+        ]) +
+        `<div class="chips" id="pd-chips" style="margin-top:14px">
+           <button class="chip ${this.modulo === '' ? 'on' : ''}" data-m="">Todos</button>
+           ${modulos.map(m => `<button class="chip ${this.modulo === m ? 'on' : ''}" data-m="${UI.esc(m)}">${UI.esc(m)}</button>`).join('')}
+         </div>
+         <div id="pd-lista" style="margin-top:12px"></div>
+         <style>
+           .chips{display:flex;gap:6px;flex-wrap:wrap}
+           .chip{border:1px solid var(--line);background:var(--panel);color:var(--ink-soft);font-size:13px;font-weight:600;padding:6px 12px;border-radius:20px;cursor:pointer}
+           .chip.on{background:var(--brand);border-color:var(--brand);color:#fff}
+           .pd{display:flex;gap:12px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-left-width:4px;border-radius:11px;padding:12px 14px;margin-bottom:9px;box-shadow:var(--shadow)}
+           .pd .em{font-size:19px;line-height:1.1}
+           .pd .main{flex:1;min-width:0}
+           .pd .txt{font-size:14px;color:var(--ink)}
+           .pd .meta{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap}
+         </style>`;
+
+      v.querySelectorAll('#pd-chips [data-m]').forEach(b => b.onclick = () => {
+        this.modulo = b.dataset.m;
+        v.querySelectorAll('#pd-chips .chip').forEach(x => x.classList.toggle('on', x.dataset.m === this.modulo));
+        this.pintar();
+      });
+      this.pintar();
+    },
+
+    pintar() {
+      const cont = document.getElementById('pd-lista'); if (!cont) return;
+      const stripe = { crit: 'var(--crit)', warn: 'var(--warn)', info: 'var(--brand)', ok: 'var(--ok)' };
+      const em = { Ventas: '💰', Producción: '🏭', Logística: '🚚', Tesorería: '💳', Compras: '🛒', Reclamos: '🛠️', CRM: '💬' };
+      const lista = this._todos.filter(p => !this.modulo || p.modulo === this.modulo);
+      cont.innerHTML = lista.length ? lista.map((p, i) => `<div class="pd" style="border-left-color:${stripe[p.tono] || stripe.info}">
+        <div class="em">${em[p.modulo] || '📌'}</div>
+        <div class="main">
+          <div class="txt">${UI.esc(p.texto)}</div>
+          <div class="meta">
+            <span class="pill ${p.tono}">${UI.esc(p.modulo)}</span>
+            ${p.urgente ? '<span class="pill crit">Necesita tu decisión</span>' : ''}
+            <span class="muted" style="font-size:11.5px">${p.quien ? UI.esc(p.quien) + ' · ' : ''}${UI.esc(p.desde)}</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+          <button class="btn sm primary" data-go="${i}">Resolver →</button>
+          <button class="btn sm" data-done="${i}">Listo</button>
+        </div></div>`).join('')
+        : UI.vacio('No tenés pendientes en este filtro. 🎉');
+
+      cont.querySelectorAll('[data-go]').forEach(b => b.onclick = () => {
+        const p = lista[+b.dataset.go];
+        if (p.destino) global.App.goSub(p.destino.modulo, p.destino.sub);
+      });
+      cont.querySelectorAll('[data-done]').forEach(b => b.onclick = () => {
+        const p = lista[+b.dataset.done];
+        this._todos = this._todos.filter(x => x.id !== p.id);
+        UI.aviso('Pendiente marcado como resuelto', 'ok');
+        this.render(this._mount);
+      });
+    },
+  };
+  global.Pendientes = Pendientes;
 })(typeof window !== 'undefined' ? window : globalThis);
 
 </script><script>
@@ -2812,6 +2897,8 @@ tr:hover td{background:var(--panel-2)}
   const MODULOS = {
     dashboard: { label: 'Inicio', icon: '🏠', home: true, r: m => global.Inicio.render(m) },
 
+    pendientes: { label: 'Mis pendientes', icon: '📌', home: true, r: m => global.Pendientes.render(m) },
+
     crm: { label: 'CRM', icon: '💬', subs: [
       S('resumen', 'Resumen', resumen('crm')),
       S('clientes', 'Clientes', m => global.Clientes.render(m)),
@@ -2926,12 +3013,12 @@ tr:hover td{background:var(--panel-2)}
 
   // Cada rol ve un subconjunto de módulos. Permisos finos: se afinan después.
   const ROLES = {
-    direccion:      { label: 'Dirección',              tabs: ['dashboard', 'crm', 'ventas', 'catalogo', 'produccion', 'compras', 'inventario', 'logistica', 'tesoreria', 'reclamos', 'config'] },
-    vendedor:       { label: 'Vendedor',               tabs: ['dashboard', 'ventas', 'crm', 'catalogo'] },
-    administrativo: { label: 'Administrativo',         tabs: ['dashboard', 'ventas', 'tesoreria', 'compras', 'catalogo', 'reclamos'] },
-    prod:           { label: 'Encargado de Producción', tabs: ['dashboard', 'produccion', 'inventario', 'compras', 'catalogo'] },
-    logi:           { label: 'Logística',              tabs: ['dashboard', 'logistica', 'reclamos'] },
-    gestion:        { label: 'Gestión de Cliente',     tabs: ['dashboard', 'crm', 'ventas'] },
+    direccion:      { label: 'Dirección',              tabs: ['dashboard', 'pendientes', 'crm', 'ventas', 'catalogo', 'produccion', 'compras', 'inventario', 'logistica', 'tesoreria', 'reclamos', 'config'] },
+    vendedor:       { label: 'Vendedor',               tabs: ['dashboard', 'pendientes', 'ventas', 'crm', 'catalogo'] },
+    administrativo: { label: 'Administrativo',         tabs: ['dashboard', 'pendientes', 'ventas', 'tesoreria', 'compras', 'catalogo', 'reclamos'] },
+    prod:           { label: 'Encargado de Producción', tabs: ['dashboard', 'pendientes', 'produccion', 'inventario', 'compras', 'catalogo'] },
+    logi:           { label: 'Logística',              tabs: ['dashboard', 'pendientes', 'logistica', 'reclamos'] },
+    gestion:        { label: 'Gestión de Cliente',     tabs: ['dashboard', 'pendientes', 'crm', 'ventas'] },
   };
 
   const App = {

@@ -21,7 +21,7 @@
     async render(mount = 'view') {
       this._mount = mount;
       const v = document.getElementById(mount);
-      const [st, pend] = await Promise.all([global.DB.estadisticasVentas(), global.DB.misPendientes()]);
+      const st = await global.DB.estadisticasVentas();
       const W = global.Widgets;
 
       v.innerHTML = `
@@ -45,28 +45,15 @@
           { lab: 'Ticket promedio', em: '🎟️', tono: 'info', val: UI.pesos(st.ticket), foot: st.operaciones + ' operaciones' },
         ])}
 
-        <div class="vp-cols">
-          <div class="pcard" style="margin-top:14px">
-            <div class="row" style="margin-bottom:8px"><h3 style="margin:0;color:var(--navy);font-size:15px">Boletas</h3><div class="sp"></div>
-              <select id="vp-vend" class="vp-vend"><option value="">Todos los vendedores</option>
-                ${global.DB.vendedores().map(x => `<option ${this.vendedor === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
-              <input id="vp-q" placeholder="Cliente o N°…" style="width:160px">
-            </div>
-            <div class="chips" id="vp-chips">${FILTROS.map(f =>
-              `<button class="chip ${this.grupo === f.k ? 'on' : ''}" data-g="${f.k}">${f.label}</button>`).join('')}</div>
-            <div id="vp-tabla" style="margin-top:10px">${UI.spinner()}</div>
+        <div class="pcard" style="margin-top:14px">
+          <div class="row" style="margin-bottom:8px"><h3 style="margin:0;color:var(--navy);font-size:15px">Boletas</h3><div class="sp"></div>
+            <select id="vp-vend" class="vp-vend"><option value="">Todos los vendedores</option>
+              ${global.DB.vendedores().map(x => `<option ${this.vendedor === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
+            <input id="vp-q" placeholder="Cliente o N°…" style="width:160px">
           </div>
-
-          <div class="pcard" style="margin-top:14px">
-            <div class="row" style="margin-bottom:6px"><h3 style="margin:0;color:var(--navy);font-size:15px">Mis pendientes</h3>
-              <span class="pill warn" style="margin-left:8px">${pend.length}</span></div>
-            <div class="muted" style="font-size:12px;margin-bottom:8px">Consultas de cualquier módulo, en un solo lugar.</div>
-            ${pend.map(p => `<div class="pend">
-              <span class="pill ${p.tono}">${UI.esc(p.modulo)}</span>
-              <div style="flex:1"><div style="font-size:13px">${UI.esc(p.texto)}</div>
-                <div class="muted" style="font-size:11px">${UI.esc(p.desde)}</div></div></div>`).join('')}
-            <span class="more" style="margin-top:8px;display:inline-block;color:var(--brand);font-size:13px;cursor:pointer">Ver todos →</span>
-          </div>
+          <div class="chips" id="vp-chips">${FILTROS.map(f =>
+            `<button class="chip ${this.grupo === f.k ? 'on' : ''}" data-g="${f.k}">${f.label}</button>`).join('')}</div>
+          <div id="vp-tabla" style="margin-top:10px">${UI.spinner()}</div>
         </div>
 
         <style>
@@ -74,14 +61,10 @@
           .per button{border:0;background:var(--panel);color:var(--muted);padding:7px 12px;font-size:13px;cursor:pointer}
           .per button+button{border-left:1px solid var(--line)}
           .per button.on{background:var(--brand-soft);color:var(--brand-ink);font-weight:700}
-          .vp-cols{display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:start}
-          @media(max-width:960px){.vp-cols{grid-template-columns:1fr}}
           .vp-vend{width:auto;font-size:13px;padding:7px 10px}
           .chips{display:flex;gap:6px;flex-wrap:wrap}
           .chip{border:1px solid var(--line);background:var(--panel);color:var(--ink-soft);font-size:13px;font-weight:600;padding:6px 12px;border-radius:20px;cursor:pointer}
           .chip.on{background:var(--brand);border-color:var(--brand);color:#fff}
-          .pend{display:flex;gap:9px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line-soft)}
-          .pend:last-of-type{border-bottom:0}
         </style>`;
 
       document.getElementById('vp-venta').onclick = () => global.App.goSub('ventas', 'nueva');
@@ -298,8 +281,9 @@
     // Confirmación bancaria: Administración/Dirección acredita la transferencia,
     // carga CUIT + N° de comprobante + monto acreditado. No permite duplicar
     // un comprobante ya cargado (un cliente puede mandar 2 comprobantes).
-    modalConfirmarBanco(o, cobroId) {
+    modalConfirmarBanco(o, cobroId, after) {
       const c = (o.cobros || []).find(x => x.id === cobroId); if (!c) return;
+      after = after || (() => { this.pintarTabla(); this.modalSenas(o); });
       const ov = this._shell(`
         <div style="padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px">
           <span>🏦</span><b>Confirmar transferencia en banco</b>
@@ -337,8 +321,7 @@
         } catch (e) { UI.aviso(e.message || String(e), 'crit'); return; }
         UI.aviso('Transferencia acreditada en ' + o.numero, 'ok');
         cerrar();
-        this.pintarTabla();
-        this.modalSenas(o);
+        after();
       };
     },
 

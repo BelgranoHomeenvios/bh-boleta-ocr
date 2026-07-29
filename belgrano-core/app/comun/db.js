@@ -235,6 +235,15 @@
     },
     _orden(id) { return DEMO.ordenes.find(o => String(o.id) === String(id)); },
 
+    // Transferencias declaradas que todavía no se acreditaron en el banco.
+    async transferenciasPendientes() {
+      const out = [];
+      DEMO.ordenes.forEach(o => (o.cobros || []).forEach(c => {
+        if (c.estado === 'pendiente_banco') out.push({ orden: o, cobro: c });
+      }));
+      return out;
+    },
+
     // Recalcula seña/saldo de una orden: SOLO cuenta lo cobrado de verdad
     // (efectivo rendido + transferencia acreditada en banco).
     _recalc(o) {
@@ -318,13 +327,16 @@
         (!grupo || (GRUPO_ESTADO[grupo] || []).includes(o.estado)) &&
         (!vendedor || o.vendedor === vendedor));
     },
-    // "Mis pendientes": consultas de cualquier módulo hacia dirección, en un solo lugar.
+    // "Mis pendientes": consultas/decisiones de cualquier módulo hacia mí, en un
+    // solo lugar. destino = a dónde me lleva "Resolver". urgente = pide decisión.
     async misPendientes() {
       return [
-        { modulo: 'Producción', tono: 'warn', texto: 'Iara pregunta si la Mesa Noruega (S00020) puede cambiar de veta', desde: 'hace 2 h' },
-        { modulo: 'Logística',  tono: 'crit', texto: 'Entrega E-2381 sin chofer para hoy — ¿reprogramo?',            desde: 'hoy' },
-        { modulo: 'Ventas',     tono: 'info', texto: 'Ale pide autorizar precio a medida en S00021',                 desde: 'hace 2 días' },
-        { modulo: 'Tesorería',  tono: 'warn', texto: 'Cristian dejó una seña sin rendir',                            desde: 'hace 3 días' },
+        { id: 'p1', modulo: 'Ventas',     tono: 'crit', urgente: true,  texto: 'Ale pide autorizar precio a medida en S00021',          quien: 'Ale',      desde: 'hace 2 días', destino: { modulo: 'ventas', sub: 'aconfirmar' } },
+        { id: 'p2', modulo: 'Logística',  tono: 'crit', urgente: true,  texto: 'Entrega E-2381 sin chofer para hoy — ¿reprogramo?',      quien: 'Depósito', desde: 'hoy',         destino: { modulo: 'logistica', sub: 'agenda' } },
+        { id: 'p3', modulo: 'Producción', tono: 'warn', urgente: false, texto: 'Iara pregunta si la Mesa Noruega (S00020) puede cambiar de veta', quien: 'Iara', desde: 'hace 2 h',    destino: { modulo: 'produccion', sub: 'resumen' } },
+        { id: 'p4', modulo: 'Tesorería',  tono: 'warn', urgente: false, texto: 'Cristian dejó una seña sin rendir',                      quien: 'Cristian', desde: 'hace 3 días', destino: { modulo: 'tesoreria', sub: 'senas' } },
+        { id: 'p5', modulo: 'Compras',    tono: 'info', urgente: false, texto: 'Proveedor Maderas del Sur subió el MDF 12% — ¿actualizo lista?', quien: 'Compras', desde: 'ayer',   destino: { modulo: 'compras', sub: 'comparador' } },
+        { id: 'p6', modulo: 'Reclamos',   tono: 'warn', urgente: false, texto: 'Reclamo R-118: mesa con veta distinta a la del showroom',  quien: 'Nati',     desde: 'ayer',        destino: { modulo: 'reclamos', sub: 'abiertos' } },
       ];
     },
     // KPIs del tablero de ventas (demo).

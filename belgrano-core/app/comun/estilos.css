@@ -38,9 +38,9 @@ a{color:var(--brand)}
 .appbar .logo{width:28px; height:28px; border-radius:6px; background:rgba(255,255,255,.14); display:flex;
   align-items:center; justify-content:center; font-weight:800; font-size:12px; flex:none}
 .appbar .brand{font-weight:800; font-size:14px; flex:none; white-space:nowrap}
-.appbar .mods{display:flex; gap:3px; margin-left:6px; overflow-x:auto; flex:1 1 auto; min-width:0; scrollbar-width:none}
+.appbar .mods{display:flex; gap:2px; margin-left:5px; overflow-x:auto; flex:1 1 auto; min-width:0; scrollbar-width:none}
 .appbar .mods::-webkit-scrollbar{display:none}
-.appbar .modpill{font:inherit; font-size:12px; font-weight:700; border:0; padding:5px 9px; border-radius:16px;
+.appbar .modpill{font:inherit; font-size:11.5px; font-weight:700; border:0; padding:5px 8px; border-radius:15px;
   cursor:pointer; white-space:nowrap; background:rgba(255,255,255,.08); color:rgba(255,255,255,.72)}
 .appbar .modpill:hover{background:rgba(255,255,255,.2); color:#fff}
 .appbar .modpill[aria-current="true"]{background:#fff; color:var(--navy)}

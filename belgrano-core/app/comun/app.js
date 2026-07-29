@@ -15,6 +15,8 @@
   const MODULOS = {
     dashboard: { label: 'Inicio', icon: '🏠', home: true, r: m => global.Inicio.render(m) },
 
+    pendientes: { label: 'Mis pendientes', icon: '📌', home: true, r: m => global.Pendientes.render(m) },
+
     crm: { label: 'CRM', icon: '💬', subs: [
       S('resumen', 'Resumen', resumen('crm')),
       S('clientes', 'Clientes', m => global.Clientes.render(m)),
@@ -129,12 +131,12 @@
 
   // Cada rol ve un subconjunto de módulos. Permisos finos: se afinan después.
   const ROLES = {
-    direccion:      { label: 'Dirección',              tabs: ['dashboard', 'crm', 'ventas', 'catalogo', 'produccion', 'compras', 'inventario', 'logistica', 'tesoreria', 'reclamos', 'config'] },
-    vendedor:       { label: 'Vendedor',               tabs: ['dashboard', 'ventas', 'crm', 'catalogo'] },
-    administrativo: { label: 'Administrativo',         tabs: ['dashboard', 'ventas', 'tesoreria', 'compras', 'catalogo', 'reclamos'] },
-    prod:           { label: 'Encargado de Producción', tabs: ['dashboard', 'produccion', 'inventario', 'compras', 'catalogo'] },
-    logi:           { label: 'Logística',              tabs: ['dashboard', 'logistica', 'reclamos'] },
-    gestion:        { label: 'Gestión de Cliente',     tabs: ['dashboard', 'crm', 'ventas'] },
+    direccion:      { label: 'Dirección',              tabs: ['dashboard', 'pendientes', 'crm', 'ventas', 'catalogo', 'produccion', 'compras', 'inventario', 'logistica', 'tesoreria', 'reclamos', 'config'] },
+    vendedor:       { label: 'Vendedor',               tabs: ['dashboard', 'pendientes', 'ventas', 'crm', 'catalogo'] },
+    administrativo: { label: 'Administrativo',         tabs: ['dashboard', 'pendientes', 'ventas', 'tesoreria', 'compras', 'catalogo', 'reclamos'] },
+    prod:           { label: 'Encargado de Producción', tabs: ['dashboard', 'pendientes', 'produccion', 'inventario', 'compras', 'catalogo'] },
+    logi:           { label: 'Logística',              tabs: ['dashboard', 'pendientes', 'logistica', 'reclamos'] },
+    gestion:        { label: 'Gestión de Cliente',     tabs: ['dashboard', 'pendientes', 'crm', 'ventas'] },
   };
 
   const App = {
