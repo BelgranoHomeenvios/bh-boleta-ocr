@@ -1818,12 +1818,14 @@ tr:hover td{background:var(--panel-2)}
     ventas: { label: 'Ventas', icon: '💰', subs: [
       S('resumen', 'Resumen', resumen('ventas')),
       S('nueva', 'Nueva cotización', m => global.Presupuesto.render(m)),
-      S('presupuestos', 'Presupuestos', m => global.Cotizaciones.render(m)),
+      S('cotizaciones', 'Cotizaciones', m => global.Cotizaciones.render(m)),
       S('ordenes', 'Órdenes', m => global.Ordenes.render(m)),
+      S('aconfirmar', 'A confirmar', skel('Órdenes a confirmar (esperando seña)')),
+      S('modificaciones', 'Modificaciones', skel('Modificaciones sobre órdenes confirmadas')),
       S('clientes', 'Clientes', m => global.Clientes.render(m)),
-      S('agenda', 'Agenda', skel('Agenda de ventas')),
-      S('cobros', 'Cobros', skel('Cobros de ventas')),
-      S('comisiones', 'Comisiones', skel('Comisiones')),
+      S('agenda', 'Agenda', skel('Agenda del vendedor')),
+      S('autorizaciones', 'Autorizaciones', skel('Precios a medida / con observaciones a verificar')),
+      S('comisiones', 'Comisiones', skel('Comisiones (con venta compartida)')),
       S('indicadores', 'Indicadores', skel('Indicadores de ventas')),
     ]},
 
