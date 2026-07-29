@@ -175,7 +175,7 @@
         if (this.orden.campo === c) this.orden.dir *= -1; else { this.orden.campo = c; this.orden.dir = 1; }
         this.pintarTabla();
       });
-      const abrir = () => global.OrdenDetalle.render(this._mount, null, () => this.render(this._mount));
+      const abrir = o => global.OrdenDetalle.render(this._mount, { boleta: o }, () => this.render(this._mount));
       cont.querySelectorAll('tr[data-b]').forEach(tr => {
         const o = bs.find(x => String(x.id) === tr.dataset.b);
         tr.querySelectorAll('[data-open]').forEach(td => td.onclick = () => abrir(o));

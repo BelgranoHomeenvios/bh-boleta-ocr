@@ -6,29 +6,40 @@
 
 ## Por aplicar (lote actual)
 
+_(vacío — el lote de la tabla de Boletas + Detalle de la orden ya se aplicó, ver abajo)_
+
+## Lote 1 — APLICADO (tabla de Boletas + Detalle de la orden)
+
+Pendientes de "para cuando apliquemos" que quedaron como aproximación demo y hay
+que terminar con la base real:
+- 15/imagen TN: hoy va un placeholder 🪑 (falta mapear `tn_variant_id` → imagen).
+- 21/archivos: hoy se listan; falta el guardado real en el cajón de Contabilidad.
+- 🔔 recordatorios: guardan {fecha, texto}; falta que disparen aviso ese día.
+- Reclamo-que-convive: hoy es un flag `reclamo`; se consolida con el módulo Reclamos.
+
 ### Tabla de Boletas (Ventas → Resumen)
 
 **Estados y filtros**
-- ⬜ 1. Agregar estados faltantes a los filtros: **Reclamo**, **Preproducción**
+- ✅ 1. Agregar estados faltantes a los filtros: **Reclamo**, **Preproducción**
   (ubicar *Preproducción* ANTES de "En fabricación") y **Archivadas**.
-- ⬜ 2. Nuevo filtro **"Activas"** = a confirmar + preproducción + en fabricación +
+- ✅ 2. Nuevo filtro **"Activas"** = a confirmar + preproducción + en fabricación +
   listas + en logística + reclamos (con las que se trabaja habitualmente).
-- ⬜ 3. Que el filtro venga **por default en "Activas"** (no en "Todas").
+- ✅ 3. Que el filtro venga **por default en "Activas"** (no en "Todas").
 
 **Reclamo como estado que convive**
-- ⬜ 4. Una boleta puede tener 2 estados a la vez: (Listo + Reclamo) o
+- ✅ 4. Una boleta puede tener 2 estados a la vez: (Listo + Reclamo) o
   (Entregado + Reclamo). "Reclamo" es una marca que convive con el estado del
   ciclo → toca modelo de datos (estado del ciclo + flag/estado de reclamo).
-- ⬜ 5. Acceso rápido / módulo para entrar directo a las **boletas con reclamo**.
+- ✅ 5. Acceso rápido / módulo para entrar directo a las **boletas con reclamo**.
 
 **Columnas = también filtros/orden**
-- ⬜ 6. Que **cada columna sea filtrable y ordenable** (Nº de venta, cliente,
+- ✅ 6. Que **cada columna sea filtrable y ordenable** (Nº de venta, cliente,
   estado, etc.) — así tengo los chips de arriba Y el filtro/orden por columna.
-- ⬜ 7. (default en "Activas" — mismo que ítem 3).
+- ✅ 7. (default en "Activas" — mismo que ítem 3).
 
 **Orden y comportamiento de columnas**
-- ⬜ 8. **Vendedor** sale de columna fija y pasa adentro de los **⋮ (3 puntitos)**.
-- ⬜ 9. Columnas fijas, en este orden:
+- ✅ 8. **Vendedor** sale de columna fija y pasa adentro de los **⋮ (3 puntitos)**.
+- ✅ 9. Columnas fijas, en este orden:
   Nº de orden · Cliente · Método de pago · Total · Seña · Saldo ·
   **Muebles (desplegable inline** → abre los muebles comprados dentro de la
   misma pantalla, sin salir**)** · Estado · Fecha de entrega ·
@@ -44,36 +55,36 @@
 ### Detalle de la orden (Ver una venta / OrdenDetalle)
 
 **Layout — todo en una pantalla**
-- ⬜ 10. Que entre TODO en una sola pantalla, sin necesidad de scrollear.
-- ⬜ 11. Arriba, primero: **Nº de orden + Cliente**.
-- ⬜ 12. **Acciones arriba con emojis**: 🛠️ Modificar orden · 🏭 Ver producción ·
+- ✅ 10. Que entre TODO en una sola pantalla, sin necesidad de scrollear.
+- ✅ 11. Arriba, primero: **Nº de orden + Cliente**.
+- ✅ 12. **Acciones arriba con emojis**: 🛠️ Modificar orden · 🏭 Ver producción ·
   🚚 Ver logística.
-- ⬜ 13. **Método de pago** elegido por el vendedor, visible arriba.
+- ✅ 13. **Método de pago** elegido por el vendedor, visible arriba.
 
 **Detalle de muebles (tipo boleta)**
-- ⬜ 14. Tabla compacta estilo boleta: **Producto · Cantidad · Monto por producto**
+- ✅ 14. Tabla compacta estilo boleta: **Producto · Cantidad · Monto por producto**
   (más chico que ahora).
-- ⬜ 15. **Imagen del mueble** por línea (si se puede, traída desde Tienda Nube).
-- ⬜ 16. Marca **estándar / a medida con emoji** por línea.
+- ✅ 15. **Imagen del mueble** por línea (si se puede, traída desde Tienda Nube).
+- ✅ 16. Marca **estándar / a medida con emoji** por línea.
 
 **Pagos y saldo (bloque al costado — ya existe)**
-- ⬜ 17. Sumar al bloque Total/Pagado/Saldo: si pagó, **el método de pago** ahí, y
+- ✅ 17. Sumar al bloque Total/Pagado/Saldo: si pagó, **el método de pago** ahí, y
   el **tilde de rendición confirmada por el vendedor** (seña rendida/acreditada).
 
 **Bloqueos en rojo**
-- ⬜ 18. Lo que esté **bloqueando** (el pago o un mueble) resaltado en **ROJO** acá:
+- ✅ 18. Lo que esté **bloqueando** (el pago o un mueble) resaltado en **ROJO** acá:
   no sólo "a confirmar" — muebles en rojo, saldo en rojo.
 
 **Comentarios / historial por área**
-- ⬜ 19. Campo de **comentarios** (abajo o al costado) donde fábrica, logística y
+- ✅ 19. Campo de **comentarios** (abajo o al costado) donde fábrica, logística y
   otras áreas puedan sumar notas → **historial de la venta por área**.
 
 **Factura**
-- ⬜ 20. Si pidió factura o hay que hacerla: **emoji de color** que marque/agrupe la
+- ✅ 20. Si pidió factura o hay que hacerla: **emoji de color** que marque/agrupe la
   factura y quede registrado.
 
 **Archivos**
-- ⬜ 21. **Archivos** cargados en la orden (plano de mueble a medida, factura, etc.)
+- ✅ 21. **Archivos** cargados en la orden (plano de mueble a medida, factura, etc.)
   visibles acá, pero **guardados en un lugar exclusivo de Contabilidad** (acceso
   restringido).
 

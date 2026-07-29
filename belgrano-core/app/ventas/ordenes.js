@@ -84,10 +84,11 @@
         }).join('')}</tbody></table></div>`
         : UI.vacio('No hay órdenes en este balde.');
 
-      const abrir = () => global.OrdenDetalle.render(this._mount, null, () => this.render(this._mount));
+      const abrir = o => global.OrdenDetalle.render(this._mount, { boleta: o }, () => this.render(this._mount));
       cont.querySelectorAll('tr[data-o]').forEach(tr => {
-        tr.onclick = e => { if (!e.target.closest('[data-menu]')) abrir(); };
-        tr.querySelector('[data-menu]').onclick = e => { e.stopPropagation(); abrir(); };
+        const o = filas.find(x => String(x.id) === tr.dataset.o);
+        tr.onclick = e => { if (!e.target.closest('[data-menu]')) abrir(o); };
+        tr.querySelector('[data-menu]').onclick = e => { e.stopPropagation(); abrir(o); };
       });
     },
   };
