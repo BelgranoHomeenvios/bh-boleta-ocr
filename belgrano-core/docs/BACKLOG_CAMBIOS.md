@@ -6,7 +6,19 @@
 
 ## Por aplicar (lote actual)
 
-_(vacío)_
+**Refinamientos del Detalle de la orden (post-Lote 2)**
+- ⬜ 27. Forma de pago NO debe ser dropdown editable directamente; pasa a **"Modificar orden"** (necesita autorización).
+- ⬜ 28. **Comentarios/mensajes** se mueven al **sidebar lateral** donde hoy está "Totales y Pagos" (no en card inferior).
+- ⬜ 29. **Subtotal breakdown** en el bloque de totales: Muebles → Complementos → Envíos/Instalación/Escalera (desglose claro).
+- ⬜ 30. **Filas más compactas** (~1.3 cm máx por renglon) para que todo entre en una sola pantalla sin scroll.
+- ⬜ 31. **Columna Imagen** en la tabla de muebles (especialmente crítica para a medida; vendedores cargan foto para aclarar pedido).
+
+**Nueva cotización (cotizacion.js / presupuesto.js)**
+- ⬜ 32. **Sección Datos del cliente** — (obligatorios + opcionales a definir).
+- ⬜ 33. **Sección Detalle de muebles y cotizaciones** — búsqueda producto, a medida, catálogo.
+- ⬜ 34. **Sección Adicionales** — (a definir: términos, moneda, etc.).
+- ⬜ 35. **Vinculación a CRM** — cada cotización se guarda en historial de vendedor para seguimiento.
+- ⬜ 36. (Pendiente descripción completa de layout)
 
 ## Lote 2 — APLICADO (refinamiento del Detalle de la orden)
 
