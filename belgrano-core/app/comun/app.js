@@ -24,7 +24,7 @@
     ]},
 
     ventas: { label: 'Ventas', icon: '💰', subs: [
-      S('resumen', 'Resumen', resumen('ventas')),
+      S('resumen', 'Resumen', m => global.VentasPanel.render(m)),
       S('nueva', 'Nueva cotización', m => global.Presupuesto.render(m)),
       S('cotizaciones', 'Cotizaciones', m => global.Cotizaciones.render(m)),
       S('ordenes', 'Órdenes', m => global.Ordenes.render(m)),

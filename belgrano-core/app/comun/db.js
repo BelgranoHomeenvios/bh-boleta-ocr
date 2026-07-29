@@ -63,11 +63,13 @@
     ],
     // Órdenes de venta de ejemplo (para ver la vista antes de conectar).
     ordenes: [
-      { id: 2, numero: 'S00002', fecha: '2026-06-01', cliente: 'Abigail Galfre',   vendedor: 'Brian',    local: '2020', total: 968000,  estado: 'entregado' },
-      { id: 1, numero: 'S00001', fecha: '2026-06-01', cliente: 'Abel Schoenmaker',  vendedor: 'Cristian', local: '2020', total: 1028500, estado: 'produccion' },
-      { id: 3, numero: 'S00003', fecha: '2026-07-24', cliente: 'Bibiana',           vendedor: 'Ale',      local: '2020', total: 516000,  estado: 'confirmar' },
-      { id: 4, numero: 'S00004', fecha: '2026-07-26', cliente: 'Laura y Hernán',    vendedor: 'Cristian', local: '2299', total: 731250,  estado: 'logistica' },
-      { id: 5, numero: 'S00005', fecha: '2026-07-27', cliente: 'Diego',             vendedor: 'Sergio',   local: '2299', total: 733000,  estado: 'anulado' },
+      { id: 1, numero: 'S00021', fecha: '29/07', cliente: 'Laura Pérez',     vendedor: 'Ale',      local: '2020', pago: 'Efectivo',      items: 3, saldo: 840000, total: 1200000, estado: 'a_confirmar' },
+      { id: 2, numero: 'S00020', fecha: '29/07', cliente: 'Juan López',      vendedor: 'Cristian', local: '2299', pago: 'Transferencia', items: 1, saldo: 700000, total: 700000,  estado: 'fabricacion' },
+      { id: 3, numero: 'S00019', fecha: '28/07', cliente: 'Bibiana',         vendedor: 'Ale',      local: '2020', pago: 'Tarjeta',       items: 2, saldo: 0,      total: 516000,  estado: 'listo' },
+      { id: 4, numero: 'S00018', fecha: '28/07', cliente: 'Laura y Hernán',  vendedor: 'Cristian', local: '2299', pago: 'Mixto',         items: 4, saldo: 250000, total: 731250,  estado: 'logistica' },
+      { id: 5, numero: 'S00017', fecha: '27/07', cliente: 'Abigail Galfre',  vendedor: 'Brian',    local: '2020', pago: 'Efectivo',      items: 2, saldo: 0,      total: 968000,  estado: 'entregado' },
+      { id: 6, numero: 'S00016', fecha: '27/07', cliente: 'Diego',           vendedor: 'Sergio',   local: '2299', pago: 'Transferencia', items: 1, saldo: 733000, total: 733000,  estado: 'falta_tesoreria' },
+      { id: 7, numero: 'S00015', fecha: '26/07', cliente: 'Camila',          vendedor: 'Nati',     local: '2020', pago: 'Tarjeta',       items: 1, saldo: 0,      total: 425750,  estado: 'anulado' },
     ],
     // Cotizaciones de ejemplo.
     cotizaciones: [
@@ -87,13 +89,25 @@
 
   // Estados de la orden → etiqueta y color del pill (según el ciclo real).
   const ESTADO_ORDEN = {
-    confirmar:   { label: 'Confirmar',   pill: 'warn' },
-    produccion:  { label: 'Producción',  pill: 'info' },
-    logistica:   { label: 'Logística',   pill: 'info' },
-    entregado:   { label: 'Entregado',   pill: 'ok' },
-    archivado:   { label: 'Archivado',   pill: 'soft' },
-    anulado:     { label: 'Anulado',     pill: 'crit' },
-    reclamo:     { label: 'Reclamo',     pill: 'crit' },
+    a_confirmar:     { label: 'A confirmar',            pill: 'warn' },
+    confirmar:       { label: 'A confirmar',            pill: 'warn' },
+    falta_tesoreria: { label: 'Falta firmar (Tesorería)', pill: 'warn' },
+    fabricacion:     { label: 'En fabricación',         pill: 'info' },
+    produccion:      { label: 'En fabricación',         pill: 'info' },
+    listo:           { label: 'Listo',                  pill: 'ok' },
+    logistica:       { label: 'En logística',           pill: 'info' },
+    entregado:       { label: 'Entregado',              pill: 'ok' },
+    archivado:       { label: 'Archivado',              pill: 'soft' },
+    anulado:         { label: 'Anulado',                pill: 'crit' },
+    reclamo:         { label: 'Reclamo',                pill: 'crit' },
+  };
+  // Grupos para los filtros de la tabla de boletas.
+  const GRUPO_ESTADO = {
+    a_confirmar: ['a_confirmar', 'confirmar', 'falta_tesoreria'],
+    fabricacion: ['fabricacion', 'produccion'],
+    listo: ['listo'],
+    logistica: ['logistica'],
+    entregado: ['entregado', 'archivado'],
   };
   const ESTADO_COTIZ = {
     borrador:  { label: 'Borrador',  pill: 'soft' },
@@ -193,6 +207,38 @@
     async ordenes({ texto = '' } = {}) {
       const t = sinTilde(texto);
       return DEMO.ordenes.filter(o => !t || sinTilde(o.cliente).includes(t) || sinTilde(o.numero).includes(t));
+    },
+
+    GRUPO_ESTADO,
+    // Tabla de boletas con filtros (texto · grupo de estado · vendedor).
+    async boletas({ texto = '', grupo = '', vendedor = '' } = {}) {
+      const t = sinTilde(texto);
+      return DEMO.ordenes.filter(o =>
+        (!t || sinTilde(o.cliente).includes(t) || sinTilde(o.numero).includes(t)) &&
+        (!grupo || (GRUPO_ESTADO[grupo] || []).includes(o.estado)) &&
+        (!vendedor || o.vendedor === vendedor));
+    },
+    // "Mis pendientes": consultas de cualquier módulo hacia dirección, en un solo lugar.
+    async misPendientes() {
+      return [
+        { modulo: 'Producción', tono: 'warn', texto: 'Iara pregunta si la Mesa Noruega (S00020) puede cambiar de veta', desde: 'hace 2 h' },
+        { modulo: 'Logística',  tono: 'crit', texto: 'Entrega E-2381 sin chofer para hoy — ¿reprogramo?',            desde: 'hoy' },
+        { modulo: 'Ventas',     tono: 'info', texto: 'Ale pide autorizar precio a medida en S00021',                 desde: 'hace 2 días' },
+        { modulo: 'Tesorería',  tono: 'warn', texto: 'Cristian dejó una seña sin rendir',                            desde: 'hace 3 días' },
+      ];
+    },
+    // KPIs del tablero de ventas (demo).
+    async estadisticasVentas() {
+      const o = DEMO.ordenes;
+      const activas = o.filter(x => !['entregado', 'archivado', 'anulado'].includes(x.estado));
+      return {
+        ventasHoy: 1256000, ventasMes: 28450000, objetivoMes: 35000000,
+        cotizacionesAbiertas: DEMO.cotizaciones.filter(c => c.estado === 'borrador').length + 22,
+        ordenesActivas: activas.length, aConfirmar: o.filter(x => (GRUPO_ESTADO.a_confirmar).includes(x.estado)).length,
+        porCobrar: o.reduce((a, x) => a + (x.saldo || 0), 0),
+        operaciones: o.filter(x => x.estado !== 'anulado').length, ticket: 978000,
+        mueblesVendidos: o.reduce((a, x) => a + (x.items || 0), 0),
+      };
     },
     async cotizaciones({ texto = '' } = {}) {
       const t = sinTilde(texto);
