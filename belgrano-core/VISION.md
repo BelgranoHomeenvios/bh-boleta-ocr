@@ -55,6 +55,22 @@ ya existe en el ERP, otro módulo lo reutiliza — nunca lo reescribe.
 Ventas no "envía" un pedido a Producción: cambia el estado de una **Orden de Venta**,
 y Producción ve **esa misma Orden** porque ambos leen del mismo Core.
 
+## Motor de transiciones (patrón del Core, no de un módulo)
+Toda transición importante del ERP pasa por el **mismo motor declarativo**: las reglas
+no viven escondidas en botones ni en el código de cada módulo, sino como **condiciones
+visibles, auditables y con responsable**. El sistema puede **explicar por qué** tomó
+cada decisión.
+
+```
+Objeto → condiciones requeridas → checks visibles → responsables →
+         bloqueos (con alcance) → excepciones autorizadas → evento de transición
+```
+El mismo patrón habilita: **confirmar una venta**, confirmar una compra, recibir
+mercadería, cerrar una producción, habilitar una entrega, cerrar un reclamo, aprobar
+una devolución. Cada evaluación guarda **evidencia** (condición, resultado, valor, regla,
+fecha, quién/qué la ejecutó, motivo de excepción). Las excepciones se autorizan de forma
+explícita y **nunca modifican silenciosamente la regla general**.
+
 ## Un sistema para decidir, no para registrar
 No quiero un lugar donde los empleados cargan información. Quiero un sistema que
 le diga a cada persona **qué tiene que hacer**.

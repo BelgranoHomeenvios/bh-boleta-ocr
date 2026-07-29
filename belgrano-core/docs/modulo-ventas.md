@@ -54,28 +54,104 @@ Orden OV-2020-0041  (Confirmada)
 ```
 
 ## 5 · Motor de confirmación y liberación (el corazón)
-No se libera "por llegar al 30%". Se libera cuando se **cumplen condiciones**, evaluadas
-por un **motor declarativo y auditable** (lista de checks — la cola "A confirmar" las muestra).
+Es una instancia del **motor de transiciones del Core** (ver `VISION.md`). No se libera
+"por llegar al 30%": se libera cuando se **cumplen condiciones**, evaluadas por un motor
+**declarativo, visible y auditable**.
 
-**Condiciones de la ORDEN (para pasar a Confirmada):**
+### 5.1 · Tres conceptos separados (no mezclarlos)
 ```
-✓ Identidad del cliente (tel/IG/mail)
-✓ Forma de pago / término definido
-✓ Seña mínima cumplida (30% — base a confirmar: efectivo o lista)
-✓ Líneas completas
+1. Orden comercial CONFIRMADA   (condiciones de la orden)
+2. Línea comercial LIBERADA     (condiciones de la línea)
+3. Destino operativo ASIGNADO   (a dónde va la línea liberada)
 ```
-**Condiciones de cada LÍNEA (para liberarse):**
+Una orden puede estar **Confirmada** con líneas todavía **Bloqueadas**. Una línea
+**Liberada** se dirige luego a: **Inventario · Producción interna · Producción
+tercerizada · Compras · Logística**.
+
+### 5.2 · Condiciones de la ORDEN (para Confirmar)
 ```
-✓ Variante / medida confirmada
-✓ Precio autorizado (si es a medida o con observaciones)
-✓ Destino de entrega definido (cuando corresponde)
-→ según el tipo de línea, el destino es:
-   estándar en stock  → Inventario reserva + Logística programa
-   a fabricar         → crea Orden de Producción
-   faltante           → Compras detecta necesidad
+✓ Cliente identificado (tel/IG/mail)
+✓ Vendedor y local definidos
+✓ Condición de pago definida
+✓ Seña mínima cumplida — o excepción autorizada
+✓ Cotización aceptada · versión de precio congelada
+✓ Líneas comerciales válidas (identificadas, con destino preliminar)
+✓ Sin bloqueos de alcance "orden"
 ```
-Cada vez que **cambia una condición** (se registra una seña, se autoriza un precio, se
-confirma una medida), el motor **reevalúa** y libera / mantiene bloqueada **cada línea**.
+> **Confirmar la orden NO exige que todas las líneas estén liberadas.** "Líneas
+> comerciales válidas" = suficientemente definidas para existir como compromiso
+> comercial. Una orden **Confirmada puede tener líneas Bloqueadas**.
+### 5.3 · Condiciones de cada LÍNEA (para Liberar)
+```
+✓ Producto o descripción completos
+✓ Variante y medida confirmadas
+✓ Precio autorizado
+✓ Observaciones verificadas
+✓ Destino operativo definido
+✓ Disponibilidad o necesidad identificada
+✓ Modificaciones pendientes resueltas
+```
+Cada cambio de condición (seña, autorización, medida) hace que el motor **reevalúe** y
+libere / mantenga bloqueada **cada línea** por separado.
+
+### 5.4 · Cada check tiene responsable (la cola "A confirmar")
+No muestra solo *qué* falta, sino **quién** lo resuelve, **desde cuándo**, la **urgencia**
+y la **próxima acción**:
+```
+OV-2020-0041 · Mesa a medida
+Pendiente : autorizar precio
+Responsable: Administración
+Desde     : hace 2 días · Urgencia: media
+Acción    : Revisar autorización →
+```
+
+### 5.5 · Bloqueos con alcance (no un único "bloqueada")
+Un bloqueo declara **qué** frena: `línea · orden · liberación · entrega · modificación ·
+cobro`. Ej.: una línea puede estar liberada para producir pero **bloqueada para
+entregar** por falta de dirección.
+
+### 5.6 · Evidencia (por qué se liberó o no)
+Cada evaluación guarda: condición · resultado · fecha/hora · valor usado · **regla
+aplicada** · usuario o automatización · motivo de excepción. Se puede **reconstruir** la
+decisión completa.
+
+### 5.7 · Excepciones explícitas (no rompen la regla)
+```
+Seña requerida : 30%
+Seña registrada: 20%
+Resultado normal: no confirma
+Excepción autorizada por: Dirección · motivo: cliente corporativo · 29/07/2026
+```
+La excepción se registra; la **regla general no cambia** en silencio.
+
+### 5.8 · No duplicar documentos operativos
+Al liberar una línea **no se copia** su información dentro de Producción o Logística: se
+genera el **objeto operativo** (orden de producción, entrega, necesidad de compra)
+**referenciando** orden de venta · línea · cliente · producto/configuración · **versión
+aprobada**. La **línea de venta** sigue siendo la fuente comercial original.
+
+### 5.9 · Liberar ≠ crear trabajo operativo (estrategia de cumplimiento)
+Liberar una línea **no** implica directamente "crear orden de producción". Hay un paso
+intermedio: el motor determina la **estrategia de cumplimiento** (no siempre surge del
+tipo de producto — un mismo placard puede estar en stock, fabricarse o comprarse):
+```
+Línea cumple condiciones → Línea LIBERADA →
+  Motor determina estrategia → genera/vincula objetos operativos
+Estrategias: stock existente · fabricación interna · fabricación tercerizada ·
+             compra directa · mixta (stock parcial + compra) · pendiente de decisión
+```
+
+### 5.10 · Idempotencia y reversión (antes de programar)
+- **Idempotente:** reevaluar N veces una línea liberada **no** duplica reservas, compras
+  ni órdenes de producción. Antes de generar, pregunta: *¿ya existe objeto operativo para
+  esta línea y esta versión?*
+- **Reversión controlada:** si una condición **deja de cumplirse** (pago anulado,
+  transferencia rechazada, reserva perdida, medida modificada, autorización anulada), el
+  sistema **no "desibera" en silencio**:
+```
+Condición deja de cumplirse → detectar impacto → bloquear nuevas acciones →
+  advertir si ya existe ejecución → requerir cancelación o modificación
+```
 
 ## 6 · Snapshot de precios y versiones de cotización
 - **Borrador:** toma el precio **vigente** del Catálogo.
@@ -85,6 +161,14 @@ confirma una medida), el motor **reevalúa** y libera / mantiene bloqueada **cad
   no sobrescribe → se sabe qué propuesta recibió y aceptó el cliente.
 - **Al convertir en venta:** la orden conserva el **precio aceptado**; cualquier cambio
   posterior pasa por Solicitud de modificación.
+
+Siempre visible la comparación (para no cambiar nada en silencio):
+```
+Precio de catálogo actual : $ …
+Precio de cotización enviado: $ …   (snapshot)
+Precio de orden aceptado  : $ …
+Diferencia                : $ …   → autorización si corresponde
+```
 
 ## 7 · Submódulos (navegación interna)
 ```
@@ -105,10 +189,17 @@ Ventas
 ## 8 · Automatizaciones (cada acción, todas sus consecuencias)
 - **Cliente por tel/IG/mail** → matchea o crea en CRM; si el teléfono existe, **avisa** (evita duplicados).
 - **Aceptar cotización ≠ confirmar venta.** Aceptar → crea una **orden A confirmar** (no genera producción ni reserva definitiva); espera pagos y validaciones.
-- **Registrar seña** (la carga Tesorería; Ventas la ve) → el motor **reevalúa condiciones**.
-- **Se cumplen condiciones de la orden** → pasa a **Confirmada**; el motor evalúa **cada línea** y libera las que están completas (parcial posible).
-- **Línea liberada** → reserva stock / crea orden de producción / genera necesidad de compra / habilita logística — **sin recargar datos**. Tesorería registra saldo; Comisiones queda calculada; Dashboard se actualiza.
 - **Ítem a medida / con obs** → crea **Autorización** pendiente; la línea queda **Bloqueada** hasta que Administración apruebe.
+
+**Las consecuencias se disparan por EVENTO, no todas de una** (cada evento tiene su momento):
+| Evento | Consecuencias |
+|--------|---------------|
+| **Cobro registrado** | Tesorería registra, valida, imputa y actualiza saldo — **siempre**, aunque la orden siga bloqueada. |
+| **Orden confirmada** | Se **congela** la participación de vendedores; comisión **provisoria**; se actualiza el embudo comercial. |
+| **Línea liberada** | El motor determina estrategia y activa **Inventario / Producción / Compras / Logística** (idempotente). |
+| **Línea lista** | Habilita logística / preparación. |
+| **Entrega realizada** | Cierra la línea operativamente. |
+| **Orden cerrada** | Consolida la **comisión definitiva** (según la regla) y cierra el ciclo. |
 - **Orden confirmada** → **no se edita directo**. Se genera **Solicitud de modificación**:
   `Solicitada → Evaluada → Aprobada/Rechazada → Aplicada`, registrando qué cambió, valor
   anterior/nuevo, **impacto económico y productivo**, responsable y motivo. Si toca un
@@ -132,7 +223,23 @@ Conversión del embudo (consultas→cotizaciones→señadas→órdenes→entrega
 abiertos (aging) · ventas por vendedor y local · comisiones · órdenes **A confirmar** por
 motivo y antigüedad. Cada indicador **explica el porqué**.
 
+## 11 · Caminos negativos (no solo el camino ideal)
+El flujo también contempla y deja evento de: cotización **rechazada** o **vencida** ·
+pago **rechazado** o **en validación** · orden **cancelada** · línea **anulada** ·
+modificación **rechazada** · **pérdida de stock reservado** · **imposibilidad de
+fabricar** · **devolución de seña** · **reclamo posterior**. Cada uno con su responsable,
+su motivo y su reversa de consecuencias (ej.: anular una línea libera su reserva de stock).
+
+## 12 · Trazabilidad — seguir una orden y una línea
+Se puede seguir **una orden completa** y también **una línea individual**, viendo en cada
+paso: **qué ocurrió · qué falta · quién lo resuelve · qué módulo actúa · qué evento se
+generó.** Esa es la prueba de que el motor es visible y explicable.
+
 ---
+
+## Secuencia de trabajo
+**Documento ✓ → flujo funcional ✓ → modelo de datos (siguiente) → recién ahí se programa.**
+Nada se codea hasta cerrar el modelo de Orden/Línea y las reglas del motor.
 
 ## Orden de construcción (primero el motor, después las pantallas)
 1. **Modelo y estados de Orden/Línea** — estados comercial y operativo, condiciones, bloqueo, liberación parcial, snapshot de precios, historial, responsables.
