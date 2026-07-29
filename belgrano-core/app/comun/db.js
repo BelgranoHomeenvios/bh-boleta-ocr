@@ -68,22 +68,58 @@
     //   metodo 'efectivo'  → estado 'rendido'  (basta con rendirlo a un autorizado).
     //   metodo 'transferencia' → 'pendiente_banco' hasta que Administración/Dirección
     //     lo acredita en el banco (cuit + comprobante + monto) → 'confirmado'.
+    // Nuevos campos por orden:
+    //  lineas[]  : muebles {producto, cantidad, precio, tipo estandar|medida, img, bloqueo}
+    //  reclamo   : marca que CONVIVE con el estado del ciclo (listo+reclamo, entregado+reclamo)
+    //  factura   : 'no' | 'solicitada' | 'hecha'
+    //  recordatorios[] : {f, texto}
+    //  comentarios[]   : {area, texto, f}   (historial por área)
+    //  archivos[]      : {nombre, tipo, area}  (se guardan en el "cajón" de Contabilidad)
     ordenes: [
-      { id: 1, numero: 'S00021', fecha: '29/07', cliente: 'Laura Pérez',    vendedor: 'Ale',      local: '2020', pago: 'Efectivo',      items: 3, total: 1200000, sena: 360000, saldo: 840000, entrega: '15/08', estado: 'a_confirmar',     situacion: 'a_confirmar', comentarios: ['Cliente pidió llamar antes de entregar'],
+      { id: 1, numero: 'S00021', fecha: '29/07', cliente: 'Laura Pérez',    vendedor: 'Ale',      local: '2020', pago: 'Efectivo',      items: 3, total: 1200000, sena: 360000, saldo: 840000, entrega: '15/08', estado: 'a_confirmar',     situacion: 'a_confirmar', reclamo: false, factura: 'solicitada',
+        lineas: [
+          { id: 'L1', producto: 'Cómoda Amberes 1.20', cantidad: 1, precio: 406250, tipo: 'estandar', img: null },
+          { id: 'L2', producto: 'Mesa Noruega',        cantidad: 1, precio: 500000, tipo: 'estandar', img: null },
+          { id: 'L3', producto: 'Respaldo Milán a medida', cantidad: 1, precio: 293750, tipo: 'medida', img: null, bloqueo: 'precio' }],
+        recordatorios: [{ f: '05/08', texto: 'Llamar para coordinar entrega' }],
+        comentarios: [{ area: 'Ventas', texto: 'Cliente pidió llamar antes de entregar', f: '29/07' }],
+        archivos: [{ nombre: 'Plano Respaldo Milán.pdf', tipo: 'plano', area: 'Producción' }],
         cobros: [{ id: 'c1', f: '29/07', m: 360000, metodo: 'efectivo', recibidoPor: 'Caja Belgrano 2020', estado: 'rendido' }] },
-      { id: 2, numero: 'S00020', fecha: '29/07', cliente: 'Juan López',     vendedor: 'Cristian', local: '2299', pago: 'Transferencia', items: 1, total: 700000,  sena: 0,      saldo: 700000, entrega: null,    estado: 'fabricacion',     situacion: 'con_frenos',  comentarios: ['Cliente dice que transfirió — sin acreditar en el banco'],
+      { id: 2, numero: 'S00020', fecha: '29/07', cliente: 'Juan López',     vendedor: 'Cristian', local: '2299', pago: 'Transferencia', items: 1, total: 700000,  sena: 0,      saldo: 700000, entrega: null,    estado: 'preproduccion',   situacion: 'con_frenos',  reclamo: false, factura: 'no',
+        lineas: [{ id: 'L1', producto: 'Vajillero Nórdico', cantidad: 1, precio: 700000, tipo: 'estandar', img: null }],
+        recordatorios: [], comentarios: [{ area: 'Tesorería', texto: 'Cliente dice que transfirió — sin acreditar en el banco', f: '29/07' }], archivos: [],
         cobros: [{ id: 'c2', f: '29/07', m: 700000, metodo: 'transferencia', recibidoPor: 'Cuenta Cristian', depositante: 'Juan López', referencia: 'Mercado Pago', estado: 'pendiente_banco' }] },
-      { id: 3, numero: 'S00019', fecha: '28/07', cliente: 'Bibiana',        vendedor: 'Ale',      local: '2020', pago: 'Tarjeta',       items: 2, total: 516000,  sena: 516000, saldo: 0,      entrega: '05/08', estado: 'listo',           situacion: 'lista',       comentarios: [],
+      { id: 3, numero: 'S00019', fecha: '28/07', cliente: 'Bibiana',        vendedor: 'Ale',      local: '2020', pago: 'Tarjeta',       items: 2, total: 516000,  sena: 516000, saldo: 0,      entrega: '05/08', estado: 'listo',           situacion: 'lista',       reclamo: true,  factura: 'no',
+        lineas: [{ id: 'L1', producto: 'Mesa de Luz Estocolmo', cantidad: 2, precio: 258000, tipo: 'estandar', img: null }],
+        recordatorios: [], comentarios: [{ area: 'Reclamos', texto: 'Vino con una veta distinta a la del showroom', f: '28/07' }], archivos: [],
         cobros: [{ id: 'c3', f: '28/07', m: 516000, metodo: 'efectivo', recibidoPor: 'Caja Belgrano 2020', estado: 'rendido' }] },
-      { id: 4, numero: 'S00018', fecha: '28/07', cliente: 'Laura y Hernán', vendedor: 'Cristian', local: '2299', pago: 'Mixto',         items: 4, total: 731250,  sena: 481250, saldo: 250000, entrega: '02/08', estado: 'logistica',       situacion: 'en_logistica', comentarios: ['Entra por el fondo', 'Falta el saldo contra entrega'],
+      { id: 4, numero: 'S00018', fecha: '28/07', cliente: 'Laura y Hernán', vendedor: 'Cristian', local: '2299', pago: 'Mixto',         items: 2, total: 731250,  sena: 481250, saldo: 250000, entrega: '02/08', estado: 'logistica',       situacion: 'en_logistica', reclamo: false, factura: 'no',
+        lineas: [
+          { id: 'L1', producto: 'Aparador Amberes',   cantidad: 1, precio: 481250, tipo: 'estandar', img: null },
+          { id: 'L2', producto: 'Mesa ratona Foster',  cantidad: 1, precio: 250000, tipo: 'estandar', img: null }],
+        recordatorios: [], comentarios: [{ area: 'Logística', texto: 'Entra por el fondo', f: '28/07' }, { area: 'Ventas', texto: 'Falta el saldo contra entrega', f: '28/07' }], archivos: [],
         cobros: [
           { id: 'c4', f: '20/07', m: 300000, metodo: 'transferencia', recibidoPor: 'Cuenta Cristian', depositante: 'Hernán Suárez', cuit: '20-30111222-3', comprobante: 'BROU-884512', montoConfirmado: 300000, confirmadoPor: 'Administración', estado: 'confirmado' },
           { id: 'c5', f: '28/07', m: 181250, metodo: 'efectivo', recibidoPor: 'Caja Verano 2299', estado: 'rendido' }] },
-      { id: 5, numero: 'S00017', fecha: '27/07', cliente: 'Abigail Galfre', vendedor: 'Brian',    local: '2020', pago: 'Efectivo',      items: 2, total: 968000,  sena: 968000, saldo: 0,      entrega: '26/07', estado: 'entregado',       situacion: 'entregada',   comentarios: [],
+      { id: 5, numero: 'S00017', fecha: '27/07', cliente: 'Abigail Galfre', vendedor: 'Brian',    local: '2020', pago: 'Efectivo',      items: 1, total: 968000,  sena: 968000, saldo: 0,      entrega: '26/07', estado: 'entregado',       situacion: 'entregada',   reclamo: true,  factura: 'hecha',
+        lineas: [{ id: 'L1', producto: 'Biblioteca Borges 1.20', cantidad: 1, precio: 968000, tipo: 'estandar', img: null }],
+        recordatorios: [], comentarios: [{ area: 'Reclamos', texto: 'Golpe en el lateral, reclamo abierto post-entrega', f: '28/07' }], archivos: [{ nombre: 'Factura A-0001-00002.pdf', tipo: 'factura', area: 'Contabilidad' }],
         cobros: [{ id: 'c6', f: '27/07', m: 968000, metodo: 'efectivo', recibidoPor: 'Dirección', estado: 'rendido' }] },
-      { id: 6, numero: 'S00016', fecha: '27/07', cliente: 'Diego',          vendedor: 'Sergio',   local: '2299', pago: 'Transferencia', items: 1, total: 733000,  sena: 0,      saldo: 733000, entrega: '10/08', estado: 'falta_tesoreria', situacion: 'impacto',     comentarios: ['El cliente mandó 2 comprobantes por el mismo pago'],
+      { id: 6, numero: 'S00016', fecha: '27/07', cliente: 'Diego',          vendedor: 'Sergio',   local: '2299', pago: 'Transferencia', items: 1, total: 733000,  sena: 0,      saldo: 733000, entrega: '10/08', estado: 'falta_tesoreria', situacion: 'impacto',     reclamo: false, factura: 'solicitada',
+        lineas: [{ id: 'L1', producto: 'Placard Oliver a medida', cantidad: 1, precio: 733000, tipo: 'medida', img: null, bloqueo: 'precio' }],
+        recordatorios: [], comentarios: [{ area: 'Tesorería', texto: 'El cliente mandó 2 comprobantes por el mismo pago', f: '27/07' }], archivos: [{ nombre: 'Plano Placard Oliver.pdf', tipo: 'plano', area: 'Producción' }],
         cobros: [{ id: 'c7', f: '27/07', m: 733000, metodo: 'transferencia', recibidoPor: 'Cuenta Sergio', depositante: 'Diego Fernández', referencia: 'Transferencia inmediata', estado: 'pendiente_banco' }] },
-      { id: 7, numero: 'S00015', fecha: '26/07', cliente: 'Camila',         vendedor: 'Nati',     local: '2020', pago: 'Tarjeta',       items: 1, total: 425750,  sena: 0,      saldo: 0,      entrega: null,    estado: 'anulado',         situacion: 'anulada',     comentarios: ['Anulada: el cliente se arrepintió'], cobros: [] },
+      { id: 8, numero: 'S00014', fecha: '25/07', cliente: 'Marta Gómez',    vendedor: 'Nati',     local: '2020', pago: 'Transferencia', items: 1, total: 640000,  sena: 200000, saldo: 440000, entrega: '18/08', estado: 'preproduccion',   situacion: 'con_frenos',  reclamo: false, factura: 'no',
+        lineas: [{ id: 'L1', producto: 'Ropero Escandinavo a medida', cantidad: 1, precio: 640000, tipo: 'medida', img: null }],
+        recordatorios: [], comentarios: [{ area: 'Producción', texto: 'Falta confirmar color de frente antes de cortar', f: '25/07' }], archivos: [],
+        cobros: [{ id: 'c8', f: '25/07', m: 200000, metodo: 'transferencia', recibidoPor: 'Cuenta Nati', depositante: 'Marta Gómez', cuit: '27-28999111-4', comprobante: 'GAL-771201', montoConfirmado: 200000, confirmadoPor: 'Administración', estado: 'confirmado' }] },
+      { id: 7, numero: 'S00015', fecha: '26/07', cliente: 'Camila',         vendedor: 'Nati',     local: '2020', pago: 'Tarjeta',       items: 1, total: 425750,  sena: 0,      saldo: 0,      entrega: null,    estado: 'anulado',         situacion: 'anulada',     reclamo: false, factura: 'no',
+        lineas: [{ id: 'L1', producto: 'Silla Meier', cantidad: 1, precio: 425750, tipo: 'estandar', img: null }],
+        recordatorios: [], comentarios: [{ area: 'Ventas', texto: 'Anulada: el cliente se arrepintió', f: '26/07' }], archivos: [], cobros: [] },
+      { id: 9, numero: 'S00013', fecha: '10/07', cliente: 'Roberto López',  vendedor: 'Ale',      local: '2299', pago: 'Efectivo',      items: 2, total: 300000,  sena: 300000, saldo: 0,      entrega: '12/07', estado: 'archivado',       situacion: 'entregada',   reclamo: false, factura: 'hecha',
+        lineas: [{ id: 'L1', producto: 'Banqueta Nórdica', cantidad: 2, precio: 150000, tipo: 'estandar', img: null }],
+        recordatorios: [], comentarios: [], archivos: [{ nombre: 'Factura A-0001-00001.pdf', tipo: 'factura', area: 'Contabilidad' }],
+        cobros: [{ id: 'c9', f: '10/07', m: 300000, metodo: 'efectivo', recibidoPor: 'Caja Verano 2299', estado: 'rendido' }] },
     ],
     // Cotizaciones de ejemplo.
     cotizaciones: [
@@ -106,6 +142,7 @@
     a_confirmar:     { label: 'A confirmar',            pill: 'warn' },
     confirmar:       { label: 'A confirmar',            pill: 'warn' },
     falta_tesoreria: { label: 'Falta firmar (Tesorería)', pill: 'warn' },
+    preproduccion:   { label: 'Preproducción',          pill: 'info' },
     fabricacion:     { label: 'En fabricación',         pill: 'info' },
     produccion:      { label: 'En fabricación',         pill: 'info' },
     listo:           { label: 'Listo',                  pill: 'ok' },
@@ -115,13 +152,17 @@
     anulado:         { label: 'Anulado',                pill: 'crit' },
     reclamo:         { label: 'Reclamo',                pill: 'crit' },
   };
-  // Grupos para los filtros de la tabla de boletas.
+  // Grupos para los filtros de la tabla de boletas. 'activas' = con las que se
+  // trabaja habitualmente. 'reclamo' es especial (marca que convive, no estado).
   const GRUPO_ESTADO = {
+    activas: ['a_confirmar', 'confirmar', 'falta_tesoreria', 'preproduccion', 'fabricacion', 'produccion', 'listo', 'logistica'],
     a_confirmar: ['a_confirmar', 'confirmar', 'falta_tesoreria'],
+    preproduccion: ['preproduccion'],
     fabricacion: ['fabricacion', 'produccion'],
     listo: ['listo'],
     logistica: ['logistica'],
-    entregado: ['entregado', 'archivado'],
+    entregado: ['entregado'],
+    archivado: ['archivado'],
   };
   const ESTADO_COTIZ = {
     borrador:  { label: 'Borrador',  pill: 'soft' },
@@ -320,11 +361,16 @@
 
     GRUPO_ESTADO,
     // Tabla de boletas con filtros (texto · grupo de estado · vendedor).
-    async boletas({ texto = '', grupo = '', vendedor = '' } = {}) {
+    async boletas({ texto = '', grupo = 'activas', vendedor = '' } = {}) {
       const t = sinTilde(texto);
+      const enGrupo = o => {
+        if (!grupo) return true;                       // 'Todas'
+        if (grupo === 'reclamo') return !!o.reclamo;   // marca que convive
+        return (GRUPO_ESTADO[grupo] || []).includes(o.estado);
+      };
       return DEMO.ordenes.filter(o =>
         (!t || sinTilde(o.cliente).includes(t) || sinTilde(o.numero).includes(t)) &&
-        (!grupo || (GRUPO_ESTADO[grupo] || []).includes(o.estado)) &&
+        enGrupo(o) &&
         (!vendedor || o.vendedor === vendedor));
     },
     // "Mis pendientes": consultas/decisiones de cualquier módulo hacia mí, en un

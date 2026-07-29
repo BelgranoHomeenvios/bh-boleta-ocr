@@ -7,16 +7,27 @@
 // =====================================================================
 (function (global) {
   const FILTROS = [
-    { k: '', label: 'Todas' },
+    { k: 'activas', label: 'Activas' },
     { k: 'a_confirmar', label: 'A confirmar' },
+    { k: 'preproduccion', label: 'Preproducción' },
     { k: 'fabricacion', label: 'En fabricación' },
     { k: 'listo', label: 'Listos' },
     { k: 'logistica', label: 'En logística' },
+    { k: 'reclamo', label: 'Reclamos' },
     { k: 'entregado', label: 'Entregadas' },
+    { k: 'archivado', label: 'Archivadas' },
+    { k: '', label: 'Todas' },
   ];
+  // Columnas ordenables → cómo obtener el valor de comparación.
+  const SORT = {
+    numero: o => o.numero, cliente: o => o.cliente, pago: o => o.pago,
+    total: o => o.total, sena: o => o.sena, saldo: o => o.saldo,
+    items: o => o.items, estado: o => o.estado, entrega: o => o.entrega || '',
+  };
 
   const VentasPanel = {
-    _mount: 'view', grupo: '', vendedor: '', texto: '', periodo: 'hoy',
+    _mount: 'view', grupo: 'activas', vendedor: '', texto: '', periodo: 'hoy',
+    orden: { campo: '', dir: 1 }, _expand: {},
 
     async render(mount = 'view') {
       this._mount = mount;
@@ -83,52 +94,94 @@
       this.pintarTabla();
     },
 
+    // Encabezado ordenable: click alterna asc/desc; muestra ▲/▼.
+    th(campo, label, extra = '') {
+      const act = this.orden.campo === campo;
+      const fl = act ? (this.orden.dir === 1 ? ' ▲' : ' ▼') : '';
+      return `<th class="so" data-sort="${campo}" ${extra}>${label}<span class="fl">${fl}</span></th>`;
+    },
+
     async pintarTabla() {
       const cont = document.getElementById('vp-tabla'); if (!cont) return;
-      this._bs = await global.DB.boletas({ texto: this.texto, grupo: this.grupo, vendedor: this.vendedor });
-      const bs = this._bs;
+      let bs = await global.DB.boletas({ texto: this.texto, grupo: this.grupo, vendedor: this.vendedor });
+      if (this.orden.campo && SORT[this.orden.campo]) {
+        const g = SORT[this.orden.campo], d = this.orden.dir;
+        bs = bs.slice().sort((a, b) => {
+          const x = g(a), y = g(b);
+          return (typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'es')) * d;
+        });
+      }
+      this._bs = bs;
+      const DB = global.DB;
       cont.innerHTML = bs.length ? `<div style="overflow-x:auto"><table class="vp-t">
         <thead><tr>
-          <th>N°</th><th>Cliente</th><th>Vend.</th>
-          <th style="text-align:right">Total</th><th style="text-align:right">Seña</th><th style="text-align:right">Saldo</th>
-          <th>Entrega</th><th>Estado</th><th></th><th></th></tr></thead>
+          ${this.th('numero', 'N°')}${this.th('cliente', 'Cliente')}${this.th('pago', 'Pago')}
+          ${this.th('total', 'Total', 'style="text-align:right"')}${this.th('sena', 'Seña', 'style="text-align:right"')}${this.th('saldo', 'Saldo', 'style="text-align:right"')}
+          ${this.th('items', 'Muebles', 'style="text-align:center"')}${this.th('estado', 'Estado')}${this.th('entrega', 'Entrega')}
+          <th title="Recordatorios">🔔</th><th title="Comentarios">💬</th><th></th></tr></thead>
         <tbody>${bs.map(o => {
           const cob = o.cobros || [];
           const pend = cob.filter(c => c.estado === 'pendiente_banco').reduce((a, c) => a + c.m, 0);
           const desglose = cob.length
-            ? cob.map(c => `${c.f}  ${UI.pesos(c.metodo === 'transferencia' ? (c.montoConfirmado ?? c.m) : c.m)}  ${c.metodo === 'transferencia' ? 'transf.' : 'efvo.'} · ${(global.DB.ESTADO_COBRO[c.estado] || {}).label || c.estado}`).join('\n')
+            ? cob.map(c => `${c.f}  ${UI.pesos(c.metodo === 'transferencia' ? (c.montoConfirmado ?? c.m) : c.m)}  ${c.metodo === 'transferencia' ? 'transf.' : 'efvo.'} · ${(DB.ESTADO_COBRO[c.estado] || {}).label || c.estado}`).join('\n')
             : 'Sin señas registradas';
-          // Tilde de seña: ✓ verde = cobrada/verificada · ⏳ ámbar = transferencia sin acreditar.
           const senaCell = o.sena
             ? `<span style="color:var(--ok);font-weight:700">${UI.pesos(o.sena)}</span> <span style="color:var(--ok)" title="Seña cobrada y verificada">✓</span>${pend ? `<div style="font-size:10.5px;color:var(--warn);white-space:nowrap">⏳ +${UI.pesos(pend)} sin acreditar</div>` : ''}`
             : (pend ? `<span style="color:var(--warn);font-weight:700">⏳ ${UI.pesos(pend)}</span><div style="font-size:10.5px;color:var(--warn);white-space:nowrap">transf. sin acreditar</div>` : '<span class="muted">—</span>');
-          const nc = (o.comentarios || []).length;
+          const bloqueaMueble = (o.lineas || []).some(l => l.bloqueo);
+          const nc = (o.comentarios || []).length, nr = (o.recordatorios || []).length;
+          const abierto = !!this._expand[o.id];
+          const detalle = abierto ? `<tr class="vp-det" data-detrow="${o.id}"><td colspan="12"><div class="vp-mueb">
+            ${(o.lineas || []).map(l => `<div class="ml">
+              <div class="mimg">🪑</div>
+              <div style="flex:1"><b>${UI.esc(l.producto)}</b> <span class="pill soft" style="font-size:10px">${l.tipo === 'medida' ? '📐 a medida' : '📦 estándar'}</span>${l.bloqueo ? ` <span class="pill crit" style="font-size:10px">⛔ ${UI.esc(l.bloqueo)}</span>` : ''}</div>
+              <div class="muted" style="width:60px;text-align:center">x${l.cantidad}</div>
+              <div class="tnum" style="width:110px;text-align:right"><b>${UI.pesos(l.precio * l.cantidad)}</b></div></div>`).join('')}
+          </div></td></tr>` : '';
           return `<tr data-b="${o.id}">
           <td data-open><b style="color:var(--brand)">${UI.esc(o.numero)}</b><div class="muted" style="font-size:11px">${UI.esc(o.fecha)}</div></td>
-          <td data-open><div style="font-weight:600">${UI.esc(o.cliente)}</div><div class="muted" style="font-size:11px">🪑 ${o.items} · ${UI.esc(o.pago)}</div></td>
-          <td data-open><span class="pill soft">${UI.esc(o.vendedor)}</span></td>
+          <td data-open style="font-weight:600">${UI.esc(o.cliente)}</td>
+          <td class="muted">${UI.esc(o.pago)}</td>
           <td class="tnum" style="text-align:right"><b style="color:var(--navy)">${UI.pesos(o.total)}</b></td>
           <td class="tnum" style="text-align:right;cursor:pointer" data-sena title="${UI.esc(desglose)}">${senaCell}</td>
           <td class="tnum" style="text-align:right">${o.saldo ? `<span style="color:var(--crit);font-weight:700">${UI.pesos(o.saldo)}</span>` : '<span class="pill ok" style="font-size:10px">saldado</span>'}</td>
+          <td style="text-align:center"><button class="mueb ${bloqueaMueble ? 'blq' : ''}" data-exp title="Ver muebles">🪑 ${o.items} <span class="ch">${abierto ? '▲' : '▾'}</span></button></td>
+          <td data-open>${UI.estado(DB.ESTADO_ORDEN, o.estado)}${o.reclamo ? ' <span class="pill crit" style="font-size:10px">⚠ Reclamo</span>' : ''}</td>
           <td>${o.entrega ? `📅 ${UI.esc(o.entrega)}` : '<span class="muted">a definir</span>'}</td>
-          <td data-open>${UI.estado(global.DB.ESTADO_ORDEN, o.estado)}</td>
+          <td style="text-align:center"><button class="ib" data-rec title="Recordatorios">🔔${nr ? `<span class="cbadge">${nr}</span>` : ''}</button></td>
           <td style="text-align:center"><button class="ib" data-nota title="Comentarios">💬${nc ? `<span class="cbadge">${nc}</span>` : ''}</button></td>
-          <td style="text-align:center"><button class="ib" data-menu title="Acciones">⋮</button></td></tr>`;
+          <td style="text-align:center"><button class="ib" data-menu title="Vendedor y acciones">⋮</button></td></tr>${detalle}`;
         }).join('')}</tbody></table></div>
         <style>
           .vp-t td{vertical-align:middle}
+          .vp-t th.so{cursor:pointer;user-select:none;white-space:nowrap}
+          .vp-t th.so:hover{color:var(--brand)}.vp-t th .fl{color:var(--brand);font-size:10px}
           .vp-t .ib{position:relative;border:0;background:none;cursor:pointer;font-size:15px;padding:4px 6px;border-radius:7px;line-height:1;color:var(--ink-soft)}
           .vp-t .ib:hover{background:var(--line-soft)}
           .vp-t .cbadge{position:absolute;top:-2px;right:-2px;background:var(--brand);color:#fff;font-size:9px;font-weight:700;min-width:14px;height:14px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;padding:0 3px}
+          .vp-t .mueb{border:1px solid var(--line);background:var(--panel);border-radius:20px;padding:3px 9px;font-size:12px;color:var(--ink-soft);cursor:pointer;white-space:nowrap}
+          .vp-t .mueb:hover{border-color:var(--brand)}.vp-t .mueb .ch{color:var(--muted);font-size:10px}
+          .vp-t .mueb.blq{border-color:var(--crit);color:var(--crit)}
+          .vp-det td{background:var(--panel-2);padding:6px 12px 10px}
+          .vp-mueb{display:flex;flex-direction:column;gap:6px}
+          .vp-mueb .ml{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line-soft);border-radius:9px;padding:7px 10px}
+          .vp-mueb .mimg{width:34px;height:34px;border-radius:7px;background:var(--brand-soft);display:flex;align-items:center;justify-content:center;font-size:16px}
           [data-open]{cursor:pointer}
         </style>`
         : UI.vacio('No hay boletas para ese filtro.');
 
-      const abrir = o => global.OrdenDetalle.render(this._mount, null, () => this.render(this._mount));
+      cont.querySelectorAll('th.so').forEach(th => th.onclick = () => {
+        const c = th.dataset.sort;
+        if (this.orden.campo === c) this.orden.dir *= -1; else { this.orden.campo = c; this.orden.dir = 1; }
+        this.pintarTabla();
+      });
+      const abrir = () => global.OrdenDetalle.render(this._mount, null, () => this.render(this._mount));
       cont.querySelectorAll('tr[data-b]').forEach(tr => {
         const o = bs.find(x => String(x.id) === tr.dataset.b);
         tr.querySelectorAll('[data-open]').forEach(td => td.onclick = () => abrir(o));
         tr.querySelector('[data-sena]').onclick = e => { e.stopPropagation(); this.modalSenas(o); };
+        tr.querySelector('[data-exp]').onclick = e => { e.stopPropagation(); this._expand[o.id] = !this._expand[o.id]; this.pintarTabla(); };
+        tr.querySelector('[data-rec]').onclick = e => { e.stopPropagation(); this.modalRecordatorios(o); };
         tr.querySelector('[data-nota]').onclick = e => { e.stopPropagation(); this.modalNota(o); };
         tr.querySelector('[data-menu]').onclick = e => { e.stopPropagation(); this.menuAcciones(o, e.currentTarget); };
       });
@@ -145,7 +198,10 @@
       // Confirmar en banco: solo si hay una transferencia sin acreditar y el rol lo permite.
       const hayPend = (o.cobros || []).some(c => c.estado === 'pendiente_banco');
       const puedeConfirmar = ['direccion', 'administrativo'].includes(global.App.rol);
-      m.innerHTML = item('📂', 'Abrir orden') + item('💵', 'Señas y cobros')
+      m.innerHTML = `<div style="padding:7px 10px 8px;border-bottom:1px solid var(--line-soft);margin-bottom:4px">
+          <div class="muted" style="font-size:10.5px;text-transform:uppercase;letter-spacing:.04em">Vendedor</div>
+          <b style="font-size:13px">${UI.esc(o.vendedor)}</b></div>`
+        + item('📂', 'Abrir orden') + item('💵', 'Señas y cobros')
         + (hayPend && puedeConfirmar ? item('🏦', 'Confirmar seña en banco') : '')
         + item('💬', 'Agregar comentario');
       document.body.appendChild(m);
@@ -325,46 +381,81 @@
       };
     },
 
-    // Diálogo de comentarios de la boleta (leer + agregar una nota).
+    // Diálogo de comentarios (historial por área): cada nota queda con el área
+    // que la escribió, así fábrica/logística/ventas arman la historia de la venta.
     modalNota(o) {
-      document.getElementById('_vpmodal')?.remove();
-      const ov = document.createElement('div');
-      ov.id = '_vpmodal';
-      ov.style.cssText = 'position:fixed;inset:0;z-index:90;background:rgba(15,26,42,.42);display:flex;align-items:center;justify-content:center;padding:16px';
+      const area = AREA_ROL[global.App.rol] || 'Ventas';
       const lista = (o.comentarios || []).length
-        ? (o.comentarios || []).map(c => `<div style="padding:8px 10px;background:var(--panel-2);border:1px solid var(--line-soft);border-radius:9px;font-size:13px;margin-bottom:6px">💬 ${UI.esc(c)}</div>`).join('')
+        ? (o.comentarios || []).map(c => `<div style="padding:8px 10px;background:var(--panel-2);border:1px solid var(--line-soft);border-radius:9px;font-size:13px;margin-bottom:6px">
+            <span class="pill soft" style="font-size:10px">${UI.esc(c.area || '—')}</span>
+            <span style="margin-left:6px">${UI.esc(c.texto)}</span>
+            <span class="muted" style="float:right;font-size:11px">${UI.esc(c.f || '')}</span></div>`).join('')
         : `<div class="muted" style="font-size:13px;padding:6px 0">Todavía no hay comentarios en esta boleta.</div>`;
-      ov.innerHTML = `<div style="background:var(--panel);border-radius:14px;width:min(440px,100%);box-shadow:0 20px 60px rgba(15,26,42,.3);overflow:hidden">
+      const ov = this._shell(`
         <div style="padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px">
-          <b style="color:var(--brand)">${UI.esc(o.numero)}</b>
-          <span style="font-weight:600">${UI.esc(o.cliente)}</span>
-          <span class="sp" style="flex:1"></span>
-          <button id="vpm-x" class="ib" style="border:0;background:none;font-size:18px;cursor:pointer;color:var(--muted)">✕</button></div>
+          <b style="color:var(--brand)">${UI.esc(o.numero)}</b><span style="font-weight:600">${UI.esc(o.cliente)}</span>
+          <span style="flex:1"></span><button id="vpm-x" style="border:0;background:none;font-size:18px;cursor:pointer;color:var(--muted)">✕</button></div>
         <div style="padding:14px 16px">
-          <div class="kick" style="margin-bottom:8px">Comentarios</div>
+          <div class="kick" style="margin-bottom:8px">Historial de comentarios</div>
           ${lista}
-          <textarea id="vpm-tx" rows="2" placeholder="Escribí una nota para esta boleta…" style="width:100%;margin-top:8px;resize:vertical"></textarea>
+          <div class="muted" style="font-size:11px;margin-top:8px">Escribís como <b>${UI.esc(area)}</b></div>
+          <textarea id="vpm-tx" rows="2" placeholder="Sumá una nota para las demás áreas…" style="width:100%;margin-top:4px;resize:vertical"></textarea>
           <div class="wrap-row" style="justify-content:flex-end;margin-top:10px">
             <button class="btn" id="vpm-cancel">Cerrar</button>
             <button class="btn primary" id="vpm-save">Guardar comentario</button>
           </div>
-        </div></div>`;
-      document.body.appendChild(ov);
+        </div>`);
       const cerrar = () => ov.remove();
-      ov.onclick = e => { if (e.target === ov) cerrar(); };
       ov.querySelector('#vpm-x').onclick = cerrar;
       ov.querySelector('#vpm-cancel').onclick = cerrar;
       const tx = ov.querySelector('#vpm-tx'); tx.focus();
       ov.querySelector('#vpm-save').onclick = () => {
         const val = tx.value.trim();
         if (!val) { cerrar(); return; }
-        (o.comentarios = o.comentarios || []).push(val);
+        (o.comentarios = o.comentarios || []).push({ area, texto: val, f: 'hoy' });
         UI.aviso('Comentario agregado a ' + o.numero, 'ok');
-        cerrar();
-        this.pintarTabla();
+        cerrar(); this.pintarTabla();
+      };
+    },
+
+    // Recordatorios por boleta (fecha + texto). Idea: que avise ese día.
+    modalRecordatorios(o) {
+      const lista = (o.recordatorios || []).length
+        ? (o.recordatorios || []).map(r => `<div style="display:flex;gap:8px;align-items:center;padding:8px 10px;background:var(--panel-2);border:1px solid var(--line-soft);border-radius:9px;font-size:13px;margin-bottom:6px">
+            <span>🔔</span><span class="pill warn" style="font-size:10px">${UI.esc(r.f)}</span><span>${UI.esc(r.texto)}</span></div>`).join('')
+        : `<div class="muted" style="font-size:13px;padding:6px 0">Sin recordatorios en esta boleta.</div>`;
+      const ov = this._shell(`
+        <div style="padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px">
+          <span>🔔</span><b>Recordatorios</b> <span class="muted" style="font-size:12px">· ${UI.esc(o.numero)}</span>
+          <span style="flex:1"></span><button id="rc-x" style="border:0;background:none;font-size:18px;cursor:pointer;color:var(--muted)">✕</button></div>
+        <div style="padding:14px 16px">
+          ${lista}
+          <div class="wrap-row" style="gap:8px;margin-top:8px">
+            <input id="rc-f" placeholder="Fecha (ej. 12/08)" style="width:130px">
+            <input id="rc-t" placeholder="¿Qué recordar?" style="flex:1">
+          </div>
+          <div class="wrap-row" style="justify-content:flex-end;margin-top:12px">
+            <button class="btn" id="rc-cancel">Cerrar</button>
+            <button class="btn primary" id="rc-save">Agregar recordatorio</button>
+          </div>
+        </div>`);
+      const cerrar = () => ov.remove();
+      ov.querySelector('#rc-x').onclick = cerrar;
+      ov.querySelector('#rc-cancel').onclick = cerrar;
+      ov.querySelector('#rc-t').focus();
+      ov.querySelector('#rc-save').onclick = () => {
+        const f = ov.querySelector('#rc-f').value.trim() || 'sin fecha';
+        const t = ov.querySelector('#rc-t').value.trim();
+        if (!t) { ov.querySelector('#rc-t').focus(); return; }
+        (o.recordatorios = o.recordatorios || []).push({ f, texto: t });
+        UI.aviso('Recordatorio agregado', 'ok');
+        cerrar(); this.pintarTabla();
       };
     },
   };
+
+  // Rol → área que firma sus comentarios.
+  const AREA_ROL = { direccion: 'Dirección', vendedor: 'Ventas', administrativo: 'Administración', prod: 'Producción', logi: 'Logística', gestion: 'CRM' };
 
   global.VentasPanel = VentasPanel;
 })(typeof window !== 'undefined' ? window : globalThis);
