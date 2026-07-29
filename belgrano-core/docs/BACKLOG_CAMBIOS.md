@@ -41,6 +41,50 @@
 >   qué guarda (fecha + texto) al aplicarlo.
 > - El reclamo-que-convive conviene resolverlo junto con el módulo Reclamos.
 
+### Detalle de la orden (Ver una venta / OrdenDetalle)
+
+**Layout — todo en una pantalla**
+- ⬜ 10. Que entre TODO en una sola pantalla, sin necesidad de scrollear.
+- ⬜ 11. Arriba, primero: **Nº de orden + Cliente**.
+- ⬜ 12. **Acciones arriba con emojis**: 🛠️ Modificar orden · 🏭 Ver producción ·
+  🚚 Ver logística.
+- ⬜ 13. **Método de pago** elegido por el vendedor, visible arriba.
+
+**Detalle de muebles (tipo boleta)**
+- ⬜ 14. Tabla compacta estilo boleta: **Producto · Cantidad · Monto por producto**
+  (más chico que ahora).
+- ⬜ 15. **Imagen del mueble** por línea (si se puede, traída desde Tienda Nube).
+- ⬜ 16. Marca **estándar / a medida con emoji** por línea.
+
+**Pagos y saldo (bloque al costado — ya existe)**
+- ⬜ 17. Sumar al bloque Total/Pagado/Saldo: si pagó, **el método de pago** ahí, y
+  el **tilde de rendición confirmada por el vendedor** (seña rendida/acreditada).
+
+**Bloqueos en rojo**
+- ⬜ 18. Lo que esté **bloqueando** (el pago o un mueble) resaltado en **ROJO** acá:
+  no sólo "a confirmar" — muebles en rojo, saldo en rojo.
+
+**Comentarios / historial por área**
+- ⬜ 19. Campo de **comentarios** (abajo o al costado) donde fábrica, logística y
+  otras áreas puedan sumar notas → **historial de la venta por área**.
+
+**Factura**
+- ⬜ 20. Si pidió factura o hay que hacerla: **emoji de color** que marque/agrupe la
+  factura y quede registrado.
+
+**Archivos**
+- ⬜ 21. **Archivos** cargados en la orden (plano de mueble a medida, factura, etc.)
+  visibles acá, pero **guardados en un lugar exclusivo de Contabilidad** (acceso
+  restringido).
+
+> Notas para cuando apliquemos:
+> - Imagen de TN: la variante ya tiene `tn_variant_id`; hay que mapear a la
+>   imagen del producto en Tienda Nube.
+> - "Lugar exclusivo de Contabilidad" para archivos = almacenamiento con acceso
+>   restringido (schema/rol Contabilidad-Tesorería), no público.
+> - El historial de comentarios por área se cruza con el motor de actividad ya
+>   existente (eventos de la orden).
+
 ## Aplicados
 
 _(nada todavía)_
