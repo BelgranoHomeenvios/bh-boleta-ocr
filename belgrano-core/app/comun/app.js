@@ -116,7 +116,7 @@
       S('indicadores', 'Indicadores', skel('Indicadores')),
     ]},
 
-    config: { label: 'Configuración', icon: '⚙️', subs: [
+    config: { label: 'Configuración', short: 'Config', icon: '⚙️', subs: [
       S('resumen', 'Resumen', resumen('config')),
       S('usuarios', 'Usuarios', skel('Usuarios')),
       S('roles', 'Roles y permisos', skel('Roles y permisos')),
@@ -176,7 +176,7 @@
       const tabs = ROLES[rol].tabs;
       const nav = document.getElementById('nav');
       nav.innerHTML = tabs.map(t =>
-        `<button class="modpill" data-tab="${t}">${UI.esc(MODULOS[t].label)}</button>`).join('');
+        `<button class="modpill" data-tab="${t}">${UI.esc(MODULOS[t].short || MODULOS[t].label)}</button>`).join('');
       nav.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => this.setTab(b.dataset.tab));
       this.setTab(tabs.includes(this.tab) ? this.tab : tabs[0]);
     },

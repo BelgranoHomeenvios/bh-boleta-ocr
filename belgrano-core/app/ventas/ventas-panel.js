@@ -107,10 +107,10 @@
         <thead><tr><th>N°</th><th>Fecha</th><th>Cliente</th><th>Vendedor</th><th>Pago</th>
           <th style="text-align:center">Muebles</th><th style="text-align:right">Total</th><th>Estado</th></tr></thead>
         <tbody>${bs.map(o => `<tr style="cursor:pointer" data-b="${o.id}">
-          <td><b>${UI.esc(o.numero)}</b></td><td class="muted">${UI.esc(o.fecha)}</td>
-          <td>${UI.esc(o.cliente)}</td><td><span class="pill soft">${UI.esc(o.vendedor)}</span></td>
-          <td class="muted">${UI.esc(o.pago)}</td><td style="text-align:center" class="tnum">${o.items}</td>
-          <td style="text-align:right" class="tnum"><b>${UI.pesos(o.total)}</b></td>
+          <td><b style="color:var(--brand)">${UI.esc(o.numero)}</b></td><td class="muted">${UI.esc(o.fecha)}</td>
+          <td style="font-weight:600">${UI.esc(o.cliente)}</td><td><span class="pill soft">${UI.esc(o.vendedor)}</span></td>
+          <td class="muted">${UI.esc(o.pago)}</td><td style="text-align:center" class="tnum">🪑 ${o.items}</td>
+          <td style="text-align:right" class="tnum"><b style="color:var(--navy)">${UI.pesos(o.total)}</b></td>
           <td>${UI.estado(global.DB.ESTADO_ORDEN, o.estado)}</td></tr>`).join('')}</tbody></table></div>`
         : UI.vacio('No hay boletas para ese filtro.');
       cont.querySelectorAll('[data-b]').forEach(tr => tr.onclick = () =>
