@@ -141,8 +141,74 @@
     return { o, ctx };
   }
 
+  // Motivo legible por condición faltante (para la cola "A confirmar").
+  const MOTIVO = {
+    sena_fabricacion: 'Esperando seña para fabricar',
+    precio: 'Esperando autorización de precio',
+    obs: 'Esperando verificación de observaciones',
+    medida: 'Falta confirmar la medida',
+    destino: 'Falta definir el destino',
+    mods: 'Modificación pendiente',
+  };
+
+  // Deriva los "pendientes" de una orden: qué falta, quién resuelve, qué acciones.
+  function pendientesDe(o) {
+    const items = [];
+    if (o.estadoComercial === 'a_confirmar' || o.estadoComercial === 'borrador') {
+      const falta = evalChecks(COND_ORDEN, o, null, 'orden', 'ui', o).filter(c => !c.ok);
+      if (falta.length) items.push({
+        nivel: 'orden', ordenId: o.id, cliente: o.cliente, desde: o._desde,
+        motivo: 'Orden a confirmar: ' + falta.map(c => c.label).join(', '),
+        responsable: falta[0].resp, acciones: ['ver_detalle'], o,
+      });
+    }
+    for (const l of o.lineas) {
+      if (l.habilitacion === 'bloqueada' && l.bloqueos.length) {
+        const b = l.bloqueos.find(x => x.acciones) || l.bloqueos[0];
+        const acciones = b.acciones ? b.acciones.slice()
+          : b.clave === 'precio' ? ['autorizar_precio']
+          : b.clave === 'obs' ? ['verificar_obs'] : ['ver_detalle'];
+        items.push({
+          nivel: 'linea', ordenId: o.id, cliente: o.cliente, producto: l.producto, lineaId: l.id,
+          desde: o._desde, motivo: b.motivo || MOTIVO[b.clave] || b.clave,
+          responsable: b.resp, acciones, o,
+        });
+      }
+    }
+    return items;
+  }
+
+  function mk(id, desde, extra, lineas) {
+    const o = mkOrden({ id, total: extra.total || 800000, termino: 'efectivo', vendedor: extra.vendedor || 'Ale', local: '2020',
+      cotizacionAceptada: extra.aceptada !== false, cliente: extra.cliente, lineas, _desde: desde });
+    const ctx = nuevoCtx();
+    if (extra.cobro) registrarCobro(o, { monto: extra.cobro, estado: 'validado' }, ctx); else evaluar(o, ctx, 'init');
+    return { o, ctx };
+  }
+
+  // Cola demo: varias órdenes en distintos estados de pendiente.
+  function colaDemo() {
+    return [
+      // Placard a medida esperando autorización de precio
+      mk('OV-2020-2048', 'hace 2 días', { total: 1200000, cobro: 360000, cliente: { nombre: 'Laura Pérez', tel: '11 5555-2048', ig: '@lau.perez', dir: 'Av. Cabildo 2450' } }, [
+        mkLinea({ id: 'L1', tipo: 'estándar', producto: 'Cómoda Amberes', destinoPreliminar: 'stock', estrategia: 'stock' }),
+        mkLinea({ id: 'L2', tipo: 'a fabricar', producto: 'Mesa Noruega', destinoPreliminar: 'fabrica', estrategia: 'fabricacion_interna' }),
+        mkLinea({ id: 'L3', tipo: 'a medida', producto: 'Placard Oliver a medida', destinoPreliminar: 'fabrica', estrategia: 'fabricacion_interna', requiereAutorizacion: true, precioAutorizado: false }),
+      ]),
+      // Vajillero a fabricar esperando seña
+      mk('OV-2020-2049', 'hace 1 día', { total: 700000, cobro: 0, vendedor: 'Cristian', cliente: { nombre: 'Juan López', tel: '11 5555-2049' } }, [
+        mkLinea({ id: 'L1', tipo: 'a fabricar', producto: 'Vajillero Nórdico', destinoPreliminar: 'fabrica', estrategia: 'fabricacion_interna' }),
+      ]),
+      // Orden a confirmar: falta aceptar la cotización
+      mk('OV-2020-2050', 'hace 3 horas', { total: 500000, cobro: 0, vendedor: 'Nati', aceptada: false, cliente: { nombre: 'Camila Ruiz', ig: '@cami.ruiz' } }, [
+        mkLinea({ id: 'L1', tipo: 'estándar', producto: 'Respaldo Milán', destinoPreliminar: 'stock', estrategia: 'stock' }),
+      ]),
+    ];
+  }
+
   global.Motor = {
-    COND_ORDEN, COND_LINEA, ETIQUETA_EFECTO, senaVal, saldo, pagosValidados, requiereFabricacion,
-    nuevoCtx, evaluar, evalChecks, registrarCobro, solicitarExcepcion, autorizarExcepcion, ordenDemo,
+    COND_ORDEN, COND_LINEA, ETIQUETA_EFECTO, MOTIVO, senaVal, saldo, pagosValidados, requiereFabricacion,
+    nuevoCtx, evaluar, evalChecks, registrarCobro, solicitarExcepcion, autorizarExcepcion,
+    ordenDemo, colaDemo, pendientesDe,
   };
 })(typeof window !== 'undefined' ? window : globalThis);
