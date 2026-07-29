@@ -62,14 +62,17 @@
       { id: 14, producto_id: 3, medida: '1.00', estructura: 'blanca', frente: null,      precio: 300000, atributos: { medida: '1.00', estructura: 'blanca' } },
     ],
     // Órdenes de venta de ejemplo (para ver la vista antes de conectar).
+    // saldo = total - sena. sena = suma de señas/cobros registrados hasta hoy.
+    // cobros: cada seña que se fue sumando (para el desglose). entrega: fecha
+    // comprometida (null = a definir). comentarios: notas internas de la boleta.
     ordenes: [
-      { id: 1, numero: 'S00021', fecha: '29/07', cliente: 'Laura Pérez',     vendedor: 'Ale',      local: '2020', pago: 'Efectivo',      items: 3, saldo: 840000, total: 1200000, estado: 'a_confirmar' },
-      { id: 2, numero: 'S00020', fecha: '29/07', cliente: 'Juan López',      vendedor: 'Cristian', local: '2299', pago: 'Transferencia', items: 1, saldo: 700000, total: 700000,  estado: 'fabricacion' },
-      { id: 3, numero: 'S00019', fecha: '28/07', cliente: 'Bibiana',         vendedor: 'Ale',      local: '2020', pago: 'Tarjeta',       items: 2, saldo: 0,      total: 516000,  estado: 'listo' },
-      { id: 4, numero: 'S00018', fecha: '28/07', cliente: 'Laura y Hernán',  vendedor: 'Cristian', local: '2299', pago: 'Mixto',         items: 4, saldo: 250000, total: 731250,  estado: 'logistica' },
-      { id: 5, numero: 'S00017', fecha: '27/07', cliente: 'Abigail Galfre',  vendedor: 'Brian',    local: '2020', pago: 'Efectivo',      items: 2, saldo: 0,      total: 968000,  estado: 'entregado' },
-      { id: 6, numero: 'S00016', fecha: '27/07', cliente: 'Diego',           vendedor: 'Sergio',   local: '2299', pago: 'Transferencia', items: 1, saldo: 733000, total: 733000,  estado: 'falta_tesoreria' },
-      { id: 7, numero: 'S00015', fecha: '26/07', cliente: 'Camila',          vendedor: 'Nati',     local: '2020', pago: 'Tarjeta',       items: 1, saldo: 0,      total: 425750,  estado: 'anulado' },
+      { id: 1, numero: 'S00021', fecha: '29/07', cliente: 'Laura Pérez',     vendedor: 'Ale',      local: '2020', pago: 'Efectivo',      items: 3, total: 1200000, sena: 360000, saldo: 840000, entrega: '15/08', estado: 'a_confirmar',     cobros: [{ f: '29/07', m: 360000, via: 'Efectivo' }],                                comentarios: ['Cliente pidió llamar antes de entregar'] },
+      { id: 2, numero: 'S00020', fecha: '29/07', cliente: 'Juan López',      vendedor: 'Cristian', local: '2299', pago: 'Transferencia', items: 1, total: 700000,  sena: 0,      saldo: 700000, entrega: null,    estado: 'fabricacion',     cobros: [],                                                                          comentarios: [] },
+      { id: 3, numero: 'S00019', fecha: '28/07', cliente: 'Bibiana',         vendedor: 'Ale',      local: '2020', pago: 'Tarjeta',       items: 2, total: 516000,  sena: 516000, saldo: 0,      entrega: '05/08', estado: 'listo',           cobros: [{ f: '28/07', m: 516000, via: 'Tarjeta' }],                                 comentarios: [] },
+      { id: 4, numero: 'S00018', fecha: '28/07', cliente: 'Laura y Hernán',  vendedor: 'Cristian', local: '2299', pago: 'Mixto',         items: 4, total: 731250,  sena: 481250, saldo: 250000, entrega: '02/08', estado: 'logistica',       cobros: [{ f: '20/07', m: 300000, via: 'Transferencia' }, { f: '28/07', m: 181250, via: 'Efectivo' }], comentarios: ['Entra por el fondo', 'Falta el saldo contra entrega'] },
+      { id: 5, numero: 'S00017', fecha: '27/07', cliente: 'Abigail Galfre',  vendedor: 'Brian',    local: '2020', pago: 'Efectivo',      items: 2, total: 968000,  sena: 968000, saldo: 0,      entrega: '26/07', estado: 'entregado',       cobros: [{ f: '27/07', m: 968000, via: 'Efectivo' }],                                comentarios: [] },
+      { id: 6, numero: 'S00016', fecha: '27/07', cliente: 'Diego',           vendedor: 'Sergio',   local: '2299', pago: 'Transferencia', items: 1, total: 733000,  sena: 0,      saldo: 733000, entrega: '10/08', estado: 'falta_tesoreria', cobros: [],                                                                          comentarios: ['Espera firma de Tesorería'] },
+      { id: 7, numero: 'S00015', fecha: '26/07', cliente: 'Camila',          vendedor: 'Nati',     local: '2020', pago: 'Tarjeta',       items: 1, total: 425750,  sena: 0,      saldo: 0,      entrega: null,    estado: 'anulado',         cobros: [],                                                                          comentarios: ['Anulada: el cliente se arrepintió'] },
     ],
     // Cotizaciones de ejemplo.
     cotizaciones: [
