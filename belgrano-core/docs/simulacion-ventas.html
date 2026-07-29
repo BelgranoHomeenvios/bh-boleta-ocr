@@ -1,0 +1,113 @@
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ventas · Simulación del motor</title>
+<style>
+  :root{--bg:#0d111b;--panel:#151b2a;--ink:#eaeef7;--muted:#7f8cab;--line:#26304a;--brand:#5b8dff;--ok:#43c98d;--warn:#e0a53c;--crit:#f0736f}
+  *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,system-ui,sans-serif}
+  .wrap{max-width:860px;margin:0 auto;padding:34px 20px 80px}
+  h1{font-size:24px;letter-spacing:-.02em;margin:0 0 4px}
+  .sub{color:var(--muted);margin-bottom:20px;font-size:14px}
+  pre{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;overflow-x:auto;
+    font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.65;white-space:pre-wrap}
+  .b{color:var(--brand);font-weight:700}.g{color:var(--ok)}.y{color:var(--warn)}.r{color:var(--crit)}.m{color:var(--muted)}
+</style></head><body>
+<div class="wrap">
+  <h1>Motor de Ventas · Simulación</h1>
+  <div class="sub">Corre los 3 casos: orden completamente liberada · confirmada parcial · condición revocada con trabajo ya generado. Es el mismo motor del prototipo — sin instalar nada.</div>
+  <pre id="out">corriendo…</pre>
+</div>
+<script>
+const LOG=[]; function linea(t=''){ LOG.push(t); }
+
+const COND_ORDEN=[
+ {clave:'cliente',resp:'Vendedor',check:o=>!!(o.cliente?.tel||o.cliente?.ig||o.cliente?.mail)},
+ {clave:'vend_local',resp:'Vendedor',check:o=>!!o.vendedor&&!!o.local},
+ {clave:'pago',resp:'Vendedor',check:o=>!!o.termino},
+ {clave:'sena',resp:'Tesorería',check:o=>senaOk(o)},
+ {clave:'aceptada',resp:'Vendedor',check:o=>o.cotizacionAceptada&&o.version!=null},
+ {clave:'lineas_valid',resp:'Vendedor',check:o=>o.lineas.length>0&&o.lineas.every(l=>l.producto&&l.destinoPreliminar)},
+];
+const COND_LINEA=[
+ {clave:'producto',resp:'Vendedor',check:l=>!!l.producto},
+ {clave:'medida',resp:'Vendedor',check:l=>!l.requiereMedida||l.medidaConfirmada},
+ {clave:'precio',resp:'Administración',check:l=>!l.requiereAutorizacion||l.precioAutorizado},
+ {clave:'obs',resp:'Administración',check:l=>!l.tieneObs||l.obsVerificada},
+ {clave:'destino',resp:'Ventas',check:l=>!!l.estrategia},
+ {clave:'mods',resp:'Administración',check:l=>!l.modPendiente},
+];
+function senaOk(o){ if(o.excepcionSena)return true;
+ const p=o.cobros.filter(c=>c.estado==='validado').reduce((a,c)=>a+c.monto,0); return p>=o.total*0.30; }
+
+function nuevoCtx(){ const eventos=[],registry=new Map();
+ return{eventos,registry,emit(t,p={}){eventos.push({tipo:t,...p});}}; }
+
+function evaluar(o,ctx){
+ const rO=COND_ORDEN.map(c=>({clave:c.clave,ok:c.check(o)}));
+ const ordenOk=rO.every(c=>c.ok), term=['cerrada','cancelada'].includes(o.estadoComercial);
+ if(ordenOk&&!term&&o.estadoComercial!=='confirmada'){o.estadoComercial='confirmada';ctx.emit('orden.confirmada',{orden:o.id});}
+ else if(!ordenOk&&o.estadoComercial==='borrador')o.estadoComercial='a_confirmar';
+ for(const l of o.lineas){
+  if(l.estadoOperativo==='entregada')continue;
+  if(l.bloqueos.some(b=>b.motivo==='reversion'))continue;
+  const rL=COND_LINEA.map(c=>({clave:c.clave,resp:c.resp,ok:c.check(l)}));
+  const lineaOk=rL.every(c=>c.ok);
+  if(o.estadoComercial==='confirmada'&&lineaOk){
+   if(l.estadoOperativo==='pendiente'||l.estadoOperativo==='bloqueada'){
+    l.estadoOperativo='liberada';l.bloqueos=[];ctx.emit('linea.liberada',{linea:l.id});crearObj(o,l,ctx);}
+  }else if(l.estadoOperativo!=='liberada'){
+   l.estadoOperativo='bloqueada';
+   l.bloqueos=rL.filter(c=>!c.ok).map(c=>({alcance:'liberacion',clave:c.clave,resp:c.resp}));}
+ }
+}
+function crearObj(o,l,ctx){ const k=l.id+'@v'+o.version; if(ctx.registry.has(k))return;
+ const tipo={stock:'reserva_inventario',fabricacion_interna:'orden_produccion',fabricacion_tercerizada:'orden_produccion_terc',compra:'necesidad_compra',mixta:'mixto'}[l.estrategia]||'pendiente_decision';
+ l.objetoOperativo={tipo};ctx.registry.set(k,l.objetoOperativo);ctx.emit(tipo,{linea:l.id,estrategia:l.estrategia}); }
+function registrarCobro(o,c,ctx){ o.cobros.push(c);ctx.emit('cobro.registrado',{monto:c.monto,estado:c.estado});evaluar(o,ctx); }
+function anularPago(o,ctx){ o.cobros.forEach(c=>c.estado='anulado');ctx.emit('pago.anulado',{});
+ const t=o.lineas.filter(l=>l.objetoOperativo);
+ if(t.length){ctx.emit('impacto.detectado',{lineas:t.map(l=>l.id)});
+  t.forEach(l=>l.bloqueos.push({alcance:'orden',motivo:'reversion',clave:'sena',resp:'Dirección'}));
+  ctx.emit('accion.requerida',{tipo:'cancelacion_o_modificacion'});}
+ else evaluar(o,ctx); }
+
+function trace(ctx){ ctx.eventos.forEach(e=>{const{tipo,...r}=e;linea('    • '+tipo+'  '+JSON.stringify(r));}); }
+function estado(o){ linea('    Orden '+o.id+': '+o.estadoComercial.toUpperCase());
+ o.lineas.forEach(l=>linea('      ├─ '+l.id+' ('+l.tipo+'): '+l.estadoOperativo+
+  (l.objetoOperativo?' → '+l.objetoOperativo.tipo:'')+
+  (l.bloqueos.length?'  ⛔ '+l.bloqueos.map(b=>b.clave+'/'+b.alcance).join(', '):''))); }
+
+// ---- CASO 1 ----
+linea('══════ CASO 1 · Orden completamente liberada ══════');
+{ const o={id:'OV-2020-0040',estadoComercial:'borrador',version:1,total:1000000,cliente:{tel:'1155550001'},vendedor:'Ale',local:'2020',termino:'efectivo',cotizacionAceptada:true,cobros:[],lineas:[
+   {id:'L1',tipo:'estándar',producto:'Cómoda Amberes',destinoPreliminar:'stock',estrategia:'stock',estadoOperativo:'pendiente',bloqueos:[],objetoOperativo:null},
+   {id:'L2',tipo:'a fabricar',producto:'Placard Oliver',destinoPreliminar:'fabrica',estrategia:'fabricacion_interna',requiereMedida:true,medidaConfirmada:true,estadoOperativo:'pendiente',bloqueos:[],objetoOperativo:null}]};
+  const ctx=nuevoCtx(); registrarCobro(o,{monto:300000,estado:'validado'},ctx);
+  linea('  Eventos:');trace(ctx);linea('  Estado final:');estado(o);
+  const a=ctx.registry.size; evaluar(o,ctx);evaluar(o,ctx);
+  linea('  Idempotencia: '+a+' objetos, tras 2 reevaluaciones = '+ctx.registry.size+'  '+(a===ctx.registry.size?'✓':'✗')); }
+
+// ---- CASO 2 ----
+linea('\n══════ CASO 2 · Confirmada, parcialmente liberada ══════');
+{ const o={id:'OV-2020-0041',estadoComercial:'borrador',version:1,total:1500000,cliente:{ig:'@laura'},vendedor:'Cristian',local:'2299',termino:'efectivo',cotizacionAceptada:true,cobros:[],lineas:[
+   {id:'L1',tipo:'estándar',producto:'Cómoda Amberes',destinoPreliminar:'stock',estrategia:'stock',estadoOperativo:'pendiente',bloqueos:[],objetoOperativo:null},
+   {id:'L2',tipo:'a fabricar',producto:'Placard Oliver',destinoPreliminar:'fabrica',estrategia:'fabricacion_interna',estadoOperativo:'pendiente',bloqueos:[],objetoOperativo:null},
+   {id:'L3',tipo:'a medida',producto:'Mesa a medida',destinoPreliminar:'fabrica',estrategia:'fabricacion_interna',requiereAutorizacion:true,precioAutorizado:false,tieneObs:true,obsVerificada:false,estadoOperativo:'pendiente',bloqueos:[],objetoOperativo:null}]};
+  const ctx=nuevoCtx(); registrarCobro(o,{monto:450000,estado:'validado'},ctx);
+  linea('  Tras la seña:');estado(o);
+  linea('  → L3 BLOQUEADA (falta autorización). La orden igual quedó CONFIRMADA.');
+  const L3=o.lineas.find(l=>l.id==='L3');L3.precioAutorizado=true;L3.obsVerificada=true;
+  ctx.emit('autorizacion.aprobada',{linea:'L3',resp:'Administración'});evaluar(o,ctx);
+  linea('  Tras autorizar L3:');estado(o);linea('  Eventos:');trace(ctx); }
+
+// ---- CASO 3 ----
+linea('\n══════ CASO 3 · Seña revocada con trabajo ya generado ══════');
+{ const o={id:'OV-2020-0042',estadoComercial:'borrador',version:1,total:800000,cliente:{tel:'1155559999'},vendedor:'Sergio',local:'2020',termino:'transferencia',cotizacionAceptada:true,cobros:[],lineas:[
+   {id:'L1',tipo:'a fabricar',producto:'Vajillero Nórdico',destinoPreliminar:'fabrica',estrategia:'fabricacion_interna',estadoOperativo:'pendiente',bloqueos:[],objetoOperativo:null}]};
+  const ctx=nuevoCtx(); registrarCobro(o,{monto:240000,estado:'validado'},ctx);
+  linea('  Tras la seña (línea liberada, orden de producción creada):');estado(o);
+  anularPago(o,ctx);
+  linea('  Tras anular el pago:');estado(o);linea('  Eventos:');trace(ctx);
+  linea('  → El motor NO desibera en silencio: detecta impacto, bloquea (alcance orden) y exige acción controlada.'); }
+
+document.getElementById('out').textContent = LOG.join('\n');
+</script></body></html>
