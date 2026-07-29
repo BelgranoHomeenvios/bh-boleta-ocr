@@ -149,41 +149,22 @@
 
     montarShell() {
       document.body.innerHTML = `
-        <div class="lay">
-          <aside class="side" id="side">
-            <div class="brandbox"><span class="logo">B</span><div><b>Belgrano Soft</b><span class="m">· demo</span></div></div>
-            <nav id="nav"></nav>
-            <div class="grow"></div>
-            <div class="sect">Atajos</div>
-            <nav style="padding:0 10px 14px">
-              <button class="navi" data-atajo="orden"><span class="ic">＋</span>Nueva orden<span class="kbd">N</span></button>
-              <button class="navi" data-atajo="cliente"><span class="ic">＋</span>Nuevo cliente<span class="kbd">C</span></button>
-              <button class="navi" data-atajo="cobro"><span class="ic">＄</span>Cobro rápido<span class="kbd">R</span></button>
-            </nav>
-          </aside>
-          <div class="main">
-            <div class="tbar">
-              <button class="ham" id="ham">☰</button>
-              <div class="search"><span class="mag">🔍</span><input placeholder="Buscar órdenes, clientes, productos…"><span class="kbd">⌘K</span></div>
-              <div class="sp"></div>
-              <div class="verComo"><span class="muted">Ver como</span><select id="selRol"></select></div>
-              <button class="ic-btn" title="Notificaciones">🔔<span class="dot">8</span></button>
-              <div class="avatar" title="Brian · Dirección">BJ</div>
-            </div>
-            <main id="view"></main>
-          </div>
-        </div>`;
+        <header class="appbar">
+          <div class="logo">BS</div>
+          <div class="brand">Belgrano Soft</div>
+          <nav class="mods" id="nav"></nav>
+          <div class="sp"></div>
+          <div class="vercomo"><span>Ver como</span><select id="selRol"></select></div>
+          <button class="ic-btn" title="Notificaciones">🔔<span class="dot">8</span></button>
+          <div class="user"><b>Brian</b><small id="rol-lbl"></small></div>
+          <div class="avatar">BJ</div>
+        </header>
+        <div class="subbar" id="subbar"></div>
+        <main id="view"></main>`;
 
       const sel = document.getElementById('selRol');
       sel.innerHTML = Object.entries(ROLES).map(([k, r]) => `<option value="${k}">${UI.esc(r.label)}</option>`).join('');
       sel.onchange = () => this.setRol(sel.value);
-      document.getElementById('ham').onclick = () => document.body.classList.toggle('sideopen');
-      document.querySelectorAll('[data-atajo]').forEach(b => b.onclick = () => {
-        const a = b.dataset.atajo;
-        if (a === 'orden') this.goSub('ventas', 'nueva');
-        else if (a === 'cliente') this.goSub('crm', 'clientes');
-        else if (a === 'cobro') this.goSub('tesoreria', 'cobros');
-      });
     },
 
     setRol(rol) {
@@ -191,10 +172,11 @@
       this.rol = rol;
       localStorage.setItem('bh_rol', rol);
       document.getElementById('selRol').value = rol;
+      const rl = document.getElementById('rol-lbl'); if (rl) rl.textContent = ROLES[rol].label;
       const tabs = ROLES[rol].tabs;
       const nav = document.getElementById('nav');
       nav.innerHTML = tabs.map(t =>
-        `<button class="navi" data-tab="${t}"><span class="ic">${MODULOS[t].icon}</span>${UI.esc(MODULOS[t].label)}</button>`).join('');
+        `<button class="modpill" data-tab="${t}">${UI.esc(MODULOS[t].label)}</button>`).join('');
       nav.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => this.setTab(b.dataset.tab));
       this.setTab(tabs.includes(this.tab) ? this.tab : tabs[0]);
     },
@@ -202,18 +184,21 @@
     setTab(key) {
       this.tab = key;
       document.querySelectorAll('#nav [data-tab]').forEach(b => b.setAttribute('aria-current', b.dataset.tab === key));
-      document.body.classList.remove('sideopen');
       const mod = MODULOS[key];
       const view = document.getElementById('view');
-      if (!mod) { view.innerHTML = UI.vacio('Módulo no encontrado.'); return; }
-      if (mod.home || !mod.subs) { view.innerHTML = '<div id="mview"></div>'; mod.r('mview'); return; }
+      const subbar = document.getElementById('subbar');
+      if (!mod) { subbar.innerHTML = ''; view.innerHTML = UI.vacio('Módulo no encontrado.'); return; }
 
+      if (mod.home || !mod.subs) {
+        subbar.innerHTML = '';
+        view.innerHTML = '<div id="mview"></div>';
+        mod.r('mview');
+        return;
+      }
       const cur = this._sub[key] || mod.subs[0].k;
-      view.innerHTML = `<div class="modlay">
-        <aside class="subside"><div class="subttl">${UI.esc(mod.label)}</div>
-          ${mod.subs.map(s => `<button class="subnavi" data-sub="${s.k}">${UI.esc(s.label)}</button>`).join('')}
-        </aside><div class="modbody" id="mview"></div></div>`;
-      view.querySelectorAll('[data-sub]').forEach(b => b.onclick = () => this.goSub(key, b.dataset.sub));
+      subbar.innerHTML = mod.subs.map(s => `<button class="subtab" data-sub="${s.k}">${UI.esc(s.label)}</button>`).join('');
+      subbar.querySelectorAll('[data-sub]').forEach(b => b.onclick = () => this.goSub(key, b.dataset.sub));
+      view.innerHTML = '<div id="mview"></div>';
       this._renderSub(key, cur);
     },
 
@@ -221,7 +206,7 @@
       const mod = MODULOS[key];
       const s = mod.subs.find(x => x.k === subK) || mod.subs[0];
       this._sub[key] = s.k;
-      document.querySelectorAll('#view [data-sub]').forEach(b => b.setAttribute('aria-current', b.dataset.sub === s.k));
+      document.querySelectorAll('#subbar [data-sub]').forEach(b => b.setAttribute('aria-current', b.dataset.sub === s.k));
       const mv = document.getElementById('mview');
       if (mv) mv.innerHTML = '';
       s.r('mview');
