@@ -62,17 +62,28 @@
       { id: 14, producto_id: 3, medida: '1.00', estructura: 'blanca', frente: null,      precio: 300000, atributos: { medida: '1.00', estructura: 'blanca' } },
     ],
     // Órdenes de venta de ejemplo (para ver la vista antes de conectar).
-    // saldo = total - sena. sena = suma de señas/cobros registrados hasta hoy.
-    // cobros: cada seña que se fue sumando (para el desglose). entrega: fecha
-    // comprometida (null = a definir). comentarios: notas internas de la boleta.
+    // saldo = total - sena. sena = suma de señas/cobros CONFIRMADOS hasta hoy.
+    // situacion = estado operativo semántico (ver SITUACION_ORDEN).
+    // cobros[]: cada seña con su método y estado de verificación:
+    //   metodo 'efectivo'  → estado 'rendido'  (basta con rendirlo a un autorizado).
+    //   metodo 'transferencia' → 'pendiente_banco' hasta que Administración/Dirección
+    //     lo acredita en el banco (cuit + comprobante + monto) → 'confirmado'.
     ordenes: [
-      { id: 1, numero: 'S00021', fecha: '29/07', cliente: 'Laura Pérez',     vendedor: 'Ale',      local: '2020', pago: 'Efectivo',      items: 3, total: 1200000, sena: 360000, saldo: 840000, entrega: '15/08', estado: 'a_confirmar',     cobros: [{ f: '29/07', m: 360000, via: 'Efectivo' }],                                comentarios: ['Cliente pidió llamar antes de entregar'] },
-      { id: 2, numero: 'S00020', fecha: '29/07', cliente: 'Juan López',      vendedor: 'Cristian', local: '2299', pago: 'Transferencia', items: 1, total: 700000,  sena: 0,      saldo: 700000, entrega: null,    estado: 'fabricacion',     cobros: [],                                                                          comentarios: [] },
-      { id: 3, numero: 'S00019', fecha: '28/07', cliente: 'Bibiana',         vendedor: 'Ale',      local: '2020', pago: 'Tarjeta',       items: 2, total: 516000,  sena: 516000, saldo: 0,      entrega: '05/08', estado: 'listo',           cobros: [{ f: '28/07', m: 516000, via: 'Tarjeta' }],                                 comentarios: [] },
-      { id: 4, numero: 'S00018', fecha: '28/07', cliente: 'Laura y Hernán',  vendedor: 'Cristian', local: '2299', pago: 'Mixto',         items: 4, total: 731250,  sena: 481250, saldo: 250000, entrega: '02/08', estado: 'logistica',       cobros: [{ f: '20/07', m: 300000, via: 'Transferencia' }, { f: '28/07', m: 181250, via: 'Efectivo' }], comentarios: ['Entra por el fondo', 'Falta el saldo contra entrega'] },
-      { id: 5, numero: 'S00017', fecha: '27/07', cliente: 'Abigail Galfre',  vendedor: 'Brian',    local: '2020', pago: 'Efectivo',      items: 2, total: 968000,  sena: 968000, saldo: 0,      entrega: '26/07', estado: 'entregado',       cobros: [{ f: '27/07', m: 968000, via: 'Efectivo' }],                                comentarios: [] },
-      { id: 6, numero: 'S00016', fecha: '27/07', cliente: 'Diego',           vendedor: 'Sergio',   local: '2299', pago: 'Transferencia', items: 1, total: 733000,  sena: 0,      saldo: 733000, entrega: '10/08', estado: 'falta_tesoreria', cobros: [],                                                                          comentarios: ['Espera firma de Tesorería'] },
-      { id: 7, numero: 'S00015', fecha: '26/07', cliente: 'Camila',          vendedor: 'Nati',     local: '2020', pago: 'Tarjeta',       items: 1, total: 425750,  sena: 0,      saldo: 0,      entrega: null,    estado: 'anulado',         cobros: [],                                                                          comentarios: ['Anulada: el cliente se arrepintió'] },
+      { id: 1, numero: 'S00021', fecha: '29/07', cliente: 'Laura Pérez',    vendedor: 'Ale',      local: '2020', pago: 'Efectivo',      items: 3, total: 1200000, sena: 360000, saldo: 840000, entrega: '15/08', estado: 'a_confirmar',     situacion: 'a_confirmar', comentarios: ['Cliente pidió llamar antes de entregar'],
+        cobros: [{ id: 'c1', f: '29/07', m: 360000, metodo: 'efectivo', recibidoPor: 'Caja Belgrano 2020', estado: 'rendido' }] },
+      { id: 2, numero: 'S00020', fecha: '29/07', cliente: 'Juan López',     vendedor: 'Cristian', local: '2299', pago: 'Transferencia', items: 1, total: 700000,  sena: 0,      saldo: 700000, entrega: null,    estado: 'fabricacion',     situacion: 'con_frenos',  comentarios: ['Cliente dice que transfirió — sin acreditar en el banco'],
+        cobros: [{ id: 'c2', f: '29/07', m: 700000, metodo: 'transferencia', recibidoPor: 'Cuenta Cristian', depositante: 'Juan López', referencia: 'Mercado Pago', estado: 'pendiente_banco' }] },
+      { id: 3, numero: 'S00019', fecha: '28/07', cliente: 'Bibiana',        vendedor: 'Ale',      local: '2020', pago: 'Tarjeta',       items: 2, total: 516000,  sena: 516000, saldo: 0,      entrega: '05/08', estado: 'listo',           situacion: 'lista',       comentarios: [],
+        cobros: [{ id: 'c3', f: '28/07', m: 516000, metodo: 'efectivo', recibidoPor: 'Caja Belgrano 2020', estado: 'rendido' }] },
+      { id: 4, numero: 'S00018', fecha: '28/07', cliente: 'Laura y Hernán', vendedor: 'Cristian', local: '2299', pago: 'Mixto',         items: 4, total: 731250,  sena: 481250, saldo: 250000, entrega: '02/08', estado: 'logistica',       situacion: 'en_logistica', comentarios: ['Entra por el fondo', 'Falta el saldo contra entrega'],
+        cobros: [
+          { id: 'c4', f: '20/07', m: 300000, metodo: 'transferencia', recibidoPor: 'Cuenta Cristian', depositante: 'Hernán Suárez', cuit: '20-30111222-3', comprobante: 'BROU-884512', montoConfirmado: 300000, confirmadoPor: 'Administración', estado: 'confirmado' },
+          { id: 'c5', f: '28/07', m: 181250, metodo: 'efectivo', recibidoPor: 'Caja Verano 2299', estado: 'rendido' }] },
+      { id: 5, numero: 'S00017', fecha: '27/07', cliente: 'Abigail Galfre', vendedor: 'Brian',    local: '2020', pago: 'Efectivo',      items: 2, total: 968000,  sena: 968000, saldo: 0,      entrega: '26/07', estado: 'entregado',       situacion: 'entregada',   comentarios: [],
+        cobros: [{ id: 'c6', f: '27/07', m: 968000, metodo: 'efectivo', recibidoPor: 'Dirección', estado: 'rendido' }] },
+      { id: 6, numero: 'S00016', fecha: '27/07', cliente: 'Diego',          vendedor: 'Sergio',   local: '2299', pago: 'Transferencia', items: 1, total: 733000,  sena: 0,      saldo: 733000, entrega: '10/08', estado: 'falta_tesoreria', situacion: 'impacto',     comentarios: ['El cliente mandó 2 comprobantes por el mismo pago'],
+        cobros: [{ id: 'c7', f: '27/07', m: 733000, metodo: 'transferencia', recibidoPor: 'Cuenta Sergio', depositante: 'Diego Fernández', referencia: 'Transferencia inmediata', estado: 'pendiente_banco' }] },
+      { id: 7, numero: 'S00015', fecha: '26/07', cliente: 'Camila',         vendedor: 'Nati',     local: '2020', pago: 'Tarjeta',       items: 1, total: 425750,  sena: 0,      saldo: 0,      entrega: null,    estado: 'anulado',         situacion: 'anulada',     comentarios: ['Anulada: el cliente se arrepintió'], cobros: [] },
     ],
     // Cotizaciones de ejemplo.
     cotizaciones: [
@@ -117,6 +128,39 @@
     aceptada:  { label: 'Aceptada',  pill: 'ok' },
     rechazada: { label: 'Rechazada', pill: 'crit' },
     vencida:   { label: 'Vencida',   pill: 'warn' },
+  };
+
+  // Situación operativa de la orden: estado semántico que resume "qué le pasa"
+  // a la orden hoy, con un ícono de alarma y a qué balde de trabajo cae.
+  // bucket → tarjetas de arriba en Órdenes de venta.
+  const SITUACION_ORDEN = {
+    a_confirmar:  { label: 'A confirmar',                    pill: 'warn', icon: '🧾', dot: 'warn', bucket: 'a_confirmar', activa: true },
+    impacto:      { label: 'Impacto detectado',              pill: 'crit', icon: '🚨', dot: 'crit', bucket: 'decision',    activa: true },
+    con_frenos:   { label: 'Confirmada, con líneas frenadas', pill: 'info', icon: '⏳', dot: 'warn', bucket: 'frenadas',   activa: true },
+    en_marcha:    { label: 'Confirmada y en marcha',         pill: 'ok',   icon: '✅', dot: 'ok',   bucket: 'en_marcha',   activa: true },
+    lista:        { label: 'Lista para entregar',            pill: 'ok',   icon: '📦', dot: 'ok',   bucket: 'en_marcha',   activa: true },
+    en_logistica: { label: 'En logística',                   pill: 'info', icon: '🚚', dot: 'info', bucket: 'en_marcha',   activa: true },
+    entregada:    { label: 'Entregada',                      pill: 'ok',   icon: '✅', dot: 'ok',   bucket: 'cerradas',    activa: false },
+    anulada:      { label: 'Anulada',                        pill: 'soft', icon: '🚫', dot: 'soft', bucket: 'cerradas',    activa: false },
+  };
+  // Baldes de las tarjetas superiores (en orden de aparición).
+  const BUCKETS_ORDEN = [
+    { k: '',           label: 'Todas las órdenes',       dot: 'info', hint: 'activas' },
+    { k: 'decision',   label: 'Necesitan tu decisión',   dot: 'crit' },
+    { k: 'frenadas',   label: 'Frenadas esperando a alguien', dot: 'warn' },
+    { k: 'a_confirmar', label: 'A confirmar',            dot: 'warn' },
+    { k: 'en_marcha',  label: 'En marcha',               dot: 'ok' },
+  ];
+
+  // Quién está autorizado a recibir plata (rendición de efectivo / cuentas).
+  const AUTORIZADOS_COBRO = ['Caja Belgrano 2020', 'Caja Verano 2299', 'Administración', 'Dirección',
+    'Cuenta Ale', 'Cuenta Cristian', 'Cuenta Sergio', 'Cuenta Nati'];
+
+  // Estado de verificación de un cobro → etiqueta/ícono para el "tilde" de seña.
+  const ESTADO_COBRO = {
+    rendido:         { label: 'Rendido',              pill: 'ok',   icon: '✔' },
+    pendiente_banco: { label: 'Sin acreditar (banco)', pill: 'warn', icon: '⏳' },
+    confirmado:      { label: 'Acreditado en banco',  pill: 'ok',   icon: '✅' },
   };
 
   // Serie de órdenes creadas en la sesión (demo). Arranca donde termina la muestra.
@@ -175,7 +219,60 @@
     },
 
     // ---- Ventas: órdenes, cotizaciones, clientes (demo por ahora) --------
-    ESTADO_ORDEN, ESTADO_COTIZ,
+    ESTADO_ORDEN, ESTADO_COTIZ, SITUACION_ORDEN, BUCKETS_ORDEN, ESTADO_COBRO,
+    autorizadosCobro() { return AUTORIZADOS_COBRO.slice(); },
+
+    // Órdenes de venta con situación operativa + conteo por balde (tarjetas).
+    async ordenesVenta({ texto = '', bucket = '' } = {}) {
+      const t = sinTilde(texto);
+      const activas = DEMO.ordenes.filter(o => (SITUACION_ORDEN[o.situacion] || {}).activa);
+      const conteos = { '': activas.length };
+      BUCKETS_ORDEN.forEach(b => { if (b.k) conteos[b.k] = activas.filter(o => (SITUACION_ORDEN[o.situacion] || {}).bucket === b.k).length; });
+      const filas = activas.filter(o =>
+        (!t || sinTilde(o.cliente).includes(t) || sinTilde(o.numero).includes(t)) &&
+        (!bucket || (SITUACION_ORDEN[o.situacion] || {}).bucket === bucket));
+      return { conteos, filas };
+    },
+    _orden(id) { return DEMO.ordenes.find(o => String(o.id) === String(id)); },
+
+    // Recalcula seña/saldo de una orden: SOLO cuenta lo cobrado de verdad
+    // (efectivo rendido + transferencia acreditada en banco).
+    _recalc(o) {
+      o.sena = (o.cobros || []).filter(c => c.estado === 'rendido' || c.estado === 'confirmado')
+        .reduce((a, c) => a + (c.metodo === 'transferencia' ? (c.montoConfirmado ?? c.m) : c.m), 0);
+      o.saldo = Math.max(0, (o.total || 0) - o.sena);
+      return o;
+    },
+    // Registra una seña. Efectivo → rendido (cobrado). Transferencia →
+    // pendiente_banco hasta que se acredite. Devuelve el cobro creado.
+    registrarSena(ordenId, { metodo, monto, recibidoPor, depositante = '', referencia = '', fecha = 'hoy' }) {
+      const o = this._orden(ordenId); if (!o) throw new Error('Orden no encontrada');
+      const c = { id: 'c' + Date.now().toString(36), f: fecha, m: Math.round(Number(monto) || 0), metodo, recibidoPor };
+      if (metodo === 'transferencia') { c.depositante = depositante; c.referencia = referencia; c.estado = 'pendiente_banco'; }
+      else { c.estado = 'rendido'; }
+      (o.cobros = o.cobros || []).push(c);
+      this._recalc(o);
+      return c;
+    },
+    // ¿Ya existe ese Nº de comprobante en cualquier orden? (evita duplicar pagos).
+    comprobanteExiste(nro, exceptId) {
+      const n = String(nro || '').trim().toLowerCase(); if (!n) return false;
+      return DEMO.ordenes.some(o => (o.cobros || []).some(c => c.id !== exceptId && String(c.comprobante || '').trim().toLowerCase() === n));
+    },
+    // Confirmación bancaria (Administración/Dirección): vincula el pago al banco
+    // con CUIT + Nº de comprobante + monto acreditado. Rechaza comprobante repetido.
+    confirmarSenaBanco(ordenId, cobroId, { cuit, comprobante, montoConfirmado, confirmadoPor }) {
+      const o = this._orden(ordenId); if (!o) throw new Error('Orden no encontrada');
+      const c = (o.cobros || []).find(x => x.id === cobroId); if (!c) throw new Error('Cobro no encontrado');
+      if (this.comprobanteExiste(comprobante, cobroId)) throw new Error('Ese N° de comprobante ya está cargado en otra seña. No se duplica.');
+      c.cuit = String(cuit || '').trim();
+      c.comprobante = String(comprobante || '').trim();
+      c.montoConfirmado = Math.round(Number(montoConfirmado) || 0);
+      c.confirmadoPor = confirmadoPor || 'Administración';
+      c.estado = 'confirmado';
+      this._recalc(o);
+      return c;
+    },
 
     // Listas de apoyo (demo).
     vendedores() { return ['Ale', 'Cristian', 'Sergio', 'Nati', 'Brian']; },
