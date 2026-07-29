@@ -11,6 +11,11 @@
     confirmada: ['Confirmada', 'ok'], cerrada: ['Cerrada', 'soft'], cancelada: ['Cancelada', 'crit'],
   };
   const HAB = { pendiente: ['Pendiente', 'soft'], bloqueada: ['Bloqueada', 'crit'], liberada: ['Liberada', 'ok'] };
+  // Forma de pago editable: cambiarla recalcula el total con su recargo (demo).
+  // Base = precios de lista de las líneas; efectivo sin recargo, tarjeta/transf. con recargo.
+  const FORMAS = ['Efectivo', 'Transferencia', 'Tarjeta', 'Mixto'];
+  const RECARGO = { Efectivo: 0, Transferencia: 0.05, Tarjeta: 0.10, Mixto: 0 };
+  const inic = s => String(s || '').split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase();
 
   const Detalle = {
     _mount: 'view', _o: null, _ctx: null, _volver: null,
@@ -34,13 +39,19 @@
       const cob = o.cobros || [];
       const pend = cob.filter(c => c.estado === 'pendiente_banco').reduce((a, c) => a + c.m, 0);
       const rendida = o.sena > 0 && !pend;
-      const facEmoji = { no: '', solicitada: '🧾', hecha: '✅' }[o.factura] || '';
+      // Recalcular total según forma de pago + adicionales (flete / instalación).
+      const base = (o.lineas || []).reduce((a, l) => a + l.precio * l.cantidad, 0);
+      const recargoPct = RECARGO[o.pago] ?? 0;
+      const recargo = Math.round(base * recargoPct);
+      const flete = o.flete?.monto || 0, inst = o.instalacion?.monto || 0;
+      o.total = base + recargo + flete + inst;
+      o.saldo = Math.max(0, o.total - (o.sena || 0));
       const facTxt = { no: 'Sin factura', solicitada: 'Factura solicitada', hecha: 'Factura hecha' }[o.factura] || '—';
-      // Bloqueos: muebles a medida sin autorizar, saldo pendiente, transf. sin acreditar.
+      // Bloqueos (en rojo): a medida sin autorizar, transf. sin acreditar, saldo.
       const bloqueos = [];
-      (o.lineas || []).forEach(l => { if (l.bloqueo) bloqueos.push(`⛔ ${l.producto}: falta ${l.bloqueo === 'precio' ? 'autorizar precio' : 'verificar observación'}`); });
-      if (pend) bloqueos.push(`⏳ Transferencia sin acreditar: ${UI.pesos(pend)}`);
-      if (o.saldo > 0) bloqueos.push(`💰 Saldo pendiente: ${UI.pesos(o.saldo)}`);
+      (o.lineas || []).forEach(l => { if (l.bloqueo) bloqueos.push(`${l.producto}: falta ${l.bloqueo === 'precio' ? 'autorizar precio' : 'verificar observación'}`); });
+      if (pend) bloqueos.push(`Transferencia sin acreditar: ${UI.pesos(pend)}`);
+      if (o.saldo > 0) bloqueos.push(`Saldo pendiente: ${UI.pesos(o.saldo)}`);
 
       document.getElementById(this._mount).innerHTML = `
         <button class="btn sm" id="ob-volver" style="margin-bottom:12px">← Volver</button>
@@ -49,31 +60,40 @@
             <span class="ob-num">${UI.esc(o.numero)}</span>
             <div>
               <div class="ob-cli">${UI.esc(o.cliente)}</div>
-              <div class="muted" style="font-size:12px">💳 ${UI.esc(o.pago)} · 🧑 ${UI.esc(o.vendedor)} · 📅 ${o.entrega ? UI.esc(o.entrega) : 'entrega a definir'}</div>
+              <div class="muted" style="font-size:12.5px">Vendedor ${UI.esc(o.vendedor)} · Entrega ${o.entrega ? UI.esc(o.entrega) : 'a definir'}</div>
             </div>
           </div>
           <div class="ob-h-r">
             ${UI.estado(DB.ESTADO_ORDEN, o.estado)}
-            ${o.reclamo ? '<span class="pill crit">⚠ Reclamo</span>' : ''}
-            ${facEmoji ? `<span class="pill ${o.factura === 'hecha' ? 'ok' : 'warn'}" title="${facTxt}">${facEmoji} ${facTxt}</span>` : ''}
+            ${o.reclamo ? '<span class="pill crit">Reclamo</span>' : ''}
+            ${o.factura !== 'no' ? `<span class="pill ${o.factura === 'hecha' ? 'ok' : 'warn'}">${facTxt}</span>` : ''}
           </div>
         </div>
-        <div class="ob-acc">
-          <button class="btn sm" id="ob-modif">🛠️ Modificar orden</button>
-          <button class="btn sm" id="ob-prod">🏭 Ver producción</button>
-          <button class="btn sm" id="ob-logi">🚚 Ver logística</button>
+
+        <div class="ob-pay">
+          <div class="ob-pay-f">
+            <label>Forma de pago</label>
+            <select id="ob-forma">${FORMAS.map(f => `<option ${f === o.pago ? 'selected' : ''}>${f}</option>`).join('')}</select>
+            ${recargo ? `<span class="ob-rec">+${Math.round(recargoPct * 100)}% recargo</span>` : '<span class="muted" style="font-size:12px">sin recargo</span>'}
+          </div>
+          <div class="ob-acc">
+            <button class="btn sm" id="ob-modif">Modificar orden</button>
+            <button class="btn sm" id="ob-prod">Ver producción</button>
+            <button class="btn sm" id="ob-logi">Ver logística</button>
+          </div>
         </div>
 
         <div class="ob-cols">
           <div>
-            ${card('Muebles', `<table class="ob-mueb"><tbody>${(o.lineas || []).map(l => `<tr>
-              <td class="mimg">🪑</td>
-              <td><b>${UI.esc(l.producto)}</b> <span class="pill soft" style="font-size:10px">${l.tipo === 'medida' ? '📐 a medida' : '📦 estándar'}</span>
-                ${l.bloqueo ? `<span class="pill crit" style="font-size:10px">⛔ ${UI.esc(l.bloqueo)}</span>` : ''}</td>
-              <td class="muted" style="text-align:center;width:54px">x${l.cantidad}</td>
-              <td class="tnum" style="text-align:right;width:120px"><b>${UI.pesos(l.precio * l.cantidad)}</b></td></tr>`).join('')}</tbody>
-              <tfoot><tr><td colspan="3" style="text-align:right;color:var(--ink-soft)">Total</td>
-                <td class="tnum" style="text-align:right"><b style="color:var(--navy)">${UI.pesos(o.total)}</b></td></tr></tfoot></table>`)}
+            ${card('Muebles', `<table class="ob-mueb">
+              <thead><tr><th></th><th>Producto</th><th>Tipo</th><th style="text-align:center">Cant.</th><th style="text-align:right">Monto</th></tr></thead>
+              <tbody>${(o.lineas || []).map(l => `<tr>
+              <td class="mimg"><div class="mono">${inic(l.producto)}</div></td>
+              <td><b>${UI.esc(l.producto)}</b>${l.variante ? `<div class="muted" style="font-size:12px">${UI.esc(l.variante)}</div>` : ''}
+                ${l.bloqueo ? `<div class="ob-blq-tag">Falta ${l.bloqueo === 'precio' ? 'autorizar precio' : 'verificar obs.'}</div>` : ''}</td>
+              <td><span class="tipo ${l.tipo}">${l.tipo === 'medida' ? 'A medida' : 'Estándar'}</span></td>
+              <td class="muted" style="text-align:center">${l.cantidad}</td>
+              <td class="tnum" style="text-align:right"><b>${UI.pesos(l.precio * l.cantidad)}</b></td></tr>`).join('')}</tbody></table>`)}
 
             ${card('Historial de comentarios', `
               <div id="ob-coms">${this.comentariosHTML(o)}</div>
@@ -83,32 +103,43 @@
           </div>
 
           <div>
-            ${card('Pagos y saldo', `
-              <div class="pg"><span>Total</span><b class="tnum">${UI.pesos(o.total)}</b></div>
-              <div class="pg"><span>Pagado (seña)</span><b class="tnum" style="color:var(--ok)">${UI.pesos(o.sena || 0)} ${rendida ? '✓' : (pend ? '⏳' : '')}</b></div>
-              ${pend ? `<div class="pg"><span class="muted" style="font-size:12px">· sin acreditar</span><b class="tnum" style="color:var(--warn)">${UI.pesos(pend)}</b></div>` : ''}
+            ${card('Totales y pago', `
+              <div class="pg"><span>Subtotal muebles</span><b class="tnum">${UI.pesos(base)}</b></div>
+              ${recargo ? `<div class="pg"><span>Recargo (${o.pago})</span><b class="tnum" style="color:var(--warn)">+${UI.pesos(recargo)}</b></div>` : ''}
+              ${flete ? `<div class="pg"><span>Flete${o.flete?.detalle ? ' · ' + UI.esc(o.flete.detalle) : ''}</span><b class="tnum">${UI.pesos(flete)}</b></div>` : ''}
+              ${inst ? `<div class="pg"><span>Instalación${o.instalacion?.detalle ? ' · ' + UI.esc(o.instalacion.detalle) : ''}</span><b class="tnum">${UI.pesos(inst)}</b></div>` : ''}
+              <div class="pg pg-tot"><span>Total</span><b class="tnum" style="color:var(--navy)">${UI.pesos(o.total)}</b></div>
+              <div class="pg"><span>Pagado (seña)</span><b class="tnum" style="color:var(--ok)">${UI.pesos(o.sena || 0)}${rendida ? ' ✓' : (pend ? ' ⏳' : '')}</b></div>
               <div class="pg"><span>Saldo</span><b class="tnum" style="color:${o.saldo ? 'var(--crit)' : 'var(--ok)'}">${UI.pesos(o.saldo || 0)}</b></div>
-              <div class="muted" style="font-size:12px;margin-top:6px">${cob.length} cobro(s) · ${rendida ? 'rendición confirmada por el vendedor ✓' : (pend ? 'falta acreditar en banco' : 'sin cobros')}</div>
-              <button class="btn sm" id="ob-sena" style="margin-top:10px;width:100%">💵 Señas y cobros</button>`)}
+              <div class="muted" style="font-size:12px;margin-top:4px">${rendida ? 'Rendición confirmada por el vendedor ✓' : (pend ? 'Falta acreditar en banco' : 'Sin cobros')}</div>
+              <button class="btn sm" id="ob-sena" style="margin-top:10px;width:100%">Señas y cobros</button>`)}
 
-            ${bloqueos.length ? `<div class="pcard ob-blq" style="margin-bottom:14px"><h3 style="color:var(--crit)">⛔ Bloqueos</h3>
+            ${card('Flete e instalación', `
+              <div class="ob-file"><span style="flex:1">Flete</span><b class="tnum">${flete ? UI.pesos(flete) : '—'}</b></div>
+              ${o.flete?.detalle ? `<div class="muted" style="font-size:11.5px;margin:-2px 0 6px">${UI.esc(o.flete.detalle)}${o.flete?.escalera ? ' · subida por escalera' : ''}</div>` : ''}
+              <div class="ob-file"><span style="flex:1">Instalación</span><b class="tnum">${inst ? UI.pesos(inst) : '—'}</b></div>
+              ${o.instalacion?.detalle ? `<div class="muted" style="font-size:11.5px;margin:-2px 0 6px">${UI.esc(o.instalacion.detalle)}</div>` : ''}
+              <button class="btn sm" id="ob-flete" style="margin-top:6px;width:100%">Editar flete / instalación</button>`)}
+
+            ${bloqueos.length ? `<div class="pcard ob-blq" style="margin-bottom:14px"><h3 style="color:var(--crit)">Bloqueos</h3>
               ${bloqueos.map(b => `<div class="ob-blq-row">${UI.esc(b)}</div>`).join('')}</div>` : ''}
 
             ${card('Archivos', `${(o.archivos || []).length
-              ? (o.archivos || []).map(a => `<div class="ob-file"><span>${a.tipo === 'factura' ? '🧾' : '📎'}</span>
-                  <span style="flex:1">${UI.esc(a.nombre)}</span><span class="pill soft" style="font-size:10px">${UI.esc(a.area)}</span></div>`).join('')
+              ? (o.archivos || []).map(a => `<div class="ob-file"><span style="flex:1">${UI.esc(a.nombre)}</span><span class="pill soft" style="font-size:10px">${UI.esc(a.area)}</span></div>`).join('')
               : '<div class="muted" style="font-size:13px">Sin archivos cargados.</div>'}
               <button class="btn sm" id="ob-file-add" style="margin-top:8px;width:100%">+ Subir archivo</button>
-              <div class="muted" style="font-size:11px;margin-top:6px">🔒 Los archivos se guardan en el cajón exclusivo de Contabilidad.</div>`)}
+              <div class="muted" style="font-size:11px;margin-top:6px">Se guardan en el cajón exclusivo de Contabilidad.</div>`)}
           </div>
         </div>
         ${ESTILO}`;
 
       document.getElementById('ob-volver').onclick = () => { if (V) V(); else global.App.goSub('ventas', 'resumen'); };
+      document.getElementById('ob-forma').onchange = e => { o.pago = e.target.value; this.renderBoleta(); UI.aviso('Total recalculado por forma de pago', 'info'); };
       document.getElementById('ob-modif').onclick = () => UI.aviso('Modificar orden — próximo paso', 'info');
       document.getElementById('ob-prod').onclick = () => global.App.goSub('produccion', 'resumen');
       document.getElementById('ob-logi').onclick = () => global.App.goSub('logistica', 'resumen');
       document.getElementById('ob-sena').onclick = () => global.VentasPanel.modalSenas(o);
+      document.getElementById('ob-flete').onclick = () => UI.aviso('Editar flete / instalación — próximo paso', 'info');
       document.getElementById('ob-file-add').onclick = () => UI.aviso('Subir archivo — se guarda en Contabilidad (próximo paso)', 'info');
       const add = () => {
         const el = document.getElementById('ob-com'); const t = el.value.trim(); if (!t) return;
@@ -316,12 +347,22 @@
     .ob-num{font-size:22px;font-weight:800;color:var(--brand)}
     .ob-cli{font-size:17px;font-weight:800;color:var(--navy)}
     .ob-h-r{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-    .ob-acc{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+    .ob-acc{display:flex;gap:8px;flex-wrap:wrap}
+    .ob-pay{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:14px}
+    .ob-pay-f{display:flex;align-items:center;gap:10px}
+    .ob-pay-f label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700}
+    .ob-pay-f select{font-size:16px;font-weight:700;color:var(--navy);padding:7px 10px;border-radius:9px;border:1px solid var(--line)}
+    .ob-rec{background:var(--warn-bg);color:var(--warn);font-size:12px;font-weight:700;padding:3px 9px;border-radius:20px}
     .ob-cols{display:grid;grid-template-columns:1fr 350px;gap:16px;align-items:start}
     @media(max-width:900px){.ob-cols{grid-template-columns:1fr}}
-    .ob-mueb{width:100%} .ob-mueb td{padding:8px 6px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
-    .ob-mueb tfoot td{border-bottom:0;border-top:1px solid var(--line);padding-top:10px}
-    .ob-mueb .mimg{width:40px;height:40px;border-radius:8px;background:var(--brand-soft);text-align:center;font-size:18px}
+    .ob-mueb{width:100%;border-collapse:collapse}
+    .ob-mueb thead th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:700;padding:0 6px 8px}
+    .ob-mueb td{padding:9px 6px;border-top:1px solid var(--line-soft);vertical-align:middle}
+    .ob-mueb .mimg{width:44px} .ob-mueb .mono{width:38px;height:38px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--ink-soft)}
+    .ob-mueb .tipo{font-size:12px;font-weight:600;padding:2px 9px;border-radius:20px;border:1px solid var(--line);color:var(--ink-soft)}
+    .ob-mueb .tipo.medida{border-color:var(--brand);color:var(--brand-ink);background:var(--brand-soft)}
+    .ob-blq-tag{color:var(--crit);font-size:12px;font-weight:600;margin-top:2px}
+    .pg-tot{border-top:1px solid var(--line);margin-top:4px;padding-top:8px;font-size:15px}
     .ob-blq{border:1px solid var(--crit)} .ob-blq-row{color:var(--crit);font-size:13px;padding:5px 0;border-bottom:1px solid var(--crit-bg)}
     .ob-blq-row:last-child{border-bottom:0}
     .ob-file{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px}

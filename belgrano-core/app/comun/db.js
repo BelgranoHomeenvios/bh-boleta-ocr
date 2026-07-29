@@ -77,10 +77,11 @@
     //  archivos[]      : {nombre, tipo, area}  (se guardan en el "cajón" de Contabilidad)
     ordenes: [
       { id: 1, numero: 'S00021', fecha: '29/07', cliente: 'Laura Pérez',    vendedor: 'Ale',      local: '2020', pago: 'Efectivo',      items: 3, total: 1200000, sena: 360000, saldo: 840000, entrega: '15/08', estado: 'a_confirmar',     situacion: 'a_confirmar', reclamo: false, factura: 'solicitada',
+        flete: { monto: 45000, detalle: 'Envío CABA' }, instalacion: { monto: 0 },
         lineas: [
-          { id: 'L1', producto: 'Cómoda Amberes 1.20', cantidad: 1, precio: 406250, tipo: 'estandar', img: null },
-          { id: 'L2', producto: 'Mesa Noruega',        cantidad: 1, precio: 500000, tipo: 'estandar', img: null },
-          { id: 'L3', producto: 'Respaldo Milán a medida', cantidad: 1, precio: 293750, tipo: 'medida', img: null, bloqueo: 'precio' }],
+          { id: 'L1', producto: 'Cómoda Amberes 1.20', variante: 'Paraíso / Blanco', cantidad: 1, precio: 406250, tipo: 'estandar', img: null },
+          { id: 'L2', producto: 'Mesa Noruega',        variante: 'Nogal',           cantidad: 1, precio: 500000, tipo: 'estandar', img: null },
+          { id: 'L3', producto: 'Respaldo Milán a medida', variante: 'Boucle Beige', cantidad: 1, precio: 293750, tipo: 'medida', img: null, bloqueo: 'precio' }],
         recordatorios: [{ f: '05/08', texto: 'Llamar para coordinar entrega' }],
         comentarios: [{ area: 'Ventas', texto: 'Cliente pidió llamar antes de entregar', f: '29/07' }],
         archivos: [{ nombre: 'Plano Respaldo Milán.pdf', tipo: 'plano', area: 'Producción' }],
@@ -94,9 +95,10 @@
         recordatorios: [], comentarios: [{ area: 'Reclamos', texto: 'Vino con una veta distinta a la del showroom', f: '28/07' }], archivos: [],
         cobros: [{ id: 'c3', f: '28/07', m: 516000, metodo: 'efectivo', recibidoPor: 'Caja Belgrano 2020', estado: 'rendido' }] },
       { id: 4, numero: 'S00018', fecha: '28/07', cliente: 'Laura y Hernán', vendedor: 'Cristian', local: '2299', pago: 'Mixto',         items: 2, total: 731250,  sena: 481250, saldo: 250000, entrega: '02/08', estado: 'logistica',       situacion: 'en_logistica', reclamo: false, factura: 'no',
+        flete: { monto: 60000, detalle: 'Subida x escalera · 2 pisos', escalera: true }, instalacion: { monto: 35000, detalle: 'Armado en domicilio' },
         lineas: [
-          { id: 'L1', producto: 'Aparador Amberes',   cantidad: 1, precio: 481250, tipo: 'estandar', img: null },
-          { id: 'L2', producto: 'Mesa ratona Foster',  cantidad: 1, precio: 250000, tipo: 'estandar', img: null }],
+          { id: 'L1', producto: 'Aparador Amberes',   variante: 'Roble / Negro', cantidad: 1, precio: 481250, tipo: 'estandar', img: null },
+          { id: 'L2', producto: 'Mesa ratona Foster',  variante: 'Nogal',        cantidad: 1, precio: 250000, tipo: 'estandar', img: null }],
         recordatorios: [], comentarios: [{ area: 'Logística', texto: 'Entra por el fondo', f: '28/07' }, { area: 'Ventas', texto: 'Falta el saldo contra entrega', f: '28/07' }], archivos: [],
         cobros: [
           { id: 'c4', f: '20/07', m: 300000, metodo: 'transferencia', recibidoPor: 'Cuenta Cristian', depositante: 'Hernán Suárez', cuit: '20-30111222-3', comprobante: 'BROU-884512', montoConfirmado: 300000, confirmadoPor: 'Administración', estado: 'confirmado' },

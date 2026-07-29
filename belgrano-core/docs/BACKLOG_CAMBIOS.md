@@ -6,7 +6,21 @@
 
 ## Por aplicar (lote actual)
 
-_(vacío — el lote de la tabla de Boletas + Detalle de la orden ya se aplicó, ver abajo)_
+_(vacío)_
+
+## Lote 2 — APLICADO (refinamiento del Detalle de la orden)
+
+- ✅ 22. Menos emojis, look más moderno (header, acciones, muebles sin pills-emoji).
+- ✅ 23. Estándar / A medida como **columna** al lado del mueble (no pill con emoji).
+- ✅ 24. Nombre del mueble con su **variante** (ej. "Cómoda Amberes 1.20 · Paraíso/Blanco").
+- ✅ 25. **Forma de pago** grande y **editable** arriba; cambiarla **recalcula** el
+  total con su recargo (Efectivo 0% · Transferencia +5% · Tarjeta +10%).
+- ✅ 26. **Flete e instalación** (subida por escalera) con su **valor**, sumados al
+  total. Botón "Editar flete / instalación" (stub).
+
+> Pendiente base real: recargos por forma de pago y valores de flete/instalación
+> hoy son demo; se definen con la lista de precios real. Imagen de mueble sigue
+> como monograma (falta traer de Tienda Nube).
 
 ## Lote 1 — APLICADO (tabla de Boletas + Detalle de la orden)
 
