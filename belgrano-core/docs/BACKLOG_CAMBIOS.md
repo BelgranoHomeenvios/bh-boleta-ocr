@@ -29,6 +29,9 @@ Sección 1 · Datos del cliente
 - ⬜ 36. **Vendedor y Local salen por default** del usuario de la sesión (el que vende
   entra con su usuario). Ambos **editables**, pero siempre precargados.
 - ⬜ 37. **Término de pago** se mantiene. **"Vence" se elimina** (no hace falta).
+- ⬜ 37b. Agregar **Domicilio de entrega** y **Localidad**.
+- ⬜ 37c. **Teléfono adicional** oculto: botón **"+ Teléfono"** que abre el campo
+  (mismo criterio que IG y DNI — no va como campo fijo).
 
 Sección 2 · Productos (hoy "Ítems")
 - ⬜ 38. Renombrar **"Ítems" → "Productos"**.
@@ -52,6 +55,22 @@ Sección 2 · Productos (hoy "Ítems")
 - ⬜ 47. Ideal: traer la **imagen real del producto desde Tienda Nube** (miniatura al
   lado del nombre, estilo boleta de TN: foto + nombre + variantes + `1 x $868.449`).
   Cantidad y precio unitario quedan como están.
+
+Sección 3 · Adicionales
+
+> Son las preguntas que hoy siempre hay que anotar a mano. La idea es que la
+> mayoría **salga por default** y el vendedor sólo corrija lo que cambie.
+
+- ⬜ 49. **Tiempo de entrega** — default **"entre 30 y 35 días"**. Si se **edita**,
+  la orden **salta a verificación** y queda contabilizado (cambio de plazo es un
+  dato que hay que auditar, no una edición libre).
+- ⬜ 50. **Saldo se abona en** — se autocompleta con el **mismo método elegido en
+  Término de pago**.
+- ⬜ 51. **Costo de envío** — sale **por default según la localidad** cargada en
+  Datos del cliente (tabla localidad → precio de flete).
+- ⬜ 52. **¿Requiere instalación?** — default **NO**.
+- ⬜ 53. **Subida por escalera** — default **$5.000 por piso por bulto**, editable.
+- ⬜ 54. **IVA no incluido** — sale por default como leyenda/marca.
 
 CRM
 - ⬜ 48. **Vinculación a CRM**: cada cotización se guarda en los registros del vendedor
