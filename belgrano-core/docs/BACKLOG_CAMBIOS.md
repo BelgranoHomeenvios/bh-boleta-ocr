@@ -13,12 +13,49 @@
 - ⬜ 30. **Filas más compactas** (~1.3 cm máx por renglon) para que todo entre en una sola pantalla sin scroll.
 - ⬜ 31. **Columna Imagen** en la tabla de muebles (especialmente crítica para a medida; vendedores cargan foto para aclarar pedido).
 
-**Nueva cotización (cotizacion.js / presupuesto.js)**
-- ⬜ 32. **Sección Datos del cliente** — (obligatorios + opcionales a definir).
-- ⬜ 33. **Sección Detalle de muebles y cotizaciones** — búsqueda producto, a medida, catálogo.
-- ⬜ 34. **Sección Adicionales** — (a definir: términos, moneda, etc.).
-- ⬜ 35. **Vinculación a CRM** — cada cotización se guarda en historial de vendedor para seguimiento.
-- ⬜ 36. (Pendiente descripción completa de layout)
+**Nueva cotización (`ventas/presupuesto.js`) — 3 espacios bien marcados**
+
+Estructura general
+- ⬜ 32. Las 3 secciones (**Datos del cliente** · **Productos y cotización** ·
+  **Adicionales**) van como **desplegable / por etapas**: se va completando de a
+  una, no todo abierto a la vez. Hoy hay demasiados campos a la vista.
+
+Sección 1 · Datos del cliente
+- ⬜ 33. Orden de los campos: **Nombre → Teléfono → Mail → ¿Cómo nos conoció?**
+  (hoy arranca por Teléfono y el Nombre está tercero).
+- ⬜ 34. **Instagram como campo oculto**: un botón "IG" que lo revela, para el caso
+  en que en vez de teléfono se anote un usuario de IG. Si no hace falta, no se carga.
+- ⬜ 35. **DNI también oculto** detrás de su botón (se abre sólo si hace falta factura).
+- ⬜ 36. **Vendedor y Local salen por default** del usuario de la sesión (el que vende
+  entra con su usuario). Ambos **editables**, pero siempre precargados.
+- ⬜ 37. **Término de pago** se mantiene. **"Vence" se elimina** (no hace falta).
+
+Sección 2 · Productos (hoy "Ítems")
+- ⬜ 38. Renombrar **"Ítems" → "Productos"**.
+- ⬜ 39. **Buscador de producto** de ~4 cm máx: al escribir aparecen las coincidencias.
+  **Insensible a tildes** ("comoda" tiene que traer "CÓMODA").
+- ⬜ 40. Al elegir el producto se abre el **armado por variantes con botones**
+  (no desplegables): primero **Medida**, después **Estructura**, después **Frente**.
+  El **precio se va actualizando** a medida que se arma.
+- ⬜ 41. **No mostrar todos los precios** de todas las variantes (puede haber 15 por
+  mueble) — sólo el precio del combo armado.
+- ⬜ 42. La línea cargada muestra el producto con **el nombre de cada variable**:
+  `Medida 1,20 · Estructura Blanco · Frente Paraíso`
+  (hoy dice sólo "1.20 · blanca · paraiso", sin decir qué es cada cosa).
+- ⬜ 43. Nueva **columna Estándar / A medida** entre Producto y Cantidad (hoy sobra
+  espacio ahí). **Estándar → precio bloqueado**; **A medida → precio se libera** y se
+  completa a mano.
+- ⬜ 44. Sacar el botón suelto **"+ A medida"** de arriba: a medida es una **opción
+  dentro de cada producto**, no un ítem aparte.
+- ⬜ 45. Renombrar columna **"Observaciones" → "Detalle"**.
+- ⬜ 46. **Botón de cargar imagen** por línea de producto.
+- ⬜ 47. Ideal: traer la **imagen real del producto desde Tienda Nube** (miniatura al
+  lado del nombre, estilo boleta de TN: foto + nombre + variantes + `1 x $868.449`).
+  Cantidad y precio unitario quedan como están.
+
+CRM
+- ⬜ 48. **Vinculación a CRM**: cada cotización se guarda en los registros del vendedor
+  para darle seguimiento después.
 
 ## Lote 2 — APLICADO (refinamiento del Detalle de la orden)
 
