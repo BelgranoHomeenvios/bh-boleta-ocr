@@ -39,6 +39,23 @@
     return _cli;
   }
 
+  // Genera el combinatorio de variantes de un mueble (medida × estructura ×
+  // frente) con un precio que crece con la medida. Es sólo para el demo: en
+  // producción cada variante viene de la tabla `variante` con su precio real.
+  // Se usa para que el armador por botones tenga con qué jugar (un mueble
+  // puede tener 15+ variantes y no se muestran todos los precios juntos).
+  let _vid = 100;
+  function combinar(productoId, medidas, estructuras, frentes, base, paso) {
+    const out = [];
+    medidas.forEach((medida, i) => estructuras.forEach(estructura => frentes.forEach(frente => {
+      out.push({
+        id: ++_vid, producto_id: productoId, medida, estructura, frente,
+        precio: base + paso * i, atributos: { medida, estructura, frente },
+      });
+    })));
+    return out;
+  }
+
   // ---- Modo demo: árbol + productos para ver la UI sin conexión --------
   const DEMO = {
     categorias: [
@@ -56,10 +73,11 @@
       { id: 3, categoria_id: 5, nombre: 'MESA RATONA NORUEGA', publicado_tn: false },
     ],
     variantes: [
-      { id: 11, producto_id: 1, medida: '1.20', estructura: 'blanca', frente: 'paraiso', precio: 425750, atributos: { medida: '1.20', estructura: 'blanca', frente: 'paraiso' } },
-      { id: 12, producto_id: 1, medida: '1.20', estructura: 'negra',  frente: 'blanca',  precio: 406250, atributos: { medida: '1.20', estructura: 'negra', frente: 'blanca' } },
-      { id: 13, producto_id: 2, medida: '2.00', estructura: 'blanca', frente: 'paraiso', precio: 900000, atributos: { medida: '2.00', estructura: 'blanca', frente: 'paraiso', espejo: '2 espejos' } },
-      { id: 14, producto_id: 3, medida: '1.00', estructura: 'blanca', frente: null,      precio: 300000, atributos: { medida: '1.00', estructura: 'blanca' } },
+      ...combinar(1, ['1.00', '1.20', '1.40', '1.60'], ['Blanca', 'Negra'], ['Paraíso', 'Blanco'], 385000, 42000),
+      ...combinar(4, ['1.20', '1.60'], ['Blanca', 'Negra'], ['Paraíso', 'Nogal'], 410000, 55000),
+      ...combinar(5, ['0.90'], ['Natural'], ['Paraíso'], 352000, 0),
+      ...combinar(2, ['1.80', '2.00', '2.20'], ['Blanca', 'Negra'], ['Paraíso', 'Blanco'], 860000, 90000),
+      ...combinar(3, ['0.80x0.50', '1.00x0.60'], ['Paraíso'], ['Negro', 'Natural'], 720000, 148000),
     ],
     // Órdenes de venta de ejemplo (para ver la vista antes de conectar).
     // saldo = total - sena. sena = suma de señas/cobros CONFIRMADOS hasta hoy.
@@ -324,6 +342,54 @@
       c.estado = 'confirmado';
       this._recalc(o);
       return c;
+    },
+
+    // ---- Adicionales de la cotización ----------------------------------
+    // Localidad → costo de envío. Tabla DEMO: Brian pasa la lista real y se
+    // reemplaza tal cual (misma forma {k, label, flete}).
+    localidades() {
+      return [
+        { k: 'caba',      label: 'CABA',                 flete: 45000 },
+        { k: 'gba_norte', label: 'GBA Norte',            flete: 62000 },
+        { k: 'gba_oeste', label: 'GBA Oeste',            flete: 68000 },
+        { k: 'gba_sur',   label: 'GBA Sur',              flete: 72000 },
+        { k: 'laplata',   label: 'La Plata',             flete: 95000 },
+        { k: 'interior',  label: 'Interior (a cotizar)', flete: 0 },
+      ];
+    },
+    fleteDe(localidadK) {
+      return (this.localidades().find(l => l.k === localidadK) || {}).flete || 0;
+    },
+
+    // Plazo de entrega estándar. Si el vendedor lo edita, la orden salta a
+    // verificación (queda contabilizado el cambio de plazo).
+    ENTREGA_DEFAULT: 'entre 30 y 35 días',
+    // La subida por escalera NO se calcula: es muy variable. Va como leyenda.
+    ESCALERA_DEFAULT: 5000,
+    escaleraTexto(monto) {
+      const m = '$' + (Number(monto) || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 });
+      return `${m} por piso por bulto`;
+    },
+    IVA_LEYENDA: 'Los precios no incluyen IVA.',
+
+    // Sesión del vendedor: el que vende entra con su usuario, así que el
+    // vendedor y el local salen precargados (igual se pueden editar).
+    sesion() { return { vendedor: 'Brian', local: '2020' }; },
+
+    // Ficha resumida + documentos relacionados del cliente, para el costado de
+    // la cotización. Sale del CRM: acá va el demo hasta enganchar la tabla real.
+    fichaCliente(ident) {
+      const k = String(ident || '').trim().toLowerCase();
+      if (!k) return null;
+      const conocido = /laura/.test(k);
+      return {
+        recurrente: conocido,
+        docs: conocido ? [
+          { tipo: 'Última consulta',   ref: 'CONS-000123', f: '' },
+          { tipo: 'Última cotización', ref: 'C-1842 v2',   f: '29/07/2026' },
+          { tipo: 'Última orden',      ref: 'OV-2020-0041', f: '29/07/2026' },
+        ] : [],
+      };
     },
 
     // Listas de apoyo (demo).

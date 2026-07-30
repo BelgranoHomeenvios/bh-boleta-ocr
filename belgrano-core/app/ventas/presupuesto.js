@@ -1,11 +1,25 @@
 // =====================================================================
-//  Belgrano Soft · Cotización → Venta (hasta "Confirmar")
-//  Se busca el producto en la línea (estándar, precio bloqueado del
-//  catálogo) o se agrega un ítem "a medida" (descripción + precio manual).
-//  El precio depende del término de pago: todo nace del precio de lista;
-//  efectivo lleva −35%; tarjeta/cuotas = lista; transferencia y mixto se
-//  ajustan (mixto es editable por línea).
-//  "Convertir en venta" crea la orden en estado CONFIRMAR (espera la seña).
+//  Belgrano Soft · Nueva cotización (Cotización → Venta)
+//
+//  Layout de dos columnas, al estilo de la ficha de documento:
+//    · Columna principal — cabecera con el total, los datos agrupados en dos
+//      bloques (cliente / operación) y las solapas Productos · Adicionales,
+//      con el desglose de totales abajo a la derecha.
+//    · Costado — Actividad y Notas, la ficha del cliente y los documentos
+//      relacionados (última consulta, última cotización, última orden).
+//
+//  Los tres espacios que pidió Brian siguen estando, sólo que agrupados:
+//    1) Datos del cliente (cabecera)  2) Productos  3) Adicionales (solapas)
+//
+//  Productos: se busca en una línea corta (sin importar tildes) y al elegir el
+//  mueble se arma la variante CON BOTONES — Medida, después Estructura, después
+//  Frente — y el precio se actualiza solo. No se listan los precios de todas
+//  las variantes (puede haber 15 por mueble): sólo el del combo armado.
+//
+//  El precio nace del precio de lista y lo ajusta la condición de pago:
+//  efectivo −35%; tarjeta/cuotas = lista; transferencia y mixto se ajustan
+//  (mixto es editable por línea).
+//  "Confirmar → Venta" crea la orden en estado CONFIRMAR (espera la seña).
 // =====================================================================
 (function (global) {
   const DESC_EFECTIVO = 0.35;     // −35% sobre lista (dato de Brian)
@@ -18,127 +32,216 @@
     { k: 'mixto',         label: 'Mixto (editable)' },
   ];
 
+  // Los tres ejes con su nombre, para que la línea diga QUÉ es cada cosa
+  // ("Medida 1.20 · Estructura Blanca · Frente Paraíso", no "1.20 · blanca").
+  const EJES = [
+    { k: 'medida',     label: 'Medida' },
+    { k: 'estructura', label: 'Estructura' },
+    { k: 'frente',     label: 'Frente' },
+  ];
+
+  // Campos que arrancan ocultos detrás de su botón: sólo se cargan si hacen
+  // falta (IG cuando no hay teléfono, DNI cuando va factura, etc.).
+  const OPCIONALES = [
+    { k: 'instagram', btn: '+ IG',       lbl: 'Instagram',          ph: '@usuario' },
+    { k: 'dni',       btn: '+ DNI',      lbl: 'DNI (para factura)', ph: '00.000.000' },
+    { k: 'tel2',      btn: '+ Teléfono', lbl: 'Teléfono adicional', ph: '11 5555-2020' },
+  ];
+
   const Presupuesto = {
-    cli: { nombre: '', telefono: '', email: '', instagram: '', dni: '', canal: '' },
-    vendedor: '', local: '2020', termino: 'efectivo', vence: '',
-    lineas: [],   // {key,tipo:'estandar'|'medida',prodNombre,varId,ejes,base,cantidad,obs,precioManual}
+    cli: null,
+    abiertos: {},        // campos opcionales revelados
+    solapa: 'productos', // productos | adicionales
+    lado: 'actividad',   // actividad | notas
+    vendedor: '', local: '', termino: 'efectivo',
+    notas: '', terminos: '',
+    ad: null,            // adicionales
+    actividad: [],       // historial de la cotización (se arma sola)
+    lineas: [],   // {key,tipo,prodNombre,varId,ejes,partes,base,cantidad,obs,precioManual,img}
     _uid: 0,
     _mount: 'view',
 
+    // ---- Cálculo ---------------------------------------------------------
     factor() {
       if (this.termino === 'efectivo') return 1 - DESC_EFECTIVO;
       if (this.termino === 'transferencia') return 1 - DESC_TRANSFER;
       return 1; // lista, mixto
     },
-    // Precio unitario según tipo de ítem y término.
     unit(l) {
       if (l.tipo === 'medida') return Number(l.precioManual) || 0;
       if (this.termino === 'mixto') return l.precioManual != null ? Number(l.precioManual) : l.base;
       return l.base * this.factor();
     },
+    // Precio de lista, antes del descuento por condición de pago.
+    lista(l) { return l.tipo === 'medida' ? (Number(l.precioManual) || 0) : l.base; },
+    totalLista() { return this.lineas.reduce((a, l) => a + this.lista(l) * l.cantidad, 0); },
     total() { return this.lineas.reduce((a, l) => a + this.unit(l) * l.cantidad, 0); },
+    descuento() { return this.totalLista() - this.total(); },
+    totalFinal() { return this.total() + (this.ad.envio || 0); },
+    items() { return this.lineas.reduce((a, l) => a + l.cantidad, 0); },
+
+    // Estándar → precio bloqueado (sale del catálogo). A medida → se libera.
     editable(l) { return l.tipo === 'medida' || this.termino === 'mixto'; },
     clienteValido() {
       const c = this.cli;
       return !!(String(c.telefono).trim() || String(c.email).trim() || String(c.instagram).trim());
     },
-    // Un ítem salta a verificación de administración si es a medida o tiene observaciones.
-    requiereVerif(l) { return l.tipo === 'medida' || !!String(l.obs).trim(); }
-    ,
+    // Un ítem salta a verificación de administración si es a medida o tiene detalle.
+    requiereVerif(l) { return l.tipo === 'medida' || !!String(l.obs).trim(); },
+    // Cambiar el plazo de entrega no es una edición libre: se audita.
+    entregaEditada() { return this.ad.entrega.trim() !== global.DB.ENTREGA_DEFAULT; },
+    terminoLabel() { return (TERMINOS.find(t => t.k === this.termino) || {}).label || ''; },
+    nombreCli() {
+      const c = this.cli;
+      return c.nombre.trim() || c.telefono.trim() || c.instagram.trim() || c.email.trim();
+    },
 
+    // Cada movimiento queda anotado en el costado (y después va al CRM).
+    log(quien, texto) {
+      this.actividad.unshift({ quien, texto, hora: hora() });
+      if (this.actividad.length > 40) this.actividad.pop();
+    },
+
+    // ---- Render ----------------------------------------------------------
     render(mount = 'view') {
       this._mount = mount;
-      const vends = global.DB.vendedores(), locs = global.DB.locales();
+      if (!this.cli) this.reset();
       document.getElementById(mount).innerHTML = `
-        <div class="row" style="margin-bottom:12px;align-items:flex-start">
-          <div><div class="kick">Ventas</div><h1 class="h-title">Nueva cotización</h1></div>
-          <div class="sp"></div>
-          <div class="wrap-row" style="justify-content:flex-end">
-            <button class="btn sm" id="pr-guardar">💾 Guardar</button>
-            <button class="btn sm" id="pr-preview">👁 Vista previa</button>
-            <button class="btn sm" id="pr-print">🖨 Imprimir</button>
+        <div class="cz-bar">
+          <div class="kick">Ventas · Cotizaciones</div>
+          <div class="sp" style="flex:1"></div>
+          <button class="btn sm" id="pr-preview">Vista previa</button>
+          <button class="btn sm" id="pr-descargar">Descargar</button>
+          <button class="btn sm" id="pr-print">Imprimir</button>
+          <span class="cz-sep"></span>
+          <button class="btn sm" id="pr-guardar">Guardar</button>
+          <button class="btn sm primary" id="pr-venta">Confirmar → Venta</button>
+        </div>
+        <div class="cz-wrap">
+          <div id="cz-main"></div>
+          <aside id="cz-side"></aside>
+        </div>
+        ${this.estilos()}`;
+
+      document.getElementById('pr-preview').onclick = () => this.accion('preview');
+      document.getElementById('pr-descargar').onclick = () => this.accion('descargar');
+      document.getElementById('pr-print').onclick = () => this.accion('print');
+      document.getElementById('pr-guardar').onclick = () => this.accion('guardar');
+      document.getElementById('pr-venta').onclick = () => this.convertir();
+      this.pintarTodo();
+    },
+
+    pintarTodo() { this.pintarMain(); this.pintarSide(); },
+
+    // ---- Columna principal -----------------------------------------------
+    pintarMain() {
+      const m = document.getElementById('cz-main'); if (!m) return;
+      m.innerHTML = `
+        <div class="card pad cz-head" id="cz-datos"></div>
+        <div class="card cz-body">
+          <div class="tabs">
+            <button class="tab ${this.solapa === 'productos' ? 'on' : ''}" data-t="productos">Productos</button>
+            <button class="tab ${this.solapa === 'adicionales' ? 'on' : ''}" data-t="adicionales">Adicionales</button>
+          </div>
+          <div id="cz-tab"></div>
+          <div class="cz-foot">
+            <div class="cz-tyc">
+              <div class="lbl">Términos y condiciones</div>
+              <textarea id="cz-tyc" rows="3" placeholder="Escribir términos y condiciones…">${UI.esc(this.terminos)}</textarea>
+            </div>
+            <div id="cz-tot"></div>
+          </div>
+        </div>`;
+      m.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { this.solapa = b.dataset.t; this.pintarMain(); });
+      document.getElementById('cz-tyc').oninput = e => { this.terminos = e.target.value; };
+      this.pintarDatos();
+      if (this.solapa === 'productos') this.pintarProductos(); else this.pintarAdicionales();
+      this.pintarTotales();
+    },
+
+    // Cabecera: título + total, y los datos agrupados en dos columnas —
+    // a la izquierda el cliente, a la derecha la operación.
+    pintarDatos() {
+      const c = document.getElementById('cz-datos'); if (!c) return;
+      const vends = global.DB.vendedores(), locs = global.DB.locales(), locds = global.DB.localidades();
+      const f = (id, lbl, val, ph) => `<div class="fr"><label for="${id}">${UI.esc(lbl)}</label>
+        <input id="${id}" value="${UI.esc(val)}" placeholder="${UI.esc(ph)}"></div>`;
+      const sel = (id, lbl, opts) => `<div class="fr"><label for="${id}">${UI.esc(lbl)}</label>
+        <select id="${id}">${opts}</select></div>`;
+
+      // Orden pedido: Nombre → Teléfono → Mail → ¿Cómo nos conoció?
+      const ocultos = OPCIONALES.filter(o => this.abiertos[o.k])
+        .map(o => f('c-' + o.k, o.lbl, this.cli[o.k], o.ph)).join('');
+      const addBtns = OPCIONALES.filter(o => !this.abiertos[o.k])
+        .map(o => `<button class="chip-add" data-add="${o.k}">${UI.esc(o.btn)}</button>`).join('');
+
+      c.innerHTML = `
+        <div class="cz-tit">
+          <div>
+            <div class="kick">Cotización</div>
+            <h1 class="h-title" style="margin:2px 0 0">${UI.esc(this.nombreCli() || 'Nueva')}</h1>
+          </div>
+          <div class="sp" style="flex:1"></div>
+          <div class="cz-box">
+            <div class="lbl">Total</div>
+            <b class="tnum">${UI.pesos(this.totalFinal())}</b>
+            <div class="lbl">${this.items()} ${this.items() === 1 ? 'ítem' : 'ítems'}</div>
           </div>
         </div>
 
-        <div class="card pad" style="margin-bottom:14px">
-          <div class="kick" style="margin-bottom:8px">Cliente</div>
-          <div class="cli-grid">
-            <label class="fld"><span class="lbl">Teléfono</span><input id="c-tel" value="${UI.esc(this.cli.telefono)}" placeholder="11 5555-2020"></label>
-            <label class="fld"><span class="lbl">Instagram</span><input id="c-ig" value="${UI.esc(this.cli.instagram)}" placeholder="@usuario"></label>
-            <label class="fld"><span class="lbl">Mail</span><input id="c-mail" value="${UI.esc(this.cli.email)}" placeholder="cliente@correo.com"></label>
-            <label class="fld"><span class="lbl">Nombre <span class="muted">(opcional)</span></span><input id="c-nombre" value="${UI.esc(this.cli.nombre)}" placeholder="Se completa después"></label>
-            <label class="fld"><span class="lbl">DNI <span class="muted">(solo factura)</span></span><input id="c-dni" value="${UI.esc(this.cli.dni)}" placeholder="opcional"></label>
-            <label class="fld"><span class="lbl">¿Cómo nos conoció?</span>
-              <select id="c-canal"><option value="">—</option>
-                ${['Instagram', 'Facebook', 'Recomendación', 'Pasó por el local', 'Google', 'Otro']
-                  .map(o => `<option ${this.cli.canal === o ? 'selected' : ''}>${o}</option>`).join('')}</select></label>
+        <div class="cz-cols">
+          <div class="cz-col">
+            ${f('c-nombre', 'Cliente', this.cli.nombre, 'Nombre y apellido')}
+            ${f('c-tel', 'Teléfono', this.cli.telefono, '11 5555-2020')}
+            ${f('c-mail', 'Email', this.cli.email, 'cliente@correo.com')}
+            ${f('c-dom', 'Domicilio de entrega', this.cli.domicilio, 'Calle 1234, piso/depto')}
+            ${sel('c-locd', 'Localidad', `<option value="">Elegí…</option>` +
+              locds.map(l => `<option value="${l.k}" ${this.cli.localidad === l.k ? 'selected' : ''}>${UI.esc(l.label)}</option>`).join(''))}
+            ${sel('c-canal', '¿Cómo nos conoció?', `<option value="">—</option>` +
+              ['Instagram', 'Facebook', 'Recomendación', 'Pasó por el local', 'Google', 'Otro']
+                .map(o => `<option ${this.cli.canal === o ? 'selected' : ''}>${o}</option>`).join(''))}
+            ${ocultos}
+            ${addBtns ? `<div class="adds">${addBtns}</div>` : ''}
           </div>
-          <div id="c-aviso"></div>
-        </div>
-
-        <div class="card pad" style="margin-bottom:14px">
-          <div class="kick" style="margin-bottom:8px">Datos de la operación</div>
-          <div class="op-grid">
-            <label class="fld"><span class="lbl">Vendedor</span>
-              <select id="op-vend"><option value="">Elegí…</option>${vends.map(v => `<option ${this.vendedor === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
-            <label class="fld"><span class="lbl">Local de origen</span>
-              <select id="op-local">${locs.map(l => `<option value="${l.k}" ${this.local === l.k ? 'selected' : ''}>${l.label}</option>`).join('')}</select></label>
-            <label class="fld"><span class="lbl">Término de pago</span>
-              <select id="op-term">${TERMINOS.map(t => `<option value="${t.k}" ${this.termino === t.k ? 'selected' : ''}>${t.label}</option>`).join('')}</select></label>
-            <label class="fld"><span class="lbl">Vence</span><input id="op-vence" type="date" value="${UI.esc(this.vence)}"></label>
+          <div class="cz-col">
+            ${sel('op-vend', 'Vendedor', vends.map(v => `<option ${this.vendedor === v ? 'selected' : ''}>${v}</option>`).join(''))}
+            ${sel('op-local', 'Local de origen', locs.map(l => `<option value="${l.k}" ${this.local === l.k ? 'selected' : ''}>${UI.esc(l.label)}</option>`).join(''))}
+            ${sel('op-term', 'Condición de pago', TERMINOS.map(t => `<option value="${t.k}" ${this.termino === t.k ? 'selected' : ''}>${UI.esc(t.label)}</option>`).join(''))}
+            <div class="fr"><label for="op-nota2">Observaciones</label>
+              <input id="op-nota2" value="${UI.esc(this.notas)}" placeholder="—"></div>
+            <div class="fr"><label></label><div class="muted" id="op-nota" style="font-size:12px;padding-top:5px"></div></div>
           </div>
-          <div class="muted" id="op-nota" style="font-size:12px;margin-top:8px"></div>
         </div>
+        <div id="c-aviso"></div>`;
 
-        <div class="card">
-          <div class="row" style="padding:12px 14px;border-bottom:1px solid var(--line)">
-            <b style="color:var(--navy)">Ítems</b><div class="sp"></div>
-            <button class="btn sm" id="pr-medida">+ A medida</button>
-            <button class="btn sm" id="pr-catalogo">☰ Catálogo</button>
-          </div>
-          <div class="lhead"><span>Producto</span><span>Cant.</span><span>Precio unit.</span><span>Observaciones</span><span style="text-align:right">Subtotal</span><span></span></div>
-          <div id="pr-lineas"></div>
-        </div>
-        <div id="pr-pie"></div>
-
-        <style>
-          .cli-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-          .op-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-          @media(max-width:760px){.cli-grid,.op-grid{grid-template-columns:1fr 1fr}}
-          @media(max-width:460px){.cli-grid,.op-grid{grid-template-columns:1fr}}
-          .lhead,.lrow{display:grid;grid-template-columns:1.4fr 72px 130px 1.1fr 120px 34px;gap:10px;align-items:center}
-          .lhead{padding:9px 14px;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:700;border-bottom:1px solid var(--line)}
-          .lrow{padding:10px 14px;border-bottom:1px solid var(--line-soft)}
-          .lrow:hover{background:var(--panel-2)}
-          .lrow .n{font-weight:650;color:var(--navy);line-height:1.25} .lrow .v{font-size:12px;color:var(--muted)}
-          .lrow input{padding:7px 9px} .lrow .sub{text-align:right;font-weight:700;color:var(--navy)}
-          .lrow .lock{color:var(--muted);font-size:12px;text-align:right;padding-right:2px}
-          .lx{color:var(--muted);cursor:pointer;font-size:16px;border:0;background:transparent;padding:4px}
-          .badge-med{font-size:10px;font-weight:800;color:var(--warn);background:var(--warn-bg);border-radius:5px;padding:1px 6px;margin-left:6px}
-          @media(max-width:760px){.lhead{display:none}.lrow{grid-template-columns:1fr 1fr;gap:8px}.lrow .sub,.lrow .lock{text-align:left}}
-          .srow{position:relative;padding:11px 14px}
-          .drop{position:absolute;left:14px;right:14px;top:100%;z-index:30;background:var(--panel);border:1px solid var(--brand);border-radius:11px;box-shadow:var(--shadow);overflow:hidden;max-height:320px;overflow-y:auto}
-          .drop .it{display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--line-soft)}
-          .drop .it:last-child{border-bottom:0} .drop .it:hover{background:var(--brand-soft)} .drop .it .cnt{color:var(--muted);font-size:12px}
-          .pie{display:flex;align-items:center;gap:24px;padding:18px;margin-top:16px;flex-wrap:wrap}
-          .tot{font-size:13px;color:var(--muted)} .tot b{display:block;font-size:22px;color:var(--navy)}
-          .mdlbg{position:fixed;inset:0;background:rgba(20,26,38,.4);z-index:50;display:grid;place-items:center;padding:20px}
-        </style>`;
-
-      const bind = (id, campo) => { const el = document.getElementById(id); if (el) el.oninput = () => { this.cli[campo] = el.value; this.avisoCliente(); }; };
-      bind('c-nombre', 'nombre'); bind('c-tel', 'telefono'); bind('c-mail', 'email'); bind('c-ig', 'instagram'); bind('c-dni', 'dni');
+      const bind = (id, campo, rerender) => {
+        const el = document.getElementById(id); if (!el) return;
+        el.oninput = () => { this.cli[campo] = el.value; this.avisoCliente(); if (rerender) this.pintarSide(); };
+      };
+      bind('c-nombre', 'nombre', true); bind('c-tel', 'telefono', true);
+      bind('c-mail', 'email', true); bind('c-dom', 'domicilio', true);
+      OPCIONALES.forEach(o => bind('c-' + o.k, o.k, true));
+      c.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { this.abiertos[b.dataset.add] = true; this.pintarDatos(); });
       document.getElementById('c-canal').onchange = e => { this.cli.canal = e.target.value; };
+      document.getElementById('op-nota2').oninput = e => { this.notas = e.target.value; };
+      // Elegir localidad trae el costo de envío por default (editable en Adicionales).
+      document.getElementById('c-locd').onchange = e => {
+        this.cli.localidad = e.target.value;
+        if (!this.ad.envioTocado) {
+          this.ad.envio = global.DB.fleteDe(this.cli.localidad);
+          this.log('Sistema', `Cargó el envío por localidad: ${UI.pesos(this.ad.envio)}`);
+        }
+        this.pintarTodo();
+      };
       document.getElementById('op-vend').onchange = e => { this.vendedor = e.target.value; };
       document.getElementById('op-local').onchange = e => { this.local = e.target.value; };
-      document.getElementById('op-term').onchange = e => { this.termino = e.target.value; this.notaTermino(); this.pintar(); };
-      document.getElementById('op-vence').onchange = e => { this.vence = e.target.value; };
-      document.getElementById('pr-catalogo').onclick = () => this.modalCatalogo();
-      document.getElementById('pr-medida').onclick = () => this.agregarMedida();
-      document.getElementById('pr-guardar').onclick = () => this.accion('guardar');
-      document.getElementById('pr-preview').onclick = () => this.accion('preview');
-      document.getElementById('pr-print').onclick = () => this.accion('print');
-
-      this.avisoCliente(); this.notaTermino(); this.pintar();
+      document.getElementById('op-term').onchange = e => {
+        this.termino = e.target.value;
+        this.ad.saldoEn = this.terminoLabel();   // "Saldo se abona en" sigue a la condición
+        this.log('Sistema', `Calculó descuento por condición de pago: ${this.terminoLabel()}`);
+        this.pintarTodo();
+      };
+      this.avisoCliente(); this.notaTermino();
     },
 
     avisoCliente() {
@@ -148,51 +251,116 @@
     },
     notaTermino() {
       const n = document.getElementById('op-nota'); if (!n) return;
-      n.innerHTML = this.termino === 'efectivo' ? 'Efectivo: precio de lista <b>−35%</b>.'
-        : this.termino === 'transferencia' ? 'Transferencia: <b>a definir</b> el descuento (por ahora = lista).'
-        : this.termino === 'mixto' ? 'Mixto: el vendedor <b>edita cada precio</b> (parte efectivo + parte tarjeta/transferencia).'
-        : 'Tarjeta / Lista: precio de lista, en 3 · 6 · 12 cuotas.';
+      n.innerHTML = this.termino === 'efectivo' ? 'Precio de lista <b>−35%</b>.'
+        : this.termino === 'transferencia' ? 'Descuento <b>a definir</b> (por ahora = lista).'
+        : this.termino === 'mixto' ? 'El vendedor <b>edita cada precio</b>.'
+        : 'Precio de lista, en 3 · 6 · 12 cuotas.';
+    },
+
+    // ---- Solapa Productos -------------------------------------------------
+    pintarProductos() {
+      const cont = document.getElementById('cz-tab'); if (!cont) return;
+      cont.innerHTML = `
+        <div class="lhead"><span></span><span>Producto</span><span>Tipo</span><span>Cant.</span>
+          <span style="text-align:right">Precio unit.</span><span>Detalle</span>
+          <span style="text-align:right">Subtotal</span><span></span></div>
+        <div id="pr-lineas"></div>
+        <div class="srow">
+          <input id="pr-buscar" class="busca" placeholder="Buscar un producto…" autocomplete="off">
+          <button class="lnk" id="pr-catalogo">Catálogo</button>
+          <div id="pr-drop"></div>
+        </div>`;
+      document.getElementById('pr-catalogo').onclick = () => this.modalCatalogo();
+      const inp = document.getElementById('pr-buscar');
+      let t; inp.oninput = () => { clearTimeout(t); t = setTimeout(() => this.buscarInline(inp.value.trim()), 220); };
+      inp.onblur = () => setTimeout(() => { const d = document.getElementById('pr-drop'); if (d) d.innerHTML = ''; }, 180);
+      this.pintar();
     },
 
     pintar() {
       const cont = document.getElementById('pr-lineas'); if (!cont) return;
-      const filas = this.lineas.map(l => {
+      if (!this.lineas.length) {
+        cont.innerHTML = UI.vacio('Buscá un mueble abajo para empezar la cotización.');
+        this.pintarTotales(); return;
+      }
+      cont.innerHTML = this.lineas.map(l => {
         const unit = this.unit(l), sub = unit * l.cantidad, ed = this.editable(l);
-        const nombre = l.tipo === 'medida'
-          ? `<input value="${UI.esc(l.prodNombre)}" data-nom="${l.key}" placeholder="Mueble a medida" style="font-weight:650">`
-          : `<div class="n">${UI.esc(l.prodNombre)}<span class="badge-med" ${this.requiereVerif(l) ? '' : 'style="display:none"'}>verifica admin</span></div><div class="v">${UI.esc(l.ejes)}</div>`;
+        const medida = l.tipo === 'medida';
+        const nombre = medida && !l.prodNombre
+          ? `<input value="" data-nom="${l.key}" placeholder="Mueble a medida" style="font-weight:650">`
+          : `<div class="n">${UI.esc(l.prodNombre || 'Mueble a medida')}</div>
+             <div class="v">${UI.esc(l.ejes)}</div>`;
+        // Estándar → precio bloqueado del catálogo. A medida → libre.
         const precioCel = ed
-          ? `<input type="number" min="0" value="${l.precioManual != null ? l.precioManual : Math.round(unit)}" data-precio="${l.key}" aria-label="Precio unitario">`
+          ? `<input type="number" min="0" class="pnum" value="${l.precioManual != null ? l.precioManual : Math.round(unit)}" data-precio="${l.key}" aria-label="Precio unitario">`
           : `<div class="lock tnum">${UI.pesos(unit)} 🔒</div>`;
         return `<div class="lrow" data-l="${l.key}">
+          <button class="thumb" data-img="${l.key}" title="${l.img ? 'Cambiar imagen' : 'Cargar imagen'}">${
+            l.img ? `<img src="${UI.esc(l.img)}" alt="">` : '<span>+</span>'}</button>
           <div>${nombre}</div>
+          <div><button class="tipo ${medida ? 'med' : ''}" data-tipo="${l.key}">${medida ? 'A medida' : 'Estándar'}</button></div>
           <input type="number" min="1" value="${l.cantidad}" data-cant="${l.key}" aria-label="Cantidad">
           ${precioCel}
-          <input value="${UI.esc(l.obs)}" data-obs="${l.key}" placeholder="—" aria-label="Observaciones">
+          <input value="${UI.esc(l.obs)}" data-obs="${l.key}" placeholder="—" aria-label="Detalle">
           <div class="sub tnum">${UI.pesos(sub)}</div>
           <button class="lx" data-del="${l.key}" title="Quitar">✕</button></div>`;
       }).join('');
 
-      cont.innerHTML = filas + `<div class="srow">
-        <input id="pr-buscar" placeholder="Agregar del catálogo (estándar)…" autocomplete="off"><div id="pr-drop"></div></div>`;
-
-      cont.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { this.lineas = this.lineas.filter(x => x.key !== Number(b.dataset.del)); this.pintar(); });
-      cont.querySelectorAll('[data-cant]').forEach(i => i.onchange = () => { const l = this.get(i.dataset.cant); if (l) { l.cantidad = Math.max(1, Math.floor(Number(i.value) || 1)); this.pintar(); } });
-      cont.querySelectorAll('[data-obs]').forEach(i => i.oninput = () => { const l = this.get(i.dataset.obs); if (l) { l.obs = i.value; this.marcaVerif(i); } });
+      cont.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
+        const l = this.get(b.dataset.del);
+        this.lineas = this.lineas.filter(x => x.key !== Number(b.dataset.del));
+        if (l) this.log(this.vendedor, `Quitó ${l.prodNombre || 'un producto'}`);
+        this.pintar(); this.pintarDatos();
+      });
+      cont.querySelectorAll('[data-cant]').forEach(i => i.onchange = () => { const l = this.get(i.dataset.cant); if (l) { l.cantidad = Math.max(1, Math.floor(Number(i.value) || 1)); this.pintar(); this.pintarDatos(); } });
+      cont.querySelectorAll('[data-obs]').forEach(i => i.oninput = () => { const l = this.get(i.dataset.obs); if (l) l.obs = i.value; });
       cont.querySelectorAll('[data-nom]').forEach(i => i.oninput = () => { const l = this.get(i.dataset.nom); if (l) l.prodNombre = i.value; });
-      cont.querySelectorAll('[data-precio]').forEach(i => i.onchange = () => { const l = this.get(i.dataset.precio); if (l) { l.precioManual = Math.max(0, Number(i.value) || 0); this.pintar(); } });
-
-      const inp = document.getElementById('pr-buscar');
-      let t; inp.oninput = () => { clearTimeout(t); t = setTimeout(() => this.buscarInline(inp.value.trim()), 220); };
-      inp.onblur = () => setTimeout(() => { const d = document.getElementById('pr-drop'); if (d) d.innerHTML = ''; }, 180);
-      this.pintarPie();
+      cont.querySelectorAll('[data-precio]').forEach(i => i.onchange = () => { const l = this.get(i.dataset.precio); if (l) { l.precioManual = Math.max(0, Number(i.value) || 0); this.pintar(); this.pintarDatos(); } });
+      // "A medida" es una opción DENTRO del producto, no un ítem suelto:
+      // se pasa la línea a medida y ahí se libera el precio.
+      cont.querySelectorAll('[data-tipo]').forEach(b => b.onclick = () => this.alternarTipo(this.get(b.dataset.tipo)));
+      cont.querySelectorAll('[data-img]').forEach(b => b.onclick = () => this.cargarImagen(this.get(b.dataset.img)));
+      this.pintarTotales();
     },
     get(key) { return this.lineas.find(x => x.key === Number(key)); },
-    marcaVerif(inp) {
-      const row = inp.closest ? null : null; // sin closest en shim; repintamos liviano
-      const l = this.get(inp.dataset.obs);
-      const badge = document.querySelector(`[data-l="${l.key}"] .badge-med`);
-      if (badge) badge.style.display = this.requiereVerif(l) ? '' : 'none';
+
+    alternarTipo(l) {
+      if (!l) return;
+      if (l.tipo === 'estandar') {
+        l.tipo = 'medida';
+        l.precioManual = Math.round(this.unit({ ...l, tipo: 'estandar' }));
+        l.ejes = l.ejes ? l.ejes + ' · adaptado' : 'a medida';
+        this.log(this.vendedor, `Pasó ${l.prodNombre} a medida`);
+      } else {
+        l.tipo = 'estandar';
+        l.precioManual = null;
+        l.ejes = l.partes ? textoEjes(l.partes) : l.ejes.replace(/ · adaptado$/, '');
+      }
+      this.pintar(); this.pintarTodo();
+    },
+
+    // Imagen del mueble. Los a medida la necesitan sí o sí (el vendedor saca la
+    // foto de lo que pide el cliente); los estándar idealmente la traen de
+    // Tienda Nube y se puede reemplazar.
+    cargarImagen(l) {
+      if (!l) return;
+      this.modal(`<h3 style="color:var(--navy)">Imagen del producto</h3>
+        <p class="muted" style="font-size:13px;margin:8px 0 12px">
+          Pegá el link de la imagen. En los muebles <b>a medida</b> la foto es la que
+          le explica a fábrica qué pidió el cliente.</p>
+        <div class="fr"><label for="im-url">URL de la imagen</label>
+          <input id="im-url" value="${UI.esc(l.img || '')}" placeholder="https://…"></div>
+        <div class="row" style="margin-top:14px;justify-content:flex-end;gap:10px">
+          ${l.img ? '<button class="btn" id="im-quitar">Quitar</button>' : ''}
+          <button class="btn primary" id="im-ok">Guardar</button></div>`, m => {
+        document.getElementById('im-ok').onclick = () => {
+          l.img = document.getElementById('im-url').value.trim();
+          this.log(this.vendedor, `Cargó imagen de ${l.prodNombre || 'un producto'}`);
+          m.remove(); this.pintar(); this.pintarSide();
+        };
+        const q = document.getElementById('im-quitar');
+        if (q) q.onclick = () => { l.img = ''; m.remove(); this.pintar(); };
+      });
     },
 
     async buscarInline(texto) {
@@ -200,9 +368,11 @@
       if (!texto) { drop.innerHTML = ''; return; }
       drop.innerHTML = `<div class="drop"><div class="it muted">${UI.spinner('Buscando…')}</div></div>`;
       try {
+        // La búsqueda ya es insensible a tildes (DB compara contra nombre_norm),
+        // así "comoda" trae "CÓMODA".
         const prods = await global.DB.productos({ texto, limite: 20 });
-        if (!prods.length) { drop.innerHTML = `<div class="drop"><div class="it muted">Nada con “${UI.esc(texto)}”. Probá el Catálogo o cargalo a medida.</div></div>`; return; }
-        drop.innerHTML = `<div class="drop">${prods.map(p => `<div class="it" data-pick="${p.id}"><span>${UI.esc(p.nombre)}</span>${p.publicado_tn ? '<span class="pill ok">TN</span>' : '<span class="pill soft">interno</span>'}<span class="sp"></span><span class="cnt">${p.variantes} var.</span></div>`).join('')}</div>`;
+        if (!prods.length) { drop.innerHTML = `<div class="drop"><div class="it muted">Nada con “${UI.esc(texto)}”. Probá el Catálogo.</div></div>`; return; }
+        drop.innerHTML = `<div class="drop">${prods.map(p => `<div class="it" data-pick="${p.id}"><span>${UI.esc(p.nombre)}</span>${p.publicado_tn ? '<span class="pill ok">TN</span>' : '<span class="pill soft">interno</span>'}<span class="sp" style="flex:1"></span><span class="cnt">${p.variantes} var.</span></div>`).join('')}</div>`;
         drop.querySelectorAll('[data-pick]').forEach(it => it.onmousedown = e => { e.preventDefault(); this.elegirProducto(Number(it.dataset.pick), prods.find(p => p.id === Number(it.dataset.pick))); });
       } catch (e) { drop.innerHTML = `<div class="drop"><div class="it muted">${UI.esc(e.message || e)}</div></div>`; }
     },
@@ -213,40 +383,164 @@
       let vars;
       try { vars = await global.DB.variantes(prodId); } catch (e) { UI.aviso(String(e.message || e), 'crit'); return; }
       if (!vars.length) { UI.aviso('Ese producto no tiene variantes', 'warn'); return; }
-      if (vars.length === 1) return this.agregarEstandar(prod.nombre, vars[0]);
-      this.modalVariante(prod.nombre, vars);
-    },
-    agregarEstandar(prodNombre, variante) {
-      this.lineas.push({ key: ++this._uid, tipo: 'estandar', prodNombre, varId: variante.id, ejes: UI.ejes(variante), base: Number(variante.precio) || 0, cantidad: 1, obs: '', precioManual: null });
-      this.pintar(); UI.aviso('Ítem agregado', 'ok');
-    },
-    agregarMedida() {
-      this.lineas.push({ key: ++this._uid, tipo: 'medida', prodNombre: '', varId: null, ejes: 'a medida', base: 0, cantidad: 1, obs: '', precioManual: 0 });
-      this.pintar();
+      if (vars.length === 1) return this.agregarEstandar(prod.nombre, vars[0], prod.img);
+      this.modalVariante(prod, vars);
     },
 
-    pintarPie() {
-      const total = this.total();
-      const items = this.lineas.reduce((a, l) => a + l.cantidad, 0);
-      const term = TERMINOS.find(t => t.k === this.termino)?.label || '';
-      const pie = document.getElementById('pr-pie'); if (!pie) return;
-      pie.innerHTML = `<div class="card pie">
-        <div class="tot">${UI.esc(term)} · ${items} ${items === 1 ? 'ítem' : 'ítems'}<b class="tnum">${UI.pesos(total)}</b></div>
-        <div class="sp"></div>
-        <button class="btn" id="pr-guardar2">Guardar borrador</button>
-        <button class="btn primary" id="pr-venta" ${this.lineas.length ? '' : 'disabled'}>Convertir en venta →</button></div>`;
-      document.getElementById('pr-guardar2').onclick = () => this.accion('guardar');
-      document.getElementById('pr-venta').onclick = () => this.convertir();
+    agregarEstandar(prodNombre, variante, img = '') {
+      const partes = EJES.filter(e => variante[e.k]).map(e => ({ lbl: e.label, val: variante[e.k] }));
+      this.lineas.push({
+        key: ++this._uid, tipo: 'estandar', prodNombre, varId: variante.id,
+        partes, ejes: textoEjes(partes), base: Number(variante.precio) || 0,
+        cantidad: 1, obs: '', precioManual: null, img: img || variante.img || '',
+      });
+      this.log(this.vendedor, `Agregó producto ${prodNombre}`);
+      this.pintar(); this.pintarDatos(); this.pintarSide();
+      UI.aviso('Producto agregado', 'ok');
     },
 
-    // ---- Acciones -------------------------------------------------------
+    // ---- Solapa Adicionales ----------------------------------------------
+    // Son las preguntas que siempre hay que anotar; casi todas salen por
+    // default y el vendedor sólo corrige lo que cambia.
+    pintarAdicionales() {
+      const c = document.getElementById('cz-tab'); if (!c) return;
+      const a = this.ad, DB = global.DB;
+      const locd = (DB.localidades().find(l => l.k === this.cli.localidad) || {}).label;
+
+      c.innerHTML = `<div class="ad-pad"><div class="cz-cols">
+        <div class="cz-col">
+          <div class="fr"><label for="ad-entrega">Tiempo de entrega</label>
+            <input id="ad-entrega" value="${UI.esc(a.entrega)}"></div>
+          <div class="fr"><label for="ad-saldo">Saldo se abona en</label>
+            <input id="ad-saldo" value="${UI.esc(a.saldoEn)}" readonly title="Sale de la condición de pago"></div>
+          <div class="fr"><label for="ad-envio">Costo de envío</label>
+            <input id="ad-envio" type="number" min="0" value="${a.envio}"></div>
+          <div class="fr"><label></label><span class="hint">${locd
+            ? `Por default de <b>${UI.esc(locd)}</b>.` : 'Elegí la localidad arriba.'}</span></div>
+        </div>
+        <div class="cz-col">
+          <div class="fr"><label for="ad-inst">¿Requiere instalación?</label>
+            <select id="ad-inst">
+              <option value="no" ${a.instalacion === 'no' ? 'selected' : ''}>No</option>
+              <option value="si" ${a.instalacion === 'si' ? 'selected' : ''}>Sí</option>
+            </select></div>
+          <div class="fr"><label for="ad-esc">Subida por escalera</label>
+            <input id="ad-esc" type="number" min="0" value="${a.escalera}"></div>
+          <div class="fr"><label></label><span class="hint">No se calcula: va como aviso en la cotización.</span></div>
+          <div class="fr"><label>IVA</label><input value="${UI.esc(DB.IVA_LEYENDA)}" readonly></div>
+        </div>
+      </div><div id="ad-avisos"></div></div>`;
+
+      const av = () => {
+        const box = document.getElementById('ad-avisos'); if (!box) return;
+        const out = [];
+        if (this.entregaEditada()) out.push(`<div class="banner warn">Cambiaste el plazo de entrega — la orden va a <b>verificarse</b> y el cambio queda registrado.</div>`);
+        out.push(`<div class="banner">Subida por escalera: <b>${UI.esc(DB.escaleraTexto(a.escalera))}</b>. Se cobra según los pisos reales al momento de la entrega.</div>`);
+        if (a.instalacion === 'si') out.push(`<div class="banner">La orden pide <b>instalación</b> — Logística la agenda con el armador.</div>`);
+        box.innerHTML = out.join('');
+      };
+
+      document.getElementById('ad-entrega').oninput = e => { a.entrega = e.target.value; av(); };
+      document.getElementById('ad-envio').oninput = e => {
+        a.envio = Math.max(0, Number(e.target.value) || 0); a.envioTocado = true;
+        this.pintarTotales(); this.pintarDatos();
+      };
+      document.getElementById('ad-inst').onchange = e => { a.instalacion = e.target.value; av(); };
+      document.getElementById('ad-esc').oninput = e => { a.escalera = Math.max(0, Number(e.target.value) || 0); av(); };
+      av();
+    },
+
+    // ---- Desglose de totales ----------------------------------------------
+    pintarTotales() {
+      const t = document.getElementById('cz-tot'); if (!t) return;
+      const lista = this.totalLista(), desc = this.descuento(), muebles = this.total();
+      const envio = this.ad.envio || 0;
+      const pct = this.termino === 'efectivo' ? ' (35%)' : '';
+      const fila = (l, v, cls = '') => `<div class="tr ${cls}"><span>${l}</span><b class="tnum">${v}</b></div>`;
+      t.innerHTML = `<div class="cz-tots">
+        ${fila('Muebles (lista)', UI.pesos(lista))}
+        ${desc ? fila('Descuento' + pct, '−' + UI.pesos(desc), 'neg') : ''}
+        ${desc ? fila('Subtotal muebles', UI.pesos(muebles)) : ''}
+        ${fila('Envío', envio ? UI.pesos(envio) : 'a definir')}
+        ${fila('Total', UI.pesos(this.totalFinal()), 'big')}
+        <div class="tiva">${UI.esc(global.DB.IVA_LEYENDA)}</div>
+      </div>`;
+    },
+
+    // ---- Costado: Actividad · Notas · Cliente · Documentos ----------------
+    pintarSide() {
+      const s = document.getElementById('cz-side'); if (!s) return;
+      const c = this.cli, DB = global.DB;
+      const ident = this.nombreCli();
+      const ficha = DB.fichaCliente(ident);
+
+      s.innerHTML = `
+        <div class="card cz-sc">
+          <div class="tabs sm">
+            <button class="tab ${this.lado === 'actividad' ? 'on' : ''}" data-l="actividad">Actividad</button>
+            <button class="tab ${this.lado === 'notas' ? 'on' : ''}" data-l="notas">Notas</button>
+          </div>
+          <div class="cz-sb">${this.lado === 'actividad' ? this.actividadHTML() : this.notasHTML()}</div>
+        </div>
+
+        <div class="card cz-sc">
+          <div class="cz-sh">Cliente</div>
+          <div class="cz-sb">
+            ${ident ? `<div class="cli-row">
+              <span class="ava">${UI.esc(inic(ident))}</span>
+              <b>${UI.esc(ident)}</b>
+              ${ficha && ficha.recurrente ? '<span class="pill ok">Frecuente</span>' : '<span class="pill soft">Nuevo</span>'}
+            </div>
+            <div class="cli-d">${[
+              c.telefono && `☎ ${UI.esc(c.telefono)}`,
+              c.tel2 && `☎ ${UI.esc(c.tel2)}`,
+              c.email && `✉ ${UI.esc(c.email)}`,
+              c.instagram && `◎ ${UI.esc(c.instagram)}`,
+              c.domicilio && `⌂ ${UI.esc(c.domicilio)}`,
+            ].filter(Boolean).join('<br>') || '<span class="muted">Sin datos de contacto todavía.</span>'}</div>
+            <button class="btn sm" id="cz-ficha" style="width:100%;margin-top:10px">Ver ficha completa</button>`
+            : `<div class="muted" style="font-size:12.5px">Cargá el nombre o el contacto y acá aparece la ficha.</div>`}
+          </div>
+        </div>
+
+        <div class="card cz-sc">
+          <div class="cz-sh">Documentos relacionados</div>
+          <div class="cz-sb">${ficha && ficha.docs.length
+            ? ficha.docs.map(d => `<div class="doc"><span class="di">▤</span>
+                <div><div class="dt">${UI.esc(d.tipo)}</div>
+                  <div class="dr">${UI.esc(d.ref)}${d.f ? ` (${UI.esc(d.f)})` : ''}</div></div></div>`).join('')
+            : '<div class="muted" style="font-size:12.5px">Sin antecedentes para este cliente.</div>'}</div>
+        </div>`;
+
+      s.querySelectorAll('[data-l]').forEach(b => b.onclick = () => { this.lado = b.dataset.l; this.pintarSide(); });
+      const fi = document.getElementById('cz-ficha');
+      if (fi) fi.onclick = () => global.App.goSub('crm', 'clientes');
+      const na = document.getElementById('cz-nota');
+      if (na) na.oninput = () => { this.notas = na.value; };
+    },
+
+    actividadHTML() {
+      if (!this.actividad.length) return '<div class="muted" style="font-size:12.5px">Todavía no pasó nada en esta cotización.</div>';
+      return this.actividad.map(a => `<div class="act">
+        <span class="ava ${a.quien === 'Sistema' ? 'sys' : ''}">${UI.esc(inic(a.quien))}</span>
+        <div><div class="aq">${UI.esc(a.quien)}<span class="ah">${UI.esc(a.hora)}</span></div>
+          <div class="at">${UI.esc(a.texto)}</div></div></div>`).join('');
+    },
+    notasHTML() {
+      return `<textarea id="cz-nota" rows="7" placeholder="Notas internas de la cotización…">${UI.esc(this.notas)}</textarea>`;
+    },
+
+    // ---- Acciones ---------------------------------------------------------
     accion(tipo) {
-      if ((tipo === 'preview' || tipo === 'print') && !this.clienteValido()) return this.popIdentidad(tipo);
-      if (tipo === 'guardar' && !this.clienteValido()) { this.avisoCliente(); return this.popIdentidad('guardar'); }
-      if ((tipo === 'preview' || tipo === 'print') && !this.lineas.length) { UI.aviso('Agregá al menos un ítem', 'warn'); return; }
-      if (tipo === 'preview') return this.modalPreview(false);
-      if (tipo === 'print') return this.modalPreview(true);
-      if (tipo === 'guardar') return UI.aviso('Borrador guardado (demo)', 'ok');
+      if (!this.clienteValido()) {
+        if (tipo === 'guardar') { this.avisoCliente(); return this.popIdentidad('guardar'); }
+        return this.popIdentidad(tipo);
+      }
+      if (tipo !== 'guardar' && !this.lineas.length) { UI.aviso('Agregá al menos un producto', 'warn'); return; }
+      if (tipo === 'preview') return this.modalPreview('ver');
+      if (tipo === 'print') return this.modalPreview('print');
+      if (tipo === 'descargar') return this.modalPreview('descargar');
+      if (tipo === 'guardar') { this.log(this.vendedor, 'Guardó la cotización'); this.pintarSide(); return UI.aviso('Borrador guardado (demo)', 'ok'); }
     },
 
     // Pop-up: se entrega un presupuesto sin los datos para registrarlo.
@@ -260,31 +554,36 @@
         </div>`, m => {
         document.getElementById('mp-cerrar').onclick = () => m.remove();
         const ig = document.getElementById('mp-igual');
-        if (ig) ig.onclick = () => { m.remove(); this.modalPreview(tipoOrig === 'print'); };
+        if (ig) ig.onclick = () => { m.remove(); this.modalPreview(tipoOrig === 'print' ? 'print' : 'ver'); };
       });
     },
 
-    // ---- Convertir en venta → estado CONFIRMAR --------------------------
+    // ---- Confirmar → Venta (estado CONFIRMAR) ------------------------------
     convertir() {
       if (!this.clienteValido()) { this.avisoCliente(); return this.popIdentidad('convertir'); }
-      if (!this.lineas.length) return UI.aviso('Agregá al menos un ítem', 'warn');
+      if (!this.lineas.length) return UI.aviso('Agregá al menos un producto', 'warn');
       if (!this.vendedor) return UI.aviso('Elegí el vendedor de la operación', 'warn');
       const incompletos = this.lineas.filter(l => l.tipo === 'medida' && (!l.prodNombre.trim() || !(Number(l.precioManual) > 0)));
-      if (incompletos.length) return UI.aviso('Completá nombre y precio de los ítems a medida', 'warn');
+      if (incompletos.length) return UI.aviso('Completá nombre y precio de los productos a medida', 'warn');
 
       const verif = this.lineas.filter(l => this.requiereVerif(l)).length;
-      const total = this.total();
-      const nombreCli = this.cli.nombre.trim() || this.cli.telefono.trim() || this.cli.instagram.trim() || this.cli.email.trim();
-      this.modal(`<h3 style="color:var(--navy)">Convertir en venta</h3>
+      const plazo = this.entregaEditada();
+      const muebles = this.total(), envio = this.ad.envio || 0, total = this.totalFinal();
+      const nombreCli = this.nombreCli();
+      this.modal(`<h3 style="color:var(--navy)">Confirmar → Venta</h3>
         <p style="margin:10px 0 0">Se crea la orden en estado <span class="pill warn">Confirmar</span> — a la espera de la seña (mínimo 30%).</p>
         <table style="margin-top:12px"><tbody>
           <tr><td class="muted">Cliente</td><td style="text-align:right"><b>${UI.esc(nombreCli)}</b></td></tr>
           <tr><td class="muted">Vendedor · Local</td><td style="text-align:right">${UI.esc(this.vendedor)} · ${UI.esc(this.local)}</td></tr>
-          <tr><td class="muted">Término</td><td style="text-align:right">${UI.esc(TERMINOS.find(t => t.k === this.termino)?.label || '')}</td></tr>
-          <tr><td class="muted">Ítems</td><td style="text-align:right">${this.lineas.length}${verif ? ` · <span style="color:var(--warn)">${verif} a verificar</span>` : ''}</td></tr>
+          <tr><td class="muted">Condición de pago</td><td style="text-align:right">${UI.esc(this.terminoLabel())}</td></tr>
+          <tr><td class="muted">Entrega</td><td style="text-align:right">${UI.esc(this.ad.entrega)}</td></tr>
+          <tr><td class="muted">Productos</td><td style="text-align:right">${this.lineas.length}${verif ? ` · <span style="color:var(--warn)">${verif} a verificar</span>` : ''}</td></tr>
+          <tr><td class="muted">Muebles</td><td style="text-align:right" class="tnum">${UI.pesos(muebles)}</td></tr>
+          <tr><td class="muted">Envío</td><td style="text-align:right" class="tnum">${envio ? UI.pesos(envio) : 'a definir'}</td></tr>
           <tr><td class="muted">Total</td><td style="text-align:right"><b class="tnum">${UI.pesos(total)}</b></td></tr>
         </tbody></table>
-        ${verif ? `<div class="banner warn" style="margin-top:12px">${verif} ítem(s) a medida / con observaciones van a <b>verificarse en Administración</b>.</div>` : ''}
+        ${verif ? `<div class="banner warn" style="margin-top:12px">${verif} producto(s) a medida / con detalle van a <b>verificarse en Administración</b>.</div>` : ''}
+        ${plazo ? `<div class="banner warn" style="margin-top:10px">El <b>plazo de entrega</b> se cambió (${UI.esc(this.ad.entrega)}) — queda registrado y va a verificación.</div>` : ''}
         <div class="row" style="margin-top:16px;justify-content:flex-end;gap:10px">
           <button class="btn" id="cv-cancel">Cancelar</button>
           <button class="btn primary" id="cv-ok">Crear orden en Confirmar</button></div>`, m => {
@@ -293,7 +592,7 @@
           const orden = global.DB.crearOrden({
             cliente: nombreCli, vendedor: this.vendedor, local: this.local, total,
             termino: this.termino, fecha: hoy(),
-            lineas: this.lineas.map(l => ({ nombre: l.prodNombre, cant: l.cantidad, unit: this.unit(l), obs: l.obs, tipo: l.tipo })),
+            lineas: this.lineas.map(l => ({ nombre: l.prodNombre, cant: l.cantidad, unit: this.unit(l), obs: l.obs, tipo: l.tipo, img: l.img })),
           });
           m.remove();
           this.reset();
@@ -302,39 +601,96 @@
         };
       });
     },
+
     reset() {
-      this.cli = { nombre: '', telefono: '', email: '', instagram: '', dni: '', canal: '' };
-      this.vendedor = ''; this.termino = 'efectivo'; this.vence = ''; this.lineas = []; this._uid = 0;
+      const s = global.DB.sesion();
+      this.cli = { nombre: '', telefono: '', email: '', instagram: '', dni: '', tel2: '', canal: '', domicilio: '', localidad: '' };
+      this.abiertos = {}; this.solapa = 'productos'; this.lado = 'actividad';
+      // Vendedor y local salen del usuario de la sesión; igual se pueden editar.
+      this.vendedor = s.vendedor; this.local = s.local; this.termino = 'efectivo';
+      this.notas = ''; this.terminos = '';
+      this.ad = {
+        entrega: global.DB.ENTREGA_DEFAULT,
+        saldoEn: this.terminoLabel(),
+        envio: 0, envioTocado: false,
+        instalacion: 'no',
+        escalera: global.DB.ESCALERA_DEFAULT,
+      };
+      this.lineas = []; this._uid = 0;
+      this.actividad = [];
+      this.log(this.vendedor, 'Creó la cotización');
     },
 
-    // ---- Vista previa / impresión ---------------------------------------
+    // ---- Vista previa / descarga / impresión -------------------------------
     cuerpoPreview() {
-      const term = TERMINOS.find(t => t.k === this.termino)?.label || '';
-      const ident = [this.cli.telefono, this.cli.email, this.cli.instagram].filter(Boolean).join(' · ');
+      const term = this.terminoLabel(), a = this.ad, DB = global.DB;
+      const c = this.cli;
+      const ident = [c.telefono, c.tel2, c.email, c.instagram].filter(Boolean).join(' · ');
+      const dom = [c.domicilio, (DB.localidades().find(l => l.k === c.localidad) || {}).label].filter(Boolean).join(' · ');
+      const lista = this.totalLista(), desc = this.descuento(), envio = a.envio || 0;
       return `<div class="pv">
         <div class="pv-h"><h2>Belgrano Home</h2><div class="muted">Cotización · ${UI.esc(term)}</div></div>
-        <div class="pv-cli"><b>${UI.esc(this.cli.nombre || 'Cliente')}</b><div class="muted">${UI.esc(ident)}</div></div>
+        <div class="pv-cli"><b>${UI.esc(c.nombre || 'Cliente')}</b>
+          <div class="muted">${UI.esc(ident)}</div>${dom ? `<div class="muted">${UI.esc(dom)}</div>` : ''}</div>
         <table><thead><tr><th>Producto</th><th>Cant.</th><th style="text-align:right">Precio</th><th style="text-align:right">Subtotal</th></tr></thead>
         <tbody>${this.lineas.map(l => { const u = this.unit(l), s = u * l.cantidad;
           return `<tr><td><b>${UI.esc(l.prodNombre || '—')}</b><br><span class="muted">${UI.esc(l.ejes)}${l.obs ? ' · ' + UI.esc(l.obs) : ''}</span></td>
           <td>${l.cantidad}</td><td style="text-align:right" class="tnum">${UI.pesos(u)}</td><td style="text-align:right" class="tnum">${UI.pesos(s)}</td></tr>`; }).join('')}</tbody></table>
-        <div class="pv-tot">Total (${UI.esc(term)}): <b class="tnum">${UI.pesos(this.total())}</b></div></div>`;
+        <div class="pv-tot">
+          <div>Muebles (lista) <b class="tnum">${UI.pesos(lista)}</b></div>
+          ${desc ? `<div>Descuento <b class="tnum">−${UI.pesos(desc)}</b></div>` : ''}
+          <div>Envío <b class="tnum">${envio ? UI.pesos(envio) : 'a definir'}</b></div>
+          <div class="big">Total <b class="tnum">${UI.pesos(this.totalFinal())}</b></div>
+        </div>
+        <div class="pv-ad">
+          <div><b>Tiempo de entrega:</b> ${UI.esc(a.entrega)}</div>
+          <div><b>Saldo se abona en:</b> ${UI.esc(a.saldoEn)}</div>
+          <div><b>Instalación:</b> ${a.instalacion === 'si' ? 'Sí' : 'No'}</div>
+          <div><b>Subida por escalera:</b> ${UI.esc(DB.escaleraTexto(a.escalera))}</div>
+          <div>${UI.esc(DB.IVA_LEYENDA)}</div>
+          ${this.terminos ? `<div style="margin-top:8px">${UI.esc(this.terminos)}</div>` : ''}
+        </div></div>`;
     },
-    modalPreview(imprimir) {
-      const estilo = `<style>.pv{color:#141a26;font-family:-apple-system,system-ui,sans-serif}
+    estiloPreview() {
+      return `<style>.pv{color:#141a26;font-family:-apple-system,system-ui,sans-serif}
         .pv-h{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #1c2b4a;padding-bottom:8px;margin-bottom:14px}
         .pv-h h2{color:#1c2b4a;margin:0}.pv .muted{color:#7d8aa3}.pv-cli{margin-bottom:14px}.pv table{width:100%;border-collapse:collapse;font-size:14px}
         .pv th{text-align:left;font-size:11px;text-transform:uppercase;color:#7d8aa3;border-bottom:1px solid #dbe1ec;padding:8px}
-        .pv td{padding:9px 8px;border-bottom:1px solid #eef1f6;vertical-align:top}.pv-tot{text-align:right;margin-top:16px;font-size:18px;color:#1c2b4a}</style>`;
-      const cuerpo = estilo + this.cuerpoPreview();
-      if (imprimir) { try { const w = global.open('', '_blank'); if (w) { w.document.write(`<title>Cotización</title>${cuerpo}`); w.document.close(); w.focus(); w.print(); return; } } catch (e) {} }
-      this.modal(`<div class="row" style="margin-bottom:12px"><b style="color:var(--navy)">Vista previa</b><div class="sp"></div>
-        <button class="btn sm" id="pv-print">🖨 Imprimir</button></div>${cuerpo}`, m => {
-        document.getElementById('pv-print').onclick = () => this.modalPreview(true);
-      }, 640);
+        .pv td{padding:9px 8px;border-bottom:1px solid #eef1f6;vertical-align:top}
+        .pv-tot{margin-top:16px;margin-left:auto;width:280px;font-size:13.5px;color:#48566e}
+        .pv-tot div{display:flex;justify-content:space-between;padding:3px 0}
+        .pv-tot b{color:#1c2b4a}
+        .pv-tot .big{border-top:1px solid #dbe1ec;margin-top:5px;padding-top:7px;font-size:17px;color:#1c2b4a}
+        .pv-ad{margin-top:22px;border-top:1px solid #dbe1ec;padding-top:12px;font-size:12.5px;color:#48566e;line-height:1.8}</style>`;
+    },
+    // Se abre para ver, imprimir o bajar el archivo — hoy la cotización se
+    // manda por la plataforma que usan, así que alcanza con el archivo.
+    modalPreview(modo) {
+      const cuerpo = this.estiloPreview() + this.cuerpoPreview();
+      const nombre = `Cotizacion-${(this.nombreCli() || 'cliente').replace(/[^\w\-]+/g, '_')}.html`;
+      if (modo === 'print') {
+        try { const w = global.open('', '_blank'); if (w) { w.document.write(`<title>Cotización</title>${cuerpo}`); w.document.close(); w.focus(); w.print(); return; } } catch (e) {}
+      }
+      if (modo === 'descargar') return this.bajar(nombre, `<!doctype html><meta charset="utf-8"><title>Cotización</title>${cuerpo}`);
+      this.modal(`<div class="row" style="margin-bottom:12px"><b style="color:var(--navy)">Vista previa</b><div class="sp" style="flex:1"></div>
+        <button class="btn sm" id="pv-baja">Descargar</button>
+        <button class="btn sm" id="pv-print">Imprimir</button></div>${cuerpo}`, m => {
+        document.getElementById('pv-print').onclick = () => this.modalPreview('print');
+        document.getElementById('pv-baja').onclick = () => this.bajar(nombre, `<!doctype html><meta charset="utf-8"><title>Cotización</title>${cuerpo}`);
+      }, 660);
+    },
+    bajar(nombre, html) {
+      try {
+        const a = document.createElement('a');
+        a.href = 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
+        a.download = nombre;
+        document.body.appendChild(a); a.click(); a.remove();
+        this.log(this.vendedor, 'Descargó la cotización'); this.pintarSide();
+        UI.aviso('Cotización descargada', 'ok');
+      } catch (e) { UI.aviso('No se pudo descargar', 'crit'); }
     },
 
-    // ---- Modales --------------------------------------------------------
+    // ---- Modales -----------------------------------------------------------
     modal(html, onready, ancho = 480) {
       const id = 'mdl-' + (++this._uid);
       document.body.insertAdjacentHTML('beforeend',
@@ -344,19 +700,61 @@
       onready && onready(m);
       return m;
     },
-    modalVariante(prodNombre, vars) {
-      this.modal(`<div class="row" style="margin-bottom:12px"><h3 style="color:var(--navy)">${UI.esc(prodNombre)}</h3><div class="sp"></div><button class="lx" id="mv-x" style="font-size:20px">✕</button></div>
-        <p class="muted" style="margin:0 0 12px;font-size:13px">Elegí la variante:</p>
-        <table><thead><tr><th>Medida</th><th>Estructura</th><th>Frente</th><th style="text-align:right">Precio lista</th><th></th></tr></thead>
-        <tbody>${vars.map((v, i) => `<tr><td class="tnum">${UI.esc(v.medida || '—')}</td><td>${UI.esc(v.estructura || '—')}</td><td>${UI.esc(v.frente || '—')}</td>
-          <td style="text-align:right"><b class="tnum">${UI.pesos(v.precio)}</b></td><td style="text-align:right"><button class="btn sm primary" data-v="${i}">Elegir</button></td></tr>`).join('')}</tbody></table>`,
-        m => {
-          document.getElementById('mv-x').onclick = () => m.remove();
-          m.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { this.agregarEstandar(prodNombre, vars[Number(b.dataset.v)]); m.remove(); });
-        }, 560);
+
+    // Armador de variante CON BOTONES: se elige Medida, después Estructura,
+    // después Frente, y el precio se actualiza en cada paso. A propósito NO se
+    // listan los precios de todas las variantes (un mueble puede tener 15+):
+    // se muestra sólo el del combo que se está armando.
+    modalVariante(prod, vars) {
+      const ejes = EJES.filter(e => vars.some(v => v[e.k]));
+      const sel = {};
+      ejes.forEach(e => { const o = opciones(vars, e.k, sel); if (o.length === 1) sel[e.k] = o[0]; });
+
+      const m = this.modal('', null, 560);
+      const caja = m.firstChild;
+
+      const calzan = () => vars.filter(v => ejes.every(e => sel[e.k] == null || v[e.k] === sel[e.k]));
+      const elegida = () => { const c = calzan(); return c.length === 1 || ejes.every(e => sel[e.k] != null) ? c[0] : null; };
+
+      const pintar = () => {
+        const v = elegida();
+        const partes = ejes.filter(e => sel[e.k]).map(e => ({ lbl: e.label, val: sel[e.k] }));
+        caja.innerHTML = `
+          <div class="row" style="margin-bottom:4px"><h3 style="color:var(--navy);margin:0">${UI.esc(prod.nombre)}</h3>
+            <div class="sp" style="flex:1"></div><button class="lx" id="mv-x" style="font-size:20px">✕</button></div>
+          <p class="muted" style="margin:0 0 14px;font-size:13px">Armá el mueble: elegí ${ejes.map(e => e.label.toLowerCase()).join(', ')}.</p>
+          ${ejes.map(e => {
+            const opts = opciones(vars, e.k, sel);
+            return `<div class="vgrp"><div class="vlbl">${UI.esc(e.label)}</div>
+              <div class="vopts">${opts.map(o =>
+                `<button class="vopt ${sel[e.k] === o ? 'on' : ''}" data-e="${e.k}" data-o="${UI.esc(o)}">${UI.esc(o)}</button>`).join('')}</div></div>`;
+          }).join('')}
+          <div class="vpre">
+            <div>
+              <div class="muted" style="font-size:12px">${partes.length ? UI.esc(textoEjes(partes)) : 'Elegí las opciones'}</div>
+              <b class="tnum" style="font-size:22px;color:var(--navy)">${v ? UI.pesos(v.precio) : '—'}</b>
+              <span class="muted" style="font-size:12px">precio de lista</span>
+            </div>
+            <div class="sp" style="flex:1"></div>
+            <button class="btn primary" id="mv-ok" ${v ? '' : 'disabled'}>Agregar</button>
+          </div>`;
+
+        document.getElementById('mv-x').onclick = () => m.remove();
+        caja.querySelectorAll('[data-e]').forEach(b => b.onclick = () => {
+          const e = b.dataset.e, o = b.dataset.o;
+          if (sel[e] === o) delete sel[e]; else sel[e] = o;
+          // Al cambiar un eje de arriba, los de abajo pueden quedar inválidos.
+          ejes.forEach(x => { if (sel[x.k] && !opciones(vars, x.k, sel, x.k).includes(sel[x.k])) delete sel[x.k]; });
+          pintar();
+        });
+        const ok = document.getElementById('mv-ok');
+        if (ok && v) ok.onclick = () => { this.agregarEstandar(prod.nombre, v, prod.img); m.remove(); };
+      };
+      pintar();
     },
+
     modalCatalogo() {
-      this.modal(`<div class="row" style="margin-bottom:12px"><h3 style="color:var(--navy)">Buscar: Producto</h3><div class="sp"></div><button class="lx" id="mc-x" style="font-size:20px">✕</button></div>
+      this.modal(`<div class="row" style="margin-bottom:12px"><h3 style="color:var(--navy)">Buscar: Producto</h3><div class="sp" style="flex:1"></div><button class="lx" id="mc-x" style="font-size:20px">✕</button></div>
         <input id="mc-q" placeholder="Buscar por nombre…" autocomplete="off" style="margin-bottom:12px"><div id="mc-lista" style="overflow:auto">${UI.spinner()}</div>`,
         m => {
           document.getElementById('mc-x').onclick = () => m.remove();
@@ -374,8 +772,130 @@
           pintar('');
         }, 720);
     },
+
+    estilos() {
+      return `<style>
+        .cz-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+        .cz-sep{width:1px;height:22px;background:var(--line);margin:0 3px}
+        .cz-wrap{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
+        @media(max-width:1180px){.cz-wrap{grid-template-columns:1fr}}
+
+        .cz-head{margin-bottom:12px}
+        .cz-tit{display:flex;align-items:flex-start;gap:14px;margin-bottom:16px}
+        .cz-box{border:1px solid var(--line);border-radius:10px;padding:9px 16px;text-align:right;background:var(--panel-2);min-width:140px}
+        .cz-box .lbl{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:700}
+        .cz-box b{display:block;font-size:22px;color:var(--navy);line-height:1.25}
+
+        .cz-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px 26px}
+        @media(max-width:820px){.cz-cols{grid-template-columns:1fr}}
+        .cz-col{display:flex;flex-direction:column;gap:9px}
+        .fr{display:grid;grid-template-columns:132px minmax(0,1fr);align-items:center;gap:10px}
+        .fr>label{font-size:12.5px;color:var(--ink-soft)}
+        .fr input,.fr select{padding:7px 10px;font-size:13px;width:100%}
+        .fr input[readonly]{background:var(--panel-2);color:var(--ink-soft)}
+        .fr .hint{font-size:11.5px;color:var(--muted)}
+        @media(max-width:520px){.fr{grid-template-columns:1fr;gap:3px}}
+        .adds{display:flex;gap:7px;flex-wrap:wrap;padding-left:142px}
+        @media(max-width:520px){.adds{padding-left:0}}
+        .chip-add{border:1px dashed var(--line);background:none;color:var(--brand);border-radius:16px;padding:3px 11px;font-size:12px;font-weight:600;cursor:pointer}
+        .chip-add:hover{border-color:var(--brand);background:var(--brand-soft)}
+
+        .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);padding:0 14px}
+        .tabs.sm{padding:0 12px}
+        .tab{border:0;background:none;padding:11px 13px;font:inherit;font-size:13px;font-weight:650;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+        .tab:hover{color:var(--ink)}
+        .tab.on{color:var(--brand);border-bottom-color:var(--brand)}
+        .cz-body{overflow:visible}
+        .ad-pad{padding:16px 14px}
+
+        .srow{position:relative;display:flex;gap:14px;align-items:center;padding:11px 14px;border-bottom:1px solid var(--line-soft)}
+        .srow .busca{width:230px;flex:none;padding:7px 10px;font-size:13px}
+        .lnk{border:0;background:none;color:var(--brand);font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:0}
+        .lnk:hover{text-decoration:underline}
+        .drop{position:absolute;left:14px;width:340px;top:100%;z-index:30;background:var(--panel);border:1px solid var(--brand);border-radius:11px;box-shadow:var(--shadow);overflow:hidden;max-height:320px;overflow-y:auto}
+        .drop .it{display:flex;align-items:center;gap:8px;padding:9px 13px;cursor:pointer;border-bottom:1px solid var(--line-soft)}
+        .drop .it:last-child{border-bottom:0} .drop .it:hover{background:var(--brand-soft)} .drop .it .cnt{color:var(--muted);font-size:12px}
+
+        .lhead,.lrow{display:grid;grid-template-columns:44px minmax(0,1.5fr) 88px 58px 112px minmax(0,1fr) 104px 28px;gap:9px;align-items:center;padding:0 14px}
+        .lhead{padding-top:9px;padding-bottom:9px;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:700;border-bottom:1px solid var(--line)}
+        .lrow{padding-top:7px;padding-bottom:7px;border-bottom:1px solid var(--line-soft)}
+        .lrow:hover{background:var(--panel-2)}
+        .lrow .n{font-weight:650;color:var(--navy);line-height:1.2;font-size:13.5px}
+        .lrow .v{font-size:11.5px;color:var(--muted);line-height:1.35}
+        .lrow input{padding:6px 8px;font-size:13px} .lrow .pnum,.lrow .sub{text-align:right}
+        .lrow .sub{font-weight:700;color:var(--navy)}
+        .lrow .lock{color:var(--muted);font-size:12.5px;text-align:right}
+        .thumb{width:38px;height:38px;flex:none;border:1px dashed var(--line);border-radius:8px;background:var(--panel-2);cursor:pointer;padding:0;overflow:hidden;color:var(--muted);font-size:16px}
+        .thumb:hover{border-color:var(--brand);color:var(--brand)}
+        .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+        .tipo{border:1px solid var(--line);background:var(--panel-2);color:var(--ink-soft);border-radius:6px;padding:4px 8px;font-size:11.5px;font-weight:700;cursor:pointer;width:100%}
+        .tipo:hover{border-color:var(--brand);color:var(--brand)}
+        .tipo.med{border-color:var(--warn);color:var(--warn);background:var(--warn-bg)}
+        .lx{color:var(--muted);cursor:pointer;font-size:15px;border:0;background:transparent;padding:3px}
+        @media(max-width:980px){.lhead{display:none}.lrow{grid-template-columns:44px 1fr 1fr;gap:8px}.lrow .sub,.lrow .lock,.lrow .pnum{text-align:left}}
+
+        .cz-foot{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:26px;padding:16px 14px 14px;border-top:1px solid var(--line)}
+        @media(max-width:820px){.cz-foot{grid-template-columns:1fr}}
+        .cz-tyc .lbl{font-size:12.5px;color:var(--ink-soft);margin-bottom:6px}
+        .cz-tyc textarea{width:100%;padding:8px 10px;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);resize:vertical}
+        .cz-tots .tr{display:flex;justify-content:space-between;gap:12px;padding:4px 0;font-size:13px;color:var(--ink-soft)}
+        .cz-tots .tr b{color:var(--navy)}
+        .cz-tots .neg b{color:var(--ok)}
+        .cz-tots .big{border-top:1px solid var(--line);margin-top:5px;padding-top:9px;font-size:15px;font-weight:700;color:var(--navy)}
+        .cz-tots .big b{font-size:19px}
+        .cz-tots .tiva{font-size:11.5px;color:var(--muted);margin-top:7px}
+
+        .cz-sc{margin-bottom:12px}
+        .cz-sh{padding:12px 14px 0;font-size:13px;font-weight:700;color:var(--navy)}
+        .cz-sb{padding:12px 14px 14px}
+        .cz-sb textarea{width:100%;padding:8px 10px;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);resize:vertical}
+        .ava{width:26px;height:26px;flex:none;border-radius:50%;background:var(--brand);color:#fff;display:inline-grid;place-items:center;font-size:10.5px;font-weight:800}
+        .ava.sys{background:var(--muted)}
+        .act{display:flex;gap:9px;padding:7px 0;align-items:flex-start}
+        .act .aq{font-size:12.5px;font-weight:650;color:var(--navy);display:flex;gap:7px;align-items:baseline}
+        .act .ah{font-size:11px;color:var(--muted);font-weight:400}
+        .act .at{font-size:12px;color:var(--ink-soft);line-height:1.4}
+        .cli-row{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--navy);flex-wrap:wrap}
+        .cli-d{margin-top:9px;font-size:12.5px;color:var(--ink-soft);line-height:1.75}
+        .doc{display:flex;gap:9px;padding:6px 0;align-items:flex-start}
+        .doc .di{color:var(--muted);font-size:13px}
+        .doc .dt{font-size:12.5px;color:var(--navy);font-weight:600}
+        .doc .dr{font-size:11.5px;color:var(--muted)}
+
+        .vgrp{margin-bottom:14px}
+        .vlbl{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:7px}
+        .vopts{display:flex;gap:7px;flex-wrap:wrap}
+        .vopt{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer}
+        .vopt:hover{border-color:var(--brand);color:var(--brand)}
+        .vopt.on{border-color:var(--brand);background:var(--brand);color:#fff}
+        .vpre{display:flex;align-items:center;gap:12px;border-top:1px solid var(--line);padding-top:14px;margin-top:4px}
+
+        .mdlbg{position:fixed;inset:0;background:rgba(20,26,38,.4);z-index:50;display:grid;place-items:center;padding:20px}
+      </style>`;
+    },
   };
 
+  // "Medida 1.20 · Estructura Blanca · Frente Paraíso" — con el nombre de cada
+  // variable, para que se entienda qué es cada valor.
+  function textoEjes(partes) {
+    return (partes || []).map(p => `${p.lbl} ${p.val}`).join(' · ') || '—';
+  }
+  // Opciones posibles de un eje, dado lo ya elegido en los otros ejes.
+  function opciones(vars, eje, sel, ignorar) {
+    const out = [];
+    vars.forEach(v => {
+      const calza = Object.keys(sel).every(k => k === eje || k === ignorar || v[k] === sel[k]);
+      if (calza && v[eje] && !out.includes(v[eje])) out.push(v[eje]);
+    });
+    return out;
+  }
+  function inic(nombre) {
+    return String(nombre || '?').trim().split(/\s+/).slice(0, 2).map(p => p[0] || '').join('').toUpperCase() || '?';
+  }
+  function hora() {
+    try { const d = new Date(); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; }
+    catch { return ''; }
+  }
   function hoy() {
     try { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
     catch { return ''; }

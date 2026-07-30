@@ -13,68 +13,69 @@
 - ⬜ 30. **Filas más compactas** (~1.3 cm máx por renglon) para que todo entre en una sola pantalla sin scroll.
 - ⬜ 31. **Columna Imagen** en la tabla de muebles (especialmente crítica para a medida; vendedores cargan foto para aclarar pedido).
 
-**Nueva cotización (`ventas/presupuesto.js`) — 3 espacios bien marcados**
+## Lote 3 — APLICADO (Nueva cotización)
 
-Estructura general
-- ⬜ 32. Las 3 secciones (**Datos del cliente** · **Productos y cotización** ·
-  **Adicionales**) van como **desplegable / por etapas**: se va completando de a
-  una, no todo abierto a la vez. Hoy hay demasiados campos a la vista.
+Se rehizo la pantalla con el **formato de ficha de documento** que pasó Brian:
+columna principal (cabecera + solapas) y costado con Actividad/Notas, ficha del
+cliente y documentos relacionados.
 
-Sección 1 · Datos del cliente
-- ⬜ 33. Orden de los campos: **Nombre → Teléfono → Mail → ¿Cómo nos conoció?**
-  (hoy arranca por Teléfono y el Nombre está tercero).
-- ⬜ 34. **Instagram como campo oculto**: un botón "IG" que lo revela, para el caso
-  en que en vez de teléfono se anote un usuario de IG. Si no hace falta, no se carga.
-- ⬜ 35. **DNI también oculto** detrás de su botón (se abre sólo si hace falta factura).
-- ⬜ 36. **Vendedor y Local salen por default** del usuario de la sesión (el que vende
-  entra con su usuario). Ambos **editables**, pero siempre precargados.
-- ⬜ 37. **Término de pago** se mantiene. **"Vence" se elimina** (no hace falta).
-- ⬜ 37b. Agregar **Domicilio de entrega** y **Localidad**.
-- ⬜ 37c. **Teléfono adicional** oculto: botón **"+ Teléfono"** que abre el campo
-  (mismo criterio que IG y DNI — no va como campo fijo).
+**Estructura**
+- ✅ 32. Los 3 espacios quedan agrupados: **Datos del cliente** (cabecera),
+  **Productos** y **Adicionales** (solapas). Se descartó el acordeón por etapas:
+  con el formato agrupado entra todo ordenado y sin abrir/cerrar.
 
-Sección 2 · Productos (hoy "Ítems")
-- ⬜ 38. Renombrar **"Ítems" → "Productos"**.
-- ⬜ 39. **Buscador de producto** de ~4 cm máx: al escribir aparecen las coincidencias.
-  **Insensible a tildes** ("comoda" tiene que traer "CÓMODA").
-- ⬜ 40. Al elegir el producto se abre el **armado por variantes con botones**
-  (no desplegables): primero **Medida**, después **Estructura**, después **Frente**.
-  El **precio se va actualizando** a medida que se arma.
-- ⬜ 41. **No mostrar todos los precios** de todas las variantes (puede haber 15 por
-  mueble) — sólo el precio del combo armado.
-- ⬜ 42. La línea cargada muestra el producto con **el nombre de cada variable**:
-  `Medida 1,20 · Estructura Blanco · Frente Paraíso`
-  (hoy dice sólo "1.20 · blanca · paraiso", sin decir qué es cada cosa).
-- ⬜ 43. Nueva **columna Estándar / A medida** entre Producto y Cantidad (hoy sobra
-  espacio ahí). **Estándar → precio bloqueado**; **A medida → precio se libera** y se
-  completa a mano.
-- ⬜ 44. Sacar el botón suelto **"+ A medida"** de arriba: a medida es una **opción
-  dentro de cada producto**, no un ítem aparte.
-- ⬜ 45. Renombrar columna **"Observaciones" → "Detalle"**.
-- ⬜ 46. **Botón de cargar imagen** por línea de producto.
-- ⬜ 47. Ideal: traer la **imagen real del producto desde Tienda Nube** (miniatura al
-  lado del nombre, estilo boleta de TN: foto + nombre + variantes + `1 x $868.449`).
-  Cantidad y precio unitario quedan como están.
+**Datos del cliente**
+- ✅ 33. Orden Nombre → Teléfono → Mail → ¿Cómo nos conoció?
+- ✅ 34. **Instagram** oculto detrás del botón `+ IG`.
+- ✅ 35. **DNI** oculto detrás del botón `+ DNI`.
+- ✅ 36. **Vendedor y Local** precargados de `DB.sesion()`, editables.
+- ✅ 37. **Condición de pago** se mantiene · **"Vence" eliminado**.
+- ✅ 37b. **Domicilio de entrega** y **Localidad**.
+- ✅ 37c. **Teléfono adicional** detrás del botón `+ Teléfono`.
 
-Sección 3 · Adicionales
+**Productos**
+- ✅ 38. "Ítems" → **Productos**.
+- ✅ 39. Buscador corto, **insensible a tildes** ("comoda" trae "CÓMODA").
+- ✅ 40. **Armador por botones**: Medida → Estructura → Frente, precio en vivo.
+- ✅ 41. Se muestra **sólo el precio del combo armado** (16 variantes por mueble
+  en el demo, ninguna lista de precios).
+- ✅ 42. La línea dice el **nombre de cada variable**:
+  `Medida 1.20 · Estructura Blanca · Frente Paraíso`.
+- ✅ 43. Columna **Estándar / A medida**: estándar bloquea el precio 🔒,
+  a medida lo libera.
+- ✅ 44. **Sin botón suelto "+ A medida"** — se alterna dentro de cada línea.
+- ✅ 45. "Observaciones" → **Detalle**.
+- ✅ 46. **Botón de imagen** por línea (miniatura clickeable).
 
-> Son las preguntas que hoy siempre hay que anotar a mano. La idea es que la
-> mayoría **salga por default** y el vendedor sólo corrija lo que cambie.
+**Adicionales**
+- ✅ 49. **Tiempo de entrega** default "entre 30 y 35 días"; editarlo avisa que
+  la orden **va a verificación** y queda registrado.
+- ✅ 50. **Saldo se abona en** — hereda la condición de pago (readonly).
+- ✅ 51. **Costo de envío** por localidad (`DB.localidades()` / `DB.fleteDe()`).
+- ✅ 52. **¿Requiere instalación?** default **No**.
+- ✅ 53. **Subida por escalera** $5.000 por piso por bulto, editable, **como
+  leyenda** — no se calcula (es muy variable).
+- ✅ 54. **IVA no incluido** por default.
 
-- ⬜ 49. **Tiempo de entrega** — default **"entre 30 y 35 días"**. Si se **edita**,
-  la orden **salta a verificación** y queda contabilizado (cambio de plazo es un
-  dato que hay que auditar, no una edición libre).
-- ⬜ 50. **Saldo se abona en** — se autocompleta con el **mismo método elegido en
-  Término de pago**.
-- ⬜ 51. **Costo de envío** — sale **por default según la localidad** cargada en
-  Datos del cliente (tabla localidad → precio de flete).
-- ⬜ 52. **¿Requiere instalación?** — default **NO**.
-- ⬜ 53. **Subida por escalera** — default **$5.000 por piso por bulto**, editable.
-- ⬜ 54. **IVA no incluido** — sale por default como leyenda/marca.
+**Del formato de referencia**
+- ✅ 55. **Costado con Actividad y Notas** — la actividad se arma sola
+  (creó la cotización, agregó producto, calculó descuento, cargó el envío…).
+- ✅ 56. **Ficha del cliente** al costado con contacto y "Ver ficha completa" → CRM.
+- ✅ 57. **Documentos relacionados** (última consulta / cotización / orden).
+- ✅ 58. **Desglose de totales** abajo a la derecha: Muebles (lista) → Descuento →
+  Subtotal muebles → Envío → Total, con la leyenda del IVA.
+- ✅ 59. **Términos y condiciones** abajo a la izquierda.
+- ✅ 60. Barra de acciones: **Vista previa · Descargar · Imprimir · Guardar ·
+  Confirmar → Venta**. Sin WhatsApp/mail: hoy se manda por la plataforma que usan,
+  así que alcanza con el archivo descargable.
 
-CRM
-- ⬜ 48. **Vinculación a CRM**: cada cotización se guarda en los registros del vendedor
-  para darle seguimiento después.
+> Pendientes de base real:
+> - **48. Vinculación al CRM**: hoy la actividad vive en memoria; falta guardarla
+>   en los registros del vendedor para el seguimiento.
+> - **47. Imagen desde Tienda Nube**: hoy la imagen se carga por URL; falta mapear
+>   `tn_variant_id` → foto del producto para que venga sola.
+> - Tabla **localidad → flete** es demo; Brian pasa la real (misma forma).
+> - Precios de variantes son demo combinatorio; salen de `variante.precio` real.
 
 ## Lote 2 — APLICADO (refinamiento del Detalle de la orden)
 
