@@ -1380,9 +1380,9 @@ tr:hover td{background:var(--panel-2)}
   const Presupuesto = {
     cli: null,
     abiertos: {},        // campos opcionales revelados
-    solapa: 'productos', // productos | adicionales
+    etapa: 'cliente',    // desplegable abierto: cliente | productos | adicionales | ''
     lado: 'actividad',   // actividad | notas
-    vendedor: '', local: '', termino: 'efectivo',
+    vendedor: '', local: '', fecha: '', termino: 'efectivo',
     notas: '', terminos: '',
     ad: null,            // adicionales
     actividad: [],       // historial de la cotización (se arma sola)
@@ -1463,47 +1463,74 @@ tr:hover td{background:var(--panel-2)}
     pintarTodo() { this.pintarMain(); this.pintarSide(); },
 
     // ---- Columna principal -----------------------------------------------
+    // Cabecera fija + las tres etapas como desplegables: se completa una, se
+    // cierra sola y se abre la siguiente. Igual se puede abrir/cerrar a mano,
+    // así queda todo en una sola pantalla.
     pintarMain() {
       const m = document.getElementById('cz-main'); if (!m) return;
+      const secs = [
+        { k: 'cliente',     n: 1, tit: 'Datos del cliente' },
+        { k: 'productos',   n: 2, tit: 'Productos' },
+        { k: 'adicionales', n: 3, tit: 'Adicionales' },
+      ];
       m.innerHTML = `
-        <div class="card pad cz-head" id="cz-datos"></div>
-        <div class="card cz-body">
-          <div class="tabs">
-            <button class="tab ${this.solapa === 'productos' ? 'on' : ''}" data-t="productos">Productos</button>
-            <button class="tab ${this.solapa === 'adicionales' ? 'on' : ''}" data-t="adicionales">Adicionales</button>
+        <div class="card pad cz-head" id="cz-cab"></div>
+        ${secs.map(s => {
+          const on = this.etapa === s.k;
+          return `<section class="card sec ${on ? 'on' : ''}">
+            <button class="sec-h" data-sec="${s.k}" aria-expanded="${on}">
+              <span class="sec-n">${s.n}</span>
+              <span class="sec-t">${UI.esc(s.tit)}</span>
+              <span class="sec-r">${this.resumen(s.k)}</span>
+              <span class="sec-c">${on ? '▲' : '▼'}</span>
+            </button>
+            ${on ? `<div class="sec-b" id="sec-${s.k}"></div>` : ''}
+          </section>`;
+        }).join('')}
+        <div class="card cz-foot">
+          <div class="cz-tyc">
+            <div class="lbl">Observaciones</div>
+            <textarea id="op-nota2" rows="2" placeholder="Observaciones de la orden…">${UI.esc(this.notas)}</textarea>
+            <div class="lbl" style="margin-top:12px">Términos y condiciones</div>
+            <textarea id="cz-tyc" rows="2" placeholder="Escribir términos y condiciones…">${UI.esc(this.terminos)}</textarea>
           </div>
-          <div id="cz-tab"></div>
-          <div class="cz-foot">
-            <div class="cz-tyc">
-              <div class="lbl">Términos y condiciones</div>
-              <textarea id="cz-tyc" rows="3" placeholder="Escribir términos y condiciones…">${UI.esc(this.terminos)}</textarea>
-            </div>
-            <div id="cz-tot"></div>
-          </div>
+          <div id="cz-tot"></div>
         </div>`;
-      m.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { this.solapa = b.dataset.t; this.pintarMain(); });
+
+      m.querySelectorAll('[data-sec]').forEach(b => b.onclick = () => {
+        this.etapa = this.etapa === b.dataset.sec ? '' : b.dataset.sec;
+        this.pintarMain();
+      });
+      document.getElementById('op-nota2').oninput = e => { this.notas = e.target.value; };
       document.getElementById('cz-tyc').oninput = e => { this.terminos = e.target.value; };
-      this.pintarDatos();
-      if (this.solapa === 'productos') this.pintarProductos(); else this.pintarAdicionales();
+
+      this.pintarCabecera();
+      if (this.etapa === 'cliente') this.pintarCliente();
+      if (this.etapa === 'productos') this.pintarProductos();
+      if (this.etapa === 'adicionales') this.pintarAdicionales();
       this.pintarTotales();
     },
 
-    // Cabecera: título + total, y los datos agrupados en dos columnas —
-    // a la izquierda el cliente, a la derecha la operación.
-    pintarDatos() {
-      const c = document.getElementById('cz-datos'); if (!c) return;
-      const vends = global.DB.vendedores(), locs = global.DB.locales(), locds = global.DB.localidades();
-      const f = (id, lbl, val, ph) => `<div class="fr"><label for="${id}">${UI.esc(lbl)}</label>
-        <input id="${id}" value="${UI.esc(val)}" placeholder="${UI.esc(ph)}"></div>`;
-      const sel = (id, lbl, opts) => `<div class="fr"><label for="${id}">${UI.esc(lbl)}</label>
-        <select id="${id}">${opts}</select></div>`;
+    // Línea corta al costado del título, para saber qué hay adentro sin abrir.
+    resumen(k) {
+      if (k === 'cliente') {
+        const c = this.cli;
+        const partes = [c.nombre.trim(), c.telefono.trim() || c.email.trim() || c.instagram.trim()].filter(Boolean);
+        return partes.length ? UI.esc(partes.join(' · ')) : '<i>sin cargar</i>';
+      }
+      if (k === 'productos') {
+        const n = this.items();
+        return n ? `${n} ${n === 1 ? 'producto' : 'productos'} · ${UI.pesos(this.total())} · ${UI.esc(this.terminoLabel())}`
+          : '<i>sin productos</i>';
+      }
+      const env = this.ad.envio ? UI.pesos(this.ad.envio) : 'envío a definir';
+      return `${UI.esc(this.ad.entrega)} · ${env}`;
+    },
 
-      // Orden pedido: Nombre → Teléfono → Mail → ¿Cómo nos conoció?
-      const ocultos = OPCIONALES.filter(o => this.abiertos[o.k])
-        .map(o => f('c-' + o.k, o.lbl, this.cli[o.k], o.ph)).join('');
-      const addBtns = OPCIONALES.filter(o => !this.abiertos[o.k])
-        .map(o => `<button class="chip-add" data-add="${o.k}">${UI.esc(o.btn)}</button>`).join('');
-
+    // Cabecera: quién y cuándo hace el presupuesto (no el total — eso va abajo).
+    pintarCabecera() {
+      const c = document.getElementById('cz-cab'); if (!c) return;
+      const vends = global.DB.vendedores(), locs = global.DB.locales();
       c.innerHTML = `
         <div class="cz-tit">
           <div>
@@ -1512,47 +1539,65 @@ tr:hover td{background:var(--panel-2)}
           </div>
           <div class="sp" style="flex:1"></div>
           <div class="cz-box">
-            <div class="lbl">Total</div>
-            <b class="tnum">${UI.pesos(this.totalFinal())}</b>
-            <div class="lbl">${this.items()} ${this.items() === 1 ? 'ítem' : 'ítems'}</div>
+            <div class="fr sm"><label for="op-vend">Vendedor</label>
+              <select id="op-vend">${vends.map(v => `<option ${this.vendedor === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+            <div class="fr sm"><label for="op-local">Local de origen</label>
+              <select id="op-local">${locs.map(l => `<option value="${l.k}" ${this.local === l.k ? 'selected' : ''}>${UI.esc(l.label)}</option>`).join('')}</select></div>
+            <div class="fr sm"><label for="op-fecha">Fecha</label>
+              <input id="op-fecha" type="date" value="${UI.esc(this.fecha)}"></div>
           </div>
-        </div>
+        </div>`;
+      document.getElementById('op-vend').onchange = e => { this.vendedor = e.target.value; };
+      document.getElementById('op-local').onchange = e => { this.local = e.target.value; };
+      document.getElementById('op-fecha').onchange = e => { this.fecha = e.target.value; };
+    },
 
+    // ---- 1 · Datos del cliente ------------------------------------------
+    // Sólo datos del cliente. La condición de pago NO va acá: es un dato de la
+    // orden y hace falta para cotizar los muebles, así que vive en Productos.
+    pintarCliente() {
+      const c = document.getElementById('sec-cliente'); if (!c) return;
+      const locds = global.DB.localidades();
+      const f = (id, lbl, val, ph) => `<div class="fr"><label for="${id}">${UI.esc(lbl)}</label>
+        <input id="${id}" value="${UI.esc(val)}" placeholder="${UI.esc(ph)}"></div>`;
+      const sel = (id, lbl, opts) => `<div class="fr"><label for="${id}">${UI.esc(lbl)}</label>
+        <select id="${id}">${opts}</select></div>`;
+
+      const ocultos = OPCIONALES.filter(o => this.abiertos[o.k])
+        .map(o => f('c-' + o.k, o.lbl, this.cli[o.k], o.ph)).join('');
+      const addBtns = OPCIONALES.filter(o => !this.abiertos[o.k])
+        .map(o => `<button class="chip-add" data-add="${o.k}">${UI.esc(o.btn)}</button>`).join('');
+
+      c.innerHTML = `
         <div class="cz-cols">
           <div class="cz-col">
             ${f('c-nombre', 'Cliente', this.cli.nombre, 'Nombre y apellido')}
             ${f('c-tel', 'Teléfono', this.cli.telefono, '11 5555-2020')}
             ${f('c-mail', 'Email', this.cli.email, 'cliente@correo.com')}
+          </div>
+          <div class="cz-col">
             ${f('c-dom', 'Domicilio de entrega', this.cli.domicilio, 'Calle 1234, piso/depto')}
             ${sel('c-locd', 'Localidad', `<option value="">Elegí…</option>` +
               locds.map(l => `<option value="${l.k}" ${this.cli.localidad === l.k ? 'selected' : ''}>${UI.esc(l.label)}</option>`).join(''))}
             ${sel('c-canal', '¿Cómo nos conoció?', `<option value="">—</option>` +
               ['Instagram', 'Facebook', 'Recomendación', 'Pasó por el local', 'Google', 'Otro']
                 .map(o => `<option ${this.cli.canal === o ? 'selected' : ''}>${o}</option>`).join(''))}
-            ${ocultos}
-            ${addBtns ? `<div class="adds">${addBtns}</div>` : ''}
-          </div>
-          <div class="cz-col">
-            ${sel('op-vend', 'Vendedor', vends.map(v => `<option ${this.vendedor === v ? 'selected' : ''}>${v}</option>`).join(''))}
-            ${sel('op-local', 'Local de origen', locs.map(l => `<option value="${l.k}" ${this.local === l.k ? 'selected' : ''}>${UI.esc(l.label)}</option>`).join(''))}
-            ${sel('op-term', 'Condición de pago', TERMINOS.map(t => `<option value="${t.k}" ${this.termino === t.k ? 'selected' : ''}>${UI.esc(t.label)}</option>`).join(''))}
-            <div class="fr"><label for="op-nota2">Observaciones</label>
-              <input id="op-nota2" value="${UI.esc(this.notas)}" placeholder="—"></div>
-            <div class="fr"><label></label><div class="muted" id="op-nota" style="font-size:12px;padding-top:5px"></div></div>
           </div>
         </div>
-        <div id="c-aviso"></div>`;
+        ${ocultos ? `<div class="cz-cols" style="margin-top:9px">${ocultos}</div>` : ''}
+        ${addBtns ? `<div class="adds">${addBtns}</div>` : ''}
+        <div id="c-aviso"></div>
+        <div class="sec-go"><button class="btn sm primary" id="c-sig">Continuar → Productos</button></div>`;
 
-      const bind = (id, campo, rerender) => {
+      const bind = (id, campo) => {
         const el = document.getElementById(id); if (!el) return;
-        el.oninput = () => { this.cli[campo] = el.value; this.avisoCliente(); if (rerender) this.pintarSide(); };
+        el.oninput = () => { this.cli[campo] = el.value; this.avisoCliente(); this.pintarCabecera(); this.pintarSide(); };
       };
-      bind('c-nombre', 'nombre', true); bind('c-tel', 'telefono', true);
-      bind('c-mail', 'email', true); bind('c-dom', 'domicilio', true);
-      OPCIONALES.forEach(o => bind('c-' + o.k, o.k, true));
-      c.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { this.abiertos[b.dataset.add] = true; this.pintarDatos(); });
+      bind('c-nombre', 'nombre'); bind('c-tel', 'telefono');
+      bind('c-mail', 'email'); bind('c-dom', 'domicilio');
+      OPCIONALES.forEach(o => bind('c-' + o.k, o.k));
+      c.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { this.abiertos[b.dataset.add] = true; this.pintarCliente(); });
       document.getElementById('c-canal').onchange = e => { this.cli.canal = e.target.value; };
-      document.getElementById('op-nota2').oninput = e => { this.notas = e.target.value; };
       // Elegir localidad trae el costo de envío por default (editable en Adicionales).
       document.getElementById('c-locd').onchange = e => {
         this.cli.localidad = e.target.value;
@@ -1562,15 +1607,8 @@ tr:hover td{background:var(--panel-2)}
         }
         this.pintarTodo();
       };
-      document.getElementById('op-vend').onchange = e => { this.vendedor = e.target.value; };
-      document.getElementById('op-local').onchange = e => { this.local = e.target.value; };
-      document.getElementById('op-term').onchange = e => {
-        this.termino = e.target.value;
-        this.ad.saldoEn = this.terminoLabel();   // "Saldo se abona en" sigue a la condición
-        this.log('Sistema', `Calculó descuento por condición de pago: ${this.terminoLabel()}`);
-        this.pintarTodo();
-      };
-      this.avisoCliente(); this.notaTermino();
+      document.getElementById('c-sig').onclick = () => { this.etapa = 'productos'; this.pintarMain(); };
+      this.avisoCliente();
     },
 
     avisoCliente() {
@@ -1586,23 +1624,42 @@ tr:hover td{background:var(--panel-2)}
         : 'Precio de lista, en 3 · 6 · 12 cuotas.';
     },
 
-    // ---- Solapa Productos -------------------------------------------------
+    // ---- 2 · Productos ----------------------------------------------------
+    // Arranca con la condición de pago: es un dato de la ORDEN, no del cliente,
+    // y es la que define con qué lista se cotizan los muebles.
     pintarProductos() {
-      const cont = document.getElementById('cz-tab'); if (!cont) return;
+      const cont = document.getElementById('sec-productos'); if (!cont) return;
       cont.innerHTML = `
-        <div class="lhead"><span></span><span>Producto</span><span>Tipo</span><span>Cant.</span>
-          <span style="text-align:right">Precio unit.</span><span>Detalle</span>
+        <div class="pr-cond">
+          <div class="fr"><label for="op-term">Condición de pago</label>
+            <select id="op-term">${TERMINOS.map(t => `<option value="${t.k}" ${this.termino === t.k ? 'selected' : ''}>${UI.esc(t.label)}</option>`).join('')}</select></div>
+          <div class="muted" id="op-nota" style="font-size:12px"></div>
+        </div>
+        <div class="lhead"><span>Producto</span><span>Tipo</span><span></span><span>Cant.</span>
+          <span>Detalle</span><span style="text-align:right">Precio unit.</span>
           <span style="text-align:right">Subtotal</span><span></span></div>
         <div id="pr-lineas"></div>
         <div class="srow">
           <input id="pr-buscar" class="busca" placeholder="Buscar un producto…" autocomplete="off">
           <button class="lnk" id="pr-catalogo">Catálogo</button>
+          <div class="sp" style="flex:1"></div>
+          <div class="pr-sum">Total de los muebles <b class="tnum">${UI.pesos(this.total())}</b></div>
           <div id="pr-drop"></div>
-        </div>`;
+        </div>
+        <div class="sec-go"><button class="btn sm primary" id="p-sig">Continuar → Adicionales</button></div>`;
+
+      document.getElementById('op-term').onchange = e => {
+        this.termino = e.target.value;
+        this.ad.saldoEn = this.terminoLabel();   // "Saldo se abona en" sigue a la condición
+        this.log('Sistema', `Calculó descuento por condición de pago: ${this.terminoLabel()}`);
+        this.pintarMain(); this.pintarSide();
+      };
       document.getElementById('pr-catalogo').onclick = () => this.modalCatalogo();
+      document.getElementById('p-sig').onclick = () => { this.etapa = 'adicionales'; this.pintarMain(); };
       const inp = document.getElementById('pr-buscar');
       let t; inp.oninput = () => { clearTimeout(t); t = setTimeout(() => this.buscarInline(inp.value.trim()), 220); };
       inp.onblur = () => setTimeout(() => { const d = document.getElementById('pr-drop'); if (d) d.innerHTML = ''; }, 180);
+      this.notaTermino();
       this.pintar();
     },
 
@@ -1610,7 +1667,7 @@ tr:hover td{background:var(--panel-2)}
       const cont = document.getElementById('pr-lineas'); if (!cont) return;
       if (!this.lineas.length) {
         cont.innerHTML = UI.vacio('Buscá un mueble abajo para empezar la cotización.');
-        this.pintarTotales(); return;
+        this.refrescarProductos(); return;
       }
       cont.innerHTML = this.lineas.map(l => {
         const unit = this.unit(l), sub = unit * l.cantidad, ed = this.editable(l);
@@ -1623,14 +1680,20 @@ tr:hover td{background:var(--panel-2)}
         const precioCel = ed
           ? `<input type="number" min="0" class="pnum" value="${l.precioManual != null ? l.precioManual : Math.round(unit)}" data-precio="${l.key}" aria-label="Precio unitario">`
           : `<div class="lock tnum">${UI.pesos(unit)} 🔒</div>`;
+        // La imagen va al lado del tipo y sólo en los a medida: el vendedor
+        // tiene que mostrar qué le pidió el cliente. Los estándar la traen del
+        // catálogo (Tienda Nube) y sólo se muestra si ya existe.
+        const imgCel = medida || l.img
+          ? `<button class="thumb" data-img="${l.key}" title="${l.img ? 'Cambiar imagen' : 'Cargar imagen del mueble a medida'}">${
+              l.img ? `<img src="${UI.esc(l.img)}" alt="">` : '<span>+</span>'}</button>`
+          : '<span></span>';
         return `<div class="lrow" data-l="${l.key}">
-          <button class="thumb" data-img="${l.key}" title="${l.img ? 'Cambiar imagen' : 'Cargar imagen'}">${
-            l.img ? `<img src="${UI.esc(l.img)}" alt="">` : '<span>+</span>'}</button>
           <div>${nombre}</div>
           <div><button class="tipo ${medida ? 'med' : ''}" data-tipo="${l.key}">${medida ? 'A medida' : 'Estándar'}</button></div>
+          ${imgCel}
           <input type="number" min="1" value="${l.cantidad}" data-cant="${l.key}" aria-label="Cantidad">
-          ${precioCel}
           <input value="${UI.esc(l.obs)}" data-obs="${l.key}" placeholder="—" aria-label="Detalle">
+          ${precioCel}
           <div class="sub tnum">${UI.pesos(sub)}</div>
           <button class="lx" data-del="${l.key}" title="Quitar">✕</button></div>`;
       }).join('');
@@ -1639,17 +1702,23 @@ tr:hover td{background:var(--panel-2)}
         const l = this.get(b.dataset.del);
         this.lineas = this.lineas.filter(x => x.key !== Number(b.dataset.del));
         if (l) this.log(this.vendedor, `Quitó ${l.prodNombre || 'un producto'}`);
-        this.pintar(); this.pintarDatos();
+        this.pintar();
       });
-      cont.querySelectorAll('[data-cant]').forEach(i => i.onchange = () => { const l = this.get(i.dataset.cant); if (l) { l.cantidad = Math.max(1, Math.floor(Number(i.value) || 1)); this.pintar(); this.pintarDatos(); } });
+      cont.querySelectorAll('[data-cant]').forEach(i => i.onchange = () => { const l = this.get(i.dataset.cant); if (l) { l.cantidad = Math.max(1, Math.floor(Number(i.value) || 1)); this.pintar(); } });
       cont.querySelectorAll('[data-obs]').forEach(i => i.oninput = () => { const l = this.get(i.dataset.obs); if (l) l.obs = i.value; });
       cont.querySelectorAll('[data-nom]').forEach(i => i.oninput = () => { const l = this.get(i.dataset.nom); if (l) l.prodNombre = i.value; });
-      cont.querySelectorAll('[data-precio]').forEach(i => i.onchange = () => { const l = this.get(i.dataset.precio); if (l) { l.precioManual = Math.max(0, Number(i.value) || 0); this.pintar(); this.pintarDatos(); } });
+      cont.querySelectorAll('[data-precio]').forEach(i => i.onchange = () => { const l = this.get(i.dataset.precio); if (l) { l.precioManual = Math.max(0, Number(i.value) || 0); this.pintar(); } });
       // "A medida" es una opción DENTRO del producto, no un ítem suelto:
       // se pasa la línea a medida y ahí se libera el precio.
       cont.querySelectorAll('[data-tipo]').forEach(b => b.onclick = () => this.alternarTipo(this.get(b.dataset.tipo)));
       cont.querySelectorAll('[data-img]').forEach(b => b.onclick = () => this.cargarImagen(this.get(b.dataset.img)));
+      this.refrescarProductos();
+    },
+    // Refresca lo que depende de las líneas sin volver a dibujar la tabla.
+    refrescarProductos() {
       this.pintarTotales();
+      const s = document.querySelector('.pr-sum b');
+      if (s) s.textContent = UI.pesos(this.total());
     },
     get(key) { return this.lineas.find(x => x.key === Number(key)); },
 
@@ -1724,19 +1793,19 @@ tr:hover td{background:var(--panel-2)}
         cantidad: 1, obs: '', precioManual: null, img: img || variante.img || '',
       });
       this.log(this.vendedor, `Agregó producto ${prodNombre}`);
-      this.pintar(); this.pintarDatos(); this.pintarSide();
+      this.pintar(); this.pintarCabecera(); this.pintarSide();
       UI.aviso('Producto agregado', 'ok');
     },
 
-    // ---- Solapa Adicionales ----------------------------------------------
+    // ---- 3 · Adicionales ---------------------------------------------------
     // Son las preguntas que siempre hay que anotar; casi todas salen por
     // default y el vendedor sólo corrige lo que cambia.
     pintarAdicionales() {
-      const c = document.getElementById('cz-tab'); if (!c) return;
+      const c = document.getElementById('sec-adicionales'); if (!c) return;
       const a = this.ad, DB = global.DB;
       const locd = (DB.localidades().find(l => l.k === this.cli.localidad) || {}).label;
 
-      c.innerHTML = `<div class="ad-pad"><div class="cz-cols">
+      c.innerHTML = `<div class="cz-cols">
         <div class="cz-col">
           <div class="fr"><label for="ad-entrega">Tiempo de entrega</label>
             <input id="ad-entrega" value="${UI.esc(a.entrega)}"></div>
@@ -1758,7 +1827,10 @@ tr:hover td{background:var(--panel-2)}
           <div class="fr"><label></label><span class="hint">No se calcula: va como aviso en la cotización.</span></div>
           <div class="fr"><label>IVA</label><input value="${UI.esc(DB.IVA_LEYENDA)}" readonly></div>
         </div>
-      </div><div id="ad-avisos"></div></div>`;
+      </div><div id="ad-avisos"></div>
+      <div class="sec-go"><button class="btn sm" id="a-cerrar">Listo — cerrar</button></div>`;
+
+      document.getElementById('a-cerrar').onclick = () => { this.etapa = ''; this.pintarMain(); };
 
       const av = () => {
         const box = document.getElementById('ad-avisos'); if (!box) return;
@@ -1772,7 +1844,7 @@ tr:hover td{background:var(--panel-2)}
       document.getElementById('ad-entrega').oninput = e => { a.entrega = e.target.value; av(); };
       document.getElementById('ad-envio').oninput = e => {
         a.envio = Math.max(0, Number(e.target.value) || 0); a.envioTocado = true;
-        this.pintarTotales(); this.pintarDatos();
+        this.pintarTotales();
       };
       document.getElementById('ad-inst').onchange = e => { a.instalacion = e.target.value; av(); };
       document.getElementById('ad-esc').oninput = e => { a.escalera = Math.max(0, Number(e.target.value) || 0); av(); };
@@ -1934,9 +2006,9 @@ tr:hover td{background:var(--panel-2)}
     reset() {
       const s = global.DB.sesion();
       this.cli = { nombre: '', telefono: '', email: '', instagram: '', dni: '', tel2: '', canal: '', domicilio: '', localidad: '' };
-      this.abiertos = {}; this.solapa = 'productos'; this.lado = 'actividad';
+      this.abiertos = {}; this.etapa = 'cliente'; this.lado = 'actividad';
       // Vendedor y local salen del usuario de la sesión; igual se pueden editar.
-      this.vendedor = s.vendedor; this.local = s.local; this.termino = 'efectivo';
+      this.vendedor = s.vendedor; this.local = s.local; this.fecha = hoy(); this.termino = 'efectivo';
       this.notas = ''; this.terminos = '';
       this.ad = {
         entrega: global.DB.ENTREGA_DEFAULT,
@@ -2109,11 +2181,30 @@ tr:hover td{background:var(--panel-2)}
         .cz-wrap{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
         @media(max-width:1180px){.cz-wrap{grid-template-columns:1fr}}
 
-        .cz-head{margin-bottom:12px}
-        .cz-tit{display:flex;align-items:flex-start;gap:14px;margin-bottom:16px}
-        .cz-box{border:1px solid var(--line);border-radius:10px;padding:9px 16px;text-align:right;background:var(--panel-2);min-width:140px}
-        .cz-box .lbl{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:700}
-        .cz-box b{display:block;font-size:22px;color:var(--navy);line-height:1.25}
+        .cz-head{margin-bottom:10px;padding-bottom:14px}
+        .cz-tit{display:flex;align-items:flex-start;gap:20px}
+        .cz-box{border:1px solid var(--line);border-radius:10px;padding:10px 14px;background:var(--panel-2);min-width:290px;display:flex;flex-direction:column;gap:7px}
+        .fr.sm{grid-template-columns:106px minmax(0,1fr);gap:8px}
+        .fr.sm>label{font-size:12px}
+        .fr.sm input,.fr.sm select{padding:5px 8px;font-size:12.5px}
+        @media(max-width:640px){.cz-tit{flex-direction:column}.cz-box{min-width:0;width:100%}}
+
+        .sec{margin-bottom:10px;overflow:visible}
+        .sec.on{border-color:var(--brand)}
+        .sec-h{width:100%;display:flex;align-items:center;gap:11px;padding:12px 15px;background:none;border:0;cursor:pointer;text-align:left;font:inherit}
+        .sec-h:hover{background:var(--panel-2)}
+        .sec-n{width:22px;height:22px;flex:none;border-radius:50%;background:var(--line-soft);color:var(--ink-soft);display:grid;place-items:center;font-size:12px;font-weight:800}
+        .sec.on .sec-n{background:var(--brand);color:#fff}
+        .sec-t{font-weight:700;color:var(--navy);font-size:14.5px;flex:none}
+        .sec-r{flex:1;color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .sec-c{color:var(--muted);font-size:11px}
+        .sec-b{padding:14px 15px 15px;border-top:1px solid var(--line-soft)}
+        .sec-go{display:flex;justify-content:flex-end;margin-top:14px}
+
+        .pr-cond{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding-bottom:13px;margin-bottom:4px;border-bottom:1px solid var(--line)}
+        .pr-cond .fr{grid-template-columns:126px 230px}
+        .pr-sum{font-size:12.5px;color:var(--muted)}
+        .pr-sum b{color:var(--navy);font-size:15px;margin-left:7px}
 
         .cz-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px 26px}
         @media(max-width:820px){.cz-cols{grid-template-columns:1fr}}
@@ -2135,17 +2226,16 @@ tr:hover td{background:var(--panel-2)}
         .tab:hover{color:var(--ink)}
         .tab.on{color:var(--brand);border-bottom-color:var(--brand)}
         .cz-body{overflow:visible}
-        .ad-pad{padding:16px 14px}
-
-        .srow{position:relative;display:flex;gap:14px;align-items:center;padding:11px 14px;border-bottom:1px solid var(--line-soft)}
+        
+        .srow{position:relative;display:flex;gap:14px;align-items:center;padding:12px 0 0}
         .srow .busca{width:230px;flex:none;padding:7px 10px;font-size:13px}
         .lnk{border:0;background:none;color:var(--brand);font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:0}
         .lnk:hover{text-decoration:underline}
-        .drop{position:absolute;left:14px;width:340px;top:100%;z-index:30;background:var(--panel);border:1px solid var(--brand);border-radius:11px;box-shadow:var(--shadow);overflow:hidden;max-height:320px;overflow-y:auto}
+        .drop{position:absolute;left:0;width:340px;top:100%;z-index:30;background:var(--panel);border:1px solid var(--brand);border-radius:11px;box-shadow:var(--shadow);overflow:hidden;max-height:320px;overflow-y:auto}
         .drop .it{display:flex;align-items:center;gap:8px;padding:9px 13px;cursor:pointer;border-bottom:1px solid var(--line-soft)}
         .drop .it:last-child{border-bottom:0} .drop .it:hover{background:var(--brand-soft)} .drop .it .cnt{color:var(--muted);font-size:12px}
 
-        .lhead,.lrow{display:grid;grid-template-columns:44px minmax(0,1.5fr) 88px 58px 112px minmax(0,1fr) 104px 28px;gap:9px;align-items:center;padding:0 14px}
+        .lhead,.lrow{display:grid;grid-template-columns:minmax(0,1.6fr) 92px 40px 56px minmax(0,1fr) 112px 106px 26px;gap:9px;align-items:center;padding:0}
         .lhead{padding-top:9px;padding-bottom:9px;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:700;border-bottom:1px solid var(--line)}
         .lrow{padding-top:7px;padding-bottom:7px;border-bottom:1px solid var(--line-soft)}
         .lrow:hover{background:var(--panel-2)}
@@ -2154,7 +2244,7 @@ tr:hover td{background:var(--panel-2)}
         .lrow input{padding:6px 8px;font-size:13px} .lrow .pnum,.lrow .sub{text-align:right}
         .lrow .sub{font-weight:700;color:var(--navy)}
         .lrow .lock{color:var(--muted);font-size:12.5px;text-align:right}
-        .thumb{width:38px;height:38px;flex:none;border:1px dashed var(--line);border-radius:8px;background:var(--panel-2);cursor:pointer;padding:0;overflow:hidden;color:var(--muted);font-size:16px}
+        .thumb{width:34px;height:34px;flex:none;border:1px dashed var(--line);border-radius:8px;background:var(--panel-2);cursor:pointer;padding:0;overflow:hidden;color:var(--muted);font-size:16px}
         .thumb:hover{border-color:var(--brand);color:var(--brand)}
         .thumb img{width:100%;height:100%;object-fit:cover;display:block}
         .tipo{border:1px solid var(--line);background:var(--panel-2);color:var(--ink-soft);border-radius:6px;padding:4px 8px;font-size:11.5px;font-weight:700;cursor:pointer;width:100%}
@@ -2163,10 +2253,10 @@ tr:hover td{background:var(--panel-2)}
         .lx{color:var(--muted);cursor:pointer;font-size:15px;border:0;background:transparent;padding:3px}
         @media(max-width:980px){.lhead{display:none}.lrow{grid-template-columns:44px 1fr 1fr;gap:8px}.lrow .sub,.lrow .lock,.lrow .pnum{text-align:left}}
 
-        .cz-foot{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:26px;padding:16px 14px 14px;border-top:1px solid var(--line)}
+        .cz-foot{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:26px;padding:16px}
         @media(max-width:820px){.cz-foot{grid-template-columns:1fr}}
         .cz-tyc .lbl{font-size:12.5px;color:var(--ink-soft);margin-bottom:6px}
-        .cz-tyc textarea{width:100%;padding:8px 10px;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);resize:vertical}
+        .cz-tyc textarea,.cz-foot textarea{width:100%;padding:8px 10px;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);resize:vertical}
         .cz-tots .tr{display:flex;justify-content:space-between;gap:12px;padding:4px 0;font-size:13px;color:var(--ink-soft)}
         .cz-tots .tr b{color:var(--navy)}
         .cz-tots .neg b{color:var(--ok)}

@@ -13,6 +13,35 @@
 - ⬜ 30. **Filas más compactas** (~1.3 cm máx por renglon) para que todo entre en una sola pantalla sin scroll.
 - ⬜ 31. **Columna Imagen** en la tabla de muebles (especialmente crítica para a medida; vendedores cargan foto para aclarar pedido).
 
+## Lote 4 — APLICADO (Nueva cotización · etapas y reagrupamiento)
+
+- ✅ 61. La caja de arriba a la derecha **ya no muestra el total ni los ítems**:
+  ahora dice **Vendedor · Local de origen · Fecha del presupuesto** (editables,
+  la fecha sale con el día de hoy).
+- ✅ 62. **Datos del cliente** queda con sólo datos del cliente: Cliente,
+  Teléfono, Email, Domicilio, Localidad, ¿Cómo nos conoció? + los chips
+  `+ IG` / `+ DNI` / `+ Teléfono`.
+- ✅ 63. **Condición de pago sale de los datos del cliente** y pasa arriba de
+  **Productos**: es un dato de la orden y es lo que define con qué lista se
+  cotizan los muebles.
+- ✅ 64. **Observaciones** baja al pie, después de toda la orden (junto a
+  Términos y condiciones).
+- ✅ 65. Las tres etapas vuelven a ser **desplegables**: al tocar
+  "Continuar → Productos" se cierra Datos del cliente y se abre Productos; con
+  "Continuar → Adicionales" pasa lo mismo. "Listo — cerrar" deja todo plegado y
+  la cotización entera entra en una pantalla. Se puede abrir/cerrar a mano.
+  Cada cabecera plegada muestra un resumen de lo que hay adentro.
+- ✅ 66. **Orden de columnas de Productos**: Producto (con el detalle de
+  variantes debajo) · Tipo · **imagen** · Cant. · Detalle · **Precio unit. +
+  Subtotal juntos al final**.
+- ✅ 67. El **ícono de imagen sólo aparece en los a medida** (y en los estándar
+  que ya tengan foto del catálogo), al lado del Tipo.
+- ✅ 68. Abajo de la tabla, junto al buscador y el catálogo, el **Total de los
+  muebles**.
+
+> Pendiente: Brian va a definir **qué campos son obligatorios** para poder crear
+> el presupuesto.
+
 ## Lote 3 — APLICADO (Nueva cotización)
 
 Se rehizo la pantalla con el **formato de ficha de documento** que pasó Brian:
