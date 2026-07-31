@@ -169,6 +169,20 @@
   Observaciones** a la vista.
 - ✅ 116. **Términos y condiciones fijos**: salen siempre y no se pueden editar.
 
+- ✅ 117. En Adicionales, **Saldo se abona en**, **Costo de envío** (sin domicilio)
+  e **instalación** salen como **texto plano, sin recuadro**; instalación y
+  escalera con su lápiz.
+- ✅ 118. Se saca el aviso "No se calcula: va como aviso en la cotización" y el
+  **banner repetido** de la subida por escalera.
+- ✅ 119. Abajo: **Observaciones para el cliente** y **Comentarios internos**,
+  estos últimos sobre **fondo gris** para separar bien lo interno de lo externo.
+- ✅ 120. Bloque de totales en el orden **Total · Dto. efvo. % · Subtotal · Envío ·
+  Descuento · Total a pagar**.
+- ✅ 121. **Descuento comercial** en un recuadro gris clickeable que abre un pop-up:
+  **% o $**, sobre **todos los muebles** o sobre **un producto** (con selector de
+  cuál), con el monto calculado en vivo y opción de quitarlo. Nunca descuenta más
+  que la base sobre la que se aplica, y sale en la vista previa.
+
 > Pendientes:
 > - La lista de localidades es **demo del AMBA**; se reemplaza por la real del mapa.
 > - La foto del diseño hoy se carga por **URL**; falta la subida real del archivo.

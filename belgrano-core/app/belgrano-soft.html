@@ -1472,6 +1472,7 @@ tr:hover td{background:var(--panel-2)}
     cabAbierta: false,            // la cabecera se lee; el lápiz la abre
     cantNueva: 1,                 // cantidad del renglón de carga (cantidad + producto)
     obsExt: '', obsInt: '', terminos: '',
+    dto: null,                    // descuento comercial extra {modo, alcance, linea, valor}
     ad: null,            // adicionales
     actividad: [],       // historial de la cotización (se arma sola)
     lineas: [],   // {key,tipo,prodNombre,varId,ejes,partes,base,cantidad,obs,precioManual,img}
@@ -1522,7 +1523,26 @@ tr:hover td{background:var(--panel-2)}
     total() { return this.lineas.reduce((a, l) => a + this.unit(l) * l.cantidad, 0); },
     descuento() { return this.totalLista() - this.total(); },
     envioMonto() { return this.envioCotizable() ? (this.ad.envio || 0) : 0; },
-    totalFinal() { return this.total() + this.envioMonto(); },
+    // Descuento comercial extra, aparte del que da la condición de pago. Puede
+    // ser en % o en $, sobre todos los muebles o sobre un producto puntual.
+    descuentoExtra() {
+      const d = this.dto;
+      if (!d || !(Number(d.valor) > 0)) return 0;
+      const base = d.alcance === 'linea'
+        ? (() => { const l = this.get(d.linea); return l ? this.unit(l) * l.cantidad : 0; })()
+        : this.total();
+      const monto = d.modo === 'pct' ? base * (Number(d.valor) / 100) : Number(d.valor);
+      return Math.round(Math.min(monto, base));   // nunca más que lo que se descuenta
+    },
+    dtoTexto() {
+      const d = this.dto;
+      if (!d || !(Number(d.valor) > 0)) return '';
+      const cuanto = d.modo === 'pct' ? `${d.valor}%` : UI.pesos(d.valor);
+      if (d.alcance !== 'linea') return `${cuanto} sobre los muebles`;
+      const l = this.get(d.linea);
+      return `${cuanto} en ${l ? l.prodNombre : 'un producto'}`;
+    },
+    totalFinal() { return this.total() + this.envioMonto() - this.descuentoExtra(); },
     items() { return this.lineas.reduce((a, l) => a + l.cantidad, 0); },
 
     // Estándar → precio bloqueado (sale del catálogo). A medida → se libera.
@@ -1643,12 +1663,14 @@ tr:hover td{background:var(--panel-2)}
         }).join('')}
         <div class="card cz-foot">
           <div class="cz-tyc">
-            <div class="lbl">Observaciones <span class="tag ext">Externas</span>
+            <div class="lbl">Observaciones para el cliente
               <span class="muted">salen impresas en la cotización</span></div>
             <textarea id="obs-ext" rows="2" placeholder="Lo que tiene que ver el cliente…">${UI.esc(this.obsExt)}</textarea>
-            <div class="lbl" style="margin-top:11px">Observaciones <span class="tag int">Internas</span>
-              <span class="muted">no salen impresas — para nosotros o producción</span></div>
-            <textarea id="obs-int" rows="2" placeholder="Notas para producción, administración o para vos…">${UI.esc(this.obsInt)}</textarea>
+            <div class="int-box">
+              <div class="lbl">Comentarios internos
+                <span class="muted">no salen impresas — para nosotros o producción</span></div>
+              <textarea id="obs-int" rows="2" placeholder="Notas para producción, administración o para vos…">${UI.esc(this.obsInt)}</textarea>
+            </div>
             <div class="lbl" style="margin-top:11px">Términos y condiciones
               <span class="muted">salen siempre, no se editan</span></div>
             <div class="tyc-fijo">${UI.esc(global.DB.TYC_DEFAULT)}</div>
@@ -2237,12 +2259,12 @@ tr:hover td{background:var(--panel-2)}
             : cerrado('Entrega', this.entregaTexto(), 'entrega',
                 `Plazo de fabricación: <b>${UI.esc(this.entregaDias())}</b>.`)}
 
-          <div class="fr"><label for="ad-saldo">Saldo se abona en</label>
-            <input id="ad-saldo" value="${UI.esc(a.saldoEn)}" readonly title="Sale de la condición de pago"></div>
+          <div class="fr"><label>Saldo se abona en</label>
+            <span class="valf">${UI.esc(a.saldoEn)}</span></div>
 
           ${!hayDom
             ? `<div class="fr"><label>Costo de envío</label>
-                 <input value="${UI.esc(DB.ENVIO_SIN_DOMICILIO)}" readonly></div>
+                 <span class="valf">${UI.esc(DB.ENVIO_SIN_DOMICILIO)}</span></div>
                <div class="fr"><label></label><span class="hint">Cargá el <b>domicilio de entrega</b> y la localidad para que salga el costo.</span></div>`
             : a.envioAbierto
               ? `<div class="fr"><label for="ad-envio">Costo de envío</label>
@@ -2266,9 +2288,8 @@ tr:hover td{background:var(--panel-2)}
             ? `<div class="fr"><label for="ad-esc">Subida por escalera</label>
                  <div class="fx"><input id="ad-esc" type="number" min="0" value="${a.escalera}">
                    <button class="lapiz" data-cerrar="escalera" title="Volver a $5.000" aria-label="Volver a $5.000">↺</button></div></div>
-               <div class="fr"><label></label><span class="hint">Por piso por bulto. No se calcula: va como aviso.</span></div>`
-            : cerrado('Subida por escalera', DB.escaleraTexto(a.escalera), 'escalera',
-                'No se calcula: va como aviso en la cotización.')}
+               <div class="fr"><label></label><span class="hint">Por piso por bulto.</span></div>`
+            : cerrado('Subida por escalera', DB.escaleraTexto(a.escalera), 'escalera')}
         </div>
       </div><div id="ad-avisos"></div>
       <div class="sec-go"><button class="btn sm primary" id="a-cerrar">Listo — cerrar</button></div>`;
@@ -2300,7 +2321,6 @@ tr:hover td{background:var(--panel-2)}
         if (a.entregaTocada) out.push(`<div class="banner warn">El vendedor <b>cambió la fecha de entrega</b> a ${UI.esc(this.entregaTexto())} — <b>Administración</b> tiene que verificarlo y el cambio queda registrado.</div>`);
         if (a.envioTocado) out.push(`<div class="banner warn">El <b>costo de envío</b> se cambió a mano (no es el de ${UI.esc(locd || 'la localidad')}) — queda registrado.</div>`);
         if (a.escaleraTocada) out.push(`<div class="banner warn">La <b>subida por escalera</b> se cambió — queda registrado.</div>`);
-        out.push(`<div class="banner">Subida por escalera: <b>${UI.esc(DB.escaleraTexto(a.escalera))}</b>. Se cobra según los pisos reales al momento de la entrega.</div>`);
         if (a.instalacion === 'si') out.push(`<div class="banner">La orden pide <b>instalación</b> — Logística la agenda con el armador.</div>`);
         box.innerHTML = out.join('');
       };
@@ -2340,18 +2360,88 @@ tr:hover td{background:var(--panel-2)}
     // ---- Desglose de totales ----------------------------------------------
     pintarTotales() {
       const t = document.getElementById('cz-tot'); if (!t) return;
-      const lista = this.totalLista(), desc = this.descuento(), muebles = this.total();
-      const envio = this.envioMonto();
-      const pct = this.descPct() ? ` (${this.descPct()}%)` : '';
+      const lista = this.totalLista(), desc = this.descuento();
+      const extra = this.descuentoExtra();
+      const pct = this.descPct() ? ` ${this.descPct()}%` : '';
       const fila = (l, v, cls = '') => `<div class="tr ${cls}"><span>${l}</span><b class="tnum">${v}</b></div>`;
       t.innerHTML = `<div class="cz-tots">
-        ${fila('Muebles (lista)', UI.pesos(lista))}
-        ${desc ? fila('Descuento' + pct, '−' + UI.pesos(desc), 'neg') : ''}
-        ${desc ? fila('Subtotal muebles', UI.pesos(muebles)) : ''}
+        ${fila('Total', UI.pesos(lista))}
+        ${desc ? fila('Dto. efvo.' + pct, '−' + UI.pesos(desc), 'neg') : ''}
+        ${desc ? fila('Subtotal', UI.pesos(this.total())) : ''}
         ${fila('Envío', this.envioTexto())}
-        ${fila('Total', UI.pesos(this.totalFinal()), 'big')}
+        <button class="tdto ${extra ? 'on' : ''}" id="cz-dto">
+          <span>Descuento${extra ? `<small>${UI.esc(this.dtoTexto())}</small>` : ''}</span>
+          <b class="tnum">${extra ? '−' + UI.pesos(extra) : '+ Agregar'}</b>
+        </button>
+        ${fila('Total a pagar', UI.pesos(this.totalFinal()), 'big')}
         <div class="tiva">${UI.esc(global.DB.IVA_LEYENDA)}</div>
       </div>`;
+      document.getElementById('cz-dto').onclick = () => this.modalDescuento();
+    },
+
+    // Pop-up del descuento comercial: % o $, sobre todo o sobre un producto.
+    modalDescuento() {
+      const d = Object.assign({ modo: 'pct', alcance: 'total', linea: null, valor: '' }, this.dto || {});
+      if (d.alcance === 'linea' && !this.get(d.linea)) d.alcance = 'total';
+      const m = this.modal('', null, 460);
+      const caja = m.firstChild;
+
+      const pintar = () => {
+        const prev = (() => {
+          const guardado = this.dto; this.dto = Number(d.valor) > 0 ? d : null;
+          const x = this.descuentoExtra(); this.dto = guardado; return x;
+        })();
+        caja.innerHTML = `
+          <div class="row" style="margin-bottom:4px"><h3 style="color:var(--navy);margin:0">Descuento</h3>
+            <div class="sp" style="flex:1"></div><button class="lx" id="dd-x" style="font-size:20px">✕</button></div>
+          <p class="muted" style="margin:0 0 14px;font-size:13px">Aparte del descuento de la condición de pago.</p>
+          <div class="vgrp"><div class="vlbl">En</div>
+            <div class="vopts">
+              <button class="vopt ${d.modo === 'pct' ? 'on' : ''}" data-m="pct">Porcentaje %</button>
+              <button class="vopt ${d.modo === 'monto' ? 'on' : ''}" data-m="monto">Pesos $</button>
+            </div></div>
+          <div class="vgrp"><div class="vlbl">Sobre</div>
+            <div class="vopts">
+              <button class="vopt ${d.alcance === 'total' ? 'on' : ''}" data-a="total">Todos los muebles</button>
+              <button class="vopt ${d.alcance === 'linea' ? 'on' : ''}" data-a="linea" ${this.lineas.length ? '' : 'disabled'}>Un producto</button>
+            </div></div>
+          ${d.alcance === 'linea' ? `<div class="vgrp"><div class="vlbl">Producto</div>
+            <select id="dd-linea">${this.lineas.map(l =>
+              `<option value="${l.key}" ${String(d.linea) === String(l.key) ? 'selected' : ''}>${UI.esc(l.prodNombre || 'Mueble a medida')} — ${UI.pesos(this.unit(l) * l.cantidad)}</option>`).join('')}</select></div>` : ''}
+          <div class="vgrp"><div class="vlbl">${d.modo === 'pct' ? 'Porcentaje' : 'Monto'}</div>
+            <div class="vcant"><input id="dd-valor" type="number" min="0" ${d.modo === 'pct' ? 'max="100"' : ''} value="${d.valor}" placeholder="0">
+              <span class="muted">${d.modo === 'pct' ? '%' : '$'}</span></div></div>
+          <div class="vpre">
+            <div><div class="muted" style="font-size:12px">Descuento</div>
+              <b class="tnum" style="font-size:21px;color:var(--ok)">${prev ? '−' + UI.pesos(prev) : '—'}</b></div>
+            <div class="sp" style="flex:1"></div>
+            ${this.dto ? '<button class="btn" id="dd-quitar">Quitar</button>' : ''}
+            <button class="btn primary" id="dd-ok">Guardar</button>
+          </div>`;
+
+        document.getElementById('dd-x').onclick = () => m.remove();
+        caja.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { d.modo = b.dataset.m; pintar(); });
+        caja.querySelectorAll('[data-a]').forEach(b => b.onclick = () => {
+          d.alcance = b.dataset.a;
+          if (d.alcance === 'linea' && !this.get(d.linea)) d.linea = (this.lineas[0] || {}).key;
+          pintar();
+        });
+        const sel = document.getElementById('dd-linea');
+        if (sel) sel.onchange = e => { d.linea = Number(e.target.value); pintar(); };
+        const val = document.getElementById('dd-valor');
+        val.oninput = () => { d.valor = val.value; pintar(); };
+        const q = document.getElementById('dd-quitar');
+        if (q) q.onclick = () => {
+          this.dto = null; this.log(this.vendedor, 'Quitó el descuento');
+          m.remove(); this.pintarTotales(); this.pintarSide();
+        };
+        document.getElementById('dd-ok').onclick = () => {
+          this.dto = Number(d.valor) > 0 ? { ...d, valor: Number(d.valor) } : null;
+          this.log(this.vendedor, this.dto ? `Aplicó un descuento de ${this.dtoTexto()}` : 'Quitó el descuento', 'dto');
+          m.remove(); this.pintarTotales(); this.pintarSide();
+        };
+      };
+      pintar();
     },
 
     // ---- Costado: Actividad · Notas · Cliente · Documentos ----------------
@@ -2516,7 +2606,7 @@ tr:hover td{background:var(--panel-2)}
         instalacion: 'convenir', instalacionAbierta: false,
         escalera: global.DB.ESCALERA_DEFAULT, escaleraAbierta: false, escaleraTocada: false,
       };
-      this.lineas = []; this._uid = 0;
+      this.lineas = []; this._uid = 0; this.dto = null;
       this.actividad = [];
       this.log(this.vendedor, 'Creó la cotización');
     },
@@ -2540,6 +2630,7 @@ tr:hover td{background:var(--panel-2)}
           <div>Muebles (lista) <b class="tnum">${UI.pesos(lista)}</b></div>
           ${desc ? `<div>Descuento <b class="tnum">−${UI.pesos(desc)}</b></div>` : ''}
           <div>Envío <b class="tnum">${UI.esc(this.envioTexto())}</b></div>
+          ${this.descuentoExtra() ? `<div>Descuento <b class="tnum">−${UI.pesos(this.descuentoExtra())}</b></div>` : ''}
           <div class="big">Total <b class="tnum">${UI.pesos(this.totalFinal())}</b></div>
         </div>
         <div class="pv-ad">
@@ -2879,6 +2970,8 @@ tr:hover td{background:var(--panel-2)}
         @media(max-width:820px){.cz-foot{grid-template-columns:1fr}}
         .cz-tyc .lbl{font-size:12.5px;color:var(--ink-soft);margin-bottom:6px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
         .cz-tyc .lbl .muted{font-size:11.5px}
+        .int-box{margin-top:11px;background:var(--line-soft);border:1px solid var(--line);border-radius:9px;padding:9px 11px}
+        .int-box textarea{background:var(--panel)}
         .tag{font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;border-radius:4px;padding:1px 6px}
         .tag.ext{background:var(--brand-soft);color:var(--brand)}
         .tag.int{background:var(--line-soft);color:var(--ink-soft)}
@@ -2901,6 +2994,14 @@ tr:hover td{background:var(--panel-2)}
         .cz-tots .big{border-top:1px solid var(--line);margin-top:5px;padding-top:9px;font-size:15px;font-weight:700;color:var(--navy)}
         .cz-tots .big b{font-size:19px}
         .cz-tots .tiva{font-size:11.5px;color:var(--muted);margin-top:7px}
+        .tdto{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;margin:6px 0 2px;
+          border:1px dashed var(--line);background:var(--line-soft);border-radius:8px;padding:7px 10px;
+          font:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;text-align:left}
+        .tdto:hover{border-color:var(--brand);color:var(--brand)}
+        .tdto b{color:var(--brand)}
+        .tdto.on{border-style:solid;border-color:var(--ok)}
+        .tdto.on b{color:var(--ok)}
+        .tdto small{display:block;font-size:11px;color:var(--muted);font-weight:400}
 
         .cz-sc{margin-bottom:12px}
         .cz-sh{padding:12px 14px 0;font-size:13px;font-weight:700;color:var(--navy)}
