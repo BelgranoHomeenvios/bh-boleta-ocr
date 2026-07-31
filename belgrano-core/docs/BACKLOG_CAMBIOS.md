@@ -274,6 +274,8 @@
   Órdenes*, desaparece "Confirmar → Venta" y aparece **Nueva cotización** para
   arrancar una nueva. El documento impreso también cambia a "Orden n.º" y deja
   de mostrar la validez.
+- ✅ 162. La vista previa muestra la **A4 entera y proporcionada**: se escala por
+  ancho y por alto para que entre completa en el modal, sin scroll.
 - ✅ 161. La leyenda de la seña queda en **30% para iniciar la fabricación**
   (coincide con el mínimo del motor de órdenes).
 

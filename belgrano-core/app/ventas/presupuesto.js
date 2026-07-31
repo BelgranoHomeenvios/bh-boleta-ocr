@@ -1671,10 +1671,28 @@
       this.modal(`<div class="row" style="margin-bottom:12px"><b style="color:var(--navy)">Vista previa</b><div class="sp" style="flex:1"></div>
         <button class="btn sm" id="pv-baja">Descargar</button>
         <button class="btn sm" id="pv-print">Imprimir</button></div>
-        <div class="pv-hoja">${cuerpo}</div>`, m => {
+        <div class="pv-hoja"><div class="pv-zoom">${cuerpo}</div></div>`, m => {
+        this.ajustarHoja(m);
         document.getElementById('pv-print').onclick = () => this.modalPreview('print');
         document.getElementById('pv-baja').onclick = () => this.bajar(nombre, `<!doctype html><meta charset="utf-8"><title>Cotización</title>${cuerpo}`);
-      }, 800);
+      }, 900);
+    },
+    // La A4 se muestra completa: se achica lo necesario para que entre en el
+    // ancho disponible, manteniendo la proporción de la hoja.
+    ajustarHoja(m) {
+      const hoja = m.querySelector('.pv-hoja'), zoom = m.querySelector('.pv-zoom');
+      if (!hoja || !zoom) return;
+      const A4 = 794;                       // 210 mm a 96 dpi
+      zoom.style.width = A4 + 'px';
+      zoom.style.transform = 'none';
+      const alto = zoom.offsetHeight;
+      // Entra completa: se achica por lo que quede más justo, el ancho o el alto.
+      const dispoW = hoja.clientWidth - 28;
+      const dispoH = (global.innerHeight || 900) * 0.85 - 96;   // menos la barra del modal
+      const k = Math.min(1, dispoW / A4, dispoH / alto);
+      zoom.style.transform = `scale(${k})`;
+      zoom.style.marginLeft = Math.max(0, (dispoW - A4 * k) / 2) + 'px';
+      hoja.style.height = Math.round(alto * k + 28) + 'px';
     },
     bajar(nombre, html) {
       try {
@@ -2110,8 +2128,9 @@
         .vpre{display:flex;align-items:center;gap:12px;border-top:1px solid var(--line);padding-top:12px;margin-top:6px}
         .ddrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 
-        .pv-hoja{background:#f1f1f1;margin:0 -20px -20px;padding:16px;border-radius:0 0 12px 12px}
-        .pv-hoja .pv{box-shadow:0 2px 14px rgba(0,0,0,.14);min-height:0}
+        .pv-hoja{background:#eceff3;margin:0 -20px -20px;padding:14px;border-radius:0 0 12px 12px;overflow:hidden}
+        .pv-zoom{transform-origin:top left}
+        .pv-hoja .pv{box-shadow:0 2px 16px rgba(0,0,0,.16)}
         .mdlbg{position:fixed;inset:0;background:rgba(20,26,38,.4);z-index:50;display:grid;place-items:center;padding:20px}
       </style>`;
     },
