@@ -153,6 +153,22 @@
   porcentaje sale de **Configuración → Reglas de precio**, así que si cambia la
   regla cambia la conversión.
 
+- ✅ 109. Cabecera más compacta (menos aire entre Vendedor · Local · Fecha).
+- ✅ 110. Se elimina el cartel de "Para pasar a Productos cargá…": ahora los
+  **campos que faltan se marcan en rojo** (Cliente y Teléfono) y se limpian al
+  completarlos.
+- ✅ 111. El **buscador de producto termina donde termina su columna**: el resto
+  del renglón queda vacío y se completa recién al elegir el mueble.
+- ✅ 112. Panel del a medida: **Medidas · Colores · Observaciones** en un renglón
+  y el **precio** debajo. Se saca la frase del −35%/×1,54.
+- ✅ 113. El precio se pide **en la condición elegida arriba** ("Precio en
+  efectivo" si la condición es Efectivo); también se puede tipear el **subtotal**
+  y el unitario sale solo. El precio de lista se deduce por detrás.
+- ✅ 114. La **cámara pasa al renglón**, al lado del "A medida".
+- ✅ 115. Al **guardar la línea**, debajo del nombre quedan **Medidas, Colores y
+  Observaciones** a la vista.
+- ✅ 116. **Términos y condiciones fijos**: salen siempre y no se pueden editar.
+
 > Pendientes:
 > - La lista de localidades es **demo del AMBA**; se reemplaza por la real del mapa.
 > - La foto del diseño hoy se carga por **URL**; falta la subida real del archivo.

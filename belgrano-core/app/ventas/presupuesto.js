@@ -73,6 +73,16 @@
       const f = this.factorEfectivo();
       return f > 0 ? (1 / f).toFixed(2).replace('.', ',') : '—';
     },
+    // El vendedor carga el precio en la condición que eligió arriba; el de
+    // lista sale solo (efectivo ÷ 0,65, lista tal cual).
+    labelPrecio() {
+      const f = this.factor();
+      return f === 1 ? 'Precio de lista' : `Precio en ${this.terminoLabel().toLowerCase()}`;
+    },
+    desdeCondicion(monto) {
+      const f = this.factor();
+      return f > 0 ? Math.round((Number(monto) || 0) / f) : Math.round(Number(monto) || 0);
+    },
     // Un mueble a medida puede estar todavía sin precio: se define después.
     sinPrecio(l) { return l.tipo === 'medida' && l.precioManual == null; },
 
@@ -220,8 +230,9 @@
             <div class="lbl" style="margin-top:11px">Observaciones <span class="tag int">Internas</span>
               <span class="muted">no salen impresas — para nosotros o producción</span></div>
             <textarea id="obs-int" rows="2" placeholder="Notas para producción, administración o para vos…">${UI.esc(this.obsInt)}</textarea>
-            <div class="lbl" style="margin-top:11px">Términos y condiciones</div>
-            <textarea id="cz-tyc" rows="3">${UI.esc(this.terminos)}</textarea>
+            <div class="lbl" style="margin-top:11px">Términos y condiciones
+              <span class="muted">salen siempre, no se editan</span></div>
+            <div class="tyc-fijo">${UI.esc(global.DB.TYC_DEFAULT)}</div>
           </div>
           <div id="cz-tot"></div>
         </div>`;
@@ -232,7 +243,7 @@
         // cerrados hasta tener nombre + un contacto.
         if (k !== 'cliente' && this.etapa !== k && !this.clienteCompleto()) {
           this.etapa = 'cliente'; this.pintarMain(); this.avisoCliente(true);
-          UI.aviso('Primero completá los datos del cliente', 'warn');
+          UI.aviso('Falta el nombre o un contacto del cliente', 'warn');
           return;
         }
         this.etapa = this.etapa === k ? '' : k;
@@ -240,7 +251,6 @@
       });
       document.getElementById('obs-ext').oninput = e => { this.obsExt = e.target.value; };
       document.getElementById('obs-int').oninput = e => { this.obsInt = e.target.value; };
-      document.getElementById('cz-tyc').oninput = e => { this.terminos = e.target.value; };
 
       this.pintarCabecera();
       if (this.etapa === 'cliente') this.pintarCliente();
@@ -357,7 +367,6 @@
         </div>
         ${ocultos ? `<div class="cz-cols" style="margin-top:9px">${ocultos}</div>` : ''}
         ${addBtns ? `<div class="adds">${addBtns}</div>` : ''}
-        <div id="c-aviso"></div>
         <div class="sec-go"><button class="btn sm primary" id="c-sig">Continuar → Productos</button></div>`;
 
       const bind = (id, campo) => {
@@ -456,20 +465,25 @@
     // No se pasa a cotizar sin saber a quién: hace falta el nombre y al menos
     // un contacto (teléfono, Instagram o mail).
     irAProductos() {
-      if (!this.clienteCompleto()) { this.avisoCliente(true); return; }
+      if (!this.clienteCompleto()) {
+        this.avisoCliente(true);
+        UI.aviso('Falta el nombre o un contacto del cliente', 'warn');
+        return;
+      }
       this.etapa = 'productos'; this.pintarMain();
     },
     clienteCompleto() { return !!String(this.cli.nombre).trim() && this.clienteValido(); },
 
-    // El aviso NO vive permanente en la pantalla: sale cuando se quiere avanzar.
+    // Sin cartel: lo que falta se marca en ROJO sobre el propio campo.
     avisoCliente(mostrar) {
-      const a = document.getElementById('c-aviso'); if (!a) return;
       if (mostrar != null) this._avisoOn = !!mostrar;
-      if (!this._avisoOn || this.clienteCompleto()) { a.innerHTML = ''; this._avisoOn = false; return; }
-      const falta = [];
-      if (!String(this.cli.nombre).trim()) falta.push('el <b>nombre</b>');
-      if (!this.clienteValido()) falta.push('al menos un contacto: <b>teléfono, Instagram o mail</b>');
-      a.innerHTML = `<div class="banner warn" style="margin:12px 0 0">Para pasar a Productos cargá ${falta.join(' y ')}.</div>`;
+      const marcar = (id, falta) => {
+        const el = document.getElementById(id); if (!el) return;
+        if (this._avisoOn && falta) el.classList.add('falta'); else el.classList.remove('falta');
+      };
+      marcar('c-nombre', !String(this.cli.nombre).trim());
+      marcar('c-tel', !this.clienteValido());
+      if (this._avisoOn && this.clienteCompleto()) this._avisoOn = false;
     },
     // Nota interna: el % es de uso nuestro, el cliente sólo ve el nombre.
     notaTermino() {
@@ -502,6 +516,7 @@
             <div id="pr-drop"></div>
           </div>
           <button class="lnk" id="pr-catalogo">Catálogo</button>
+          <span></span><span></span><span></span><span></span>
         </div>
         <div class="pr-pie">
           <div class="pr-sum">Total de los muebles <b class="tnum">${UI.pesos(this.total())}</b></div>
@@ -566,30 +581,35 @@
         // vendedor explica lo que pidió el cliente, con la foto del diseño.
         const obs = !medida ? '' : abierta
           ? `<div class="lobs">
-              <div class="lprec">
-                <label>Precio de lista <input type="number" min="0" data-plista="${l.key}" value="${l.precioManual != null ? l.precioManual : ''}" placeholder="0"></label>
-                <span class="oo">o</span>
-                <label>Precio en efectivo <input type="number" min="0" data-pefec="${l.key}" value="${l.precioManual != null ? this.aEfectivo(l.precioManual) : ''}" placeholder="0"></label>
-                <span class="hint">Cargá uno y el otro sale solo (−${this.descEfectivoPct()}% / ×${this.multLista()}).</span>
+              <div class="lmed">
+                <label>Medidas <input data-med="${l.key}" value="${UI.esc(l.medidas || '')}" placeholder="ej. 2.40 × 0.50 × 0.90"></label>
+                <label>Colores <input data-col="${l.key}" value="${UI.esc(l.colores || '')}" placeholder="ej. estructura negra, frente paraíso"></label>
+                <label class="ancho">Observaciones <input data-obs="${l.key}" value="${UI.esc(l.obs)}" placeholder="lo que pidió el cliente"></label>
               </div>
-              <textarea data-obs="${l.key}" rows="2" placeholder="Observaciones del mueble a medida — medidas, materiales, lo que pidió el cliente…">${UI.esc(l.obs)}</textarea>
-              <div class="lobs-f">
-                <button class="cam" data-img="${l.key}" title="${l.img ? 'Cambiar la foto del diseño' : 'Adjuntar foto del diseño'}">📷 ${l.img ? 'Cambiar foto' : 'Adjuntar foto'}</button>
+              <div class="lmed">
+                <label>${UI.esc(this.labelPrecio())} <input type="number" min="0" data-pcond="${l.key}" value="${l.precioManual != null ? Math.round(this.unit(l)) : ''}" placeholder="0"></label>
                 ${l.img ? `<img class="lobs-img" src="${UI.esc(l.img)}" alt="Foto del diseño">` : ''}
               </div>
             </div>`
-          : (l.obs || l.img) ? `<div class="lobs leido">
-              ${l.obs ? `<div class="obst">${UI.esc(l.obs)}</div>` : ''}
+          : (l.medidas || l.colores || l.obs || l.img) ? `<div class="lobs leido">
+              <div class="obst">${[
+                l.medidas && `<b>Medidas:</b> ${UI.esc(l.medidas)}`,
+                l.colores && `<b>Colores:</b> ${UI.esc(l.colores)}`,
+                l.obs && UI.esc(l.obs),
+              ].filter(Boolean).join(' · ')}</div>
               ${l.img ? `<img class="lobs-img" src="${UI.esc(l.img)}" alt="Foto del diseño">` : ''}
             </div>` : '';
         return `<div class="litem ${medida ? 'med' : ''} ${abierta ? 'abierta' : ''}">
           <div class="lrow" data-l="${l.key}">
             <div class="lcant">${cantCel}</div>
             <div>${nombre}</div>
-            <div>${tipoCel}</div>
+            <div class="ltipo">${tipoCel}${medida
+              ? `<button class="cam mini" data-img="${l.key}" title="${l.img ? 'Cambiar la imagen' : 'Adjuntar imagen'}" aria-label="Adjuntar imagen">📷</button>` : ''}</div>
             ${precioCel}
             <div class="dto tnum">${dto ? '−' + UI.pesos(dto) : '—'}</div>
-            <div class="sub tnum">${this.sinPrecio(l) ? '<span class="adef">—</span>' : UI.pesos(sub)}</div>
+            ${abierta && medida
+              ? `<input type="number" min="0" class="pnum sube" data-subt="${l.key}" value="${this.sinPrecio(l) ? '' : Math.round(sub)}" placeholder="subtotal" aria-label="Subtotal">`
+              : `<div class="sub tnum">${this.sinPrecio(l) ? '<span class="adef">—</span>' : UI.pesos(sub)}</div>`}
             <div class="lacc">
               <button class="lx" data-ed="${l.key}" title="${abierta ? 'Listo' : 'Editar el renglón'}">${abierta ? '✓' : '✏️'}</button>
               <button class="lx" data-del="${l.key}" title="Quitar">✕</button>
@@ -613,6 +633,22 @@
       });
       this.bindCant(cont);
       cont.querySelectorAll('[data-obs]').forEach(i => i.oninput = () => { const l = this.get(i.dataset.obs); if (l) l.obs = i.value; });
+      cont.querySelectorAll('[data-med]').forEach(i => i.oninput = () => { const l = this.get(i.dataset.med); if (l) l.medidas = i.value; });
+      cont.querySelectorAll('[data-col]').forEach(i => i.oninput = () => { const l = this.get(i.dataset.col); if (l) l.colores = i.value; });
+      // El precio se carga en la condición elegida arriba (efectivo, lista…) y
+      // el de lista se deduce solo.
+      cont.querySelectorAll('[data-pcond]').forEach(i => i.onchange = () => {
+        const l = this.get(i.dataset.pcond); if (!l) return;
+        l.precioManual = i.value === '' ? null : this.desdeCondicion(Number(i.value) || 0);
+        this.repintar();
+      });
+      // También se puede tipear el SUBTOTAL y el unitario sale solo.
+      cont.querySelectorAll('[data-subt]').forEach(i => i.onchange = () => {
+        const l = this.get(i.dataset.subt); if (!l) return;
+        const total = Math.max(0, Number(i.value) || 0);
+        l.precioManual = i.value === '' ? null : this.desdeCondicion(total / Math.max(1, l.cantidad));
+        this.repintar();
+      });
       cont.querySelectorAll('[data-nom]').forEach(i => i.oninput = () => { const l = this.get(i.dataset.nom); if (l) l.prodNombre = i.value; });
       // Se carga el de lista o el de efectivo; el otro se completa solo.
       cont.querySelectorAll('[data-plista]').forEach(i => i.onchange = () => {
@@ -740,7 +776,7 @@
         base: Number(variante.precio) || 0,
         cantidad: Math.max(1, Math.floor(cantidad) || 1),
         // A medida arranca SIN precio ("a definir"): se completa después.
-        obs: '', precioManual: medida ? null : null, img: img || variante.img || '',
+        obs: '', medidas: '', colores: '', precioManual: null, img: img || variante.img || '',
         editando: medida,   // se abre para cargar precio, detalle y foto
       });
       this.log(this.vendedor, `Agregó ${cantidad > 1 ? cantidad + ' × ' : ''}${prodNombre}${medida ? ' (a medida)' : ''}`);
@@ -1302,13 +1338,14 @@
 
         .cz-head{margin-bottom:10px;padding-bottom:14px}
         .cz-tit{display:flex;align-items:flex-start;gap:20px}
-        .cz-box{position:relative;border:1px solid var(--line);border-radius:10px;padding:10px 14px;background:var(--panel-2);min-width:290px;display:flex;flex-direction:column;gap:7px}
+        .cz-box{position:relative;border:1px solid var(--line);border-radius:10px;padding:9px 13px;background:var(--panel-2);min-width:282px;display:flex;flex-direction:column;gap:1px}
         .cz-box .cabx{position:absolute;top:5px;right:5px}
-        .cz-box .valf{font-size:13px;font-weight:600;color:var(--navy);padding:4px 0}
+        .cz-box .valf{font-size:13px;font-weight:600;color:var(--navy);padding:2px 0}
         .fr.sm{grid-template-columns:106px minmax(0,1fr);gap:8px}
+        .cz-box .fr.sm{align-items:baseline}
         .fr.sm.nro b{font-size:16px;color:var(--navy);font-weight:800}
         .fr.sm>label{font-size:12px}
-        .fr.sm input,.fr.sm select{padding:5px 8px;font-size:12.5px}
+        .fr.sm input,.fr.sm select{padding:4px 8px;font-size:12.5px}
         @media(max-width:640px){.cz-tit{flex-direction:column}.cz-box{min-width:0;width:100%}}
 
         .sec{margin-bottom:10px;overflow:visible}
@@ -1344,6 +1381,8 @@
         .fx input{flex:1;min-width:0}
         .cx{flex:none;border:0;background:none;color:var(--muted);cursor:pointer;font-size:13px;line-height:1;padding:5px 6px;border-radius:6px}
         .cx:hover{background:var(--crit-bg,var(--line-soft));color:var(--crit)}
+        input.falta,textarea.falta{border-color:var(--crit);background:var(--crit-bg,#fdf2f2)}
+        input.falta::placeholder{color:var(--crit)}
         .chip-add{border:1px dashed var(--line);background:none;color:var(--brand);border-radius:16px;padding:3px 11px;font-size:12px;font-weight:600;cursor:pointer}
         .chip-add:hover{border-color:var(--brand);background:var(--brand-soft)}
 
@@ -1356,7 +1395,7 @@
         
         /* El buscador va alineado con la columna Producto, arriba de las líneas:
            lo que se elige completa directamente ese renglón. */
-        .srow{display:grid;grid-template-columns:62px minmax(0,1.6fr) auto;gap:8px;align-items:center;padding:9px 0 4px}
+        .srow{display:grid;grid-template-columns:62px minmax(0,1.5fr) 122px 104px 96px 106px 50px;gap:8px;align-items:center;padding:9px 0 4px}
         .bwrap{position:relative}
         .srow .busca{width:100%;padding:7px 10px;font-size:13px}
         .lnk{border:0;background:none;color:var(--brand);font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:0;justify-self:start}
@@ -1367,7 +1406,7 @@
         .drop .it:last-child{border-bottom:0} .drop .it:hover{background:var(--brand-soft)} .drop .it .cnt{color:var(--muted);font-size:12px}
 
         /* Cantidad adelante · los dos precios juntos al final. */
-        .lhead,.lrow{display:grid;grid-template-columns:62px minmax(0,1.6fr) 92px 108px 100px 108px 52px;gap:8px;align-items:center;padding:0}
+        .lhead,.lrow{display:grid;grid-template-columns:62px minmax(0,1.5fr) 122px 104px 96px 106px 50px;gap:8px;align-items:center;padding:0}
         .lcant{display:flex;align-items:center}
         .cantv{border:1px solid transparent;background:none;font:inherit;font-size:14px;font-weight:650;color:var(--navy);
           cursor:pointer;padding:4px 10px;border-radius:7px;min-width:42px;text-align:center}
@@ -1387,11 +1426,14 @@
            para escribir y para adjuntar la foto del diseño que pidió el cliente. */
         .lobs{padding:0 0 11px 70px;display:flex;flex-direction:column;gap:7px}
         .adef{text-align:right;font-size:12.5px;font-weight:700;color:var(--warn)}
-        .lprec{display:flex;align-items:flex-end;gap:11px;flex-wrap:wrap}
-        .lprec label{display:flex;flex-direction:column;gap:4px;font-size:11.5px;color:var(--ink-soft)}
-        .lprec input{width:132px;padding:6px 9px;font-size:13px}
-        .lprec .oo{font-size:12px;color:var(--muted);padding-bottom:8px}
-        .lprec .hint{padding-bottom:7px}
+        .lmed{display:flex;align-items:flex-end;gap:11px;flex-wrap:wrap}
+        .lmed label{display:flex;flex-direction:column;gap:4px;font-size:11.5px;color:var(--ink-soft)}
+        .lmed label.ancho{flex:1;min-width:180px}
+        .lmed input{width:190px;padding:6px 9px;font-size:13px}
+        .lmed label.ancho input{width:100%}
+        .ltipo{display:flex;align-items:center;gap:4px}
+        .cam.mini{padding:3px 6px;font-size:13px;border-radius:6px}
+        .sube{border-color:var(--warn)}
         .lobs textarea{width:100%;padding:7px 9px;font:inherit;font-size:12.5px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);resize:vertical}
         .lobs-f{display:flex;align-items:center;gap:10px}
         .cam{border:1px dashed var(--line);background:var(--panel);color:var(--ink-soft);border-radius:8px;padding:5px 11px;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
@@ -1408,7 +1450,7 @@
         .thumb{width:34px;height:34px;flex:none;border:1px dashed var(--line);border-radius:8px;background:var(--panel-2);cursor:pointer;padding:0;overflow:hidden;color:var(--muted);font-size:16px}
         .thumb:hover{border-color:var(--brand);color:var(--brand)}
         .thumb img{width:100%;height:100%;object-fit:cover;display:block}
-        .tipo{border:1px solid var(--line);background:var(--panel-2);color:var(--ink-soft);border-radius:6px;padding:4px 8px;font-size:11.5px;font-weight:700;cursor:pointer;width:100%}
+        .tipo{border:1px solid var(--line);background:var(--panel-2);color:var(--ink-soft);border-radius:6px;padding:4px 8px;font-size:11.5px;font-weight:700;cursor:pointer;flex:1;white-space:nowrap}
         .tipo:hover{border-color:var(--brand);color:var(--brand)}
         .tipo.med{border-color:var(--warn);color:var(--warn);background:var(--warn-bg)}
         .lx{color:var(--muted);cursor:pointer;font-size:15px;border:0;background:transparent;padding:3px}
@@ -1432,6 +1474,7 @@
         .locw .drop{width:100%;min-width:250px}
         .bwrap .drop{margin-top:4px}
         .drop .it.nueva{color:var(--brand);font-weight:600}
+        .tyc-fijo{font-size:12.5px;color:var(--ink-soft);line-height:1.5;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:9px 11px}
         .cz-tyc textarea,.cz-foot textarea{width:100%;padding:8px 10px;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);resize:vertical}
         .cz-tots .tr{display:flex;justify-content:space-between;gap:12px;padding:4px 0;font-size:13px;color:var(--ink-soft)}
         .cz-tots .tr b{color:var(--navy)}
