@@ -67,13 +67,18 @@
       if (this.termino === 'transferencia') return 1 - DESC_TRANSFER;
       return 1; // lista, mixto
     },
-    unit(l) {
-      if (l.tipo === 'medida') return Number(l.precioManual) || 0;
-      if (this.termino === 'mixto') return l.precioManual != null ? Number(l.precioManual) : l.base;
-      return l.base * this.factor();
-    },
-    // Precio de lista, antes del descuento por condición de pago.
+    // Descuento que aplica la condición de pago, en %.
+    descPct() { return Math.round((1 - this.factor()) * 100); },
+    // Precio de lista, antes del descuento por condición de pago. En los muebles
+    // a medida el vendedor carga el precio de LISTA, igual que en los estándar.
     lista(l) { return l.tipo === 'medida' ? (Number(l.precioManual) || 0) : l.base; },
+    // Precio final por unidad. El descuento sale de la condición de pago y aplica
+    // igual a estándar y a medida — lo único que cambia es de dónde sale la lista.
+    unit(l) {
+      // Mixto: el vendedor arma cada precio a mano (parte efectivo + parte tarjeta).
+      if (this.termino === 'mixto') return l.precioManual != null ? Number(l.precioManual) : l.base;
+      return this.lista(l) * this.factor();
+    },
     totalLista() { return this.lineas.reduce((a, l) => a + this.lista(l) * l.cantidad, 0); },
     total() { return this.lineas.reduce((a, l) => a + this.unit(l) * l.cantidad, 0); },
     descuento() { return this.totalLista() - this.total(); },
@@ -307,7 +312,8 @@
           <div class="muted" id="op-nota" style="font-size:12px"></div>
         </div>
         <div class="lhead"><span>Producto</span><span>Tipo</span><span></span><span>Cant.</span>
-          <span>Detalle</span><span style="text-align:right">Precio unit.</span>
+          <span>Detalle</span><span style="text-align:center">Dto.</span>
+          <span style="text-align:right">Precio unit.</span>
           <span style="text-align:right">Subtotal</span><span></span></div>
         <div id="pr-lineas"></div>
         <div class="srow">
@@ -341,16 +347,18 @@
         this.refrescarProductos(); return;
       }
       cont.innerHTML = this.lineas.map(l => {
-        const unit = this.unit(l), sub = unit * l.cantidad, ed = this.editable(l);
+        const sub = this.unit(l) * l.cantidad, ed = this.editable(l), pct = this.descPct();
         const medida = l.tipo === 'medida';
         const nombre = medida && !l.prodNombre
           ? `<input value="" data-nom="${l.key}" placeholder="Mueble a medida" style="font-weight:650">`
           : `<div class="n">${UI.esc(l.prodNombre || 'Mueble a medida')}</div>
              <div class="v">${UI.esc(l.ejes)}</div>`;
-        // Estándar → precio bloqueado del catálogo. A medida → libre.
+        // La columna muestra siempre el precio de LISTA: el descuento de la
+        // condición de pago se ve aparte y ya viene aplicado en el subtotal.
+        // Estándar → bloqueado (sale del catálogo). A medida → lo carga el vendedor.
         const precioCel = ed
-          ? `<input type="number" min="0" class="pnum" value="${l.precioManual != null ? l.precioManual : Math.round(unit)}" data-precio="${l.key}" aria-label="Precio unitario">`
-          : `<div class="lock tnum">${UI.pesos(unit)} 🔒</div>`;
+          ? `<input type="number" min="0" class="pnum" value="${l.precioManual != null ? l.precioManual : Math.round(this.lista(l))}" data-precio="${l.key}" aria-label="Precio unitario de lista">`
+          : `<div class="lock tnum">${UI.pesos(this.lista(l))} 🔒</div>`;
         // La imagen va al lado del tipo y sólo en los a medida: el vendedor
         // tiene que mostrar qué le pidió el cliente. Los estándar la traen del
         // catálogo (Tienda Nube) y sólo se muestra si ya existe.
@@ -364,6 +372,7 @@
           ${imgCel}
           <input type="number" min="1" value="${l.cantidad}" data-cant="${l.key}" aria-label="Cantidad">
           <input value="${UI.esc(l.obs)}" data-obs="${l.key}" placeholder="—" aria-label="Detalle">
+          <div class="dto">${pct ? `<span class="pill ok">${pct}%</span>` : '—'}</div>
           ${precioCel}
           <div class="sub tnum">${UI.pesos(sub)}</div>
           <button class="lx" data-del="${l.key}" title="Quitar">✕</button></div>`;
@@ -397,7 +406,7 @@
       if (!l) return;
       if (l.tipo === 'estandar') {
         l.tipo = 'medida';
-        l.precioManual = Math.round(this.unit({ ...l, tipo: 'estandar' }));
+        l.precioManual = Math.round(l.base);
         l.ejes = l.ejes ? l.ejes + ' · adaptado' : 'a medida';
         this.log(this.vendedor, `Pasó ${l.prodNombre} a medida`);
       } else {
@@ -527,7 +536,7 @@
       const t = document.getElementById('cz-tot'); if (!t) return;
       const lista = this.totalLista(), desc = this.descuento(), muebles = this.total();
       const envio = this.ad.envio || 0;
-      const pct = this.termino === 'efectivo' ? ' (35%)' : '';
+      const pct = this.descPct() ? ` (${this.descPct()}%)` : '';
       const fila = (l, v, cls = '') => `<div class="tr ${cls}"><span>${l}</span><b class="tnum">${v}</b></div>`;
       t.innerHTML = `<div class="cz-tots">
         ${fila('Muebles (lista)', UI.pesos(lista))}
@@ -906,7 +915,8 @@
         .drop .it{display:flex;align-items:center;gap:8px;padding:9px 13px;cursor:pointer;border-bottom:1px solid var(--line-soft)}
         .drop .it:last-child{border-bottom:0} .drop .it:hover{background:var(--brand-soft)} .drop .it .cnt{color:var(--muted);font-size:12px}
 
-        .lhead,.lrow{display:grid;grid-template-columns:minmax(0,1.6fr) 92px 40px 56px minmax(0,1fr) 112px 106px 26px;gap:9px;align-items:center;padding:0}
+        .lhead,.lrow{display:grid;grid-template-columns:minmax(0,1.5fr) 90px 38px 52px minmax(0,1fr) 54px 108px 104px 24px;gap:8px;align-items:center;padding:0}
+        .lrow .dto{text-align:center;font-size:12px;color:var(--muted)}
         .lhead{padding-top:9px;padding-bottom:9px;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:700;border-bottom:1px solid var(--line)}
         .lrow{padding-top:7px;padding-bottom:7px;border-bottom:1px solid var(--line-soft)}
         .lrow:hover{background:var(--panel-2)}
@@ -922,7 +932,7 @@
         .tipo:hover{border-color:var(--brand);color:var(--brand)}
         .tipo.med{border-color:var(--warn);color:var(--warn);background:var(--warn-bg)}
         .lx{color:var(--muted);cursor:pointer;font-size:15px;border:0;background:transparent;padding:3px}
-        @media(max-width:980px){.lhead{display:none}.lrow{grid-template-columns:44px 1fr 1fr;gap:8px}.lrow .sub,.lrow .lock,.lrow .pnum{text-align:left}}
+        @media(max-width:1080px){.lhead{display:none}.lrow{grid-template-columns:1fr 1fr;gap:8px}.lrow .sub,.lrow .lock,.lrow .pnum{text-align:left}}
 
         .cz-foot{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:26px;padding:16px}
         @media(max-width:820px){.cz-foot{grid-template-columns:1fr}}

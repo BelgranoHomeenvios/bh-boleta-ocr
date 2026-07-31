@@ -39,6 +39,13 @@
 - ✅ 68. Abajo de la tabla, junto al buscador y el catálogo, el **Total de los
   muebles**.
 
+- ✅ 69. El **descuento por condición de pago aplica igual a estándar y a
+  medida**. En los a medida el vendedor carga el **precio de lista** y el
+  descuento se aplica solo; antes ese precio quedaba fuera del descuento.
+- ✅ 70. Nueva columna **Dto.** con el % de la condición de pago, entre Detalle y
+  los dos precios (que siguen juntos al final). La columna "Precio unit." pasa a
+  mostrar siempre el **precio de lista** y el subtotal ya viene descontado.
+
 > Pendiente: Brian va a definir **qué campos son obligatorios** para poder crear
 > el presupuesto.
 
