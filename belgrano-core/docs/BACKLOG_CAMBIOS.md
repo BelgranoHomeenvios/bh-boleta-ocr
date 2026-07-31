@@ -258,7 +258,22 @@
   (`Clientes.render(mount, { id })` o `{ buscar }`); si todavía no existe, deja el
   listado filtrado.
 
+- ✅ 158. Arriba quedan **Guardar · Confirmar → Venta**; abajo de los totales,
+  **Vista previa**, y adentro de ella **Descargar / Imprimir**.
+- ✅ 159. **Presupuesto A4** con el diseño de la marca (el PDF que pasó Brian):
+  logo, "Transformamos hogares" en terracota, N° de cotización espaciado, fecha
+  y validez a la derecha, datos del cliente, tabla de productos con sus
+  variantes, condiciones a la izquierda y totales a la derecha con el **TOTAL en
+  banda negra**, recuadro de observaciones para el cliente y pie con los T&C y
+  los datos de contacto. Sirve igual para ver, imprimir y descargar.
+- ✅ 160. **Confirmar → Venta ya no muestra el resumen**: sale un pop-up corto
+  **"¿Confirmamos la orden OV-…?"** con **No, seguir editando** / **Sí, confirmar**.
+  Con Sí se crea la orden con su **N° de orden automático** y se abre la orden
+  para terminar de cargarla.
+
 > Pendientes:
+> - La **pantalla "Nueva orden"** la va a diseñar Brian en el próximo paso; hoy al
+>   confirmar se abre el detalle de la orden ya existente.
 > - La lista de localidades es **demo del AMBA**; se reemplaza por la real del mapa.
 > - La foto del diseño hoy se carga por **URL**; falta la subida real del archivo.
 > - Brian va a definir **qué campos son obligatorios** para poder crear el presupuesto.

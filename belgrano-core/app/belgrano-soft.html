@@ -612,6 +612,16 @@ tr:hover td{background:var(--panel-2)}
       return `${m} por piso por bulto`;
     },
     IVA_LEYENDA: 'Los precios no incluyen IVA.',
+    // Leyendas del presupuesto impreso.
+    VALIDEZ_DIAS: 7,
+    SENA_LEYENDA: '50% para iniciar la fabricación',
+    EMPRESA: {
+      nombre: 'Belgrano Home',
+      lema: 'Transformamos hogares',
+      direccion: 'Av. Belgrano 2020-2299',
+      instagram: '@belgranohome',
+      telefono: '11 3359 5571',
+    },
 
     // Sesión del vendedor: el que vende entra con su usuario, así que el
     // vendedor y el local salen precargados (igual se pueden editar).
@@ -689,6 +699,10 @@ tr:hover td{background:var(--panel-2)}
 
     // Crea una orden a partir de una cotización aceptada. Nace en "confirmar"
     // (a la espera de la seña). Numeración provisional: OV-<local>-<serie>.
+    // Próximo número de orden, sin consumirlo: se muestra al confirmar.
+    proximoNumeroOrden(local) {
+      return `OV-${local}-${String(_seqOrden + 1).padStart(4, '0')}`;
+    },
     crearOrden(data) {
       _seqOrden += 1;
       const orden = {
@@ -2856,43 +2870,36 @@ tr:hover td{background:var(--panel-2)}
         return UI.aviso('Cargá el costo de instalación', 'warn');
       }
 
-      const verif = this.lineas.filter(l => this.requiereVerif(l)).length;
-      const plazo = this.entregaEditada();
-      const muebles = this.total(), envio = this.envioMonto(), total = this.totalFinal();
+      const nro = global.DB.proximoNumeroOrden(this.local);
       const nombreCli = this.nombreCli();
-      this.modal(`<h3 style="color:var(--navy)">Confirmar → Venta</h3>
-        <p style="margin:10px 0 0">Se crea la orden en estado <span class="pill warn">Confirmar</span> — a la espera de la seña (mínimo 30%).</p>
-        <table style="margin-top:12px"><tbody>
-          <tr><td class="muted">Cliente</td><td style="text-align:right"><b>${UI.esc(nombreCli)}</b></td></tr>
-          <tr><td class="muted">Vendedor · Local</td><td style="text-align:right">${UI.esc(this.vendedor)} · ${UI.esc(this.local)}</td></tr>
-          <tr><td class="muted">Condición de pago</td><td style="text-align:right">${UI.esc(this.terminoLabel())}</td></tr>
-          <tr><td class="muted">Entrega</td><td style="text-align:right">${UI.esc(this.entregaTexto())}</td></tr>
-          <tr><td class="muted">Productos</td><td style="text-align:right">${this.lineas.length}${verif ? ` · <span style="color:var(--warn)">${verif} a verificar</span>` : ''}</td></tr>
-          <tr><td class="muted">Muebles</td><td style="text-align:right" class="tnum">${UI.pesos(muebles)}</td></tr>
-          <tr><td class="muted">Envío</td><td style="text-align:right" class="tnum">${UI.esc(this.envioTexto())}</td></tr>
-          <tr><td class="muted">Total</td><td style="text-align:right"><b class="tnum">${UI.pesos(total)}</b></td></tr>
-        </tbody></table>
-        ${verif ? `<div class="banner warn" style="margin-top:12px">${verif} producto(s) a medida / con detalle van a <b>verificarse en Administración</b>.</div>` : ''}
-        ${plazo ? `<div class="banner warn" style="margin-top:10px">El <b>plazo de entrega</b> se cambió (${UI.esc(this.entregaTexto())}) — queda registrado y va a verificación.</div>` : ''}
-        <div class="row" style="margin-top:16px;justify-content:flex-end;gap:10px">
-          <button class="btn" id="cv-cancel">Cancelar</button>
-          <button class="btn primary" id="cv-ok">Crear orden en Confirmar</button></div>`, m => {
-        document.getElementById('cv-cancel').onclick = () => m.remove();
-        document.getElementById('cv-ok').onclick = () => {
+      // Nada de resumen: se confirma y se pasa a la orden, que es donde se
+      // termina de cargar lo que en la cotización todavía no importaba.
+      this.modal(`<h3 style="color:var(--navy);margin:0 0 6px">¿Confirmamos la orden ${UI.esc(nro)}?</h3>
+        <p class="muted" style="font-size:13px;margin:0">
+          La cotización ${UI.esc(global.DB.numeroCotizacion(this.nro))} de <b>${UI.esc(nombreCli)}</b>
+          pasa a orden de venta y se abre para completarla.</p>
+        <div class="row" style="margin-top:18px;justify-content:flex-end;gap:10px">
+          <button class="btn" id="cv-no">No, seguir editando</button>
+          <button class="btn primary" id="cv-si">Sí, confirmar</button></div>`, m => {
+        document.getElementById('cv-no').onclick = () => m.remove();
+        document.getElementById('cv-si').onclick = () => {
           const orden = global.DB.crearOrden({
-            cliente: nombreCli, vendedor: this.vendedor, local: this.local, total,
+            cliente: nombreCli, vendedor: this.vendedor, local: this.local, total: this.totalFinal(),
             termino: this.termino, fecha: hoy(),
             lineas: this.lineas.map(l => ({ nombre: l.prodNombre, cant: l.cantidad, unit: this.unit(l), obs: l.obs, tipo: l.tipo, img: l.img })),
           });
           m.remove();
-          this.guardada = true;   // el número queda usado por la venta
+          this.guardada = true;   // el número de cotización queda usado por la venta
           this.registrando = true;
           this.log(this.vendedor, `Confirmó la venta ${orden.numero}`);
           this.reset();
-          UI.aviso(`Orden ${orden.numero} creada en estado Confirmar`, 'ok');
+          UI.aviso(`Orden ${orden.numero} creada`, 'ok');
+          // Se abre la orden recién creada para seguir cargándola.
           global.App.goSub('ventas', 'ordenes');
+          setTimeout(() => global.OrdenDetalle.render('mview', { boleta: orden },
+            () => global.Ordenes.render('mview')), 0);
         };
-      });
+      }, 420);
     },
 
     reset() {
@@ -2923,50 +2930,157 @@ tr:hover td{background:var(--panel-2)}
     },
 
     // ---- Vista previa / descarga / impresión -------------------------------
+    // ---- Presupuesto A4 (lo que ve y recibe el cliente) ------------------
     cuerpoPreview() {
-      const term = this.terminoLabel(), a = this.ad, DB = global.DB;
-      const c = this.cli;
-      const ident = [c.telefono, c.tel2, c.email, c.instagram].filter(Boolean).join(' · ');
-      const dom = [c.domicilio, (DB.localidades().find(l => l.k === c.localidad) || {}).label].filter(Boolean).join(' · ');
-      const lista = this.totalLista(), desc = this.descuento(), envio = this.envioMonto();
+      const a = this.ad, DB = global.DB, c = this.cli, E = DB.EMPRESA;
+      const contacto = [c.telefono, c.tel2, c.email, c.instagram].filter(Boolean).join(' · ');
+      const dom = [c.domicilio, (DB.localidades().find(l => l.k === c.localidad) || {}).label]
+        .filter(Boolean).join(' — ');
+      const lista = this.totalLista(), desc = this.descuento(), extra = this.descuentoExtra();
+      // El número va espaciado, como en el presupuesto impreso: 0 0 1 4 7
+      const nro = String(this.nro).padStart(5, '0').split('').join(' ');
+
+      const dato = (l, v) => `<div class="pv-dato"><span>${UI.esc(l)}</span> <b>${UI.esc(v)}</b></div>`;
+      const cond = (l, v) => `<div class="pv-cond"><span>${UI.esc(l)}</span> · <b>${UI.esc(v)}</b></div>`;
+      const tot = (l, v, cls = '') => `<div class="pv-tr ${cls}"><span>${UI.esc(l)}</span><b>${UI.esc(v)}</b></div>`;
+
       return `<div class="pv">
-        <div class="pv-h"><h2>Belgrano Home</h2><div class="muted">Cotización · ${UI.esc(term)}</div></div>
-        <div class="pv-cli"><b>${UI.esc(c.nombre || 'Cliente')}</b>
-          <div class="muted">${UI.esc(ident)}</div>${dom ? `<div class="muted">${UI.esc(dom)}</div>` : ''}</div>
-        <table><thead><tr><th>Producto</th><th>Cant.</th><th style="text-align:right">Precio</th><th style="text-align:right">Subtotal</th></tr></thead>
-        <tbody>${this.lineas.map(l => { const u = this.unit(l), s = u * l.cantidad;
-          return `<tr><td><b>${UI.esc(l.prodNombre || '—')}</b><br><span class="muted">${UI.esc(l.ejes)}${l.obs ? ' · ' + UI.esc(l.obs) : ''}</span></td>
-          <td>${l.cantidad}</td><td style="text-align:right" class="tnum">${UI.pesos(u)}</td><td style="text-align:right" class="tnum">${UI.pesos(s)}</td></tr>`; }).join('')}</tbody></table>
-        <div class="pv-tot">
-          <div>Muebles (lista) <b class="tnum">${UI.pesos(lista)}</b></div>
-          ${desc ? `<div>Descuento <b class="tnum">−${UI.pesos(desc)}</b></div>` : ''}
-          <div>Envío <b class="tnum">${UI.esc(this.envioTexto())}</b></div>
-          ${this.descuentoExtra() ? `<div>Descuento <b class="tnum">−${UI.pesos(this.descuentoExtra())}</b></div>` : ''}
-          <div class="big">Total <b class="tnum">${UI.pesos(this.totalFinal())}</b></div>
+        <div class="pv-top"></div>
+
+        <header class="pv-head">
+          <div>
+            <div class="pv-logo">${UI.esc(E.nombre)}<span>.</span></div>
+            <div class="pv-lema">${UI.esc(E.lema)}</div>
+          </div>
+          <div class="pv-meta">
+            <div><span>Cotización n.º</span><b class="esp">${nro}</b></div>
+            <div><span>Fecha</span><b>${UI.esc(fechaBarras(this.fecha))}</b></div>
+            <div><span>Validez</span><b>${DB.VALIDEZ_DIAS} días</b></div>
+          </div>
+        </header>
+
+        <div class="pv-cli">
+          ${dato('Nombre:', c.nombre || this.nombreCli() || '—')}
+          ${contacto ? dato('Contacto:', contacto) : ''}
+          ${dom ? dato('Domicilio:', dom) : ''}
         </div>
-        <div class="pv-ad">
-          <div><b>Tiempo de entrega:</b> ${UI.esc(this.entregaTexto())}</div>
-          <div><b>Saldo se abona en:</b> ${UI.esc(a.saldoEn)}</div>
-          <div><b>Instalación:</b> ${UI.esc(this.instalacionTexto())}</div>
-          <div><b>Subida por escalera:</b> ${UI.esc(DB.escaleraTexto(a.escalera))}</div>
-          <div>${UI.esc(DB.IVA_LEYENDA)}</div>
-          ${this.obsExt ? `<div style="margin-top:8px"><b>Observaciones:</b> ${UI.esc(this.obsExt)}</div>` : ''}
-          ${this.terminos ? `<div style="margin-top:8px">${UI.esc(this.terminos)}</div>` : ''}
-        </div></div>`;
+
+        <div class="pv-sec">Productos</div>
+        <table class="pv-tabla">
+          <thead><tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Subtotal</th></tr></thead>
+          <tbody>${this.lineas.map(l => {
+            const u = this.unit(l), sub = u * l.cantidad, sin = this.sinPrecio(l);
+            const pie = [l.ejes, l.medidas, l.colores, l.obs].filter(Boolean).join(' · ');
+            return `<tr>
+              <td><b>${UI.esc(l.prodNombre || 'Mueble a medida')}</b>
+                ${pie ? `<div class="pv-var">${UI.esc(pie)}</div>` : ''}</td>
+              <td class="num">${l.cantidad}</td>
+              <td class="num">${sin ? 'A definir' : UI.pesos(u)}</td>
+              <td class="num fuerte">${sin ? '—' : UI.pesos(sub)}</td></tr>`;
+          }).join('')}</tbody>
+        </table>
+
+        <div class="pv-band">
+          <div class="pv-conds">
+            ${cond('Tiempo de entrega', this.entregaTexto())}
+            ${cond('Instalación', this.instalacionMonto() ? UI.pesos(this.instalacionMonto()) : this.instalacionTexto())}
+            ${cond('Saldo se abona en', a.saldoEn)}
+            ${cond('Subida por escalera', DB.escaleraTexto(a.escalera))}
+            ${cond('Seña', DB.SENA_LEYENDA)}
+            ${cond('IVA', DB.IVA_LEYENDA.replace(/\.$/, ''))}
+          </div>
+          <div class="pv-tots">
+            ${tot('Muebles (lista)', UI.pesos(lista))}
+            ${desc ? tot('Descuento', '−' + UI.pesos(desc), 'neg') : ''}
+            ${extra ? tot('Descuento comercial', '−' + UI.pesos(extra), 'neg') : ''}
+            ${this.instalacionMonto() ? tot('Instalación', UI.pesos(this.instalacionMonto())) : ''}
+            ${tot('Envío', this.envioCotizable() ? UI.pesos(this.envioMonto()) : 'A confirmar')}
+            <div class="pv-total"><span>Total</span><b>${UI.esc(UI.pesos(this.totalFinal()))}</b></div>
+          </div>
+        </div>
+
+        <div class="pv-obs">${this.obsExt ? UI.esc(this.obsExt) : ''}</div>
+
+        <footer class="pv-pie">
+          <div class="pv-tyc">${UI.esc(DB.TYC_DEFAULT)}</div>
+          <div class="pv-marca">
+            <b>${UI.esc(E.nombre)}</b>
+            <span>${UI.esc(E.direccion)}</span>
+            <span>${UI.esc(E.instagram)}</span>
+            <span class="tel">${UI.esc(E.telefono)}</span>
+          </div>
+        </footer>
+      </div>`;
       // Las observaciones INTERNAS nunca entran acá: son para nosotros.
     },
+
+    // Hoja A4 en blanco y negro, con el sello de la marca. Mismo HTML para ver,
+    // imprimir y descargar.
     estiloPreview() {
-      return `<style>.pv{color:#141a26;font-family:-apple-system,system-ui,sans-serif}
-        .pv-h{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #1c2b4a;padding-bottom:8px;margin-bottom:14px}
-        .pv-h h2{color:#1c2b4a;margin:0}.pv .muted{color:#7d8aa3}.pv-cli{margin-bottom:14px}.pv table{width:100%;border-collapse:collapse;font-size:14px}
-        .pv th{text-align:left;font-size:11px;text-transform:uppercase;color:#7d8aa3;border-bottom:1px solid #dbe1ec;padding:8px}
-        .pv td{padding:9px 8px;border-bottom:1px solid #eef1f6;vertical-align:top}
-        .pv-tot{margin-top:16px;margin-left:auto;width:280px;font-size:13.5px;color:#48566e}
-        .pv-tot div{display:flex;justify-content:space-between;padding:3px 0}
-        .pv-tot b{color:#1c2b4a}
-        .pv-tot .big{border-top:1px solid #dbe1ec;margin-top:5px;padding-top:7px;font-size:17px;color:#1c2b4a}
-        .pv-ad{margin-top:22px;border-top:1px solid #dbe1ec;padding-top:12px;font-size:12.5px;color:#48566e;line-height:1.8}</style>`;
+      return `<style>
+        @page{size:A4;margin:0}
+        .pv{--tinta:#141414;--gris:#8b8b8b;--linea:#dcdcdc;--tierra:#8a5a3c;
+          box-sizing:border-box;width:100%;max-width:210mm;min-height:297mm;margin:0 auto;
+          background:#fff;color:var(--tinta);padding:16mm 15mm 10mm;
+          font-family:'Segoe UI',-apple-system,system-ui,Helvetica,Arial,sans-serif;
+          font-size:11px;line-height:1.45;display:flex;flex-direction:column}
+        .pv *{box-sizing:border-box}
+        .pv-top{border-top:1px solid var(--linea);width:46%;margin-bottom:11mm}
+
+        .pv-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
+          padding-bottom:5mm;border-bottom:1.6px solid var(--tinta)}
+        .pv-logo{font-size:30px;font-weight:600;letter-spacing:-.6px;line-height:1}
+        .pv-logo span{color:var(--tinta)}
+        .pv-lema{margin-top:7mm;color:var(--tierra);font-size:9.5px;font-weight:700;
+          letter-spacing:.22em;text-transform:uppercase}
+        .pv-meta{text-align:right;display:flex;flex-direction:column;gap:5px;white-space:nowrap}
+        .pv-meta div{display:flex;justify-content:flex-end;align-items:baseline;gap:14px}
+        .pv-meta span{color:var(--gris);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase}
+        .pv-meta b{font-size:12px}
+        .pv-meta .esp{font-size:14px;letter-spacing:.12em}
+
+        .pv-cli{padding:6mm 0 0}
+        .pv-dato{font-size:12.5px;margin-bottom:3.4mm}
+        .pv-dato span{color:var(--gris)}
+        .pv-dato b{color:var(--tinta)}
+
+        .pv-sec{margin:4mm 0 3mm;font-size:9.5px;font-weight:700;letter-spacing:.22em;text-transform:uppercase}
+        .pv-tabla{width:100%;border-collapse:collapse}
+        .pv-tabla th{font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+          color:var(--gris);text-align:right;padding:0 0 2.4mm;border-bottom:1px solid var(--linea)}
+        .pv-tabla th:first-child{text-align:left}
+        .pv-tabla td{padding:3.2mm 0;border-bottom:1px solid var(--linea);vertical-align:top}
+        .pv-tabla td.num{text-align:right;white-space:nowrap;padding-left:8mm;
+          font-variant-numeric:tabular-nums}
+        .pv-tabla td b{font-size:12.5px;font-weight:700}
+        .pv-tabla td.fuerte{font-weight:700;font-size:12.5px}
+        .pv-var{color:var(--gris);font-size:10.5px;margin-top:1mm}
+
+        .pv-band{display:flex;gap:10mm;margin-top:7mm;align-items:flex-start}
+        .pv-conds{flex:1;padding-top:1mm}
+        .pv-cond{font-size:11px;margin-bottom:2.6mm;color:var(--gris)}
+        .pv-cond b{color:var(--tinta)}
+        .pv-tots{width:72mm;flex:none}
+        .pv-tr{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+          padding:2.9mm 4mm;border:1px solid var(--linea);border-bottom:0;font-size:11.5px;color:var(--gris)}
+        .pv-tr b{color:var(--tinta);font-weight:700;font-variant-numeric:tabular-nums}
+        .pv-tr.neg b{color:var(--tierra)}
+        .pv-total{display:flex;justify-content:space-between;align-items:center;gap:10px;
+          background:var(--tinta);color:#fff;padding:4mm}
+        .pv-total span{font-size:9.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase}
+        .pv-total b{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+
+        .pv-obs{flex:1;min-height:26mm;border:1px solid var(--linea);margin-top:7mm;padding:4mm;
+          font-size:11px;color:var(--tinta);white-space:pre-wrap}
+        .pv-pie{margin-top:5mm}
+        .pv-tyc{color:var(--gris);font-size:9.5px;line-height:1.6;max-width:150mm}
+        .pv-marca{display:flex;align-items:baseline;gap:5mm;flex-wrap:wrap;margin-top:3.5mm;
+          padding-top:3mm;border-top:1px solid var(--linea);font-size:10.5px;color:var(--gris)}
+        .pv-marca b{color:var(--tinta);font-size:11.5px}
+        .pv-marca .tel{color:var(--tinta);font-weight:600}
+      </style>`;
     },
+
     // Se abre para ver, imprimir o bajar el archivo — hoy la cotización se
     // manda por la plataforma que usan, así que alcanza con el archivo.
     modalPreview(modo) {
@@ -2978,10 +3092,11 @@ tr:hover td{background:var(--panel-2)}
       if (modo === 'descargar') return this.bajar(nombre, `<!doctype html><meta charset="utf-8"><title>Cotización</title>${cuerpo}`);
       this.modal(`<div class="row" style="margin-bottom:12px"><b style="color:var(--navy)">Vista previa</b><div class="sp" style="flex:1"></div>
         <button class="btn sm" id="pv-baja">Descargar</button>
-        <button class="btn sm" id="pv-print">Imprimir</button></div>${cuerpo}`, m => {
+        <button class="btn sm" id="pv-print">Imprimir</button></div>
+        <div class="pv-hoja">${cuerpo}</div>`, m => {
         document.getElementById('pv-print').onclick = () => this.modalPreview('print');
         document.getElementById('pv-baja').onclick = () => this.bajar(nombre, `<!doctype html><meta charset="utf-8"><title>Cotización</title>${cuerpo}`);
-      }, 660);
+      }, 800);
     },
     bajar(nombre, html) {
       try {
@@ -3417,6 +3532,8 @@ tr:hover td{background:var(--panel-2)}
         .vpre{display:flex;align-items:center;gap:12px;border-top:1px solid var(--line);padding-top:12px;margin-top:6px}
         .ddrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 
+        .pv-hoja{background:#f1f1f1;margin:0 -20px -20px;padding:16px;border-radius:0 0 12px 12px}
+        .pv-hoja .pv{box-shadow:0 2px 14px rgba(0,0,0,.14);min-height:0}
         .mdlbg{position:fixed;inset:0;background:rgba(20,26,38,.4);z-index:50;display:grid;place-items:center;padding:20px}
       </style>`;
     },
@@ -3469,6 +3586,10 @@ tr:hover td{background:var(--panel-2)}
   function fechaLarga(s) {
     const p = String(s || '').split('-');
     return p.length === 3 ? `${Number(p[2])} de ${MESES[Number(p[1]) - 1] || ''}` : String(s || '');
+  }
+  function fechaBarras(iso) {
+    const p = String(iso || '').split('-');
+    return p.length === 3 ? `${p[2]} / ${p[1]} / ${p[0]}` : String(iso || '');
   }
   function mesDe(iso) { return String(iso || '').slice(0, 7) || iso; }
   function correrMes(mesISO, n) {

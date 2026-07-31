@@ -417,6 +417,16 @@
       return `${m} por piso por bulto`;
     },
     IVA_LEYENDA: 'Los precios no incluyen IVA.',
+    // Leyendas del presupuesto impreso.
+    VALIDEZ_DIAS: 7,
+    SENA_LEYENDA: '50% para iniciar la fabricación',
+    EMPRESA: {
+      nombre: 'Belgrano Home',
+      lema: 'Transformamos hogares',
+      direccion: 'Av. Belgrano 2020-2299',
+      instagram: '@belgranohome',
+      telefono: '11 3359 5571',
+    },
 
     // Sesión del vendedor: el que vende entra con su usuario, así que el
     // vendedor y el local salen precargados (igual se pueden editar).
@@ -494,6 +504,10 @@
 
     // Crea una orden a partir de una cotización aceptada. Nace en "confirmar"
     // (a la espera de la seña). Numeración provisional: OV-<local>-<serie>.
+    // Próximo número de orden, sin consumirlo: se muestra al confirmar.
+    proximoNumeroOrden(local) {
+      return `OV-${local}-${String(_seqOrden + 1).padStart(4, '0')}`;
+    },
     crearOrden(data) {
       _seqOrden += 1;
       const orden = {
