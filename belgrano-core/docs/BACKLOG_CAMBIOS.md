@@ -226,6 +226,17 @@
 - ✅ 145. **Términos y condiciones** queda dentro de la **primera columna**, junto
   a las observaciones; los totales solos a la derecha.
 
+- ✅ 146. **El historial arranca al guardar**, no antes: armar la cotización por
+  primera vez no deja rastro en Actividad (no hay nada que auditar todavía).
+  Mientras tanto el costado explica desde cuándo se registra.
+- ✅ 147. Una vez guardada (o pasada a venta), **todo lo que se toca queda
+  registrado con quién lo hizo**.
+- ✅ 148. Los cambios con **impacto** (localidad/flete, condición de pago, alta o
+  baja de producto, cantidad, precio, plazo de entrega, descuento, instalación)
+  quedan **pendientes de confirmar**: el costado avisa cuántos hay y, al guardar
+  o pasar a venta, sale un pop-up con **antes → después y la diferencia**, que
+  hay que confirmar ("Confirmo que vi los cambios") para poder seguir.
+
 > Pendientes:
 > - La lista de localidades es **demo del AMBA**; se reemplaza por la real del mapa.
 > - La foto del diseño hoy se carga por **URL**; falta la subida real del archivo.

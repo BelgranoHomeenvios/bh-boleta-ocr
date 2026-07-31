@@ -55,6 +55,8 @@
     obsExt: '', obsInt: '', terminos: '',
     dto: null,                    // descuento comercial extra {modo, alcance, linea, valor}
     archivos: [],                 // adjuntos de la cotización (van a Documentos)
+    registrando: false,           // el historial arranca al guardar / confirmar
+    cambios: [],                  // cambios con impacto, a confirmar antes de guardar
     ad: null,            // adicionales
     actividad: [],       // historial de la cotización (se arma sola)
     lineas: [],   // {key,tipo,prodNombre,varId,ejes,partes,base,cantidad,obs,precioManual,img}
@@ -176,10 +178,23 @@
       return c.nombre.trim() || c.telefono.trim() || c.instagram.trim() || c.email.trim();
     },
 
+    // Un cambio con impacto (precio, envío, plazo) no se guarda a la callada:
+    // queda pendiente y hay que confirmarlo antes de volver a guardar.
+    cambio(texto, antes) {
+      if (!this.registrando) return;
+      const ahora = this.totalFinal();
+      this.cambios.push({ texto, antes, ahora, quien: this.vendedor });
+      this.log(this.vendedor, texto);
+    },
+    // Foto del total antes de tocar algo, para poder contar la diferencia.
+    antes() { return this.registrando ? this.totalFinal() : null; },
+
     // Cada movimiento queda anotado en el costado (y después va al CRM).
-    // `clave` agrupa los cambios repetidos del mismo dato (mover la fecha tres
-    // veces deja una sola línea, no tres).
+    // El historial NO registra el armado inicial: mientras la cotización se está
+    // cargando por primera vez no hay nada que auditar. Recién cuando se guarda
+    // (o se pasa a venta) empieza a quedar registro de lo que se toca después.
     log(quien, texto, clave) {
+      if (!this.registrando) return;
       const ult = this.actividad[0];
       if (clave && ult && ult.clave === clave && ult.quien === quien) {
         ult.texto = texto; ult.hora = hora(); return;
@@ -452,11 +467,12 @@
       const cerrar = () => { if (drop) drop.innerHTML = ''; };
 
       const elegir = l => {
+        const antes = this.antes();
+        const locAnt = global.DB.localidad(this.cli.localidad);
         this.cli.localidad = l.k;
-        if (!this.ad.envioTocado) {
-          this.ad.envio = global.DB.fleteDe(l.k);
-          this.log('Sistema', `Cargó el envío por localidad (${l.label}): ${this.ad.envio ? UI.pesos(this.ad.envio) : 'a cotizar'}`);
-        }
+        if (!this.ad.envioTocado) this.ad.envio = global.DB.fleteDe(l.k);
+        // Cambiar la localidad mueve el flete: se avisa antes de guardar.
+        this.cambio(`Cambió la localidad de entrega${locAnt ? ` (${locAnt.label} → ${l.label})` : ` a ${l.label}`}`, antes);
         cerrar(); this.pintarTodo();
       };
 
@@ -637,9 +653,10 @@
         <div class="sec-go"><button class="btn sm primary" id="p-sig">Continuar → Adicionales</button></div>`;
 
       document.getElementById('op-term').onchange = e => {
+        const antes = this.antes(), ant = this.terminoLabel();
         this.termino = e.target.value;
         this.ad.saldoEn = this.terminoLabel();   // "Saldo se abona en" sigue a la condición
-        this.log('Sistema', `Calculó descuento por condición de pago: ${this.terminoLabel()}`);
+        this.cambio(`Cambió la condición de pago (${ant} → ${this.terminoLabel()})`, antes);
         this.pintarMain(); this.pintarSide();
       };
       document.getElementById('pr-catalogo').onclick = () => this.modalCatalogo();
@@ -736,9 +753,9 @@
         this.pintar();
       });
       cont.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
-        const l = this.get(b.dataset.del);
+        const antes = this.antes(), l = this.get(b.dataset.del);
         this.lineas = this.lineas.filter(x => x.key !== Number(b.dataset.del));
-        if (l) this.log(this.vendedor, `Quitó ${l.prodNombre || 'un producto'}`);
+        if (l) this.cambio(`Quitó ${l.prodNombre || 'un producto'}`, antes);
         this.pintar();
       });
       this.bindCant(cont);
@@ -767,7 +784,13 @@
           this.refrescarProductos();
         };
         i.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); i.blur(); } };
-        i.onblur = () => this.repintar();
+        i.onblur = () => {
+          if (l && this.registrando && l.precioManual !== i._ant) {
+            this.cambio(`Cambió el precio de ${l.prodNombre || 'un producto'}`, i._antTotal);
+          }
+          this.repintar();
+        };
+        i.onfocus = () => { i._ant = l ? l.precioManual : null; i._antTotal = this.antes(); };
       });
       cont.querySelectorAll('[data-nom]').forEach(i => i.oninput = () => { const l = this.get(i.dataset.nom); if (l) l.prodNombre = i.value; });
       // Se carga el de lista o el de efectivo; el otro se completa solo.
@@ -803,7 +826,12 @@
           if (listo) return; listo = true;
           const n = Math.max(1, Math.floor(Number(i.value)) || 1);
           if (key === 'nueva') { this.cantNueva = n; setTimeout(() => this.pintarProductos(), 0); }
-          else { const l = this.get(key); if (l) l.cantidad = n; this.repintar(); }
+          else {
+            const antes = this.antes(), l = this.get(key);
+            if (l && l.cantidad !== n) { const ant = l.cantidad; l.cantidad = n;
+              this.cambio(`Cambió la cantidad de ${l.prodNombre || 'un producto'} (${ant} → ${n})`, antes); }
+            this.repintar();
+          }
         };
         i.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); i.blur(); } };
         i.onblur = guardar;
@@ -909,6 +937,7 @@
     },
 
     agregarEstandar(prodNombre, variante, img = '', cantidad = 1, tipo = 'estandar') {
+      const antes = this.antes();
       const partes = EJES.filter(e => variante[e.k]).map(e => ({ lbl: e.label, val: variante[e.k] }));
       const medida = tipo === 'medida';
       this.lineas.push({
@@ -920,7 +949,7 @@
         obs: '', medidas: '', colores: '', precioManual: null, img: img || variante.img || '',
         editando: medida,   // se abre para cargar precio, detalle y foto
       });
-      this.log(this.vendedor, `Agregó ${cantidad > 1 ? cantidad + ' × ' : ''}${prodNombre}${medida ? ' (a medida)' : ''}`);
+      this.cambio(`Agregó ${cantidad > 1 ? cantidad + ' × ' : ''}${prodNombre}${medida ? ' (a medida)' : ''}`, antes);
       this.cantNueva = 1;   // el renglón de carga vuelve a 1 para el próximo
       this.pintarProductos(); this.pintarCabecera(); this.pintarSide();
       UI.aviso('Producto agregado', 'ok');
@@ -1035,16 +1064,22 @@
       };
       if (a.calAbierto) {
         this.pintarCalendario('ad-calbox', { d1: a.desde, d2: a.hasta }, (d1, d2) => {
+          const antes = this.antes(), ant = this.entregaTexto();
           a.desde = d1; a.hasta = d2; a.entregaTocada = true; a.calAbierto = false;
           this.normalizarEntrega();
-          this.log(this.vendedor, `Cambió la fecha de entrega: ${this.entregaTexto()}`, 'entrega');
+          this.cambio(`Cambió la fecha de entrega (${ant} → ${this.entregaTexto()})`, antes);
           this.pintarAdicionales(); this.refrescarResumen(); this.pintarSide();
         });
       }
       const en = document.getElementById('ad-envio');
+      if (en) en.onblur = () => {
+        if (this._envioAntes != null) { this.cambio(`Cambió el costo de envío a ${UI.pesos(a.envio)}`, this._envioAntes); this._envioAntes = null; this.pintarSide(); }
+      };
       if (en) en.oninput = e => {
         const n = e.target.value.replace(/[^\d]/g, '');
         if (n !== e.target.value) e.target.value = n;
+        const antes = this._envioAntes != null ? this._envioAntes : this.antes();
+        this._envioAntes = antes;
         a.envio = Math.max(0, Number(n) || 0); a.envioTocado = true;
         av(); this.pintarTotales(); this.refrescarResumen();
       };
@@ -1055,9 +1090,14 @@
         this.pintarAdicionales(); this.pintarTotales(); this.refrescarResumen();
       };
       const ci = document.getElementById('ad-cinst');
+      if (ci) ci.onblur = () => {
+        if (this._instAntes != null) { this.cambio(`Cambió el costo de instalación a ${UI.pesos(a.instalacionCosto)}`, this._instAntes); this._instAntes = null; this.pintarSide(); }
+      };
       if (ci) ci.oninput = e => {
         const n = e.target.value.replace(/[^\d]/g, '');
         if (n !== e.target.value) e.target.value = n;
+        const antes = this._instAntes != null ? this._instAntes : this.antes();
+        this._instAntes = antes;
         a.instalacionCosto = Math.max(0, Number(n) || 0);
         e.target.classList.toggle('falta', !a.instalacionCosto);
         this.pintarTotales(); this.refrescarResumen();
@@ -1156,8 +1196,9 @@
           m.remove(); this.pintarTotales(); this.pintarSide();
         };
         document.getElementById('dd-ok').onclick = () => {
+          const antes = this.antes();
           this.dto = Number(d.valor) > 0 ? { ...d, valor: Number(d.valor) } : null;
-          this.log(this.vendedor, this.dto ? `Aplicó un descuento de ${this.dtoTexto()}` : 'Quitó el descuento', 'dto');
+          this.cambio(this.dto ? `Aplicó un descuento de ${this.dtoTexto()}` : 'Quitó el descuento', antes);
           m.remove(); this.pintarTotales(); this.pintarSide();
         };
       };
@@ -1177,7 +1218,10 @@
             <button class="tab ${this.lado === 'actividad' ? 'on' : ''}" data-l="actividad">Actividad</button>
             <button class="tab ${this.lado === 'notas' ? 'on' : ''}" data-l="notas">Notas</button>
           </div>
-          <div class="cz-sb">${this.lado === 'actividad' ? this.actividadHTML() : this.notasHTML()}</div>
+          <div class="cz-sb">${this.lado === 'actividad'
+            ? (this.cambios.length ? `<div class="cbav">${this.cambios.length} ${this.cambios.length === 1 ? 'cambio sin confirmar' : 'cambios sin confirmar'} — se revisan al guardar</div>` : '')
+              + this.actividadHTML()
+            : this.notasHTML()}</div>
         </div>
 
         <div class="card cz-sc">
@@ -1222,7 +1266,10 @@
     },
 
     actividadHTML() {
-      if (!this.actividad.length) return '<div class="muted" style="font-size:12.5px">Todavía no pasó nada en esta cotización.</div>';
+      if (!this.registrando) return `<div class="muted" style="font-size:12.5px">
+        El historial arranca cuando se <b>guarda</b> la cotización. Desde ahí queda
+        registrado quién cambió qué.</div>`;
+      if (!this.actividad.length) return '<div class="muted" style="font-size:12.5px">Sin movimientos todavía.</div>';
       return this.actividad.map(a => `<div class="act">
         <span class="ava ${a.quien === 'Sistema' ? 'sys' : ''}">${UI.esc(inic(a.quien))}</span>
         <div><div class="aq">${UI.esc(a.quien)}<span class="ah">${UI.esc(a.hora)}</span></div>
@@ -1243,11 +1290,48 @@
       if (tipo === 'preview') return this.modalPreview('ver');
       if (tipo === 'print') return this.modalPreview('print');
       if (tipo === 'descargar') return this.modalPreview('descargar');
-      if (tipo === 'guardar') {
-        this.guardada = true;   // ya tiene número tomado en firme
-        this.log(this.vendedor, 'Guardó la cotización'); this.pintarSide();
-        return UI.aviso(`${global.DB.numeroCotizacion(this.nro)} guardada (demo)`, 'ok');
-      }
+      if (tipo === 'guardar') return this.conCambiosConfirmados(() => this.guardar());
+    },
+
+    guardar() {
+      const primera = !this.registrando;
+      this.guardada = true;          // el número queda tomado en firme
+      this.registrando = true;       // de acá en más sí queda historial
+      this.log(this.vendedor, primera
+        ? `Guardó la cotización ${global.DB.numeroCotizacion(this.nro)}`
+        : 'Guardó los cambios');
+      this.pintarSide();
+      UI.aviso(`${global.DB.numeroCotizacion(this.nro)} guardada (demo)`, 'ok');
+    },
+
+    // Antes de guardar, lo que movió el precio o la entrega se muestra y se
+    // confirma: nadie guarda un cambio de flete o de producto sin verlo.
+    conCambiosConfirmados(seguir) {
+      if (!this.cambios.length) return seguir();
+      const filas = this.cambios.map(c => {
+        const movio = c.antes != null && c.ahora != null && c.antes !== c.ahora;
+        return `<div class="cbf">
+          <div class="cbt">${UI.esc(c.texto)}</div>
+          ${movio ? `<div class="cbm"><span class="tnum">${UI.pesos(c.antes)}</span>
+            <span class="fl">→</span><b class="tnum">${UI.pesos(c.ahora)}</b>
+            <span class="dif ${c.ahora > c.antes ? 'sube' : 'baja'}">${c.ahora > c.antes ? '+' : '−'}${UI.pesos(Math.abs(c.ahora - c.antes))}</span></div>`
+            : '<div class="cbm muted">sin cambio en el total</div>'}
+        </div>`;
+      }).join('');
+      this.modal(`<h3 style="color:var(--navy)">Confirmá los cambios</h3>
+        <p class="muted" style="font-size:13px;margin:8px 0 12px">
+          Esto se modificó desde la última vez que se guardó. Revisá el impacto antes de seguir.</p>
+        <div class="cblist">${filas}</div>
+        <div class="row" style="margin-top:14px;justify-content:flex-end;gap:10px">
+          <button class="btn" id="cb-volver">Volver a revisar</button>
+          <button class="btn primary" id="cb-ok">Confirmo que vi los cambios</button></div>`, m => {
+        document.getElementById('cb-volver').onclick = () => m.remove();
+        document.getElementById('cb-ok').onclick = () => {
+          this.cambios.forEach(c => this.log(c.quien || this.vendedor, `Confirmó: ${c.texto}`));
+          this.cambios = [];
+          m.remove(); seguir();
+        };
+      }, 480);
     },
 
     // Pop-up: se entrega un presupuesto sin los datos para registrarlo.
@@ -1267,6 +1351,7 @@
 
     // ---- Confirmar → Venta (estado CONFIRMAR) ------------------------------
     convertir() {
+      if (this.cambios.length) return this.conCambiosConfirmados(() => this.convertir());
       if (!this.clienteValido()) { this.avisoCliente(); return this.popIdentidad('convertir'); }
       if (!this.lineas.length) return UI.aviso('Agregá al menos un producto', 'warn');
       if (!this.vendedor) return UI.aviso('Elegí el vendedor de la operación', 'warn');
@@ -1308,6 +1393,8 @@
           });
           m.remove();
           this.guardada = true;   // el número queda usado por la venta
+          this.registrando = true;
+          this.log(this.vendedor, `Confirmó la venta ${orden.numero}`);
           this.reset();
           UI.aviso(`Orden ${orden.numero} creada en estado Confirmar`, 'ok');
           global.App.goSub('ventas', 'ordenes');
@@ -1338,8 +1425,7 @@
         escalera: global.DB.ESCALERA_DEFAULT, escaleraAbierta: false, escaleraTocada: false,
       };
       this.lineas = []; this._uid = 0; this.dto = null; this.archivos = [];
-      this.actividad = [];
-      this.log(this.vendedor, 'Creó la cotización');
+      this.actividad = []; this.registrando = false; this.cambios = [];
     },
 
     // ---- Vista previa / descarga / impresión -------------------------------
@@ -1765,6 +1851,16 @@
         .cz-sb textarea{width:100%;padding:8px 10px;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);resize:vertical}
         .ava{width:26px;height:26px;flex:none;border-radius:50%;background:var(--brand);color:#fff;display:inline-grid;place-items:center;font-size:10.5px;font-weight:800}
         .ava.sys{background:var(--muted)}
+        .cbav{background:var(--warn-bg);border:1px solid var(--warn);color:var(--warn);border-radius:8px;
+          padding:7px 10px;font-size:12px;font-weight:600;margin-bottom:10px}
+        .cblist{max-height:300px;overflow:auto}
+        .cbf{border:1px solid var(--line);border-radius:9px;padding:9px 11px;margin-bottom:8px}
+        .cbt{font-size:13px;color:var(--navy);font-weight:600}
+        .cbm{display:flex;align-items:baseline;gap:8px;font-size:12.5px;color:var(--muted);margin-top:4px}
+        .cbm b{color:var(--navy);font-size:14px}
+        .cbm .fl{color:var(--muted)}
+        .cbm .dif{font-weight:700}
+        .cbm .dif.sube{color:var(--crit)} .cbm .dif.baja{color:var(--ok)}
         .act{display:flex;gap:9px;padding:7px 0;align-items:flex-start}
         .act .aq{font-size:12.5px;font-weight:650;color:var(--navy);display:flex;gap:7px;align-items:baseline}
         .act .ah{font-size:11px;color:var(--muted);font-weight:400}
