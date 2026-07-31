@@ -377,6 +377,30 @@
     // El local se elige al iniciar sesión — de ahí sale este default.
     sesion() { return { vendedor: 'Brian', local: '2020' }; },
 
+    // ---- Condiciones de pago y sus descuentos ----------------------------
+    // El cliente sólo ve el nombre ("Efectivo"). El descuento que lleva cada
+    // condición es información interna y se administra en
+    // Configuración → Reglas de precio, no acá.
+    _COND: [
+      { k: 'lista',         label: 'Tarjeta / Lista (3·6·12)', desc: 0 },
+      { k: 'efectivo',      label: 'Efectivo',                 desc: 35 },
+      { k: 'transferencia', label: 'Transferencia',            desc: 0 },
+      { k: 'mixto',         label: 'Mixto',                    desc: 0, manual: true },
+    ],
+    condiciones() {
+      try {
+        const g = JSON.parse(localStorage.getItem('bh_cond') || 'null');
+        if (g) return this._COND.map(c => ({ ...c, desc: g[c.k] != null ? g[c.k] : c.desc }));
+      } catch (e) {}
+      return this._COND.map(c => ({ ...c }));
+    },
+    condicion(k) { return this.condiciones().find(c => c.k === k) || this.condiciones()[0]; },
+    // Descuento de la condición, en % (0-100).
+    descuentoDe(k) { return Number(this.condicion(k).desc) || 0; },
+    guardarCondiciones(mapa) {
+      try { localStorage.setItem('bh_cond', JSON.stringify(mapa)); } catch (e) {}
+    },
+
     // ---- Numeración de cotizaciones -------------------------------------
     // La cotización toma número apenas se abre, aunque todavía no se guarde,
     // así el vendedor ya la puede nombrar. Si al final no se usa, el número

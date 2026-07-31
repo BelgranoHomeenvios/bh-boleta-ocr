@@ -124,7 +124,7 @@
       S('roles', 'Roles y permisos', skel('Roles y permisos')),
       S('locales', 'Locales', skel('Locales')),
       S('vendedores', 'Vendedores', skel('Vendedores')),
-      S('precios', 'Reglas de precio', skel('Reglas de precio por término')),
+      S('precios', 'Reglas de precio', m => global.Precios.render(m)),
       S('series', 'Series y numeración', skel('Series y numeración')),
     ]},
   };

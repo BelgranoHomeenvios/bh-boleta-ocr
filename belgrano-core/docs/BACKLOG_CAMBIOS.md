@@ -54,6 +54,14 @@
   no se guarde; si la cotización se descarta sin usar, **el número vuelve al pozo**
   y lo toma la siguiente (`DB.tomarNumeroCotizacion()` / `liberarNumeroCotizacion()`).
 
+- ✅ 74. La condición de pago muestra **sólo el nombre** ("Efectivo"), sin el
+  −35%: el porcentaje es información interna y el cliente no lo ve.
+- ✅ 75. Los descuentos pasan a **Configuración → Reglas de precio**, una pantalla
+  real (antes esqueleto) donde se edita el % de cada condición, con ejemplo en
+  vivo sobre $1.000.000 y botón para volver a los valores base. La cotización
+  toma el valor configurado (`DB.condiciones()` / `descuentoDe()`), que se guarda
+  en `localStorage` hasta que haya tabla real.
+
 > Pendientes:
 > - Brian va a definir **qué campos son obligatorios** para poder crear el presupuesto.
 > - **Elegir el local al iniciar sesión**: hoy sale de `DB.sesion()` fijo; cuando

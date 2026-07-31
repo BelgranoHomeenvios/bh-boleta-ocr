@@ -22,15 +22,10 @@
 //  "Confirmar → Venta" crea la orden en estado CONFIRMAR (espera la seña).
 // =====================================================================
 (function (global) {
-  const DESC_EFECTIVO = 0.35;     // −35% sobre lista (dato de Brian)
-  const DESC_TRANSFER = 0.00;     // provisional, a definir (a·b·c·d)
-
-  const TERMINOS = [
-    { k: 'lista',         label: 'Tarjeta / Lista (3·6·12)' },
-    { k: 'efectivo',      label: 'Efectivo (−35%)' },
-    { k: 'transferencia', label: 'Transferencia' },
-    { k: 'mixto',         label: 'Mixto (editable)' },
-  ];
+  // Las condiciones de pago y su descuento salen de Configuración → Reglas de
+  // precio. Acá sólo se usan: el nombre es lo único que ve el cliente
+  // ("Efectivo"), el % que lleva cada una es interno.
+  const cond = () => global.DB.condiciones();
 
   // Los tres ejes con su nombre, para que la línea diga QUÉ es cada cosa
   // ("Medida 1.20 · Estructura Blanca · Frente Paraíso", no "1.20 · blanca").
@@ -63,13 +58,9 @@
     _mount: 'view',
 
     // ---- Cálculo ---------------------------------------------------------
-    factor() {
-      if (this.termino === 'efectivo') return 1 - DESC_EFECTIVO;
-      if (this.termino === 'transferencia') return 1 - DESC_TRANSFER;
-      return 1; // lista, mixto
-    },
-    // Descuento que aplica la condición de pago, en %.
-    descPct() { return Math.round((1 - this.factor()) * 100); },
+    // Descuento de la condición de pago, en % (se configura en Configuración).
+    descPct() { return this.termino === 'mixto' ? 0 : global.DB.descuentoDe(this.termino); },
+    factor() { return 1 - this.descPct() / 100; },
     // Precio de lista, antes del descuento por condición de pago. En los muebles
     // a medida el vendedor carga el precio de LISTA, igual que en los estándar.
     lista(l) { return l.tipo === 'medida' ? (Number(l.precioManual) || 0) : l.base; },
@@ -96,7 +87,7 @@
     requiereVerif(l) { return l.tipo === 'medida' || !!String(l.obs).trim(); },
     // Cambiar el plazo de entrega no es una edición libre: se audita.
     entregaEditada() { return this.ad.entrega.trim() !== global.DB.ENTREGA_DEFAULT; },
-    terminoLabel() { return (TERMINOS.find(t => t.k === this.termino) || {}).label || ''; },
+    terminoLabel() { return global.DB.condicion(this.termino).label; },
     nombreCli() {
       const c = this.cli;
       return c.nombre.trim() || c.telefono.trim() || c.instagram.trim() || c.email.trim();
@@ -313,12 +304,15 @@
       a.innerHTML = this.clienteValido() ? '' :
         `<div class="banner warn" style="margin:12px 0 0">Cargá al menos <b>teléfono, Instagram o mail</b> — es lo que arma al cliente. El nombre puede quedar para después.</div>`;
     },
+    // Nota interna: el % es de uso nuestro, el cliente sólo ve el nombre.
     notaTermino() {
       const n = document.getElementById('op-nota'); if (!n) return;
-      n.innerHTML = this.termino === 'efectivo' ? 'Precio de lista <b>−35%</b>.'
-        : this.termino === 'transferencia' ? 'Descuento <b>a definir</b> (por ahora = lista).'
-        : this.termino === 'mixto' ? 'El vendedor <b>edita cada precio</b>.'
-        : 'Precio de lista, en 3 · 6 · 12 cuotas.';
+      const pct = this.descPct();
+      n.innerHTML = this.termino === 'mixto'
+        ? 'El vendedor <b>edita cada precio</b>.'
+        : pct
+          ? `Precio de lista <b>−${pct}%</b> <span class="int">interno</span>`
+          : 'Precio de lista, sin descuento.';
     },
 
     // ---- 2 · Productos ----------------------------------------------------
@@ -329,7 +323,7 @@
       cont.innerHTML = `
         <div class="pr-cond">
           <div class="fr"><label for="op-term">Condición de pago</label>
-            <select id="op-term">${TERMINOS.map(t => `<option value="${t.k}" ${this.termino === t.k ? 'selected' : ''}>${UI.esc(t.label)}</option>`).join('')}</select></div>
+            <select id="op-term">${cond().map(t => `<option value="${t.k}" ${this.termino === t.k ? 'selected' : ''}>${UI.esc(t.label)}</option>`).join('')}</select></div>
           <div class="muted" id="op-nota" style="font-size:12px"></div>
         </div>
         <div class="lhead"><span>Producto</span><span>Tipo</span><span></span><span>Cant.</span>
@@ -915,6 +909,7 @@
         .pr-cond .fr{grid-template-columns:126px 230px}
         .pr-sum{font-size:12.5px;color:var(--muted)}
         .pr-sum b{color:var(--navy);font-size:15px;margin-left:7px}
+        .int{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 5px;margin-left:5px}
 
         .cz-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px 26px}
         @media(max-width:820px){.cz-cols{grid-template-columns:1fr}}
