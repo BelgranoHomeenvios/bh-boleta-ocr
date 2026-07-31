@@ -213,7 +213,6 @@
           <div class="kick">Ventas · Cotizaciones</div>
           <div class="sp" style="flex:1"></div>
           <button class="btn sm" id="pr-guardar">Guardar</button>
-          <button class="btn sm" id="pr-preview">Vista previa</button>
           <button class="btn sm primary" id="pr-venta">Confirmar → Venta</button>
         </div>
         <div class="cz-wrap">
@@ -222,7 +221,6 @@
         </div>
         ${this.estilos()}`;
 
-      document.getElementById('pr-preview').onclick = () => this.accion('preview');
       document.getElementById('pr-guardar').onclick = () => this.accion('guardar');
       document.getElementById('pr-venta').onclick = () => this.convertir();
       this.pintarTodo();
@@ -1140,13 +1138,11 @@
         ${fila('Saldo restante', UI.pesos(this.totalFinal()), 'big')}
         <div class="tiva">${UI.esc(global.DB.IVA_LEYENDA)}</div>
         <div class="tacc">
-          <button class="btn sm" id="cz-print">Imprimir</button>
-          <button class="btn sm" id="cz-baja">Descargar</button>
+          <button class="btn sm" id="cz-preview">Vista previa</button>
         </div>
       </div>`;
       document.getElementById('cz-dto').onclick = () => this.modalDescuento();
-      document.getElementById('cz-print').onclick = () => this.accion('print');
-      document.getElementById('cz-baja').onclick = () => this.accion('descargar');
+      document.getElementById('cz-preview').onclick = () => this.accion('preview');
     },
 
     // Pop-up del descuento comercial: % o $, sobre todo o sobre un producto.

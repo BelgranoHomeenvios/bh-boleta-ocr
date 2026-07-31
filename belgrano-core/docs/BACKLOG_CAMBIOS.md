@@ -244,8 +244,9 @@
   en vez de 1.00, o "a convenir" en vez de una estructura del catálogo.
 - ✅ 152. **Medidas · Terminaciones · Detalles arrancan cerrados**, cada uno con
   su **+**: se abre sólo el que hace falta.
-- ✅ 153. Acciones repartidas: arriba **Guardar · Vista previa · Confirmar → Venta**;
-  abajo del "los precios no incluyen IVA", **Imprimir · Descargar**.
+- ✅ 153. Acciones repartidas: arriba **Guardar · Confirmar → Venta**; abajo del
+  "los precios no incluyen IVA", **Vista previa** — y **Descargar / Imprimir**
+  viven adentro de la vista previa.
 - ✅ 154. El costado pasa a tres solapas: **Notas · Histórico · Actividad**,
   con **Notas** seleccionada por default.
 - ✅ 155. **Actividad** agenda algo para la cotización: **Recordatorio** o
