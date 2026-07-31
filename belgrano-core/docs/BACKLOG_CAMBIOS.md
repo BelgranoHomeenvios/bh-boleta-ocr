@@ -199,6 +199,33 @@
   bloque de Términos y condiciones.
 - ✅ 131. **Achicar el alto** de Observaciones para el cliente y Comentarios internos.
 
+- ✅ 132. Datos del cliente reordenado: izquierda **Cliente · Domicilio · ¿Cómo
+  nos conoció?**, derecha **Teléfono · Localidad · Email**.
+- ✅ 133. Los opcionales cuelgan del campo con el que se relacionan: **+** al lado
+  de *Teléfono*, **+ IG** debajo de *Cliente* y **Agregar DNI** debajo de
+  *¿Cómo nos conoció?* (se van los tres chips sueltos).
+- ✅ 134. Con **Tab o Enter** se recorre Cliente → Teléfono → Domicilio →
+  Localidad → ¿Cómo nos conoció? → Email (y para atrás con Shift+Tab).
+- ✅ 135. En el a medida: **Medidas · Terminaciones · Detalles** ("Observaciones"
+  pasó a "Detalles").
+- ✅ 136. El **subtotal recalcula mientras se escribe** (unitario, descuento y
+  totales); con **Enter** o el ✓ se cierra la línea y se sigue con el siguiente.
+- ✅ 137. En Entrega el lápiz pasa a **🗓️** y abre el **calendario ahí mismo**,
+  sin pop-up.
+- ✅ 138. Si se cambió el plazo, el 🗓️ queda en **recuadro amarillo** (en lugar
+  del cartel), para ver de un vistazo que hay que autorizarlo.
+- ✅ 139. **Costo de envío sin flechas** (monto directo) y con **🔀**.
+- ✅ 140. Nuevo **Costo de instalación**: muestra "Sin instalación" y sólo se abre
+  —**obligatorio**— si se pone Sí en *¿Requiere instalación?*. Suma al total y
+  bloquea Confirmar → Venta si queda vacío.
+- ✅ 141. Comentarios más altos, para que el bloque quede parejo con los totales.
+- ✅ 142. "Total a pagar" → **"Saldo restante"**.
+- ✅ 143. **Descuento alineado** con Subtotal / Envío, y el "+ Agregar" con los montos.
+- ✅ 144. La imagen se **adjunta de verdad** (no una URL) y queda listada en
+  **Documentos relacionados**.
+- ✅ 145. **Términos y condiciones** queda dentro de la **primera columna**, junto
+  a las observaciones; los totales solos a la derecha.
+
 > Pendientes:
 > - La lista de localidades es **demo del AMBA**; se reemplaza por la real del mapa.
 > - La foto del diseño hoy se carga por **URL**; falta la subida real del archivo.

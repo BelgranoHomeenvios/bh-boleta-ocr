@@ -1473,6 +1473,7 @@ tr:hover td{background:var(--panel-2)}
     cantNueva: 1,                 // cantidad del renglón de carga (cantidad + producto)
     obsExt: '', obsInt: '', terminos: '',
     dto: null,                    // descuento comercial extra {modo, alcance, linea, valor}
+    archivos: [],                 // adjuntos de la cotización (van a Documentos)
     ad: null,            // adicionales
     actividad: [],       // historial de la cotización (se arma sola)
     lineas: [],   // {key,tipo,prodNombre,varId,ejes,partes,base,cantidad,obs,precioManual,img}
@@ -1542,7 +1543,8 @@ tr:hover td{background:var(--panel-2)}
       const l = this.get(d.linea);
       return `${cuanto} en ${l ? l.prodNombre : 'un producto'}`;
     },
-    totalFinal() { return this.total() + this.envioMonto() - this.descuentoExtra(); },
+    instalacionMonto() { return this.ad.instalacion === 'si' ? (this.ad.instalacionCosto || 0) : 0; },
+    totalFinal() { return this.total() + this.envioMonto() + this.instalacionMonto() - this.descuentoExtra(); },
     items() { return this.lineas.reduce((a, l) => a + l.cantidad, 0); },
 
     // Estándar → precio bloqueado (sale del catálogo). A medida → se libera.
@@ -1665,19 +1667,17 @@ tr:hover td{background:var(--panel-2)}
           <div class="cz-tyc">
             <div class="lbl">Observaciones para el cliente
               <span class="muted">salen impresas en la cotización</span></div>
-            <textarea id="obs-ext" rows="1" placeholder="Lo que tiene que ver el cliente…">${UI.esc(this.obsExt)}</textarea>
+            <textarea id="obs-ext" rows="2" placeholder="Lo que tiene que ver el cliente…">${UI.esc(this.obsExt)}</textarea>
             <div class="int-box">
               <div class="lbl">Comentarios internos
                 <span class="muted">no salen impresas — para nosotros o producción</span></div>
-              <textarea id="obs-int" rows="1" placeholder="Notas para producción, administración o para vos…">${UI.esc(this.obsInt)}</textarea>
+              <textarea id="obs-int" rows="2" placeholder="Notas para producción, administración o para vos…">${UI.esc(this.obsInt)}</textarea>
             </div>
-          </div>
-          <div id="cz-tot"></div>
-          <div class="cz-tyc tyc-full">
-            <div class="lbl">Términos y condiciones
+            <div class="lbl" style="margin-top:11px">Términos y condiciones
               <span class="muted">salen siempre, no se editan</span></div>
             <div class="tyc-fijo">${UI.esc(global.DB.TYC_DEFAULT)}</div>
           </div>
+          <div id="cz-tot"></div>
         </div>`;
 
       m.querySelectorAll('[data-sec]').forEach(b => b.onclick = () => {
@@ -1776,19 +1776,36 @@ tr:hover td{background:var(--panel-2)}
 
       // Los opcionales abiertos llevan una X para volver a cerrarlos: si se
       // abrió uno por error, se borra lo cargado y vuelve a quedar oculto.
-      const ocultos = OPCIONALES.filter(o => this.abiertos[o.k]).map(o =>
-        `<div class="fr"><label for="c-${o.k}">${UI.esc(o.lbl)}</label>
-          <div class="fx"><input id="c-${o.k}" value="${UI.esc(this.cli[o.k])}" placeholder="${UI.esc(o.ph)}">
-            <button class="cx" data-quitar="${o.k}" title="Quitar ${UI.esc(o.lbl)}" aria-label="Quitar ${UI.esc(o.lbl)}">✕</button></div>
-        </div>`).join('');
-      const addBtns = OPCIONALES.filter(o => !this.abiertos[o.k])
-        .map(o => `<button class="chip-add" data-add="${o.k}">${UI.esc(o.btn)}</button>`).join('');
+      // Cada opcional cuelga del campo con el que se relaciona: el teléfono
+      // adicional al lado de Teléfono, el IG debajo de Cliente (lo reemplaza
+      // cuando no hay teléfono) y el DNI debajo de ¿Cómo nos conoció?
+      const opcional = k => {
+        const o = OPCIONALES.find(x => x.k === k);
+        if (!this.abiertos[k]) return '';
+        return `<div class="fr"><label for="c-${k}">${UI.esc(o.lbl)}</label>
+          <div class="fx"><input id="c-${k}" value="${UI.esc(this.cli[k])}" placeholder="${UI.esc(o.ph)}">
+            <button class="cx" data-quitar="${k}" title="Quitar ${UI.esc(o.lbl)}" aria-label="Quitar ${UI.esc(o.lbl)}">✕</button></div></div>`;
+      };
+      const mas = (k, txt) => this.abiertos[k] ? ''
+        : `<button class="chip-add" data-add="${k}">${UI.esc(txt)}</button>`;
 
       c.innerHTML = `
         <div class="cz-cols">
           <div class="cz-col">
             ${f('c-nombre', 'Cliente', this.cli.nombre, 'Nombre y apellido')}
+            ${mas('instagram', '+ IG') ? `<div class="fr"><label></label><div class="adds">${mas('instagram', '+ IG')}</div></div>` : ''}
+            ${opcional('instagram')}
             ${f('c-dom', 'Domicilio de entrega', this.cli.domicilio, 'Calle 1234, piso/depto')}
+            ${sel('c-canal', '¿Cómo nos conoció?', `<option value="">—</option>` +
+              ['Instagram', 'Facebook', 'Recomendación', 'Pasó por el local', 'Google', 'Otro']
+                .map(o => `<option ${this.cli.canal === o ? 'selected' : ''}>${o}</option>`).join(''))}
+            ${mas('dni', 'Agregar DNI') ? `<div class="fr"><label></label><div class="adds">${mas('dni', 'Agregar DNI')}</div></div>` : ''}
+            ${opcional('dni')}
+          </div>
+          <div class="cz-col">
+            <div class="fr"><label for="c-tel">Teléfono ${mas('tel2', '+')}</label>
+              <input id="c-tel" value="${UI.esc(this.cli.telefono)}" placeholder="11 5555-2020" inputmode="tel"></div>
+            ${opcional('tel2')}
             <div class="fr"><label for="c-locd">Localidad</label>
               <div class="fx locw">
                 <input id="c-locd" value="${UI.esc(locActual ? locActual.label : '')}"
@@ -1799,17 +1816,9 @@ tr:hover td{background:var(--panel-2)}
             ${locActual ? `<div class="fr"><label></label><span class="hint">
               ${UI.esc(locActual.zona)} · envío ${locActual.flete ? UI.pesos(locActual.flete) : 'a cotizar'}
               ${locActual.manual ? '<b>· cargada a mano</b>' : ''}</span></div>` : ''}
-          </div>
-          <div class="cz-col">
-            ${f('c-tel', 'Teléfono', this.cli.telefono, '11 5555-2020', 'inputmode="tel"')}
             ${f('c-mail', 'Email', this.cli.email, 'cliente@correo.com')}
-            ${sel('c-canal', '¿Cómo nos conoció?', `<option value="">—</option>` +
-              ['Instagram', 'Facebook', 'Recomendación', 'Pasó por el local', 'Google', 'Otro']
-                .map(o => `<option ${this.cli.canal === o ? 'selected' : ''}>${o}</option>`).join(''))}
           </div>
         </div>
-        ${ocultos ? `<div class="cz-cols" style="margin-top:9px">${ocultos}</div>` : ''}
-        ${addBtns ? `<div class="adds">${addBtns}</div>` : ''}
         <div class="sec-go"><button class="btn sm primary" id="c-sig">Continuar → Productos</button></div>`;
 
       // `soloNum` deja escribir únicamente números (teléfonos y DNI).
@@ -1834,6 +1843,21 @@ tr:hover td{background:var(--panel-2)}
         this.pintarCliente(); this.pintarCabecera(); this.refrescarResumen(); this.pintarSide();
       });
       document.getElementById('c-canal').onchange = e => { this.cli.canal = e.target.value; };
+      // Con Tab o Enter se recorre en el orden en que se pregunta, no por columna.
+      const ORDEN = ['c-nombre', 'c-tel', 'c-dom', 'c-locd', 'c-canal', 'c-mail'];
+      ORDEN.forEach((id, i) => {
+        const el = document.getElementById(id); if (!el) return;
+        el.onkeydown = e => {
+          if (e.key !== 'Tab' && e.key !== 'Enter') return;
+          if (e.key === 'Tab' && e.shiftKey) {
+            const ant = document.getElementById(ORDEN[i - 1]); if (!ant) return;
+            e.preventDefault(); ant.focus(); return;
+          }
+          const sig = document.getElementById(ORDEN[i + 1]);
+          if (!sig) return;
+          e.preventDefault(); sig.focus();
+        };
+      });
       this.bindLocalidad();
       document.getElementById('c-sig').onclick = () => this.irAProductos();
       this.avisoCliente();
@@ -1889,11 +1913,10 @@ tr:hover td{background:var(--panel-2)}
 
     // Calendario de rango: se toca el primer día y después el último, y el
     // tramo del medio queda pintado. Nunca se acepta un solo día.
-    modalCalendario(desde, hasta, onlisto) {
-      let d1 = desde || '', d2 = hasta || '';
+    pintarCalendario(contId, st, onlisto) {
+      const caja = document.getElementById(contId); if (!caja) return;
+      let d1 = st.d1 || '', d2 = st.d2 || '';
       let mes = mesDe(d1 || enDias(0));
-      const m = this.modal('', null, 380);
-      const caja = m.firstChild;
 
       const pintar = () => {
         const hoyISO = enDias(0);
@@ -1913,8 +1936,7 @@ tr:hover td{background:var(--panel-2)}
           celdas.push(`<button class="cd ${cls}" data-d="${iso}" ${iso < hoyISO ? 'disabled' : ''}>${d}</button>`);
         }
         caja.innerHTML = `
-          <div class="row" style="margin-bottom:10px"><h3 style="color:var(--navy);margin:0;font-size:16px">Fechas de entrega</h3>
-            <div class="sp" style="flex:1"></div><button class="lx" id="cal-x" style="font-size:20px">✕</button></div>
+          <div class="cal-box">
           <div class="cal-h">
             <button class="cal-nav" id="cal-prev" aria-label="Mes anterior">‹</button>
             <b>${UI.esc(MESES[mm - 1].toUpperCase())} ${y}</b>
@@ -1928,10 +1950,9 @@ tr:hover td{background:var(--panel-2)}
               : d1 ? `Desde el <b>${fechaLarga(d1)}</b> — ahora marcá hasta cuándo`
                    : 'Marcá desde qué día'}</div>
             <div class="sp" style="flex:1"></div>
-            <button class="btn primary" id="cal-ok" ${d1 && d2 ? '' : 'disabled'}>Listo</button>
-          </div>`;
+            <button class="btn sm primary" id="cal-ok" ${d1 && d2 ? '' : 'disabled'}>Listo</button>
+          </div></div>`;
 
-        document.getElementById('cal-x').onclick = () => m.remove();
         document.getElementById('cal-prev').onclick = () => { mes = correrMes(mes, -1); pintar(); };
         document.getElementById('cal-next').onclick = () => { mes = correrMes(mes, 1); pintar(); };
         caja.querySelectorAll('[data-d]').forEach(b => b.onclick = () => {
@@ -1942,7 +1963,7 @@ tr:hover td{background:var(--panel-2)}
           pintar();
         });
         const ok = document.getElementById('cal-ok');
-        if (d1 && d2) ok.onclick = () => { m.remove(); onlisto(d1, d2); };
+        if (d1 && d2) ok.onclick = () => onlisto(d1, d2);
       };
       pintar();
     },
@@ -2095,7 +2116,7 @@ tr:hover td{background:var(--panel-2)}
               <div class="lmed">
                 <label>Medidas <input data-med="${l.key}" value="${UI.esc(l.medidas || '')}" placeholder="ej. 2.40 × 0.50 × 0.90"></label>
                 <label>Terminaciones <input data-col="${l.key}" value="${UI.esc(l.colores || '')}" placeholder="ej. estructura negra, frente paraíso"></label>
-                <label class="ancho">Observaciones <input data-obs="${l.key}" value="${UI.esc(l.obs)}" placeholder="lo que pidió el cliente"></label>
+                <label class="ancho">Detalles <input data-obs="${l.key}" value="${UI.esc(l.obs)}" placeholder="lo que pidió el cliente"></label>
                 ${l.img ? `<img class="lobs-img" src="${UI.esc(l.img)}" alt="Foto del diseño">` : ''}
               </div>
             </div>`
@@ -2149,13 +2170,23 @@ tr:hover td{background:var(--panel-2)}
       // Único lugar donde se carga el precio del a medida: se tipea el total de
       // la línea y el unitario (y el de lista) salen solos.
       cont.querySelectorAll('[data-subt]').forEach(i => {
-        i.oninput = () => { const n = i.value.replace(/[^\d]/g, ''); if (n !== i.value) i.value = n; };
-        i.onchange = () => {
-          const l = this.get(i.dataset.subt); if (!l) return;
-          const total = Math.max(0, Number(i.value) || 0);
-          l.precioManual = i.value === '' ? null : this.desdeCondicion(total / Math.max(1, l.cantidad));
-          this.repintar();
+        const l = this.get(i.dataset.subt);
+        // Mientras se escribe ya se ven el unitario y el descuento; recién al
+        // salir (Enter o el tilde) se repinta y se pasa al siguiente producto.
+        i.oninput = () => {
+          const n = i.value.replace(/[^\d]/g, ''); if (n !== i.value) i.value = n;
+          if (!l) return;
+          l.precioManual = n === '' ? null : this.desdeCondicion(Number(n) / Math.max(1, l.cantidad));
+          const fila = i.parentNode;
+          const pu = fila && fila.querySelector('.lock,.adef');
+          if (pu) pu.textContent = this.sinPrecio(l) ? 'A definir' : UI.pesos(this.lista(l));
+          const dt = fila && fila.querySelector('.dto');
+          const d = (this.lista(l) - this.unit(l)) * l.cantidad;
+          if (dt) dt.textContent = d ? '−' + UI.pesos(d) : '—';
+          this.refrescarProductos();
         };
+        i.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); i.blur(); } };
+        i.onblur = () => this.repintar();
       });
       cont.querySelectorAll('[data-nom]').forEach(i => i.oninput = () => { const l = this.get(i.dataset.nom); if (l) l.prodNombre = i.value; });
       // Se carga el de lista o el de efectivo; el otro se completa solo.
@@ -2233,22 +2264,43 @@ tr:hover td{background:var(--panel-2)}
     cargarImagen(l) {
       if (!l) return;
       this.modal(`<h3 style="color:var(--navy)">Imagen del producto</h3>
-        <p class="muted" style="font-size:13px;margin:8px 0 12px">
-          Pegá el link de la imagen. En los muebles <b>a medida</b> la foto es la que
-          le explica a fábrica qué pidió el cliente.</p>
-        <div class="fr"><label for="im-url">URL de la imagen</label>
-          <input id="im-url" value="${UI.esc(l.img || '')}" placeholder="https://…"></div>
+        <p class="muted" style="font-size:13px;margin:8px 0 14px">
+          En los muebles <b>a medida</b> la foto es la que le explica a fábrica qué
+          pidió el cliente. Queda guardada en <b>Documentos relacionados</b>.</p>
+        <label class="adj">
+          <input type="file" id="im-file" accept="image/*" hidden>
+          <span>📷 Elegir imagen</span>
+        </label>
+        <div id="im-prev">${l.img ? `<img src="${UI.esc(l.img)}" alt="Imagen del producto"><div class="muted">${UI.esc(l.imgNombre || 'Imagen cargada')}</div>` : ''}</div>
         <div class="row" style="margin-top:14px;justify-content:flex-end;gap:10px">
           ${l.img ? '<button class="btn" id="im-quitar">Quitar</button>' : ''}
-          <button class="btn primary" id="im-ok">Guardar</button></div>`, m => {
-        document.getElementById('im-ok').onclick = () => {
-          l.img = document.getElementById('im-url').value.trim();
-          this.log(this.vendedor, `Cargó imagen de ${l.prodNombre || 'un producto'}`);
-          m.remove(); this.pintar(); this.pintarSide();
+          <button class="btn primary" id="im-ok">Listo</button></div>`, m => {
+        const file = document.getElementById('im-file');
+        file.onchange = () => {
+          const f = file.files && file.files[0]; if (!f) return;
+          const lector = new FileReader();
+          lector.onload = () => {
+            l.img = lector.result; l.imgNombre = f.name;
+            const pv = document.getElementById('im-prev');
+            if (pv) pv.innerHTML = `<img src="${l.img}" alt=""><div class="muted">${UI.esc(f.name)}</div>`;
+            this.guardarArchivo(f.name, l);
+          };
+          lector.readAsDataURL(f);
         };
+        document.getElementById('im-ok').onclick = () => { m.remove(); this.pintar(); this.pintarSide(); };
         const q = document.getElementById('im-quitar');
-        if (q) q.onclick = () => { l.img = ''; m.remove(); this.pintar(); };
+        if (q) q.onclick = () => {
+          this.archivos = this.archivos.filter(a => a.key !== l.key);
+          l.img = ''; l.imgNombre = ''; m.remove(); this.pintar(); this.pintarSide();
+        };
       });
+    },
+    // Los archivos adjuntos de la cotización se listan en el costado.
+    guardarArchivo(nombre, l) {
+      this.archivos = this.archivos.filter(a => a.key !== l.key);
+      this.archivos.unshift({ key: l.key, nombre, de: l.prodNombre || 'Mueble a medida' });
+      this.log(this.vendedor, `Adjuntó ${nombre} a ${l.prodNombre || 'un producto'}`);
+      this.pintarSide();
     },
 
     async buscarInline(texto) {
@@ -2304,10 +2356,10 @@ tr:hover td{background:var(--panel-2)}
       // Los tres campos vienen BLOQUEADOS con su valor estándar. Si el vendedor
       // necesita poner otra cosa, los abre con "Modificar" — y ahí sí salta el
       // aviso para que Administración lo revise.
-      const cerrado = (lbl, valor, k, nota) => `
+      const cerrado = (lbl, valor, k, nota, ico = '✏️') => `
         <div class="fr"><label>${UI.esc(lbl)}</label>
           <div class="fx"><span class="valf">${UI.esc(valor)}</span>
-            <button class="lapiz" data-abrir="${k}" title="Modificar ${UI.esc(lbl)}" aria-label="Modificar ${UI.esc(lbl)}">✏️</button></div></div>
+            <button class="lapiz" data-abrir="${k}" title="Modificar ${UI.esc(lbl)}" aria-label="Modificar ${UI.esc(lbl)}">${ico}</button></div></div>
         ${nota ? `<div class="fr"><label></label><span class="hint">${nota}</span></div>` : ''}`;
 
       const hayDom = this.envioCotizable();
@@ -2316,10 +2368,13 @@ tr:hover td{background:var(--panel-2)}
         <div class="cz-col">
           <div class="fr"><label>Entrega</label>
             <div class="fx"><span class="valf">${UI.esc(this.entregaTexto())}</span>
-              <button class="lapiz" id="ad-cal" title="Elegir las fechas de entrega" aria-label="Elegir las fechas de entrega">✏️</button>
+              <button class="lapiz cal ${a.entregaTocada ? 'tocado' : ''}" id="ad-cal"
+                title="${a.entregaTocada ? 'Plazo modificado — requiere autorización' : 'Elegir las fechas de entrega'}"
+                aria-label="Elegir las fechas de entrega">🗓️</button>
               ${a.entregaTocada ? `<button class="lapiz" data-cerrar="entrega" title="Volver al plazo estándar" aria-label="Volver al plazo estándar">↺</button>` : ''}
             </div></div>
           <div class="fr"><label></label><span class="hint" id="ad-plazo">Plazo de fabricación: <b>${UI.esc(this.entregaDias())}</b>.</span></div>
+          <div id="ad-calbox"></div>
 
           <div class="fr"><label>Saldo se abona en</label>
             <span class="valf">${UI.esc(a.saldoEn)}</span></div>
@@ -2330,10 +2385,10 @@ tr:hover td{background:var(--panel-2)}
                <div class="fr"><label></label><span class="hint">Cargá el <b>domicilio de entrega</b> y la localidad para que salga el costo.</span></div>`
             : a.envioAbierto
               ? `<div class="fr"><label for="ad-envio">Costo de envío</label>
-                   <div class="fx"><input id="ad-envio" type="number" min="0" value="${a.envio}">
+                   <div class="fx"><input id="ad-envio" inputmode="numeric" value="${a.envio}">
                      <button class="lapiz" data-cerrar="envio" title="Volver al de la localidad" aria-label="Volver al de la localidad">↺</button></div></div>`
               : cerrado('Costo de envío', UI.pesos(a.envio), 'envio',
-                  `Por la localidad <b>${UI.esc(locd)}</b>.`)}
+                  `Por la localidad <b>${UI.esc(locd)}</b>.`, '🔀')}
         </div>
 
         <div class="cz-col">
@@ -2345,6 +2400,12 @@ tr:hover td{background:var(--panel-2)}
                    <option value="no" ${a.instalacion === 'no' ? 'selected' : ''}>No</option>
                  </select><button class="lapiz" data-cerrar="instalacion" title="Volver" aria-label="Volver">↺</button></div></div>`
             : cerrado('¿Requiere instalación?', this.instalacionTexto(), 'instalacion')}
+
+          ${a.instalacion === 'si'
+            ? `<div class="fr"><label for="ad-cinst">Costo de instalación</label>
+                 <input id="ad-cinst" inputmode="numeric" class="${a.instalacionCosto ? '' : 'falta'}" value="${a.instalacionCosto || ''}" placeholder="obligatorio"></div>`
+            : `<div class="fr"><label>Costo de instalación</label>
+                 <span class="valf">Sin instalación</span></div>`}
 
           ${a.escaleraAbierta
             ? `<div class="fr"><label for="ad-esc">Subida por escalera</label>
@@ -2380,7 +2441,6 @@ tr:hover td{background:var(--panel-2)}
       const av = () => {
         const box = document.getElementById('ad-avisos'); if (!box) return;
         const out = [];
-        if (a.entregaTocada) out.push(`<div class="banner warn">El vendedor <b>cambió la fecha de entrega</b> a ${UI.esc(this.entregaTexto())} — <b>Administración</b> tiene que verificarlo y el cambio queda registrado.</div>`);
         if (a.envioTocado) out.push(`<div class="banner warn">El <b>costo de envío</b> se cambió a mano (no es el de ${UI.esc(locd || 'la localidad')}) — queda registrado.</div>`);
         if (a.escaleraTocada) out.push(`<div class="banner warn">La <b>subida por escalera</b> se cambió — queda registrado.</div>`);
         if (a.instalacion === 'si') out.push(`<div class="banner">La orden pide <b>instalación</b> — Logística la agenda con el armador.</div>`);
@@ -2388,19 +2448,39 @@ tr:hover td{background:var(--panel-2)}
       };
 
 
-      document.getElementById('ad-cal').onclick = () => this.modalCalendario(a.desde, a.hasta, (d1, d2) => {
-        a.desde = d1; a.hasta = d2; a.entregaTocada = true;
-        this.normalizarEntrega();
-        this.log(this.vendedor, `Cambió la fecha de entrega: ${this.entregaTexto()}`, 'entrega');
-        this.pintarAdicionales(); this.refrescarResumen(); this.pintarSide();
-      });
+      // El calendario se abre en el mismo lugar, sin pop-up.
+      document.getElementById('ad-cal').onclick = () => {
+        a.calAbierto = !a.calAbierto; this.pintarAdicionales();
+      };
+      if (a.calAbierto) {
+        this.pintarCalendario('ad-calbox', { d1: a.desde, d2: a.hasta }, (d1, d2) => {
+          a.desde = d1; a.hasta = d2; a.entregaTocada = true; a.calAbierto = false;
+          this.normalizarEntrega();
+          this.log(this.vendedor, `Cambió la fecha de entrega: ${this.entregaTexto()}`, 'entrega');
+          this.pintarAdicionales(); this.refrescarResumen(); this.pintarSide();
+        });
+      }
       const en = document.getElementById('ad-envio');
       if (en) en.oninput = e => {
-        a.envio = Math.max(0, Number(e.target.value) || 0); a.envioTocado = true;
+        const n = e.target.value.replace(/[^\d]/g, '');
+        if (n !== e.target.value) e.target.value = n;
+        a.envio = Math.max(0, Number(n) || 0); a.envioTocado = true;
         av(); this.pintarTotales(); this.refrescarResumen();
       };
       const ins = document.getElementById('ad-inst');
-      if (ins) ins.onchange = e => { a.instalacion = e.target.value; av(); this.refrescarResumen(); };
+      if (ins) ins.onchange = e => {
+        a.instalacion = e.target.value;
+        if (a.instalacion !== 'si') a.instalacionCosto = 0;
+        this.pintarAdicionales(); this.pintarTotales(); this.refrescarResumen();
+      };
+      const ci = document.getElementById('ad-cinst');
+      if (ci) ci.oninput = e => {
+        const n = e.target.value.replace(/[^\d]/g, '');
+        if (n !== e.target.value) e.target.value = n;
+        a.instalacionCosto = Math.max(0, Number(n) || 0);
+        e.target.classList.toggle('falta', !a.instalacionCosto);
+        this.pintarTotales(); this.refrescarResumen();
+      };
       const es = document.getElementById('ad-esc');
       if (es) es.oninput = e => { a.escalera = Math.max(0, Number(e.target.value) || 0); a.escaleraTocada = true; av(); };
       av();
@@ -2422,7 +2502,8 @@ tr:hover td{background:var(--panel-2)}
           <b class="tnum">${extra ? '−' + UI.pesos(extra) : '+ Agregar'}</b>
         </button>
         ${fila('Envío', this.envioTexto())}
-        ${fila('Total a pagar', UI.pesos(this.totalFinal()), 'big')}
+        ${this.instalacionMonto() ? fila('Instalación', UI.pesos(this.instalacionMonto())) : ''}
+        ${fila('Saldo restante', UI.pesos(this.totalFinal()), 'big')}
         <div class="tiva">${UI.esc(global.DB.IVA_LEYENDA)}</div>
       </div>`;
       document.getElementById('cz-dto').onclick = () => this.modalDescuento();
@@ -2540,11 +2621,16 @@ tr:hover td{background:var(--panel-2)}
 
         <div class="card cz-sc">
           <div class="cz-sh">Documentos relacionados</div>
-          <div class="cz-sb">${ficha && ficha.docs.length
-            ? ficha.docs.map(d => `<div class="doc"><span class="di">▤</span>
-                <div><div class="dt">${UI.esc(d.tipo)}</div>
-                  <div class="dr">${UI.esc(d.ref)}${d.f ? ` (${UI.esc(d.f)})` : ''}</div></div></div>`).join('')
-            : '<div class="muted" style="font-size:12.5px">Sin antecedentes para este cliente.</div>'}</div>
+          <div class="cz-sb">${
+            this.archivos.map(a => `<div class="doc"><span class="di">📎</span>
+                <div><div class="dt">${UI.esc(a.nombre)}</div>
+                  <div class="dr">${UI.esc(a.de)}</div></div></div>`).join('')
+            + (ficha && ficha.docs.length
+              ? ficha.docs.map(d => `<div class="doc"><span class="di">▤</span>
+                  <div><div class="dt">${UI.esc(d.tipo)}</div>
+                    <div class="dr">${UI.esc(d.ref)}${d.f ? ` (${UI.esc(d.f)})` : ''}</div></div></div>`).join('')
+              : (this.archivos.length ? '' : '<div class="muted" style="font-size:12.5px">Sin antecedentes para este cliente.</div>'))
+          }</div>
         </div>`;
 
       s.querySelectorAll('[data-l]').forEach(b => b.onclick = () => { this.lado = b.dataset.l; this.pintarSide(); });
@@ -2605,6 +2691,11 @@ tr:hover td{background:var(--panel-2)}
       if (!this.vendedor) return UI.aviso('Elegí el vendedor de la operación', 'warn');
       const incompletos = this.lineas.filter(l => l.tipo === 'medida' && (!l.prodNombre.trim() || !(Number(l.precioManual) > 0)));
       if (incompletos.length) return UI.aviso('Completá nombre y precio de los productos a medida', 'warn');
+      // Si la orden lleva instalación, su costo es obligatorio.
+      if (this.ad.instalacion === 'si' && !this.ad.instalacionCosto) {
+        this.etapa = 'adicionales'; this.pintarMain();
+        return UI.aviso('Cargá el costo de instalación', 'warn');
+      }
 
       const verif = this.lineas.filter(l => this.requiereVerif(l)).length;
       const plazo = this.entregaEditada();
@@ -2661,10 +2752,11 @@ tr:hover td{background:var(--panel-2)}
         entregaAbierta: false, entregaTocada: false,
         saldoEn: this.terminoLabel(),
         envio: 0, envioAbierto: false, envioTocado: false,
-        instalacion: 'convenir', instalacionAbierta: false,
+        instalacion: 'convenir', instalacionAbierta: false, instalacionCosto: 0,
+        calAbierto: false,
         escalera: global.DB.ESCALERA_DEFAULT, escaleraAbierta: false, escaleraTocada: false,
       };
-      this.lineas = []; this._uid = 0; this.dto = null;
+      this.lineas = []; this._uid = 0; this.dto = null; this.archivos = [];
       this.actividad = [];
       this.log(this.vendedor, 'Creó la cotización');
     },
@@ -2943,8 +3035,8 @@ tr:hover td{background:var(--panel-2)}
         .fr input[readonly]{background:var(--panel-2);color:var(--ink-soft)}
         .fr .hint{font-size:11.5px;color:var(--muted)}
         @media(max-width:520px){.fr{grid-template-columns:1fr;gap:3px}}
-        .adds{display:flex;gap:7px;flex-wrap:wrap;padding-left:142px}
-        @media(max-width:520px){.adds{padding-left:0}}
+        .adds{display:flex;gap:7px;flex-wrap:wrap}
+        .fr>label .chip-add{padding:0 7px;font-size:11.5px;line-height:1.5;margin-left:4px}
         .fx{display:flex;align-items:center;gap:5px}
         .fx input{flex:1;min-width:0}
         .cx{flex:none;border:0;background:none;color:var(--muted);cursor:pointer;font-size:13px;line-height:1;padding:5px 6px;border-radius:6px}
@@ -3006,6 +3098,11 @@ tr:hover td{background:var(--panel-2)}
         .lobs-f{display:flex;align-items:center;gap:10px}
         .cam{border:1px dashed var(--line);background:var(--panel);color:var(--ink-soft);border-radius:8px;padding:5px 11px;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
         .cam:hover{border-color:var(--brand);color:var(--brand)}
+        .adj{display:inline-block;border:1px dashed var(--line);border-radius:9px;padding:9px 14px;font-size:13px;font-weight:600;color:var(--brand);cursor:pointer}
+        .adj:hover{border-color:var(--brand);background:var(--brand-soft)}
+        #im-prev{margin-top:12px}
+        #im-prev img{max-width:100%;max-height:190px;border-radius:9px;border:1px solid var(--line);display:block}
+        #im-prev .muted{font-size:12px;margin-top:5px}
         .lobs-img{width:44px;height:44px;object-fit:cover;border-radius:7px;border:1px solid var(--line)}
         @media(max-width:640px){.lobs{padding-left:0}}
         .lhead{padding-top:9px;padding-bottom:9px;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:700;border-bottom:1px solid var(--line)}
@@ -3037,6 +3134,9 @@ tr:hover td{background:var(--panel-2)}
         .valf{flex:1;min-width:0;font-size:13px;color:var(--ink);padding:6px 0}
         .lapiz{flex:none;border:0;background:none;cursor:pointer;font-size:13px;line-height:1;padding:5px 7px;border-radius:6px;color:var(--muted)}
         .lapiz:hover{background:var(--line-soft)}
+        .lapiz.cal{font-size:15px}
+        .lapiz.cal.tocado{background:var(--warn-bg);border:1px solid var(--warn);border-radius:7px}
+        .cal-box{border:1px solid var(--line);border-radius:11px;padding:11px 13px;margin:2px 0 4px;background:var(--panel);max-width:330px}
         .cal-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
         .cal-h b{font-size:13.5px;color:var(--navy);letter-spacing:.04em}
         .cal-nav{border:0;background:none;font-size:19px;color:var(--ink-soft);cursor:pointer;padding:2px 9px;border-radius:7px;line-height:1}
@@ -3053,7 +3153,7 @@ tr:hover td{background:var(--panel-2)}
         .cd.ini{border-radius:9px 0 0 9px}
         .cd.fin{border-radius:0 9px 9px 0}
         .cd.ini.fin{border-radius:9px}
-        .cal-pie{display:flex;align-items:center;gap:12px;border-top:1px solid var(--line);margin-top:12px;padding-top:12px;font-size:12.5px}
+        .cal-pie{display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);margin-top:10px;padding-top:10px;font-size:12px}
         .rango{gap:7px}
         .rango input{flex:1;min-width:0}
         .rango .ent{flex:none;font-size:12.5px;color:var(--muted)}
@@ -3062,7 +3162,6 @@ tr:hover td{background:var(--panel-2)}
         .bwrap .drop{margin-top:4px}
         .drop .it.nueva{color:var(--brand);font-weight:600}
         .tyc-fijo{font-size:12.5px;color:var(--ink-soft);line-height:1.55}
-        .tyc-full{grid-column:1/-1;border-top:1px solid var(--line);padding-top:12px;margin-top:2px}
         .cz-tyc textarea,.cz-foot textarea{width:100%;padding:8px 10px;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);resize:vertical}
         .cz-tots .tr{display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:13px;color:var(--ink-soft)}
         .cz-tots .tr b{color:var(--navy)}
@@ -3070,8 +3169,8 @@ tr:hover td{background:var(--panel-2)}
         .cz-tots .big{border-top:1px solid var(--line);margin-top:5px;padding-top:9px;font-size:15px;font-weight:700;color:var(--navy)}
         .cz-tots .big b{font-size:19px}
         .cz-tots .tiva{font-size:11.5px;color:var(--muted);margin-top:7px}
-        .tdto{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;margin:6px 0 2px;
-          border:1px dashed var(--line);background:var(--line-soft);border-radius:8px;padding:7px 10px;
+        .tdto{display:flex;justify-content:space-between;align-items:center;gap:12px;width:calc(100% + 20px);margin:4px -10px;
+          border:1px dashed var(--line);background:var(--line-soft);border-radius:8px;padding:5px 10px;
           font:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;text-align:left}
         .tdto:hover{border-color:var(--brand);color:var(--brand)}
         .tdto b{color:var(--brand)}
