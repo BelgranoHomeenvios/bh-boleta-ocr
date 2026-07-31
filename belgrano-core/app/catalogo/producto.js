@@ -62,47 +62,79 @@
     },
 
     // ---- Pintado -------------------------------------------------------
+    // Las solapas. La primera es la que se abre siempre: el mueble, sus
+    // atributos, sus variantes y el precio. Todo lo demás — lo que no hace
+    // falta para saber qué es y cuánto sale — vive en las otras.
+    SOLAPAS: [
+      { k: 'producto', label: 'Producto' },
+      { k: 'costos', label: 'Costos y márgenes', costos: true },
+      { k: 'contabilidad', label: 'Contabilidad' },
+    ],
+    _tab: 'producto',
+    solapas() { return this.SOLAPAS.filter(t => !t.costos || this.verCostos()); },
+    // Los números de costo sólo se ven en su solapa, y sólo si el rol puede.
+    muestraCostos() { return this.verCostos() && this._tab === 'costos'; },
+
     pintar() {
       const v = document.getElementById(this._mount); if (!v) return;
       const p = this.p, ed = this.puedeEditar();
-      const est = this.estado();
+      if (!this.solapas().some(t => t.k === this._tab)) this._tab = 'producto';
       v.innerHTML = `
-        <div class="pd-bar">
-          <a href="#" id="pd-volver" class="kick">‹ Catálogo</a>
-          <div class="sp"></div>
-          ${ed ? '' : '<span class="pill soft">Sólo lectura</span>'}
-          <span class="pill ${p.publicado ? 'ok' : 'warn'}" id="pd-pub-pill">${
-            p.publicado ? 'Visible para los vendedores' : 'Oculto — no se puede vender'}</span>
-          ${this.verCostos() ? `<span class="pill ${est.pill}">${UI.esc(est.label)}</span>` : ''}
+        <div class="pd-wrap">
+          <div class="pd-bar">
+            <a href="#" id="pd-volver" class="kick">‹ Catálogo</a>
+            <div class="sp"></div>
+            ${ed ? '' : '<span class="pill soft">Sólo lectura</span>'}
+            <span class="pill ${p.publicado ? 'ok' : 'warn'}" id="pd-pub-pill">${
+              p.publicado ? 'Visible para los vendedores' : 'Oculto — no se puede vender'}</span>
+          </div>
+          ${this.bloqueNombre()}
+          <div class="pd-tabs">${this.solapas().map(t =>
+            `<button class="pd-tab ${this._tab === t.k ? 'on' : ''}" data-tab="${t.k}"
+              aria-current="${this._tab === t.k}">${UI.esc(t.label)}</button>`).join('')}</div>
+          ${this['tab' + this._tab.charAt(0).toUpperCase() + this._tab.slice(1)]()}
+          <div id="pd-panel"></div>
         </div>
-
-        ${this.bloqueNombre()}
-        ${this.bloqueFotos()}
-        <div class="pd-2">${this.bloqueCategorias()}${this.bloquePropiedades()}</div>
-        ${this.bloqueVariantes()}
-        ${this.verCostos() ? this.bloqueSimulador() : ''}
-        <div class="pd-2">${this.bloqueProveedores()}${this.bloqueAbastecimiento()}</div>
-        ${this.bloqueContabilidad()}
-        <div id="pd-panel"></div>
         ${this.estilos()}`;
 
       document.getElementById('pd-volver').onclick = e => { e.preventDefault(); global.Catalogo.render(this._mount); };
+      document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {
+        this._tab = b.dataset.tab; this.pintar();
+      });
       this.enganchar();
     },
 
-    // 1 · Nombre -----------------------------------------------------------
+    // La solapa principal, en cuatro módulos y en este orden:
+    //  1 · qué es el mueble  2 · dónde va y de qué depende
+    //  3 · qué variantes salen de eso  4 · el resto.
+    tabProducto() {
+      return this.bloqueFotos() + this.bloqueCatProp()
+        + this.bloqueVariantes() + this.bloqueAdicionales();
+    },
+    tabCostos() {
+      return this.bloqueVariantes() + this.bloqueSimulador() + this.bloqueProveedores();
+    },
+    tabContabilidad() { return this.bloqueContabilidad(); },
+
+    // 1 · Nombre y descripción ---------------------------------------------
+    // La descripción es para lo que NO es una variante: el alto y la
+    // profundidad cuando son siempre los mismos, cómo se arma, qué herrajes
+    // lleva. Todo eso no puede ser una propiedad porque no multiplica nada.
     bloqueNombre() {
       const p = this.p, ed = this.puedeEditar();
       return `<section class="pd-b">
         <label class="lbl-t" for="pd-nombre">Nombre</label>
         <input id="pd-nombre" class="pd-nom" value="${UI.esc(p.nombre)}"
           placeholder="Nombre del mueble" ${ed ? '' : 'readonly'}>
+
+        <label class="lbl-t" for="pd-desc" style="margin-top:11px">Descripción</label>
+        <textarea id="pd-desc" class="pd-des" rows="2" ${ed ? '' : 'readonly'}
+          placeholder="Las medidas y los detalles que no cambian entre variantes. Ej: alto 0,55 · profundidad 0,40 · la base se retira en los cuatro lados · corte de tapa a 45°."
+          >${UI.esc(p.desc || '')}</textarea>
+        <div class="hint">Lo que es igual en todas las variantes. Lo que cambia va como propiedad.</div>
+
         <div class="pd-nsub">
           <span class="muted">Código</span> <b class="tnum">${UI.esc(p.sku || '—')}</b>
-          <span class="pd-sep"></span>
-          <label class="chk"><input type="checkbox" id="pd-pub" ${p.publicado ? 'checked' : ''}
-            ${ed ? '' : 'disabled'}> Mostrar a los vendedores</label>
-          <span class="hint">Oculto no aparece para cotizar.</span>
         </div>
       </section>`;
     },
@@ -156,9 +188,20 @@
       return [...out.values()];
     },
 
-    bloqueCategorias() {
-      const cs = this.cats(), her = this.heredadas();
+    // Módulo 2 · dónde entra el mueble y de qué depende. Las dos cosas van
+    // juntas y en este orden: primero en qué familia está, después qué
+    // propiedades tiene — que es de donde salen las variantes de abajo.
+    bloqueCatProp() {
       return `<section class="pd-b">
+        ${this.bloqueCategorias(true)}
+        <div class="pd-sepl"></div>
+        ${this.bloquePropiedades(true)}
+      </section>`;
+    },
+
+    bloqueCategorias(dentro) {
+      const cs = this.cats(), her = this.heredadas();
+      return `<${dentro ? 'div' : 'section class="pd-b"'}>
         <div class="pd-h">Categorías</div>
         <div class="chips">
           ${cs.map(c => `<span class="chip">${UI.esc(c.nombre)}${this.puedeEditar()
@@ -170,16 +213,16 @@
         ${her.length ? `<div class="hint" style="margin-top:6px">
           <b>${UI.esc(her.map(c => c.nombre).join(' · '))}</b> ${her.length === 1 ? 'se hereda' : 'se heredan'} —
           con marcar la familia alcanza.</div>` : ''}
-      </section>`;
+      </${dentro ? 'div' : 'section'}>`;
     },
 
     // 4 · Propiedades ------------------------------------------------------
     // Se ve la lista de las que usa este mueble, cada una con sus valores, y
     // se ENTRA a una para cargarle los que puede tener. Abajo de todo, agregar
     // otra propiedad.
-    bloquePropiedades() {
+    bloquePropiedades(dentro) {
       const ps = this.props(), n = this.combinatorio(), ed = this.puedeEditar();
-      return `<section class="pd-b">
+      return `<${dentro ? 'div' : 'section class="pd-b"'}>
         <div class="pd-h">Propiedades</div>
         <div class="props">${ps.map(p => `
           <button class="prow" data-prop="${UI.esc(p.k)}">
@@ -198,16 +241,18 @@
         </div>` : ''}
         ${n ? `<div class="prop-pie"><div class="combo"><b class="tnum">${n}</b> combinaciones posibles
           ${this.vars.length !== n ? `<span class="muted">· ${this.vars.length} creadas</span>` : ''}</div></div>` : ''}
-      </section>`;
+      </${dentro ? 'div' : 'section'}>`;
     },
 
     // 5 · Listado de variantes ---------------------------------------------
     bloqueVariantes() {
       const f = this._fVar.trim().toLowerCase();
       const lista = this.vars.filter(v => !f || this.nombreVar(v).toLowerCase().includes(f));
-      const cost = this.verCostos();
+      const cost = this.muestraCostos();
       return `<section class="pd-b">
-        <div class="pd-h">Todas las variantes <span class="muted">(${this.vars.length})</span></div>
+        <div class="pd-h">${cost ? 'Costo y precio por variante' : 'Variantes'}
+          <span class="muted">(${this.vars.length})</span>
+          ${cost ? `<span class="pill ${this.estado().pill}" style="float:right">${UI.esc(this.estado().label)}</span>` : ''}</div>
         <div class="vr-tools">
           <input id="pd-fvar" class="busca" placeholder="Filtrar por medida, estructura, frente…" value="${UI.esc(this._fVar)}">
           <div class="sp"></div>
@@ -217,7 +262,7 @@
           <span>Imágenes</span><span>Variante</span><span>Stock</span>
           ${cost ? '<span style="text-align:right">Costo</span>' : ''}
           <span style="text-align:right">Precio</span>
-          ${cost ? '<span style="text-align:right">Markup</span>' : ''}
+          <span style="text-align:right">${cost ? 'Markup' : 'Peso'}</span>
           <span></span>
         </div>
         <div id="pd-vars">${lista.map(v => this.filaVar(v, cost)).join('')
@@ -244,14 +289,47 @@
         </div>
         <div class="vr-st">${v.stock > 0
           ? `<b class="tnum ok-t">${v.stock}</b>`
-          : `<span class="muted">${v.reponer === 'minimo' ? 'reponer' : 'a pedido'}</span>`}</div>
+          : (v.reponer === 'minimo'
+            ? '<span class="muted">reponer</span>'
+            // Se fabrica cuando se vende: no hay tope de stock.
+            : '<span class="inf">∞ a pedido</span>')}</div>
         ${cost ? `<div class="vr-c"><input inputmode="numeric" class="pn" data-costo="${v.id}"
           value="${v.costo || ''}" ${this.puedeEditar() ? '' : 'readonly'}></div>` : ''}
-        <div class="vr-p"><input inputmode="numeric" class="pn" data-precio="${v.id}"
+        <div class="vr-p"><span class="uni">$</span><input inputmode="numeric" class="pn" data-precio="${v.id}"
           value="${v.precio || ''}" ${this.puedeEditar() ? '' : 'readonly'}></div>
-        ${cost ? `<div class="vr-m"><span class="mk ${banda.pill}">${mk ? mk.toFixed(2).replace('.', ',') + 'x' : '—'}</span></div>` : ''}
-        <div class="vr-a"><button class="lx" data-abrir="${v.id}" title="Editar la variante">✏️</button></div>
+        ${cost ? `<div class="vr-m"><span class="mk ${banda.pill}">${mk ? mk.toFixed(2).replace('.', ',') + 'x' : '—'}</span></div>`
+          : `<div class="vr-pe"><input inputmode="decimal" class="pn" data-peso="${v.id}"
+              value="${v.peso || ''}" ${this.puedeEditar() ? '' : 'readonly'}><span class="uni">kg</span></div>`}
+        <div class="vr-a">
+          <button class="lx" data-abrir="${v.id}" title="Editar la variante">✏️</button>
+          <button class="lx" data-dup="${v.id}" title="Duplicar">⧉</button>
+          <button class="lx" data-hist="${v.id}" title="Historial de precio">↺</button>
+        </div>
       </div>`;
+    },
+
+    // Duplicar sirve para la variante que es casi igual a otra: se copia
+    // entera y después se le cambia lo que sea distinto.
+    duplicar(id) {
+      const v = this.vars.find(x => x.id === id); if (!v) return;
+      const copia = { ...v, id: Math.max(0, ...this.vars.map(x => x.id)) + 1, sku: '', stock: 0 };
+      this.vars.splice(this.vars.indexOf(v) + 1, 0, copia);
+      UI.aviso('Variante duplicada — cambiale lo que sea distinto', 'ok');
+      this.pintar();
+      this.abrirVariante(copia.id);
+    },
+
+    // El historial de precio todavía no se guarda: hace falta la tabla.
+    historial(id) {
+      const v = this.vars.find(x => x.id === id); if (!v) return;
+      this.modal(`
+        <h3 class="h-title" style="font-size:17px">Historial de precio</h3>
+        <p class="h-sub">${UI.esc(this.nombreVar(v))}</p>
+        <div class="banner info" style="margin:14px 0 0">Todavía no se guardan los cambios de precio.
+          Cuando esté la tabla, acá va a estar cada cambio con la fecha y quién lo hizo.</div>
+        <div class="row" style="margin-top:16px;justify-content:flex-end">
+          <button class="btn" onclick="document.getElementById('mdlz').remove()">Cerrar</button>
+        </div>`, 460);
     },
 
     // 6 · Simulador --------------------------------------------------------
@@ -300,20 +378,37 @@
       </section>`;
     },
 
-    // 8 · Abastecimiento + instalación --------------------------------------
-    bloqueAbastecimiento() {
-      const r = this.p.rutas || {}, ed = this.puedeEditar();
+    // Módulo 4 · Adicionales — todo lo que no es ni qué es el mueble ni cuánto
+    // sale: quién lo ve, cómo se consigue y cómo se entrega.
+    bloqueAdicionales() {
+      const p = this.p, r = p.rutas || {}, ed = this.puedeEditar();
       return `<section class="pd-b">
-        <div class="pd-h">Cómo se obtiene</div>
+        <div class="pd-h">Adicionales</div>
+
+        <div class="ad-t">Visibilidad</div>
+        <label class="chk"><input type="checkbox" id="pd-pub" ${p.publicado ? 'checked' : ''}
+          ${ed ? '' : 'disabled'}> Mostrar a los vendedores</label>
+        <div class="hint">Oculto no aparece para cotizar. Cada variante además se puede
+          mostrar o esconder por separado.</div>
+
+        <div class="pd-sepl"></div>
+        <div class="ad-t">Cómo se pide</div>
         <div class="rutas">${global.DB.RUTAS.map(x =>
           `<label class="chk"><input type="checkbox" data-ruta="${x.k}" ${r[x.k] ? 'checked' : ''}
             ${ed ? '' : 'disabled'}> ${UI.esc(x.label)}</label>`).join('')}</div>
+
         <div class="pd-sepl"></div>
-        <label class="chk"><input type="checkbox" id="pd-inst" ${this.p.instalacion ? 'checked' : ''}
-          ${ed ? '' : 'disabled'}> <b>Requiere instalación</b></label>
-        <div class="hint" style="margin-top:6px">${this.p.instalacion
+        <div class="ad-t">Entrega</div>
+        <label class="chk"><input type="checkbox" id="pd-inst" ${p.instalacion ? 'checked' : ''}
+          ${ed ? '' : 'disabled'}> Requiere instalación</label>
+        <div class="hint">${p.instalacion
           ? 'En la orden va a saltar solo, con <b>a convenir</b>; el costo se define en Instalaciones, no acá.'
-          : 'En la orden sale <b>no requiere instalación</b> por default, y el vendedor puede cambiarlo.'}</div>
+          : 'En la orden sale <b>no requiere instalación</b> por default, y el vendedor puede editarlo.'}</div>
+        <div class="fr" style="margin-top:9px"><label for="pd-bultos">Bultos por unidad</label>
+          <input id="pd-bultos" inputmode="numeric" value="${UI.esc(p.bultos || '')}"
+            placeholder="1" ${ed ? '' : 'readonly'}></div>
+        <div class="fr"><label></label><span class="hint">Con cuántos bultos viaja. Es lo que usa
+          la subida por escalera, que se cobra por piso y por bulto.</span></div>
       </section>`;
     },
 
@@ -341,6 +436,8 @@
 
       const nom = g('pd-nombre');
       if (nom && ed) nom.onchange = () => { p.nombre = nom.value.trim() || p.nombre; this.guardar(); };
+      const des = g('pd-desc');
+      if (des && ed) des.onchange = () => { p.desc = des.value.trim(); this.guardar(); };
       const pub = g('pd-pub');
       if (pub && ed) pub.onchange = () => {
         p.publicado = pub.checked; this.guardar();
@@ -385,7 +482,7 @@
           const box = g('pd-vars');
           const f = this._fVar.trim().toLowerCase();
           const lista = this.vars.filter(v => !f || this.nombreVar(v).toLowerCase().includes(f));
-          box.innerHTML = lista.map(v => this.filaVar(v, this.verCostos())).join('')
+          box.innerHTML = lista.map(v => this.filaVar(v, this.muestraCostos())).join('')
             || UI.vacio('Ninguna variante coincide con el filtro.');
           this.engancharVars();
         }, 200); };
@@ -397,6 +494,10 @@
       });
       if (g('pd-inst') && ed) g('pd-inst').onchange = e => {
         p.instalacion = e.target.checked; this.guardar(); this.pintar();
+      };
+      const bul = g('pd-bultos');
+      if (bul && ed) bul.onchange = () => {
+        p.bultos = Math.max(0, Number(String(bul.value).replace(/[^\d]/g, '')) || 0); this.guardar();
       };
       if (g('pd-addprov')) g('pd-addprov').onclick = () => this.modalProveedor();
       document.querySelectorAll('[data-quitarprov]').forEach(b => b.onclick = () => {
@@ -428,18 +529,18 @@
           this.refrescarFila(v);
         };
       });
-      num('costo', 'costo'); num('precio', 'precio');
+      num('costo', 'costo'); num('precio', 'precio'); num('peso', 'peso');
+      document.querySelectorAll('[data-dup]').forEach(b =>
+        b.onclick = () => this.duplicar(Number(b.dataset.dup)));
+      document.querySelectorAll('[data-hist]').forEach(b =>
+        b.onclick = () => this.historial(Number(b.dataset.hist)));
     },
 
     refrescarFila(v) {
       const fila = document.querySelector(`.vr[data-v="${v.id}"]`);
       if (!fila) return;
-      fila.outerHTML = this.filaVar(v, this.verCostos());
+      fila.outerHTML = this.filaVar(v, this.muestraCostos());
       this.engancharVars();
-      const pill = document.querySelector('.pd-bar .pill:last-child');
-      if (pill && this.verCostos()) {
-        const e = this.estado(); pill.className = 'pill ' + e.pill; pill.textContent = e.label;
-      }
     },
 
     guardar() { global.DB.guardarProducto(this.p); },
@@ -477,7 +578,7 @@
     abrirVariante(id) {
       const v = this.vars.find(x => x.id === id); if (!v) return;
       this._abierta = id;
-      const ed = this.puedeEditar(), cost = this.verCostos();
+      const ed = this.puedeEditar(), cost = this.muestraCostos();
       const mk = this.markupDe(v), banda = global.DB.bandaDe(mk);
       const f = (id2, lbl, val, extra = '') => `<div class="fr"><label for="${id2}">${lbl}</label>
         <input id="${id2}" value="${UI.esc(val ?? '')}" ${extra} ${ed ? '' : 'readonly'}></div>`;
@@ -576,7 +677,10 @@
 
     // ---- Simulador -----------------------------------------------------------
     bindSimulador() {
-      const sel = document.getElementById('sim-v'); if (!sel) return;
+      // El simulador vive en su solapa: si no está en pantalla no hay nada
+      // que enganchar.
+      const sel = document.getElementById('sim-v');
+      if (!sel || !this._sim) return;
       const c = document.getElementById('sim-c'), p = document.getElementById('sim-p');
       sel.onchange = () => {
         const v = this.vars.find(x => x.id === Number(sel.value));
@@ -958,7 +1062,16 @@
         .lapiz{border:0;background:none;cursor:pointer;font-size:13px;padding:4px 6px;border-radius:6px;color:var(--muted)}
         .lapiz:hover{background:var(--panel-2)}
 
+        /* La pantalla no ocupa todo el ancho: se lee mucho mejor una columna
+           angosta y centrada, con aire a los dos costados. */
+        .pd-wrap{max-width:1000px;margin:0 auto}
         .pd-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+        /* Solapas: adelante lo que se mira siempre, atrás lo que se consulta. */
+        .pd-tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0 0 12px}
+        .pd-tab{border:0;background:none;font:inherit;font-size:13px;font-weight:650;color:var(--muted);
+          cursor:pointer;padding:9px 13px;border-bottom:2px solid transparent;margin-bottom:-1px}
+        .pd-tab:hover{color:var(--navy)}
+        .pd-tab.on{color:var(--navy);border-bottom-color:var(--brand)}
         /* Los bloques cortos van de a dos: uno abajo del otro la pantalla
            no terminaba más y había que bajar para todo. */
         .pd-2{display:grid;grid-template-columns:1fr 1fr;gap:9px;align-items:start}
@@ -971,6 +1084,8 @@
           color:var(--navy);margin-bottom:9px}
         .lbl-t{display:block;font-size:12px;color:var(--ink-soft);margin-bottom:4px}
         .pd-nom{width:100%;font-size:14px;font-weight:650;color:var(--navy);padding:7px 10px}
+        .pd-des{width:100%;font-size:12.5px;line-height:1.5;resize:vertical;min-height:52px}
+        .pd-des+.hint{margin-top:4px}
         .pd-nsub{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12px;
           color:var(--ink-soft);margin-top:7px}
         .pd-sep{width:1px;height:15px;background:var(--line)}
@@ -1028,9 +1143,13 @@
 
         .vr-tools{display:flex;align-items:center;gap:10px;margin-bottom:8px}
         .vr-tools .busca{max-width:320px;padding:7px 10px;font-size:13px}
-        .vr-head,.vr{display:grid;grid-template-columns:74px minmax(0,1fr) 74px 94px 94px 66px 34px;
+        .vr-head,.vr{display:grid;grid-template-columns:74px minmax(0,1fr) 82px 104px 104px 66px 82px;
           gap:8px;align-items:center}
-        .vr-head.sincosto,.vr.sincosto{grid-template-columns:74px minmax(0,1fr) 74px 94px 34px}
+        .vr-head.sincosto,.vr.sincosto{grid-template-columns:74px minmax(0,1fr) 82px 104px 106px 82px}
+        .vr-p,.vr-pe{display:flex;align-items:center;gap:4px}
+        .uni{font-size:11px;color:var(--muted);flex:none}
+        .inf{font-size:12px;color:var(--brand)}
+        .vr-a{display:flex;gap:1px;justify-content:flex-end}
         .vr-head{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
           font-weight:700;padding-bottom:8px;border-bottom:1px solid var(--line)}
         .vr{padding:6px 0;border-bottom:1px solid var(--line-soft)}
@@ -1072,6 +1191,8 @@
         .sim-kv span{display:block;font-size:11px;color:var(--muted)}
         .sim-kv b{font-size:15px;color:var(--navy)}
         .rutas{display:flex;gap:18px;flex-wrap:wrap}
+        .ad-t{font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px}
+        #pd-bultos{max-width:96px}
 
         .pv-back{position:fixed;inset:0;background:rgba(12,22,44,.35);z-index:40}
         .pv-drawer{position:fixed;top:0;right:0;bottom:0;width:min(480px,100%);background:var(--panel);

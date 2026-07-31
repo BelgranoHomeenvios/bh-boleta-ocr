@@ -415,6 +415,29 @@ Todo en **una sola columna**, un bloque abajo del otro, y en modo edición.
   muebles publicados desde Inventario). **Producción ve todo menos costo,
   markup, margen y ganancia**, y sólo lee.
 
+### Lote 10 — APLICADO (El mueble: cuatro módulos, solapas y columna angosta)
+
+La pantalla abría con todo junto. Ahora adelante está lo que se mira siempre y
+lo demás se consulta cuando hace falta.
+
+- ✅ 224. **Columna angosta y centrada** (1.000 px), con aire a los dos costados.
+- ✅ 225. **Solapas**: `Producto` · `Costos y márgenes` · `Contabilidad`. Abre
+  siempre en Producto. A **Producción** la de costos no le aparece.
+- ✅ 226. El **costo, el markup y el simulador salen de la vista principal**.
+- ✅ 227. La solapa Producto, en **cuatro módulos**:
+  1. **Nombre y descripción** — la descripción es para lo que **no** es una
+     variante: alto y profundidad cuando son siempre los mismos, cómo se arma,
+     qué herrajes lleva. Eso no puede ser propiedad porque no multiplica nada.
+  2. **Categorías y propiedades** — primero dónde entra, después de qué
+     depende. De acá salen las variantes de abajo.
+  3. **Variantes** — con imagen de venta y de producción, SKU, stock, precio y
+     peso, más **duplicar** e **historial de precio**.
+  4. **Adicionales** — visibilidad, cómo se pide y entrega (instalación y
+     bultos por unidad).
+- ✅ 228. Stock **∞ a pedido** cuando se fabrica contra venta: no hay tope.
+- ✅ 229. **Duplicar variante**: copia entera, sin SKU (se recalcula) y sin
+  stock heredado.
+
 ### Lote 9 — APLICADO (Escala de espaciado para toda la app)
 
 Los márgenes dejaron de ser un número puesto a ojo en cada pantalla: salen de
