@@ -231,7 +231,16 @@
     },
 
     // ---- Ficha del mueble --------------------------------------------------
+    // Dirección y Producción entran al mueble para editarlo; el resto ve la
+    // ficha de lectura.
     async ficha(prodId) {
+      if (global.ProductoDet && global.App && global.App.tab === 'catalogo') {
+        return global.ProductoDet.render(this._mount || 'view', prodId);
+      }
+      return this.fichaLectura(prodId);
+    },
+
+    async fichaLectura(prodId) {
       const v = document.getElementById(this._mount || 'view');
       v.innerHTML = UI.spinner('Abriendo el mueble…');
       let p, vars;

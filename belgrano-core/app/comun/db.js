@@ -23,6 +23,24 @@
     return sinTilde(s).replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
   }
 
+  // Distancia de edición: cuántas letras hay que cambiar para pasar de una
+  // palabra a la otra. Sirve para cazar los errores de tipeo al cargar valores.
+  function distancia(a, b) {
+    if (a === b) return 0;
+    const m = a.length, n = b.length;
+    if (!m || !n) return m || n;
+    let fila = Array.from({ length: n + 1 }, (_, j) => j);
+    for (let i = 1; i <= m; i++) {
+      let ant = fila[0]; fila[0] = i;
+      for (let j = 1; j <= n; j++) {
+        const tmp = fila[j];
+        fila[j] = Math.min(fila[j] + 1, fila[j - 1] + 1, ant + (a[i - 1] === b[j - 1] ? 0 : 1));
+        ant = tmp;
+      }
+    }
+    return fila[n];
+  }
+
   function cfg() {
     try { return JSON.parse(localStorage.getItem(CFG_KEY)) || {}; }
     catch { return {}; }
@@ -53,15 +71,114 @@
   function combinar(productoId, medidas, estructuras, frentes, base, paso) {
     const out = [];
     medidas.forEach((medida, i) => estructuras.forEach(estructura => frentes.forEach(frente => {
+      const precio = base + paso * i;
+      // El costo del demo sale de un markup que varía un poco por combinación,
+      // para que se vean las tres bandas del semáforo y no todo verde.
+      const mk = 1.45 + ((_vid % 7) * 0.13);
       out.push({
         id: ++_vid, producto_id: productoId, medida, estructura, frente,
-        precio: base + paso * i, atributos: { medida, estructura, frente },
+        precio, atributos: { medida, estructura, frente },
+        costo: Math.round(precio / mk),
+        // Medida de costeo: a veces el proveedor no pasa la del mueble que
+        // vendemos (el chiffonier de 0,90 se costea con el de 1,00).
+        medidaCosteo: medida,
+        markupObj: null,     // null = hereda el del mueble
+        stock: 0, activa: true, mostrar: true,
+        peso: 35, alto: 0, prof: 0,
+        imgVenta: '', imgProd: '',
+        minStock: 0, reponer: 'pedido',   // pedido | minimo
       });
     })));
     return out;
   }
 
-  // ---- Modo demo: árbol + productos para ver la UI sin conexión --------
+  // ---- Diccionario de propiedades y valores ----------------------------
+  // Las propiedades (ESTRUCTURA, FRENTE, MEDIDAS…) y sus valores son ÚNICOS
+  // para todo el catálogo: si cada mueble escribiera los suyos, un error de
+  // tipeo crearía "ESTRUCTURA BLANCA" y "ESTRUTURA BLANCA" como dos cosas
+  // distintas. Sólo Dirección da de alta valores nuevos acá; lo que carga un
+  // vendedor en un mueble a medida queda pegado a esa boleta y NO entra.
+  const PROP_KEY = 'bh_propiedades';
+  const PROPS_BASE = [
+    { k: 'estructura', nombre: 'ESTRUCTURA', valores: ['ESTRUCTURA BLANCA', 'ESTRUCTURA NEGRA', 'ESTRUCTURA PARAÍSO', 'ESTRUCTURA NATURAL'] },
+    { k: 'frente', nombre: 'FRENTE', valores: ['FRENTE BLANCO', 'FRENTE NEGRO', 'FRENTE PARAÍSO', 'FRENTE NOGAL'] },
+    { k: 'medida', nombre: 'MEDIDAS DEL FRENTE', valores: ['0,50', '0,70', '0,80', '0,90', '1,00', '1,20', '1,40', '1,60', '1,80', '2,00', '2,20'] },
+    { k: 'terminacion', nombre: 'TERMINACIÓN', valores: ['Laqueado', 'Melamina', 'Enchapado'] },
+  ];
+
+  // Plano de producción de ejemplo: la hoja que se le manda a fábrica, con el
+  // material, la cantidad, el código y el despiece acotado. Es una
+  // RECONSTRUCCIÓN del formato que ya usan, para ver cómo se ve cargada la
+  // imagen de producción; el archivo real lo sube cada uno.
+  function planoDemo(material, codigo, oscuro) {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 460" font-family="Georgia,serif">
+      <rect width="700" height="460" fill="#fff"/>
+      <g stroke="#000" fill="none" stroke-width="1.2">
+        <rect x="8" y="8" width="684" height="444"/>
+        <line x1="8" y1="48" x2="540" y2="48"/><line x1="130" y1="8" x2="130" y2="48"/>
+        <line x1="330" y1="8" x2="330" y2="48"/><line x1="430" y1="8" x2="430" y2="48"/>
+        <line x1="540" y1="8" x2="540" y2="452"/>
+        <line x1="540" y1="60" x2="692" y2="60"/><line x1="540" y1="112" x2="692" y2="112"/>
+        <line x1="540" y1="152" x2="692" y2="152"/><line x1="540" y1="204" x2="692" y2="204"/>
+        <line x1="540" y1="244" x2="692" y2="244"/><line x1="540" y1="296" x2="692" y2="296"/>
+        <line x1="540" y1="348" x2="692" y2="348"/><line x1="540" y1="380" x2="692" y2="380"/>
+        <line x1="540" y1="412" x2="692" y2="412"/>
+        <line x1="8" y1="330" x2="130" y2="330"/><line x1="130" y1="330" x2="130" y2="452"/>
+        <line x1="8" y1="360" x2="130" y2="360"/><line x1="8" y1="390" x2="130" y2="390"/>
+        <line x1="8" y1="421" x2="130" y2="421"/>
+      </g>
+      <g font-size="15" fill="#000">
+        <text x="18" y="33">MATERIAL</text><text x="142" y="33" font-weight="bold">${material}</text>
+        <text x="340" y="33">CANTIDAD</text><text x="443" y="33" font-weight="bold">1 UNIDADES</text>
+        <text x="590" y="33">PEDIDO</text>
+        <text x="588" y="85">PROVEEDOR</text><text x="600" y="177">NOMBRE</text>
+        <text x="578" y="270" font-weight="bold">MUEBLE TV</text>
+        <text x="580" y="290" font-weight="bold">TASOS 55</text>
+        <text x="604" y="325">CÓDIGO</text>
+        <text x="556" y="370" font-weight="bold" font-size="14">${codigo}</text>
+        <text x="574" y="402">OBSERVACIONES</text>
+      </g>
+      <g font-size="9" fill="#000">
+        <text x="14" y="348">VERIF.</text><text x="14" y="378">ORDEN</text>
+        <text x="14" y="408">PROD.</text><text x="14" y="439">STOCK</text>
+        <text x="548" y="372">FECHA DE COMPRA</text><text x="548" y="404">FECHA DE PRODUCCIÓN</text>
+        <text x="548" y="436">FIRMA</text>
+      </g>
+      <defs><pattern id="ray" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+        <line x1="0" y1="0" x2="0" y2="6" stroke="#000" stroke-width="1"/></pattern></defs>
+      <g stroke="#000" stroke-width="1.1" fill="none">
+        <path d="M150 200 L390 200 L430 172 L190 172 Z" fill="url(#ray)"/>
+        <path d="M150 200 L150 268 L190 240 L190 172 Z" fill="url(#ray)"/>
+        <path d="M390 200 L430 172 L430 240 L390 268 Z" fill="url(#ray)"/>
+        <rect x="150" y="200" width="240" height="68" fill="#fff"/>
+        <line x1="150" y1="234" x2="390" y2="234"/><line x1="270" y1="200" x2="270" y2="268"/>
+        <line x1="150" y1="200" x2="270" y2="234"/><line x1="270" y1="200" x2="150" y2="234"/>
+        <line x1="270" y1="200" x2="390" y2="234"/><line x1="390" y1="200" x2="270" y2="234"/>
+        <line x1="150" y1="234" x2="270" y2="268"/><line x1="270" y1="234" x2="150" y2="268"/>
+        <line x1="270" y1="234" x2="390" y2="268"/><line x1="390" y1="234" x2="270" y2="268"/>
+        <path d="M146 268 L394 268 L434 240 L434 246 L394 274 L146 274 Z" fill="${oscuro ? '#000' : 'url(#ray)'}"/>
+        <line x1="150" y1="160" x2="390" y2="160"/><line x1="150" y1="155" x2="150" y2="165"/><line x1="390" y1="155" x2="390" y2="165"/>
+        <line x1="398" y1="160" x2="430" y2="172"/>
+        <line x1="138" y1="200" x2="138" y2="268"/><line x1="133" y1="200" x2="143" y2="200"/><line x1="133" y1="268" x2="143" y2="268"/>
+        <line x1="330" y1="120" x2="300" y2="188"/>
+        <line x1="300" y1="330" x2="250" y2="276"/>
+        ${oscuro ? '<line x1="420" y1="330" x2="392" y2="256"/>' : ''}
+      </g>
+      <g font-size="13" fill="#000">
+        <text x="252" y="155" text-anchor="middle">1.60</text>
+        <text x="118" y="238">0.55</text><text x="408" y="152">0.38+2</text>
+        <text x="336" y="115">CORTE 45°</text>
+        <text x="196" y="222" font-size="11">CAJÓN</text><text x="316" y="222" font-size="11">CAJÓN</text>
+        <text x="196" y="256" font-size="11">CAJÓN</text><text x="316" y="256" font-size="11">CAJÓN</text>
+        <text x="300" y="348" text-anchor="middle">BASE SE RETIRA</text>
+        <text x="300" y="364" text-anchor="middle">EN LOS CUATRO</text>
+        <text x="300" y="380" text-anchor="middle">LADOS</text>
+        ${oscuro ? '<text x="420" y="346">LAQUEADO</text><text x="420" y="362">NEGRO</text>' : ''}
+      </g>
+    </svg>`;
+    return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg.replace(/\s+/g, ' '));
+  }
+
   const DEMO = {
     categorias: [
       { id: 1, nombre: 'DORMITORIO', padre_id: null, nivel: 2 },
@@ -77,7 +194,9 @@
     productos: [
       { id: 1, categoria_id: 2, nombre: 'CÓMODA AMBERES 55', publicado_tn: true, sku: 'CO-AMB-55',
         desc: 'Cómoda de 4 cajones con guías de extracción total y tiradores embutidos. El clásico de la línea Amberes.',
-        alto: 0.85, prof: 0.45, materiales: 'MDF 18 mm laqueado · guías telescópicas · tiradores de aluminio', dias: 32 },
+        alto: 0.85, prof: 0.45, materiales: 'MDF 18 mm laqueado · guías telescópicas · tiradores de aluminio', dias: 32,
+        proveedores: [{ nombre: 'Tony' }, { nombre: 'Andrés' }, { nombre: 'Luciano' }],
+        rutas: { fabricar: true }, instalacion: false },
       { id: 4, categoria_id: 2, nombre: 'CÓMODA OLIVER 60', publicado_tn: true, sku: 'CO-OLI-60',
         desc: 'Seis cajones sobre patas de madera maciza. Frente ranurado, sin tiradores a la vista.',
         alto: 0.90, prof: 0.45, materiales: 'MDF 18 mm · patas de paraíso macizo · guías telescópicas', dias: 35 },
@@ -86,7 +205,8 @@
         alto: 0.75, prof: 0.42, materiales: 'MDF 18 mm enchapado · patas torneadas', dias: 35 },
       { id: 2, categoria_id: 3, nombre: 'PLACARD OLIVER', publicado_tn: true, sku: 'PL-OLI',
         desc: 'Placard de dos y tres puertas con interior armado: barral, estantes y cajonera.',
-        alto: 2.10, prof: 0.55, materiales: 'MDF 18 mm · barral cromado · bisagras con freno', dias: 40 },
+        alto: 2.10, prof: 0.55, materiales: 'MDF 18 mm · barral cromado · bisagras con freno', dias: 40,
+        proveedores: [{ nombre: 'Tony' }], rutas: { fabricar: true, pedido: true }, instalacion: true },
       { id: 6, categoria_id: 3, nombre: 'PLACARD AMBERES 2 PUERTAS', publicado_tn: true, sku: 'PL-AMB-2P',
         desc: 'Dos puertas batientes con cajonera interna de tres cajones y estante alto.',
         alto: 2.00, prof: 0.55, materiales: 'MDF 18 mm laqueado · bisagras con freno', dias: 40 },
@@ -105,6 +225,11 @@
       { id: 10, categoria_id: 7, nombre: 'RACK BERGEN 1.60', publicado_tn: true, sku: 'RK-BER-160',
         desc: 'Dos puertas rebatibles y un estante pasacables. Soporta televisores de hasta 65".',
         alto: 0.45, prof: 0.40, materiales: 'MDF 18 mm laqueado · bisagras con freno · pasacables', dias: 30 },
+      { id: 12, categoria_id: 7, nombre: 'MUEBLE TV TASOS 55', publicado_tn: true, sku: 'S-MT-TA',
+        desc: 'Mueble de TV de 1,60 con cuatro cajones y frente ranurado. La base se retira en los cuatro lados y el corte de la tapa es a 45°.',
+        alto: 0.55, prof: 0.40, materiales: 'MDF 18 mm · frente ranurado · corte 45° · guías telescópicas', dias: 32,
+        proveedores: [{ nombre: 'Tony' }, { nombre: 'Andrés' }],
+        rutas: { fabricar: true }, instalacion: false },
       { id: 11, categoria_id: 7, nombre: 'RACK OSLO 1.80', publicado_tn: true, sku: 'RK-OSL-180',
         desc: 'Dos cajones y un módulo abierto, sobre patas de madera. La versión larga del living Oslo.',
         alto: 0.48, prof: 0.40, materiales: 'MDF 18 mm · patas de paraíso macizo · guías telescópicas', dias: 32 },
@@ -121,6 +246,21 @@
       ...combinar(9, ['0.80', '1.00'], ['Negra'], ['Paraíso', 'Blanco'], 268000, 46000),
       ...combinar(10, ['1.60'], ['Blanca', 'Negra'], ['Paraíso', 'Blanco'], 415000, 0),
       ...combinar(11, ['1.80', '2.00'], ['Blanca', 'Negra'], ['Paraíso', 'Nogal'], 498000, 62000),
+      // Las dos que ya se fabrican, con su plano y su código real.
+      { id: 900, producto_id: 12, medida: '1.60', estructura: 'PARAÍSO', frente: 'BLANCO',
+        atributos: { medida: '1.60', estructura: 'PARAÍSO', frente: 'BLANCO' },
+        precio: 452000, costo: 214000, sku: 'S-MT-TA-16-PB', medidaCosteo: '1.60',
+        markupObj: null, stock: 2, activa: true, mostrar: true,
+        peso: 42, alto: 55, prof: 40, frenteCm: 160,
+        imgVenta: '', imgProd: planoDemo('PARAÍSO Y BLANCO', 'S-MT-TA-16-PB', false),
+        minStock: 0, reponer: 'pedido' },
+      { id: 901, producto_id: 12, medida: '1.60', estructura: 'PARAÍSO', frente: 'NEGRO',
+        atributos: { medida: '1.60', estructura: 'PARAÍSO', frente: 'NEGRO' },
+        precio: 468000, costo: 226000, sku: 'S-MT-TA-16-PN', medidaCosteo: '1.60',
+        markupObj: null, stock: 0, activa: true, mostrar: true,
+        peso: 42, alto: 55, prof: 40, frenteCm: 160,
+        imgVenta: '', imgProd: planoDemo('PARAÍSO Y NEGRO', 'S-MT-TA-16-PN', true),
+        minStock: 0, reponer: 'pedido' },
     ],
     // Órdenes de venta de ejemplo (para ver la vista antes de conectar).
     // saldo = total - sena. sena = suma de señas/cobros CONFIRMADOS hasta hoy.
@@ -273,7 +413,99 @@
   // ---- API que usan los módulos ---------------------------------------
   const DB = {
     modo() { return hayConexion() ? 'supabase' : 'demo'; },
-    DEFAULT_URL, cfg, guardarCfg, hayConexion,
+    DEFAULT_URL, cfg, guardarCfg, hayConexion, slug,
+
+    // ---- Propiedades y valores (diccionario único del catálogo) ---------
+    propiedades() {
+      let guardadas = [];
+      try { guardadas = JSON.parse(localStorage.getItem(PROP_KEY)) || []; } catch {}
+      // Las de fábrica siempre están; lo guardado suma valores y propiedades nuevas.
+      const mapa = new Map(PROPS_BASE.map(p => [p.k, { ...p, valores: [...p.valores] }]));
+      guardadas.forEach(g => {
+        const b = mapa.get(g.k);
+        if (!b) return mapa.set(g.k, { ...g, valores: [...(g.valores || [])] });
+        b.nombre = g.nombre || b.nombre;
+        // El orden lo manda lo guardado: se puede reordenar y desactivar.
+        b.valores = (g.valores || []).concat(b.valores.filter(v => !(g.valores || []).includes(v)));
+      });
+      return [...mapa.values()];
+    },
+    propiedad(k) { return this.propiedades().find(p => p.k === k) || null; },
+    guardarPropiedades(lista) {
+      try { localStorage.setItem(PROP_KEY, JSON.stringify(lista)); } catch {}
+    },
+    // Da de alta un valor nuevo en el diccionario. Devuelve el valor tal como
+    // quedó guardado: si ya existía uno igual (sin importar tildes ni
+    // mayúsculas) devuelve ESE, para no duplicar por un error de tipeo.
+    agregarValor(k, valor) {
+      const v = String(valor || '').trim();
+      if (!v) return null;
+      const props = this.propiedades();
+      const p = props.find(x => x.k === k);
+      if (!p) return null;
+      const ya = p.valores.find(x => sinTilde(x) === sinTilde(v));
+      if (ya) return ya;
+      p.valores.push(v);
+      this.guardarPropiedades(props);
+      return v;
+    },
+    // Un valor escrito con un error de tipeo ("ESTRUTURA BLANCA") no es igual a
+    // ninguno, así que se colaría como valor nuevo. Antes de dar el alta se
+    // busca el más parecido y se pregunta: es el caso que más ensucia el
+    // catálogo, porque después hay dos valores donde tendría que haber uno.
+    parecidoA(k, valor) {
+      const v = sinTilde(valor);
+      if (!v) return null;
+      const p = this.propiedad(k); if (!p) return null;
+      let mejor = null, mejorD = Infinity;
+      p.valores.forEach(x => {
+        const d = distancia(sinTilde(x), v);
+        if (d < mejorD) { mejorD = d; mejor = x; }
+      });
+      // Hasta dos letras de diferencia (y nunca más del 25% de la palabra).
+      const tope = Math.min(2, Math.floor(v.length * 0.25));
+      return mejorD > 0 && mejorD <= Math.max(1, tope) ? mejor : null;
+    },
+
+    crearPropiedad(nombre) {
+      const n = String(nombre || '').trim();
+      if (!n) return null;
+      const props = this.propiedades();
+      const k = slug(n);
+      if (props.some(p => p.k === k)) return props.find(p => p.k === k);
+      const nueva = { k, nombre: n.toUpperCase(), valores: [] };
+      props.push(nueva);
+      this.guardarPropiedades(props);
+      return nueva;
+    },
+
+    // ---- Costos y rentabilidad ------------------------------------------
+    // El markup objetivo arranca en 2,00x para todo, pero se puede cambiar por
+    // categoría, por mueble y por variante: una cómoda de 2,00 se marca ×3
+    // porque el cliente lo paga, y una variante de poca salida se marca menos.
+    MARKUP_OBJETIVO: 2,
+    // Bandas para el semáforo de rentabilidad (por debajo del objetivo).
+    BANDAS: { critica: 1.60, floja: 1.90 },
+    bandaDe(markup) {
+      const m = Number(markup) || 0;
+      if (m < this.BANDAS.critica) return { k: 'critica', label: 'Rentab. baja', pill: 'crit' };
+      if (m < this.BANDAS.floja) return { k: 'floja', label: 'Para aumentar', pill: 'warn' };
+      return { k: 'ok', label: 'OK', pill: 'ok' };
+    },
+    margenDe(costo, precio) {
+      const p = Number(precio) || 0;
+      return p ? ((p - (Number(costo) || 0)) / p) * 100 : 0;
+    },
+    markupDe(costo, precio) {
+      const c = Number(costo) || 0;
+      return c ? (Number(precio) || 0) / c : 0;
+    },
+    // El costo del mueble sale del PROMEDIO de lo que pasan los proveedores:
+    // cuando tres lo fabrican, no se toma ni el más barato ni el más caro.
+    costoPromedio(precios) {
+      const xs = (precios || []).map(x => Number(x.precio) || 0).filter(x => x > 0);
+      return xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : 0;
+    },
 
     // El árbol de categorías (ambiente → tipo de mueble).
     async arbolCategorias() {
@@ -311,12 +543,53 @@
       return (data || []).map(p => ({ ...p, variantes: p.variante?.[0]?.count ?? 0 }));
     },
 
+    // Rutas de abastecimiento: un mueble puede tener más de una.
+    RUTAS: [
+      { k: 'fabricar', label: 'Lo fabricamos' },
+      { k: 'comprar', label: 'Lo compramos terminado' },
+      { k: 'pedido', label: 'Se repone contra pedido' },
+    ],
+    // Lo que todo mueble tiene aunque no se haya cargado todavía.
+    _defProd(p) {
+      return {
+        proveedores: [], rutas: { fabricar: true }, instalacion: false,
+        publicado: true, markupObj: this.MARKUP_OBJETIVO,
+        contabilidad: { ingresos: '', gastos: '' },   // vacío = hereda de la categoría
+        propiedades: ['medida', 'estructura', 'frente'],
+        fotos: [],
+        ...p,
+      };
+    },
+
+    // Guarda los cambios de un mueble (demo: en memoria + localStorage).
+    guardarProducto(p) {
+      const i = DEMO.productos.findIndex(x => x.id === p.id);
+      if (i >= 0) DEMO.productos[i] = { ...DEMO.productos[i], ...p };
+      return DEMO.productos[i] || null;
+    },
+    guardarVariante(v) {
+      const i = DEMO.variantes.findIndex(x => x.id === v.id);
+      if (i >= 0) DEMO.variantes[i] = { ...DEMO.variantes[i], ...v };
+      return DEMO.variantes[i] || null;
+    },
+    // El SKU se arma solo con el código del mueble y los valores de la
+    // variante; se puede pisar a mano, pero nunca hace falta inventarlo.
+    skuDe(prod, v) {
+      const cod = x => sinTilde(x).replace(/[^a-z0-9]/g, '').slice(0, 3).toUpperCase();
+      return [prod.sku || slug(prod.nombre).slice(0, 6).toUpperCase(),
+        v.medida && String(v.medida).replace(/[^0-9]/g, ''),
+        v.estructura && cod(String(v.estructura).split(' ').pop()),
+        v.frente && cod(String(v.frente).split(' ').pop()),
+      ].filter(Boolean).join('-');
+    },
+
     // La ficha de un mueble: el producto con su categoría y su rango de precios.
     async producto(id) {
       const n = Number(id);
       if (!hayConexion()) {
-        const p = DEMO.productos.find(x => x.id === n);
-        if (!p) return null;
+        const p0 = DEMO.productos.find(x => x.id === n);
+        if (!p0) return null;
+        const p = this._defProd(p0);
         const vs = DEMO.variantes.filter(v => v.producto_id === n).map(v => v.precio);
         const cat = DEMO.categorias.find(c => c.id === p.categoria_id) || null;
         const padre = cat && cat.padre_id ? DEMO.categorias.find(c => c.id === cat.padre_id) : null;

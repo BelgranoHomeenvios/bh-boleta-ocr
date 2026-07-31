@@ -370,6 +370,62 @@
 - ✅ 192. El efectivo entra a la caja del local **y** del vendedor —la plata del
   local la tiene en mano un vendedor—; el arqueo resuelve a quién se rindió.
 
+### Lote 8 — APLICADO (El mueble · pantalla de creación y edición)
+Todo en **una sola columna**, un bloque abajo del otro, y en modo edición.
+
+- ✅ 193. **Nombre** arriba, siempre editable, con el interruptor **Mostrar a
+  los vendedores**: oculto, el mueble no se puede cotizar.
+- ✅ 194. **Fotos y videos**: arrastrar y soltar, las que hagan falta, con
+  **Principal** y borrar. Los archivos van al **Storage del sistema**, no
+  adentro del documento.
+- ✅ 195. **Categorías**: alcanza con marcar la familia — si Cómodas cuelga de
+  Dormitorio, **Dormitorio se hereda solo**. "Editar categorías" abre el árbol
+  completo en rutas, con buscador.
+- ✅ 196. **Propiedades y valores** en un **diccionario único del catálogo**:
+  ESTRUCTURA, FRENTE, MEDIDAS DEL FRENTE, TERMINACIÓN. Sólo Dirección da de
+  alta valores nuevos.
+- ✅ 197. Al crear un valor se avisa si **se parece a uno que ya existe**
+  ("ESTRUTURA BLANCA" vs "ESTRUCTURA BLANCA"): un error de tipeo no puede
+  partir el catálogo en dos.
+- ✅ 198. El **combinatorio sale solo**: 3 × 3 × 3 = 27. Al agregar un valor se
+  crean las variantes que faltaban, con el precio de la más parecida.
+- ✅ 199. **Listado de variantes** con las **dos imágenes** —la de **venta**,
+  que sale impresa, y la de **producción**, el plano que va a fábrica (acepta
+  PDF)—, el nombre, el SKU, el stock, el costo, el precio y el **markup con
+  semáforo**. Filtro por medida, estructura o frente.
+- ✅ 200. **Editar variante** en panel lateral: precio, costo, **markup
+  objetivo propio**, precio promocional, SKU, medidas y peso, **medida de
+  costeo** (el de 0,90 se costea con el de 1,00), stock, reposición
+  (a pedido / mantener un mínimo), y si se muestra y si se fabrica.
+- ✅ 201. **SKU automático** con el código del mueble y los valores de la
+  variante, editable a mano y con vuelta al automático.
+- ✅ 202. **Simulador**: mover costo y precio y ver markup, margen y ganancia
+  por unidad contra el objetivo, con las bandas de color. **No toca los datos
+  reales.**
+- ✅ 203. **Proveedores** por mueble (no por variante). El costo sale del
+  **promedio** de lo que pasa cada uno.
+- ✅ 204. **Cómo se obtiene**: Lo fabricamos · Lo compramos terminado · Se
+  repone contra pedido, con tildes (puede ser más de una).
+- ✅ 205. **Requiere instalación** sí/no: si va, en la orden salta con "a
+  convenir"; si no, sale "no requiere instalación" y el vendedor puede
+  cambiarlo. El **costo no se define acá**, va en Instalaciones.
+- ✅ 206. **Contabilidad**: cuenta de venta y de compra, en blanco heredan la
+  de la categoría.
+- ✅ 207. **Permisos**: el catálogo es interno. El **vendedor no entra** (ve los
+  muebles publicados desde Inventario). **Producción ve todo menos costo,
+  markup, margen y ganancia**, y sólo lee.
+
+> Pendientes de este lote:
+> - **Edición masiva** de costo y precio **por categoría, por mueble y por
+>   variante** — con 16.077 variantes no alcanza con ir de a una.
+> - Storage real de Supabase: hoy la imagen se lee del disco y queda el enlace.
+> - Costo por **medida de costeo** compartida entre variantes (hoy el costo es
+>   por variante, pisable).
+> - Precio por proveedor para comparar (hoy se guarda el nombre; el promedio ya
+>   está resuelto en `DB.costoPromedio()`).
+> - Lo que carga un **vendedor en un mueble a medida** tiene que quedar pegado a
+>   esa boleta y NO entrar al diccionario del catálogo.
+
 ### Lote 5 bis — Solapas de Ventas
 - ✅ 178. La solapa **"Órdenes"** pasa a llamarse **"Or. Venta"**.
 - ✅ 179. Se sacan **"A confirmar"**, **"Modificaciones"** y **"Autorizaciones"**

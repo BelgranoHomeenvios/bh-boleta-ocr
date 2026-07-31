@@ -131,11 +131,24 @@
   // Cada rol ve un subconjunto de módulos. Permisos finos: se afinan después.
   const ROLES = {
     direccion:      { label: 'Dirección',              tabs: ['dashboard', 'pendientes', 'crm', 'ventas', 'catalogo', 'produccion', 'compras', 'inventario', 'logistica', 'tesoreria', 'reclamos', 'config'] },
-    vendedor:       { label: 'Vendedor',               tabs: ['dashboard', 'pendientes', 'ventas', 'crm', 'catalogo'] },
-    administrativo: { label: 'Administrativo',         tabs: ['dashboard', 'pendientes', 'ventas', 'tesoreria', 'compras', 'catalogo', 'reclamos'] },
+    // El vendedor NO entra al catálogo: ve los muebles publicados desde
+    // Inventario, con sus variantes e imágenes, sin costos ni edición.
+    vendedor:       { label: 'Vendedor',               tabs: ['dashboard', 'pendientes', 'ventas', 'crm', 'inventario'] },
+    administrativo: { label: 'Administrativo',         tabs: ['dashboard', 'pendientes', 'ventas', 'tesoreria', 'compras', 'inventario', 'reclamos'] },
+    // Producción ve todo el catálogo MENOS costo, markup, margen y ganancia,
+    // y sólo lo lee: si algo hay que cambiar, lo pide.
     prod:           { label: 'Encargado de Producción', tabs: ['dashboard', 'pendientes', 'produccion', 'inventario', 'compras', 'catalogo'] },
     logi:           { label: 'Logística',              tabs: ['dashboard', 'pendientes', 'logistica', 'reclamos'] },
     gestion:        { label: 'Gestión de Cliente',     tabs: ['dashboard', 'pendientes', 'crm', 'ventas'] },
+  };
+
+  // Quién puede hacer qué. Se afina cuando exista el login real; hoy sale del
+  // selector "Ver como".
+  const PERMISOS = {
+    // Los números de costo, markup, margen y ganancia son sólo de Dirección.
+    verCostos: ['direccion'],
+    // Editar el catálogo (nombres, propiedades, valores, precios) también.
+    editarCatalogo: ['direccion'],
   };
 
   const App = {
@@ -219,6 +232,10 @@
       else this._renderSub(key, subK);
     },
   };
+
+  App.puede = function (que) { return (PERMISOS[que] || []).includes(this.rol); };
+  App.verCostos = function () { return this.puede('verCostos'); };
+  App.editaCatalogo = function () { return this.puede('editarCatalogo'); };
 
   global.App = App;
   if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded', () => App.init());
