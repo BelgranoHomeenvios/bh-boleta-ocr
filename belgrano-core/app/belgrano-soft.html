@@ -1411,9 +1411,9 @@ tr:hover td{background:var(--panel-2)}
   // Campos que arrancan ocultos detrás de su botón: sólo se cargan si hacen
   // falta (IG cuando no hay teléfono, DNI cuando va factura, etc.).
   const OPCIONALES = [
+    { k: 'tel2',      btn: '+ Teléfono', lbl: 'Teléfono adicional', ph: '11 5555-2020' },
     { k: 'instagram', btn: '+ IG',       lbl: 'Instagram',          ph: '@usuario' },
     { k: 'dni',       btn: '+ DNI',      lbl: 'DNI (para factura)', ph: '00.000.000' },
-    { k: 'tel2',      btn: '+ Teléfono', lbl: 'Teléfono adicional', ph: '11 5555-2020' },
   ];
 
   const Presupuesto = {
@@ -1628,13 +1628,13 @@ tr:hover td{background:var(--panel-2)}
         <div class="cz-cols">
           <div class="cz-col">
             ${f('c-nombre', 'Cliente', this.cli.nombre, 'Nombre y apellido')}
-            ${f('c-tel', 'Teléfono', this.cli.telefono, '11 5555-2020')}
-            ${f('c-mail', 'Email', this.cli.email, 'cliente@correo.com')}
-          </div>
-          <div class="cz-col">
             ${f('c-dom', 'Domicilio de entrega', this.cli.domicilio, 'Calle 1234, piso/depto')}
             ${sel('c-locd', 'Localidad', `<option value="">Elegí…</option>` +
               locds.map(l => `<option value="${l.k}" ${this.cli.localidad === l.k ? 'selected' : ''}>${UI.esc(l.label)}</option>`).join(''))}
+          </div>
+          <div class="cz-col">
+            ${f('c-tel', 'Teléfono', this.cli.telefono, '11 5555-2020')}
+            ${f('c-mail', 'Email', this.cli.email, 'cliente@correo.com')}
             ${sel('c-canal', '¿Cómo nos conoció?', `<option value="">—</option>` +
               ['Instagram', 'Facebook', 'Recomendación', 'Pasó por el local', 'Google', 'Otro']
                 .map(o => `<option ${this.cli.canal === o ? 'selected' : ''}>${o}</option>`).join(''))}

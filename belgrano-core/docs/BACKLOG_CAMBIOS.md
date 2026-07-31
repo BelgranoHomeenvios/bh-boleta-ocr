@@ -62,6 +62,10 @@
   toma el valor configurado (`DB.condiciones()` / `descuentoDe()`), que se guarda
   en `localStorage` hasta que haya tabla real.
 
+- ✅ 76. Orden de Datos del cliente: columna izquierda **Cliente · Domicilio de
+  entrega · Localidad**, columna derecha **Teléfono · Email · ¿Cómo nos conoció?**,
+  y debajo los opcionales en el orden **+ Teléfono · + IG · + DNI**.
+
 > Pendientes:
 > - Brian va a definir **qué campos son obligatorios** para poder crear el presupuesto.
 > - **Elegir el local al iniciar sesión**: hoy sale de `DB.sesion()` fijo; cuando
