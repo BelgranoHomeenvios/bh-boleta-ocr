@@ -291,10 +291,30 @@
   - La **seña se descuenta en el bloque de totales** y el pie pasa a mostrar el
     saldo real.
 
+- ✅ 164. En la orden, la cabecera deja de ser una caja y pasa a ser **un renglón
+  del alto de las otras etapas** (~1,5 cm): a la izquierda **Orden de venta
+  OV-…** (con la cotización, el vendedor y el local en chico), a la derecha la
+  **fecha de la orden** —propia, puede no ser la de la cotización— y el lápiz
+  para cambiarla junto con vendedor y local.
+- ✅ 165. En la orden **hay que reconfirmar** Datos del cliente, Productos y
+  Adicionales: cada botón pasa a "Confirmar …" y la etapa queda con un **✓
+  verde**. Sin las tres confirmadas **no se puede cobrar**.
+- ✅ 166. La etapa 4 se llama **"Registrar pago"**.
+- ✅ 167. **Método de pago** como desplegable —Efectivo · Transferencia · Mercado
+  Pago— con los que **no corresponden a la condición pactada bloqueados** (con
+  Efectivo, Mercado Pago queda deshabilitado).
+- ✅ 168. **Monto recibido** manual, con la **seña mínima sugerida** calculada
+  para que el **saldo quede redondo**: sobre $96.765 sugiere **$29.765** y deja
+  **$67.000**, en vez de $29.029,50.
+- ✅ 169. En **efectivo no se pregunta quién lo recibió**: entra a la caja del
+  local o del vendedor y eso **se resuelve en el arqueo**.
+- ✅ 170. En **transferencia** se piden **nombre y DNI del depositante**.
+- ✅ 171. Cada seña registrada muestra **"Seña $X"** con su **fecha**.
+
 > Pendientes:
 > - Confirmación de la transferencia contra el banco (CUIT + comprobante) — ya
 >   existe en `DB.confirmarSenaBanco()`; falta engancharla desde acá.
-> - Qué otros campos suma la orden además de la seña (factura, planos, etc.).
+> - El **arqueo de cajas** (dónde se rinde el efectivo) es un módulo aparte.
 > - La lista de localidades es **demo del AMBA**; se reemplaza por la real del mapa.
 > - La foto del diseño hoy se carga por **URL**; falta la subida real del archivo.
 > - Brian va a definir **qué campos son obligatorios** para poder crear el presupuesto.

@@ -51,7 +51,8 @@
     vendedor: '', local: '', fecha: '', termino: 'efectivo',
     nro: null, guardada: false,   // el número se toma al abrir; si no se usa, vuelve
     modo: 'cotizacion',           // cotizacion | orden (misma pantalla, otro documento)
-    nroOrden: null,
+    nroOrden: null, fechaOrden: '',
+    confirmadas: {},              // en la orden hay que revalidar cada etapa
     cabAbierta: false,            // la cabecera se lee; el lápiz la abre
     cantNueva: 1,                 // cantidad del renglón de carga (cantidad + producto)
     obsExt: '', obsInt: '', terminos: '',
@@ -256,15 +257,16 @@
         { k: 'productos',   n: 2, tit: 'Productos' },
         { k: 'adicionales', n: 3, tit: 'Adicionales' },
         // La seña sólo tiene sentido con la venta confirmada.
-        ...(this.esOrden() ? [{ k: 'sena', n: 4, tit: 'Seña y pago' }] : []),
+        ...(this.esOrden() ? [{ k: 'sena', n: 4, tit: 'Registrar pago' }] : []),
       ];
       m.innerHTML = `
-        <div class="card pad cz-head" id="cz-cab"></div>
+        <div class="${this.esOrden() ? 'card ordbar' : 'card pad cz-head'}" id="cz-cab"></div>
         ${secs.map(s => {
           const on = this.etapa === s.k;
-          return `<section class="card sec ${on ? 'on' : ''}">
+          const ok = this.esOrden() && s.k !== 'sena' && this.confirmadas[s.k];
+          return `<section class="card sec ${on ? 'on' : ''} ${ok ? 'ok' : ''}">
             <button class="sec-h" data-sec="${s.k}" aria-expanded="${on}">
-              <span class="sec-n">${s.n}</span>
+              <span class="sec-n">${ok ? '✓' : s.n}</span>
               <span class="sec-t">${UI.esc(s.tit)}</span>
               <span class="sec-r" id="res-${s.k}">${this.resumen(s.k)}</span>
               <span class="sec-c">${on ? '▲' : '▼'}</span>
@@ -304,7 +306,7 @@
       document.getElementById('obs-ext').oninput = e => { this.obsExt = e.target.value; };
       document.getElementById('obs-int').oninput = e => { this.obsInt = e.target.value; };
 
-      this.pintarCabecera();
+      if (!this.esOrden()) this.pintarCabecera(); else this.pintarBarraOrden();
       if (this.etapa === 'cliente') this.pintarCliente();
       if (this.etapa === 'productos') this.pintarProductos();
       if (this.etapa === 'adicionales') this.pintarAdicionales();
@@ -325,9 +327,9 @@
           : '<i>sin productos</i>';
       }
       if (k === 'adicionales') return `entrega ${UI.esc(this.entregaDias())} · envío ${UI.esc(this.envioTexto())}`;
-      const s = this.senaTotal();
-      return s ? `seña ${UI.pesos(s)} · saldo ${UI.pesos(this.saldo())}`
-        : `<i>sin seña — mínimo ${UI.pesos(this.senaMinima())}</i>`;
+      const x = this.senaTotal();
+      return x ? `seña ${UI.pesos(x)} · saldo ${UI.pesos(this.saldo())}`
+        : `<i>sin seña — sugerida ${UI.pesos(this.senaSugerida())}</i>`;
     },
 
     // Refresca el resumen de las cabeceras plegadas mientras se escribe.
@@ -336,6 +338,40 @@
         const el = document.getElementById('res-' + k);
         if (el) el.innerHTML = this.resumen(k);
       });
+    },
+
+    // En la orden la cabecera es un renglón más, del alto de las otras etapas:
+    // a la izquierda el N° de orden, a la derecha su fecha (que puede no ser la
+    // de la cotización).
+    pintarBarraOrden() {
+      const c = document.getElementById('cz-cab'); if (!c) return;
+      const vends = global.DB.vendedores(), locs = global.DB.locales();
+      const local = (locs.find(l => l.k === this.local) || {}).label || this.local;
+      const ab = this.cabAbierta;
+      c.innerHTML = `<div class="ob-row">
+        <div class="ob-izq">
+          <b>Orden de venta ${UI.esc(this.nroOrden)}</b>
+          <span>Cotización ${UI.esc(global.DB.numeroCotizacion(this.nro))} · ${UI.esc(this.vendedor)} · ${UI.esc(local)}</span>
+        </div>
+        <div class="ob-der">
+          <span>Fecha de la orden</span>
+          ${ab ? `<input id="op-fechao" type="date" value="${UI.esc(this.fechaOrden)}">`
+               : `<b>${UI.esc(fechaLarga(this.fechaOrden))}</b>`}
+          <button class="lapiz" id="cab-ed" title="${ab ? 'Listo' : 'Cambiar la fecha, el vendedor o el local'}">${ab ? '✓' : '✏️'}</button>
+        </div>
+      </div>
+      ${ab ? `<div class="ob-edit">
+        <div class="fr sm"><label for="op-vend">Vendedor</label>
+          <select id="op-vend">${vends.map(v => `<option ${this.vendedor === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+        <div class="fr sm"><label for="op-local">Local de origen</label>
+          <select id="op-local">${locs.map(l => `<option value="${l.k}" ${this.local === l.k ? 'selected' : ''}>${UI.esc(l.label)}</option>`).join('')}</select></div>
+      </div>` : ''}`;
+      document.getElementById('cab-ed').onclick = () => { this.cabAbierta = !this.cabAbierta; this.pintarBarraOrden(); };
+      if (ab) {
+        document.getElementById('op-fechao').onchange = e => { this.fechaOrden = e.target.value; };
+        document.getElementById('op-vend').onchange = e => { this.vendedor = e.target.value; };
+        document.getElementById('op-local').onchange = e => { this.local = e.target.value; };
+      }
     },
 
     // Cabecera: quién y cuándo hace el presupuesto (no el total — eso va abajo).
@@ -434,7 +470,7 @@
             ${f('c-mail', 'Email', this.cli.email, 'cliente@correo.com')}
           </div>
         </div>
-        <div class="sec-go"><button class="btn sm primary" id="c-sig">Continuar</button></div>`;
+        <div class="sec-go"><button class="btn sm primary" id="c-sig">${this.esOrden() ? 'Confirmar datos del cliente' : 'Continuar'}</button></div>`;
 
       // `soloNum` deja escribir únicamente números (teléfonos y DNI).
       const bind = (id, campo, soloNum) => {
@@ -474,7 +510,7 @@
         };
       });
       this.bindLocalidad();
-      document.getElementById('c-sig').onclick = () => this.irAProductos();
+      document.getElementById('c-sig').onclick = () => { this.marcarConfirmada('cliente'); this.irAProductos(); };
       this.avisoCliente();
     },
 
@@ -612,6 +648,18 @@
 
     // No se pasa a cotizar sin saber a quién: hace falta el nombre y al menos
     // un contacto (teléfono, Instagram o mail).
+    // En la orden cada etapa se vuelve a revisar antes de cobrar.
+    marcarConfirmada(k) {
+      if (!this.esOrden() || this.confirmadas[k]) return;
+      this.confirmadas[k] = true;
+      this.log(this.vendedor, `Confirmó ${k === 'cliente' ? 'los datos del cliente' : k === 'productos' ? 'los productos' : 'los adicionales'}`);
+      this.pintarSide();
+    },
+    faltaConfirmar() {
+      return [['cliente', 'los datos del cliente'], ['productos', 'los productos'], ['adicionales', 'los adicionales']]
+        .filter(([k]) => !this.confirmadas[k]).map(([, t]) => t);
+    },
+
     irAProductos() {
       if (!this.clienteCompleto()) {
         this.avisoCliente(true);
@@ -669,7 +717,7 @@
         <div class="pr-pie">
           <div class="pr-sum">Total de los muebles <b class="tnum">${UI.pesos(this.total())}</b></div>
         </div>
-        <div class="sec-go"><button class="btn sm primary" id="p-sig">Continuar</button></div>`;
+        <div class="sec-go"><button class="btn sm primary" id="p-sig">${this.esOrden() ? 'Confirmar productos' : 'Continuar'}</button></div>`;
 
       document.getElementById('op-term').onchange = e => {
         const antes = this.antes(), ant = this.terminoLabel();
@@ -679,7 +727,7 @@
         this.pintarMain(); this.pintarSide();
       };
       document.getElementById('pr-catalogo').onclick = () => this.modalCatalogo();
-      document.getElementById('p-sig').onclick = () => { this.etapa = 'adicionales'; this.pintarMain(); };
+      document.getElementById('p-sig').onclick = () => { this.marcarConfirmada('productos'); this.etapa = 'adicionales'; this.pintarMain(); };
       const cn = document.getElementById('pr-cant');
       cn.oninput = () => { this.cantNueva = Math.max(1, Math.floor(Number(cn.value)) || 1); };
       const inp = document.getElementById('pr-buscar');
@@ -1061,9 +1109,13 @@
             : cerrado('Subida por escalera', DB.escaleraTexto(a.escalera), 'escalera')}
         </div>
       </div><div id="ad-avisos"></div>
-      <div class="sec-go"><button class="btn sm primary" id="a-cerrar">Listo — cerrar</button></div>`;
+      <div class="sec-go"><button class="btn sm primary" id="a-cerrar">${this.esOrden() ? 'Confirmar adicionales' : 'Listo — cerrar'}</button></div>`;
 
-      document.getElementById('a-cerrar').onclick = () => { this.etapa = ''; this.pintarMain(); };
+      document.getElementById('a-cerrar').onclick = () => {
+        this.marcarConfirmada('adicionales');
+        this.etapa = this.esOrden() ? 'sena' : '';
+        this.pintarMain();
+      };
 
       // Abrir un campo es un acto deliberado: queda registrado y avisa a Administración.
       const ABRE = { entrega: 'entregaAbierta', envio: 'envioAbierto', instalacion: 'instalacionAbierta', escalera: 'escaleraAbierta' };
@@ -1146,58 +1198,78 @@
     // ---- 4 · Seña y pago ---------------------------------------------------
     // Efectivo: alcanza con rendirlo a un autorizado. Transferencia: queda sin
     // acreditar hasta que Administración la confirme contra el banco.
+    // La seña sugerida deja un saldo redondo: sobre $96.765 pide $29.765 para
+    // que queden $67.000 justos, en vez de $29.029,50.
+    senaSugerida() {
+      const total = Math.max(0, this.totalFinal() - this.senaTotal());
+      if (!total) return 0;
+      const resto = total * (1 - global.DB.SENA_PCT / 100);
+      const redondo = Math.floor(resto / 1000) * 1000;      // saldo redondo
+      return Math.max(0, total - redondo);
+    },
+
     pintarSena() {
       const c = document.getElementById('sec-sena'); if (!c) return;
       const DB = global.DB;
+      const falta = this.faltaConfirmar();
+      if (falta.length) {
+        c.innerHTML = `<div class="banner warn">Antes de cobrar hay que confirmar
+          <b>${UI.esc(falta.join(', '))}</b>.</div>`;
+        return;
+      }
+      // Con qué se puede cobrar depende de lo pactado en la condición de pago.
+      const habil = DB.metodosDe(this.termino);
       const n = this._nuevaSena || (this._nuevaSena = {
-        metodo: 'efectivo', monto: this.senaMinima(), recibidoPor: DB.autorizadosCobro()[0], depositante: '',
+        metodo: habil[0], monto: this.senaSugerida(), dni: '', depositante: '',
       });
-      const falta = Math.max(0, this.senaMinima() - this.senaTotal());
+      if (!habil.includes(n.metodo)) n.metodo = habil[0];
+      const transfer = n.metodo !== 'efectivo';
+      const sug = this.senaSugerida();
 
       c.innerHTML = `
         <div class="sn-kpis">
           <div class="sn-k"><span>Total de la orden</span><b class="tnum">${UI.pesos(this.totalFinal())}</b></div>
-          <div class="sn-k"><span>Seña mínima (${DB.SENA_PCT}%)</span><b class="tnum">${UI.pesos(this.senaMinima())}</b></div>
           <div class="sn-k ${this.senaTotal() ? 'ok' : ''}"><span>Señado</span><b class="tnum">${UI.pesos(this.senaTotal())}</b></div>
           <div class="sn-k"><span>Saldo</span><b class="tnum">${UI.pesos(this.saldo())}</b></div>
         </div>
 
         ${this.cobros.length ? `<div class="sn-lista">${this.cobros.map(x => {
           const e = DB.ESTADO_COBRO[x.estado] || { label: x.estado, pill: 'soft', icon: '•' };
+          const met = (DB.METODOS_PAGO.find(m => m.k === x.metodo) || {}).label || x.metodo;
           return `<div class="sn-c">
             <span class="sn-i">${e.icon}</span>
-            <div><div class="sn-m tnum">${UI.pesos(x.m)} <span class="pill ${e.pill}">${UI.esc(e.label)}</span></div>
-              <div class="sn-d">${UI.esc(x.metodo === 'transferencia' ? 'Transferencia' : 'Efectivo')} ·
-                ${UI.esc(x.recibidoPor)}${x.depositante ? ` · depositó ${UI.esc(x.depositante)}` : ''}</div></div>
+            <div><div class="sn-m tnum">Seña ${UI.pesos(x.m)} <span class="pill ${e.pill}">${UI.esc(e.label)}</span></div>
+              <div class="sn-d">${UI.esc(met)} · ${UI.esc(fechaLarga(x.f))}${
+                x.depositante ? ` · depositó ${UI.esc(x.depositante)}${x.dni ? ` (DNI ${UI.esc(x.dni)})` : ''}` : ''}</div></div>
             <div class="sp" style="flex:1"></div>
             <button class="lx" data-quitac="${UI.esc(x.id)}" title="Quitar">✕</button></div>`;
         }).join('')}</div>` : ''}
 
-        <div class="sn-tit">${this.cobros.length ? 'Agregar otro pago' : 'Registrar la seña'}</div>
         <div class="cz-cols">
           <div class="cz-col">
-            <div class="fr"><label>Método</label>
-              <div class="vopts">
-                <button class="vopt ${n.metodo === 'efectivo' ? 'on' : ''}" data-sm="efectivo">Efectivo</button>
-                <button class="vopt ${n.metodo === 'transferencia' ? 'on' : ''}" data-sm="transferencia">Transferencia</button>
-              </div></div>
-            <div class="fr"><label for="sn-monto">Monto</label>
+            <div class="fr"><label for="sn-met">Método de pago</label>
+              <select id="sn-met">${DB.METODOS_PAGO.map(m =>
+                `<option value="${m.k}" ${n.metodo === m.k ? 'selected' : ''} ${habil.includes(m.k) ? '' : 'disabled'}>${UI.esc(m.label)}</option>`).join('')}</select></div>
+            <div class="fr"><label></label><span class="hint">Según la condición pactada (<b>${UI.esc(this.terminoLabel())}</b>).</span></div>
+            <div class="fr"><label for="sn-monto">Monto recibido</label>
               <input id="sn-monto" inputmode="numeric" value="${n.monto}"></div>
-            ${falta ? `<div class="fr"><label></label><span class="hint">Faltan <b>${UI.pesos(falta)}</b> para llegar al ${DB.SENA_PCT}%.</span></div>` : ''}
+            ${sug ? `<div class="fr"><label></label><span class="hint">
+              Seña mínima sugerida <b>${UI.pesos(sug)}</b> — quedan
+              <b>${UI.pesos(Math.max(0, this.totalFinal() - this.senaTotal() - sug))}</b> para cuando esté listo.</span></div>` : ''}
           </div>
           <div class="cz-col">
-            <div class="fr"><label for="sn-quien">Lo recibió</label>
-              <select id="sn-quien">${DB.autorizadosCobro().map(a =>
-                `<option ${n.recibidoPor === a ? 'selected' : ''}>${UI.esc(a)}</option>`).join('')}</select></div>
-            ${n.metodo === 'transferencia'
-              ? `<div class="fr"><label for="sn-dep">Quién depositó</label>
+            ${transfer
+              ? `<div class="fr"><label for="sn-dep">Nombre del depositante</label>
                    <input id="sn-dep" value="${UI.esc(n.depositante)}" placeholder="No siempre es el cliente"></div>
+                 <div class="fr"><label for="sn-dni">DNI del depositante</label>
+                   <input id="sn-dni" inputmode="numeric" value="${UI.esc(n.dni)}" placeholder="00.000.000"></div>
                  <div class="fr"><label></label><span class="hint">Queda <b>sin acreditar</b> hasta que Administración la confirme contra el banco.</span></div>`
-              : `<div class="fr"><label></label><span class="hint">Con rendirlo a un autorizado alcanza.</span></div>`}
+              : `<div class="fr"><label></label><span class="hint">El efectivo entra a la caja del local o del vendedor;
+                   <b>a quién se le rindió se resuelve en el arqueo</b>, no acá.</span></div>`}
           </div>
         </div>
         <div id="sn-avisos"></div>
-        <div class="sec-go"><button class="btn sm primary" id="sn-ok">Registrar</button></div>`;
+        <div class="sec-go"><button class="btn sm primary" id="sn-ok">Registrar pago</button></div>`;
 
       const av = () => {
         const box = document.getElementById('sn-avisos'); if (!box) return;
@@ -1206,30 +1278,33 @@
           : `<div class="banner warn">Sin el <b>${DB.SENA_PCT}%</b> la orden queda <b>a confirmar</b> y no entra a fábrica.</div>`;
       };
 
-      c.querySelectorAll('[data-sm]').forEach(b => b.onclick = () => { n.metodo = b.dataset.sm; this.pintarSena(); });
+      document.getElementById('sn-met').onchange = e => { n.metodo = e.target.value; this.pintarSena(); };
       const mo = document.getElementById('sn-monto');
       mo.oninput = () => { const x = mo.value.replace(/[^\d]/g, ''); if (x !== mo.value) mo.value = x; n.monto = Number(x) || 0; };
-      document.getElementById('sn-quien').onchange = e => { n.recibidoPor = e.target.value; };
       const dep = document.getElementById('sn-dep');
       if (dep) dep.oninput = e => { n.depositante = e.target.value; };
+      const dni = document.getElementById('sn-dni');
+      if (dni) dni.oninput = e => { const x = e.target.value.replace(/[^\d]/g, ''); if (x !== e.target.value) e.target.value = x; n.dni = x; };
       c.querySelectorAll('[data-quitac]').forEach(b => b.onclick = () => {
         const antes = this.antes();
         const x = this.cobros.find(y => y.id === b.dataset.quitac);
         this.cobros = this.cobros.filter(y => y.id !== b.dataset.quitac);
-        if (x) this.cambio(`Quitó un pago de ${UI.pesos(x.m)}`, antes);
-        this.pintarSena(); this.refrescarResumen(); this.pintarSide();
+        if (x) this.cambio(`Quitó una seña de ${UI.pesos(x.m)}`, antes);
+        this.pintarSena(); this.refrescarResumen(); this.pintarTotales(); this.pintarSide();
       });
       document.getElementById('sn-ok').onclick = () => {
-        if (!(n.monto > 0)) return UI.aviso('Poné el monto de la seña', 'warn');
-        if (n.metodo === 'transferencia' && !n.depositante.trim()) return UI.aviso('Cargá quién depositó', 'warn');
+        if (!(n.monto > 0)) return UI.aviso('Poné el monto recibido', 'warn');
+        if (transfer && !n.depositante.trim()) return UI.aviso('Cargá el nombre del depositante', 'warn');
+        if (transfer && !n.dni.trim()) return UI.aviso('Cargá el DNI del depositante', 'warn');
         this.cobros.push({
-          id: 'c' + (++this._uid), m: n.monto, metodo: n.metodo, recibidoPor: n.recibidoPor,
-          depositante: n.depositante.trim(),
-          estado: n.metodo === 'transferencia' ? 'pendiente_banco' : 'rendido',
+          id: 'c' + (++this._uid), m: n.monto, metodo: n.metodo, f: hoy(),
+          depositante: n.depositante.trim(), dni: n.dni.trim(),
+          estado: transfer ? 'pendiente_banco' : 'rendido',
         });
-        this.log(this.vendedor, `Registró ${n.metodo === 'transferencia' ? 'una transferencia' : 'un pago en efectivo'} de ${UI.pesos(n.monto)} — ${n.recibidoPor}`);
-        this._nuevaSena = { metodo: n.metodo, monto: Math.max(0, this.senaMinima() - this.senaTotal()), recibidoPor: n.recibidoPor, depositante: '' };
-        UI.aviso('Pago registrado', 'ok');
+        const met = (DB.METODOS_PAGO.find(m => m.k === n.metodo) || {}).label || n.metodo;
+        this.log(this.vendedor, `Registró una seña de ${UI.pesos(n.monto)} en ${met}`);
+        this._nuevaSena = { metodo: n.metodo, monto: this.senaSugerida(), dni: '', depositante: '' };
+        UI.aviso('Seña registrada', 'ok');
         this.pintarSena(); this.refrescarResumen(); this.pintarTotales(); this.pintarSide();
       };
       av();
@@ -1578,7 +1653,9 @@
           // completar lo que en la cotización todavía no hacía falta.
           this.guardada = true;   // el número de cotización queda usado por la venta
           this.registrando = true;
-          this.modo = 'orden'; this.nroOrden = orden.numero;
+          this.modo = 'orden'; this.nroOrden = orden.numero; this.fechaOrden = hoy();
+          this.confirmadas = {};   // se revisa todo de nuevo antes de cobrar
+          this.etapa = 'cliente';
           this.log(this.vendedor, `Confirmó la venta ${orden.numero}`);
           UI.aviso(`Orden ${orden.numero} creada — completala`, 'ok');
           this.render(this._mount);
@@ -1593,7 +1670,7 @@
       this.nro = global.DB.tomarNumeroCotizacion(); this.guardada = false;
       this.cli = { nombre: '', telefono: '', email: '', instagram: '', dni: '', tel2: '', canal: '', domicilio: '', localidad: '' };
       this.abiertos = {}; this.etapa = 'cliente'; this.lado = 'notas'; this.cantNueva = 1;
-      this.modo = 'cotizacion'; this.nroOrden = null;
+      this.modo = 'cotizacion'; this.nroOrden = null; this.fechaOrden = ''; this.confirmadas = {};
       this.cabAbierta = false;
       // Vendedor y local salen del usuario de la sesión; igual se pueden editar.
       this.vendedor = s.vendedor; this.local = s.local; this.fecha = hoy(); this.termino = 'efectivo';
@@ -2022,6 +2099,17 @@
         .sec-h:hover{background:var(--panel-2)}
         .sec-n{width:22px;height:22px;flex:none;border-radius:50%;background:var(--line-soft);color:var(--ink-soft);display:grid;place-items:center;font-size:12px;font-weight:800}
         .sec.on .sec-n{background:var(--brand);color:#fff}
+        .sec.ok .sec-n{background:var(--ok);color:#fff}
+        .ordbar{margin-bottom:10px;padding:8px 15px}
+        .ob-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+        .ob-izq b{font-size:14px;color:var(--navy)}
+        .ob-izq span{display:block;font-size:11px;color:var(--muted);line-height:1.3}
+        .ob-der{margin-left:auto;display:flex;align-items:center;gap:9px}
+        .ob-der span{font-size:11.5px;color:var(--muted)}
+        .ob-der b{font-size:13px;color:var(--navy)}
+        .ob-der input{padding:4px 8px;font-size:12.5px}
+        .ob-edit{display:flex;gap:20px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--line-soft)}
+        .ob-edit .fr.sm{grid-template-columns:106px 200px}
         .sec-t{font-weight:700;color:var(--navy);font-size:14.5px;flex:none}
         .sec-r{flex:1;color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .sec-c{color:var(--muted);font-size:11px}
@@ -2194,7 +2282,7 @@
         .cz-sb textarea{width:100%;padding:8px 10px;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);resize:vertical}
         .ava{width:26px;height:26px;flex:none;border-radius:50%;background:var(--brand);color:#fff;display:inline-grid;place-items:center;font-size:10.5px;font-weight:800}
         .ava.sys{background:var(--muted)}
-        .sn-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+        .sn-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
         @media(max-width:760px){.sn-kpis{grid-template-columns:1fr 1fr}}
         .sn-k{border:1px solid var(--line);border-radius:9px;padding:9px 11px;background:var(--panel-2)}
         .sn-k span{display:block;font-size:11px;color:var(--muted)}

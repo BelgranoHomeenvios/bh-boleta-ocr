@@ -420,6 +420,22 @@
     // Leyendas del presupuesto impreso.
     VALIDEZ_DIAS: 7,
     SENA_PCT: 30,
+    // Con qué se puede cobrar según la condición pactada. Mercado Pago no entra
+    // en una venta cerrada en efectivo, por ejemplo.
+    METODOS_PAGO: [
+      { k: 'efectivo',      label: 'Efectivo' },
+      { k: 'transferencia', label: 'Transferencia' },
+      { k: 'mercadopago',   label: 'Mercado Pago' },
+    ],
+    METODOS_POR_CONDICION: {
+      efectivo:      ['efectivo', 'transferencia'],
+      transferencia: ['transferencia'],
+      lista:         ['transferencia', 'mercadopago'],
+      mixto:         ['efectivo', 'transferencia', 'mercadopago'],
+    },
+    metodosDe(condicion) {
+      return this.METODOS_POR_CONDICION[condicion] || this.METODOS_PAGO.map(m => m.k);
+    },
     SENA_LEYENDA: '30% para iniciar la fabricación',
     EMPRESA: {
       nombre: 'Belgrano Home',
