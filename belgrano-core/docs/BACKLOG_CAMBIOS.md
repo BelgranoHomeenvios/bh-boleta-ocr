@@ -111,6 +111,9 @@
   La que **no está se carga a mano** (nombre + costo) y **queda guardada** para
   las próximas cotizaciones, marcada como "cargada a mano".
 
+- ✅ 94. La **cantidad en la línea** también es un contador: **− 1 +**, con el −
+  deshabilitado en 1, y el número se puede escribir a mano (2, 3, 7…).
+
 > Pendientes:
 > - La lista de localidades es **demo del AMBA**; se reemplaza por la real del mapa.
 > - La foto del diseño hoy se carga por **URL**; falta la subida real del archivo.
