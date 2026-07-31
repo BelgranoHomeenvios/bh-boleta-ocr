@@ -1503,6 +1503,14 @@ tr:hover td{background:var(--panel-2)}
     { k: 'confirmar', label: 'A confirmar' },
   ];
 
+  // Estado de cada mueble DENTRO DE LA ORDEN. En la cotización no se pregunta:
+  // todavía no se sabe cuándo va a comprar el cliente.
+  const ESTADOS = [
+    { k: 'fabricar',   label: 'A fabricar',    pill: '',    nota: 'va a fabricar' },
+    { k: 'produccion', label: 'En producción', pill: 'wip', nota: 'ya está en producción' },
+    { k: 'listo',      label: 'Listo',         pill: 'ok',  nota: 'sale de stock' },
+  ];
+
   const Presupuesto = {
     cli: null,
     abiertos: {},        // campos opcionales revelados
@@ -1628,8 +1636,10 @@ tr:hover td{background:var(--panel-2)}
       if (!a.desde || !a.hasta) return 'a confirmar';
       return `${diasHasta(a.desde)} a ${diasHasta(a.hasta)} días`;
     },
-    // Si nada va a fábrica, no hay plazo de fabricación que esperar.
-    todoListo() { return !!this.lineas.length && this.lineas.every(l => l.estadoProd === 'listo'); },
+    // Si nada va a fábrica, no hay plazo de fabricación que esperar. En la
+    // cotización el estado ni se pregunta, así que el plazo siempre corre.
+    verEstado() { return this.esOrden(); },
+    todoListo() { return this.verEstado() && !!this.lineas.length && this.lineas.every(l => l.estadoProd === 'listo'); },
     // Corrige el rango: nunca puede quedar en un solo día.
     normalizarEntrega() {
       const a = this.ad, d = global.DB.ENTREGA_DIAS;
@@ -1792,9 +1802,9 @@ tr:hover td{background:var(--panel-2)}
           : '<i>sin productos</i>';
       }
       if (k === 'adicionales') return `entrega ${UI.esc(this.entregaDias())} · envío ${UI.esc(this.envioTexto())}`;
+      // La sugerencia no va acá arriba: vive al lado del monto recibido.
       const x = this.senaTotal();
-      return x ? `seña ${UI.pesos(x)} · saldo ${UI.pesos(this.saldo())}`
-        : `<i>sin seña — sugerida ${UI.pesos(this.senaSugerida())}</i>`;
+      return x ? `seña ${UI.pesos(x)} · saldo ${UI.pesos(this.saldo())}` : '<i>sin seña</i>';
     },
 
     // Refresca el resumen de las cabeceras plegadas mientras se escribe.
@@ -1952,7 +1962,6 @@ tr:hover td{background:var(--panel-2)}
             <div class="fr"><label for="c-entrega">Forma de entrega</label>
               <select id="c-entrega">${ENTREGAS.map(o =>
                 `<option value="${o.k}" ${ent === o.k ? 'selected' : ''}>${UI.esc(o.label)}</option>`).join('')}</select></div>
-            ${ent === 'retira' ? `<div class="fr"><label></label><span class="hint">Retira en el local: no hace falta domicilio ni flete.</span></div>` : ''}
             ${ent === 'confirmar' ? `<div class="fr"><label></label><span class="hint">Se define después: el envío se puede cargar igual o dejarlo a confirmar.</span></div>` : ''}
             ${campoDom}
             ${ent === 'expreso' ? `<div class="fr"><label for="c-expdom">Domicilio del expreso <span class="opt">(opcional)</span></label>
@@ -1973,11 +1982,14 @@ tr:hover td{background:var(--panel-2)}
                 <option value="no" ${this.cli.factura === 'no' ? 'selected' : ''}>No</option>
                 <option value="si" ${this.cli.factura === 'si' ? 'selected' : ''}>Sí</option>
               </select></div>
+            ${this.cli.factura === 'si' ? ''
+              : `<div class="fr"><label></label><span class="hint">Si no pide factura, no sale impreso.</span></div>`}
+          </div>
+          <div class="cz-col">
             ${this.cli.factura === 'si' ? `
               <div class="fr"><label for="c-dni">DNI o CUIT</label>
                 <input id="c-dni" inputmode="numeric" class="${String(this.cli.dni).trim() ? '' : 'falta'}"
-                  value="${UI.esc(this.cli.dni)}" placeholder="obligatorio para facturar"></div>`
-              : `<div class="fr"><label></label><span class="hint">Si no pide factura, no sale impreso.</span></div>`}
+                  value="${UI.esc(this.cli.dni)}" placeholder="obligatorio para facturar"></div>` : ''}
           </div>
         </div>
         <div class="sec-go"><button class="btn sm primary" id="c-sig">${this.esOrden() ? 'Confirmar datos del cliente' : 'Continuar'}</button></div>`;
@@ -2242,16 +2254,16 @@ tr:hover td{background:var(--panel-2)}
             <select id="op-term">${cond().map(t => `<option value="${t.k}" ${this.termino === t.k ? 'selected' : ''}>${UI.esc(t.label)}</option>`).join('')}</select></div>
           <div class="muted" id="op-nota" style="font-size:12px"></div>
         </div>
-        <div class="lhead" id="pr-head"></div>
+        <div class="lhead ${this.verEstado() ? '' : 'noest'}" id="pr-head"></div>
         <div id="pr-lineas"></div>
-        <div class="srow">
+        <div class="srow ${this.verEstado() ? '' : 'noest'}">
           <input id="pr-cant" class="cantn" type="number" min="1" value="${this.cantNueva}" aria-label="Cantidad a agregar">
           <div class="bwrap">
             <input id="pr-buscar" class="busca" placeholder="Buscar un producto…" autocomplete="off">
             <div id="pr-drop"></div>
           </div>
           <button class="lnk" id="pr-catalogo">Catálogo</button>
-          <span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span>${this.verEstado() ? '<span></span>' : ''}
         </div>
         <div class="pr-pie">
           <div class="pr-sum">Total de los muebles <b class="tnum">${UI.pesos(this.total())}</b></div>
@@ -2283,10 +2295,14 @@ tr:hover td{background:var(--panel-2)}
       // El encabezado lleva el % vigente ("Dto. 35%") y en cada línea va el
       // monto descontado; el descuento total de la orden queda abajo de todo.
       const head = document.getElementById('pr-head');
-      if (head) head.innerHTML = `<span>Cant.</span><span>Producto</span><span>Tipo</span><span>Estado</span>
-        <span style="text-align:right">Precio unit.</span>
-        <span style="text-align:right">${pct ? `Dto. ${pct}%` : 'Dto.'}</span>
-        <span style="text-align:right">Subtotal</span><span></span>`;
+      if (head) {
+        head.classList.toggle('noest', !this.verEstado());
+        head.innerHTML = `<span>Cant.</span><span>Producto</span><span>Tipo</span>
+          ${this.verEstado() ? '<span>Estado</span>' : ''}
+          <span style="text-align:right">Precio unit.</span>
+          <span style="text-align:right">${pct ? `Dto. ${pct}%` : 'Dto.'}</span>
+          <span style="text-align:right">Subtotal</span><span></span>`;
+      }
 
       if (!this.lineas.length) { cont.innerHTML = ''; this.refrescarProductos(); return; }
       // Una vez cargado, el renglón queda QUIETO: se lee, no se edita. Con el
@@ -2344,18 +2360,20 @@ tr:hover td{background:var(--panel-2)}
               ].filter(Boolean).join(' · ')}</div>
               ${l.img ? `<img class="lobs-img" src="${UI.esc(l.img)}" alt="Foto del diseño">` : ''}
             </div>` : '';
+        // El estado (listo / en producción / a fabricar) es de la ORDEN: cuando
+        // se cotiza todavía no se sabe cuándo va a comprar el cliente.
+        const est = ESTADOS.find(x => x.k === l.estadoProd) || ESTADOS[0];
+        const estCel = !this.verEstado() ? '' : `<div>${abierta
+          ? `<select class="est" data-est="${l.key}">${ESTADOS.map(x =>
+              `<option value="${x.k}" ${est.k === x.k ? 'selected' : ''}>${UI.esc(x.label)}</option>`).join('')}</select>`
+          : `<span class="est fijo ${UI.esc(est.pill)}">${UI.esc(est.label)}</span>`}</div>`;
         return `<div class="litem ${medida ? 'med' : ''} ${abierta ? 'abierta' : ''}">
-          <div class="lrow" data-l="${l.key}">
+          <div class="lrow ${this.verEstado() ? '' : 'noest'}" data-l="${l.key}">
             <div class="lcant">${cantCel}</div>
             <div>${nombre}</div>
             <div class="ltipo">${tipoCel}${medida
               ? `<button class="cam mini" data-img="${l.key}" title="${l.img ? 'Cambiar la imagen' : 'Adjuntar imagen'}" aria-label="Adjuntar imagen">📷</button>` : ''}</div>
-            <div>${abierta
-              ? `<select class="est" data-est="${l.key}">
-                   <option value="fabricar" ${l.estadoProd !== 'listo' ? 'selected' : ''}>A fabricar</option>
-                   <option value="listo" ${l.estadoProd === 'listo' ? 'selected' : ''}>Listo</option>
-                 </select>`
-              : `<span class="est fijo ${l.estadoProd === 'listo' ? 'ok' : ''}">${l.estadoProd === 'listo' ? 'Listo' : 'A fabricar'}</span>`}</div>
+            ${estCel}
             ${precioCel}
             <div class="dto tnum">${dto ? '−' + UI.pesos(dto) : '—'}</div>
             ${abierta && medida
@@ -2392,7 +2410,8 @@ tr:hover td{background:var(--panel-2)}
       cont.querySelectorAll('[data-est]').forEach(sl => sl.onchange = () => {
         const l = this.get(sl.dataset.est); if (!l) return;
         l.estadoProd = sl.value;
-        this.log(this.vendedor, `${l.prodNombre}: ${l.estadoProd === 'listo' ? 'sale de stock' : 'va a fabricar'}`);
+        const e = ESTADOS.find(x => x.k === l.estadoProd) || ESTADOS[0];
+        this.log(this.vendedor, `${l.prodNombre}: ${e.nota}`);
         this.pintar(); this.pintarMain(); this.pintarSide();
       });
       cont.querySelectorAll('[data-med]').forEach(i => i.oninput = () => { const l = this.get(i.dataset.med); if (l) l.medidas = i.value; });
@@ -2620,9 +2639,9 @@ tr:hover td{background:var(--panel-2)}
                 aria-label="Elegir las fechas de entrega">🗓️</button>
               ${a.entregaTocada ? `<button class="lapiz" data-cerrar="entrega" title="Volver al plazo estándar" aria-label="Volver al plazo estándar">↺</button>` : ''}
             </div></div>
-          <div class="fr"><label></label><span class="hint" id="ad-plazo">${this.todoListo()
-            ? 'Todo sale de <b>stock</b>: no hay plazo de fabricación, se coordina la entrega.'
-            : `Plazo de fabricación: <b>${UI.esc(this.entregaDias())}</b>.`}</span></div>
+          ${this.todoListo()
+            ? `<div class="fr"><label></label><span class="hint" id="ad-plazo">Todo sale de <b>stock</b>: no hay plazo de fabricación, se coordina la entrega.</span></div>`
+            : ''}
           ${this.todoListo() && a.entregaModo === 'fecha'
             ? `<div class="fr"><label></label><button class="lnk" id="ad-conv">Volver a "a convenir con logística"</button></div>` : ''}
           <div id="ad-calbox"></div>
@@ -2774,6 +2793,19 @@ tr:hover td{background:var(--panel-2)}
       return Math.max(0, total - redondo);
     },
 
+    // Qué porcentaje del total representa lo que está por señar (contando lo
+    // que ya señó), para que se vea en el momento si llega al mínimo.
+    pctNum(monto) {
+      const t = this.totalFinal();
+      if (!t) return 0;
+      return ((this.senaTotal() + (Number(monto) || 0)) / t) * 100;
+    },
+    pctSena(monto) {
+      if (!this.totalFinal()) return '—';
+      const p = this.pctNum(monto);
+      return `${p % 1 ? p.toFixed(1).replace('.', ',') : p.toFixed(0)}%`;
+    },
+
     pintarSena() {
       const c = document.getElementById('sec-sena'); if (!c) return;
       const DB = global.DB;
@@ -2792,13 +2824,9 @@ tr:hover td{background:var(--panel-2)}
       const transfer = n.metodo !== 'efectivo';
       const sug = this.senaSugerida();
 
+      // El total, lo señado y el saldo ya están en el cuadro de la derecha:
+      // repetirlos acá sólo hace ruido.
       c.innerHTML = `
-        <div class="sn-kpis">
-          <div class="sn-k"><span>Total de la orden</span><b class="tnum">${UI.pesos(this.totalFinal())}</b></div>
-          <div class="sn-k ${this.senaTotal() ? 'ok' : ''}"><span>Señado</span><b class="tnum">${UI.pesos(this.senaTotal())}</b></div>
-          <div class="sn-k"><span>Saldo</span><b class="tnum">${UI.pesos(this.saldo())}</b></div>
-        </div>
-
         ${this.cobros.length ? `<div class="sn-lista">${this.cobros.map(x => {
           const e = DB.ESTADO_COBRO[x.estado] || { label: x.estado, pill: 'soft', icon: '•' };
           const met = (DB.METODOS_PAGO.find(m => m.k === x.metodo) || {}).label || x.metodo;
@@ -2818,7 +2846,8 @@ tr:hover td{background:var(--panel-2)}
                 `<option value="${m.k}" ${n.metodo === m.k ? 'selected' : ''} ${habil.includes(m.k) ? '' : 'disabled'}>${UI.esc(m.label)}</option>`).join('')}</select></div>
             <div class="fr"><label></label><span class="hint">Según la condición pactada (<b>${UI.esc(this.terminoLabel())}</b>).</span></div>
             <div class="fr"><label for="sn-monto">Monto recibido</label>
-              <input id="sn-monto" inputmode="numeric" value="${n.monto}"></div>
+              <div class="fx"><input id="sn-monto" class="sn-monto" inputmode="numeric" value="${n.monto}">
+                <span class="sn-pct tnum" id="sn-pct">${this.pctSena(n.monto)}</span></div></div>
             ${sug ? `<div class="fr"><label></label><span class="hint">
               Seña mínima sugerida <b>${UI.pesos(sug)}</b> — quedan
               <b>${UI.pesos(Math.max(0, this.totalFinal() - this.senaTotal() - sug))}</b> para cuando esté listo.</span></div>` : ''}
@@ -2830,8 +2859,8 @@ tr:hover td{background:var(--panel-2)}
                  <div class="fr"><label for="sn-dni">DNI del depositante</label>
                    <input id="sn-dni" inputmode="numeric" value="${UI.esc(n.dni)}" placeholder="00.000.000"></div>
                  <div class="fr"><label></label><span class="hint">Queda <b>sin acreditar</b> hasta que Administración la confirme contra el banco.</span></div>`
-              : `<div class="fr"><label></label><span class="hint">El efectivo entra a la caja del local o del vendedor;
-                   <b>a quién se le rindió se resuelve en el arqueo</b>, no acá.</span></div>`}
+              : `<div class="fr"><label></label><span class="hint">El efectivo entra a la caja del local <b>y</b> del vendedor
+                   —la plata del local la tiene en mano un vendedor—; <b>a quién se le rindió se resuelve en el arqueo</b>, no acá.</span></div>`}
           </div>
         </div>
         <div id="sn-avisos"></div>
@@ -2846,7 +2875,15 @@ tr:hover td{background:var(--panel-2)}
 
       document.getElementById('sn-met').onchange = e => { n.metodo = e.target.value; this.pintarSena(); };
       const mo = document.getElementById('sn-monto');
-      mo.oninput = () => { const x = mo.value.replace(/[^\d]/g, ''); if (x !== mo.value) mo.value = x; n.monto = Number(x) || 0; };
+      // Mientras escribe el monto, al lado se ve qué porcentaje del total está
+      // señando: así sabe en el momento si llega al mínimo o no.
+      mo.oninput = () => {
+        const x = mo.value.replace(/[^\d]/g, ''); if (x !== mo.value) mo.value = x;
+        n.monto = Number(x) || 0;
+        const p = document.getElementById('sn-pct');
+        if (p) { p.textContent = this.pctSena(n.monto); p.classList.toggle('ok', this.pctNum(n.monto) >= global.DB.SENA_PCT); }
+      };
+      mo.oninput();
       const dep = document.getElementById('sn-dep');
       if (dep) dep.oninput = e => { n.depositante = e.target.value; };
       const dni = document.getElementById('sn-dni');
@@ -3711,6 +3748,9 @@ tr:hover td{background:var(--panel-2)}
         .fr{display:grid;grid-template-columns:132px minmax(0,1fr);align-items:center;gap:10px}
         .fr>label{font-size:12.5px;color:var(--ink-soft)}
         .fr input,.fr select{padding:7px 10px;font-size:13px;width:100%}
+        /* Los datos del cliente son cortos: los campos no tienen por qué
+           estirarse hasta el borde de la columna. */
+        #sec-cliente .fr input,#sec-cliente .fr select,#sec-cliente .fx{max-width:340px}
         .fr input[readonly]{background:var(--panel-2);color:var(--ink-soft)}
         .fr .hint{font-size:11.5px;color:var(--muted)}
         @media(max-width:520px){.fr{grid-template-columns:1fr;gap:3px}}
@@ -3739,6 +3779,7 @@ tr:hover td{background:var(--panel-2)}
         /* El buscador va alineado con la columna Producto, arriba de las líneas:
            lo que se elige completa directamente ese renglón. */
         .srow{display:grid;grid-template-columns:56px minmax(0,1.4fr) 116px 96px 96px 90px 100px 48px;gap:8px;align-items:center;padding:9px 0 4px}
+        .srow.noest{grid-template-columns:56px minmax(0,1.4fr) 116px 96px 90px 100px 48px}
         .bwrap{position:relative}
         .srow .busca{width:100%;padding:7px 10px;font-size:13px}
         .lnk{border:0;background:none;color:var(--brand);font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:0;justify-self:start}
@@ -3750,6 +3791,8 @@ tr:hover td{background:var(--panel-2)}
 
         /* Cantidad adelante · los dos precios juntos al final. */
         .lhead,.lrow{display:grid;grid-template-columns:56px minmax(0,1.4fr) 116px 96px 96px 90px 100px 48px;gap:7px;align-items:center;padding:0}
+        /* En la cotización no hay columna Estado: la grilla va sin esa franja. */
+        .lhead.noest,.lrow.noest{grid-template-columns:56px minmax(0,1.4fr) 116px 96px 90px 100px 48px}
         .lcant{display:flex;align-items:center}
         .cantv{border:1px solid transparent;background:none;font:inherit;font-size:14px;font-weight:650;color:var(--navy);
           cursor:pointer;padding:4px 10px;border-radius:7px;min-width:42px;text-align:center}
@@ -3765,6 +3808,7 @@ tr:hover td{background:var(--panel-2)}
         .est.fijo{display:inline-block;border:1px solid transparent;border-radius:6px;padding:4px 7px;
           font-size:11.5px;font-weight:700;color:var(--warn);background:var(--warn-bg);text-align:center}
         .est.fijo.ok{color:var(--ok);background:var(--ok-bg,#e9f7f0)}
+        .est.fijo.wip{color:var(--brand);background:var(--brand-soft)}
         .tipo.fijo{display:inline-block;cursor:default;background:none;border-color:transparent;color:var(--muted);text-align:center}
         .tipo.fijo.med{color:var(--warn);border-color:var(--warn);background:var(--warn-bg)}
         .lobs.leido{gap:9px;flex-direction:row;align-items:flex-start;padding-bottom:9px}
@@ -3873,12 +3917,11 @@ tr:hover td{background:var(--panel-2)}
         .cz-sb textarea{width:100%;padding:8px 10px;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);resize:vertical}
         .ava{width:26px;height:26px;flex:none;border-radius:50%;background:var(--brand);color:#fff;display:inline-grid;place-items:center;font-size:10.5px;font-weight:800}
         .ava.sys{background:var(--muted)}
-        .sn-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
-        @media(max-width:760px){.sn-kpis{grid-template-columns:1fr 1fr}}
-        .sn-k{border:1px solid var(--line);border-radius:9px;padding:9px 11px;background:var(--panel-2)}
-        .sn-k span{display:block;font-size:11px;color:var(--muted)}
-        .sn-k b{font-size:16px;color:var(--navy)}
-        .sn-k.ok b{color:var(--ok)}
+        /* El monto va corto y al lado, en vivo, qué % del total se está señando. */
+        .sn-monto{max-width:150px}
+        .sn-pct{flex:none;font-size:13px;font-weight:700;color:var(--muted);
+          border:1px solid var(--line);border-radius:7px;padding:6px 9px;background:var(--panel-2);min-width:56px;text-align:center}
+        .sn-pct.ok{color:var(--ok);border-color:var(--ok);background:var(--ok-bg,#e9f7f0)}
         .sn-lista{border:1px solid var(--line);border-radius:9px;margin-bottom:14px}
         .sn-c{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line-soft)}
         .sn-c:last-child{border-bottom:0}

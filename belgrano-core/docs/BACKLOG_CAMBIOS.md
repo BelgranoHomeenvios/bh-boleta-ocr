@@ -347,6 +347,29 @@
 - ✅ 183. La forma de entrega **se imprime** en el documento; el expreso sale
   con su domicilio cuando está cargado.
 
+### Lote 7 — APLICADO (prolijidad, estado sólo en la orden, registrar pago)
+- ✅ 184. Campos de Datos del cliente **más cortos** (no se estiran hasta el
+  borde) y **DNI o CUIT** pasa a la **segunda columna**, al lado de Solicita
+  factura, para que el bloque quede simétrico.
+- ✅ 185. Se saca el aviso *"Retira en el local: no hace falta domicilio ni
+  flete"*: ya se entiende con la opción elegida.
+- ✅ 186. El **estado del producto aparece sólo en la orden**. Cotizando no se
+  pregunta: todavía no se sabe cuándo va a comprar el cliente. La grilla de
+  productos se arma con o sin esa columna.
+- ✅ 187. Tercer estado: **En producción** (además de A fabricar y Listo), para
+  el mueble que está por entrar. *(Reservar contra un ingreso próximo se
+  resuelve cuando veamos Productos.)*
+- ✅ 188. En Adicionales se saca el *"Plazo de fabricación: 30 a 35 días"* de
+  abajo del rango: ya está en la cabecera de la etapa.
+- ✅ 189. En **Registrar pago** se sacan los tres recuadros (Total de la orden,
+  Señado, Saldo): esa info ya está en el cuadro de la derecha.
+- ✅ 190. La **sugerida sale de la cabecera** de la etapa y queda sólo como
+  sugerencia abajo del monto recibido.
+- ✅ 191. **Monto recibido** más corto, y al lado el **% del total que se está
+  señando**, que se actualiza mientras se escribe (verde al llegar al 30%).
+- ✅ 192. El efectivo entra a la caja del local **y** del vendedor —la plata del
+  local la tiene en mano un vendedor—; el arqueo resuelve a quién se rindió.
+
 ### Lote 5 bis — Solapas de Ventas
 - ✅ 178. La solapa **"Órdenes"** pasa a llamarse **"Or. Venta"**.
 - ✅ 179. Se sacan **"A confirmar"**, **"Modificaciones"** y **"Autorizaciones"**
