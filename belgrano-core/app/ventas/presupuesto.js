@@ -40,7 +40,7 @@
   const OPCIONALES = [
     { k: 'tel2',      btn: '+ Teléfono', lbl: 'Teléfono adicional', ph: '11 5555-2020' },
     { k: 'instagram', btn: '+ IG',       lbl: 'Instagram',          ph: '@usuario' },
-    { k: 'dni',       btn: '+ DNI',      lbl: 'DNI (para factura)', ph: '00.000.000' },
+    { k: 'dni',       btn: '+ DNI',      lbl: 'DNI o CUIT',         ph: '00.000.000' },
   ];
 
   const Presupuesto = {
@@ -156,15 +156,20 @@
     // la fábrica no compromete un día puntual.
     entregaTexto() {
       const a = this.ad;
+      if (this.todoListo() && a.entregaModo !== 'fecha') return 'A convenir con logística';
       if (!a.desde || !a.hasta) return 'A confirmar';
+      if (a.hasta === a.desde) return `el ${fechaLarga(a.desde)}`;
       return `entre el ${fechaLarga(a.desde)} y el ${fechaLarga(a.hasta)}`;
     },
     // El plazo en días, para el resumen de la cabecera: "30 a 35 días".
     entregaDias() {
       const a = this.ad;
+      if (this.todoListo() && a.entregaModo !== 'fecha') return 'a convenir';
       if (!a.desde || !a.hasta) return 'a confirmar';
       return `${diasHasta(a.desde)} a ${diasHasta(a.hasta)} días`;
     },
+    // Si nada va a fábrica, no hay plazo de fabricación que esperar.
+    todoListo() { return !!this.lineas.length && this.lineas.every(l => l.estadoProd === 'listo'); },
     // Corrige el rango: nunca puede quedar en un solo día.
     normalizarEntrega() {
       const a = this.ad, d = global.DB.ENTREGA_DIAS;
@@ -176,8 +181,10 @@
       return false;
     },
     // Sin domicilio + localidad no se cotiza el envío: no puede salir un número.
-    envioCotizable() { return !!(String(this.cli.domicilio).trim() && this.cli.localidad); },
+    pideEnvio() { return this.cli.envio !== 'no'; },
+    envioCotizable() { return this.pideEnvio() && !!(String(this.cli.domicilio).trim() && this.cli.localidad); },
     envioTexto() {
+      if (!this.pideEnvio()) return 'Sin envío — retira';
       return this.envioCotizable() ? UI.pesos(this.ad.envio) : global.DB.ENVIO_SIN_DOMICILIO;
     },
     instalacionTexto() {
@@ -225,10 +232,6 @@
       document.getElementById(mount).innerHTML = `
         <div class="cz-bar">
           <div class="kick">Ventas · ${this.esOrden() ? 'Órdenes' : 'Cotizaciones'}</div>
-          <div class="sp" style="flex:1"></div>
-          ${this.esOrden() ? '<button class="btn sm" id="pr-nueva">Nueva cotización</button>' : ''}
-          <button class="btn sm" id="pr-guardar">Guardar</button>
-          ${this.esOrden() ? '' : '<button class="btn sm primary" id="pr-venta">Confirmar → Venta</button>'}
         </div>
         <div class="cz-wrap">
           <div id="cz-main"></div>
@@ -236,11 +239,6 @@
         </div>
         ${this.estilos()}`;
 
-      document.getElementById('pr-guardar').onclick = () => this.accion('guardar');
-      const venta = document.getElementById('pr-venta');
-      if (venta) venta.onclick = () => this.convertir();
-      const nueva = document.getElementById('pr-nueva');
-      if (nueva) nueva.onclick = () => { this.reset(); this.render(this._mount); };
       this.pintarTodo();
     },
 
@@ -450,8 +448,6 @@
             ${sel('c-canal', '¿Cómo nos conoció?', `<option value="">—</option>` +
               ['Instagram', 'Facebook', 'Recomendación', 'Pasó por el local', 'Google', 'Otro']
                 .map(o => `<option ${this.cli.canal === o ? 'selected' : ''}>${o}</option>`).join(''))}
-            ${mas('dni', 'Agregar DNI') ? `<div class="fr"><label></label><div class="adds">${mas('dni', 'Agregar DNI')}</div></div>` : ''}
-            ${opcional('dni')}
           </div>
           <div class="cz-col">
             <div class="fr"><label for="c-tel">Teléfono ${mas('tel2', '+')}</label>
@@ -468,6 +464,29 @@
               ${UI.esc(locActual.zona)} · envío ${locActual.flete ? UI.pesos(locActual.flete) : 'a cotizar'}
               ${locActual.manual ? '<b>· cargada a mano</b>' : ''}</span></div>` : ''}
             ${f('c-mail', 'Email', this.cli.email, 'cliente@correo.com')}
+          </div>
+        </div>
+
+        <div class="cz-cols" style="margin-top:4px">
+          <div class="cz-col">
+            <div class="fr"><label for="c-envio">¿Necesita envío?</label>
+              <select id="c-envio">
+                <option value="si" ${this.cli.envio === 'si' ? 'selected' : ''}>Sí, se entrega</option>
+                <option value="no" ${this.cli.envio === 'no' ? 'selected' : ''}>No, retira</option>
+              </select></div>
+            ${this.cli.envio === 'no' ? `<div class="fr"><label></label><span class="hint">Sin envío: no se cotiza flete.</span></div>` : ''}
+          </div>
+          <div class="cz-col">
+            <div class="fr"><label for="c-fact">Solicita factura</label>
+              <select id="c-fact">
+                <option value="no" ${this.cli.factura === 'no' ? 'selected' : ''}>No</option>
+                <option value="si" ${this.cli.factura === 'si' ? 'selected' : ''}>Sí</option>
+              </select></div>
+            ${this.cli.factura === 'si' ? `
+              <div class="fr"><label for="c-dni">DNI o CUIT</label>
+                <input id="c-dni" inputmode="numeric" class="${String(this.cli.dni).trim() ? '' : 'falta'}"
+                  value="${UI.esc(this.cli.dni)}" placeholder="obligatorio para facturar"></div>`
+              : `<div class="fr"><label></label><span class="hint">Si no pide factura, no sale impreso.</span></div>`}
           </div>
         </div>
         <div class="sec-go"><button class="btn sm primary" id="c-sig">${this.esOrden() ? 'Confirmar datos del cliente' : 'Continuar'}</button></div>`;
@@ -494,6 +513,23 @@
         this.pintarCliente(); this.pintarCabecera(); this.refrescarResumen(); this.pintarSide();
       });
       document.getElementById('c-canal').onchange = e => { this.cli.canal = e.target.value; };
+      // Sin envío no se cotiza flete; con factura, el documento fiscal es obligatorio.
+      document.getElementById('c-envio').onchange = e => {
+        const antes = this.antes();
+        this.cli.envio = e.target.value;
+        this.cambio(`Marcó que ${this.cli.envio === 'si' ? 'necesita envío' : 'retira (sin envío)'}`, antes);
+        this.pintarTodo();
+      };
+      document.getElementById('c-fact').onchange = e => {
+        this.cli.factura = e.target.value;
+        if (this.cli.factura === 'si') this.abiertos.dni = true;
+        this.pintarCliente();
+      };
+      const fd = document.getElementById('c-dni');
+      if (fd) fd.oninput = () => {
+        const n = fd.value.replace(/[^\d]/g, ''); if (n !== fd.value) fd.value = n;
+        this.cli.dni = n; fd.classList.toggle('falta', !n);
+      };
       // Con Tab o Enter se recorre en el orden en que se pregunta, no por columna.
       const ORDEN = ['c-nombre', 'c-tel', 'c-dom', 'c-locd', 'c-canal', 'c-mail'];
       ORDEN.forEach((id, i) => {
@@ -663,12 +699,17 @@
     irAProductos() {
       if (!this.clienteCompleto()) {
         this.avisoCliente(true);
-        UI.aviso('Falta el nombre o un contacto del cliente', 'warn');
+        UI.aviso(this.cli.factura === 'si' && !String(this.cli.dni).trim()
+          ? 'Para facturar hace falta el DNI o CUIT'
+          : 'Falta el nombre o un contacto del cliente', 'warn');
         return;
       }
       this.etapa = 'productos'; this.pintarMain();
     },
-    clienteCompleto() { return !!String(this.cli.nombre).trim() && this.clienteValido(); },
+    clienteCompleto() {
+      if (this.cli.factura === 'si' && !String(this.cli.dni).trim()) return false;
+      return !!String(this.cli.nombre).trim() && this.clienteValido();
+    },
 
     // Sin cartel: lo que falta se marca en ROJO sobre el propio campo.
     avisoCliente(mostrar) {
@@ -679,6 +720,7 @@
       };
       marcar('c-nombre', !String(this.cli.nombre).trim());
       marcar('c-tel', !this.clienteValido());
+      marcar('c-dni', this.cli.factura === 'si' && !String(this.cli.dni).trim());
       if (this._avisoOn && this.clienteCompleto()) this._avisoOn = false;
     },
     // Nota interna: el % es de uso nuestro, el cliente sólo ve el nombre.
@@ -744,7 +786,7 @@
       // El encabezado lleva el % vigente ("Dto. 35%") y en cada línea va el
       // monto descontado; el descuento total de la orden queda abajo de todo.
       const head = document.getElementById('pr-head');
-      if (head) head.innerHTML = `<span>Cant.</span><span>Producto</span><span>Tipo</span>
+      if (head) head.innerHTML = `<span>Cant.</span><span>Producto</span><span>Tipo</span><span>Estado</span>
         <span style="text-align:right">Precio unit.</span>
         <span style="text-align:right">${pct ? `Dto. ${pct}%` : 'Dto.'}</span>
         <span style="text-align:right">Subtotal</span><span></span>`;
@@ -811,6 +853,12 @@
             <div>${nombre}</div>
             <div class="ltipo">${tipoCel}${medida
               ? `<button class="cam mini" data-img="${l.key}" title="${l.img ? 'Cambiar la imagen' : 'Adjuntar imagen'}" aria-label="Adjuntar imagen">📷</button>` : ''}</div>
+            <div>${abierta
+              ? `<select class="est" data-est="${l.key}">
+                   <option value="fabricar" ${l.estadoProd !== 'listo' ? 'selected' : ''}>A fabricar</option>
+                   <option value="listo" ${l.estadoProd === 'listo' ? 'selected' : ''}>Listo</option>
+                 </select>`
+              : `<span class="est fijo ${l.estadoProd === 'listo' ? 'ok' : ''}">${l.estadoProd === 'listo' ? 'Listo' : 'A fabricar'}</span>`}</div>
             ${precioCel}
             <div class="dto tnum">${dto ? '−' + UI.pesos(dto) : '—'}</div>
             ${abierta && medida
@@ -843,6 +891,12 @@
         const [key, campo] = b.dataset.abrec.split(':');
         const l = this.get(key); if (!l) return;
         l.abre = l.abre || {}; l.abre[campo] = true; this.pintar();
+      });
+      cont.querySelectorAll('[data-est]').forEach(sl => sl.onchange = () => {
+        const l = this.get(sl.dataset.est); if (!l) return;
+        l.estadoProd = sl.value;
+        this.log(this.vendedor, `${l.prodNombre}: ${l.estadoProd === 'listo' ? 'sale de stock' : 'va a fabricar'}`);
+        this.pintar(); this.pintarMain(); this.pintarSide();
       });
       cont.querySelectorAll('[data-med]').forEach(i => i.oninput = () => { const l = this.get(i.dataset.med); if (l) l.medidas = i.value; });
       cont.querySelectorAll('[data-col]').forEach(i => i.oninput = () => { const l = this.get(i.dataset.col); if (l) l.colores = i.value; });
@@ -1031,6 +1085,8 @@
         cantidad: Math.max(1, Math.floor(cantidad) || 1),
         // A medida arranca SIN precio ("a definir"): se completa después.
         obs: '', medidas: '', colores: '', precioManual: null, img: img || variante.img || '',
+        // Listo = sale de stock · A fabricar = va a producción. No se imprime.
+        estadoProd: 'fabricar',
         editando: medida,   // se abre para cargar precio, detalle y foto
       });
       this.cambio(`Agregó ${cantidad > 1 ? cantidad + ' × ' : ''}${prodNombre}${medida ? ' (a medida)' : ''}`, antes);
@@ -1067,7 +1123,11 @@
                 aria-label="Elegir las fechas de entrega">🗓️</button>
               ${a.entregaTocada ? `<button class="lapiz" data-cerrar="entrega" title="Volver al plazo estándar" aria-label="Volver al plazo estándar">↺</button>` : ''}
             </div></div>
-          <div class="fr"><label></label><span class="hint" id="ad-plazo">Plazo de fabricación: <b>${UI.esc(this.entregaDias())}</b>.</span></div>
+          <div class="fr"><label></label><span class="hint" id="ad-plazo">${this.todoListo()
+            ? 'Todo sale de <b>stock</b>: no hay plazo de fabricación, se coordina la entrega.'
+            : `Plazo de fabricación: <b>${UI.esc(this.entregaDias())}</b>.`}</span></div>
+          ${this.todoListo() && a.entregaModo === 'fecha'
+            ? `<div class="fr"><label></label><button class="lnk" id="ad-conv">Volver a "a convenir con logística"</button></div>` : ''}
           <div id="ad-calbox"></div>
 
           <div class="fr"><label>Saldo se abona en</label>
@@ -1150,10 +1210,12 @@
       document.getElementById('ad-cal').onclick = () => {
         a.calAbierto = !a.calAbierto; this.pintarAdicionales();
       };
+      const conv = document.getElementById('ad-conv');
+      if (conv) conv.onclick = () => { a.entregaModo = 'plazo'; a.entregaTocada = false; this.pintarAdicionales(); this.refrescarResumen(); };
       if (a.calAbierto) {
         this.pintarCalendario('ad-calbox', { d1: a.desde, d2: a.hasta }, (d1, d2) => {
           const antes = this.antes(), ant = this.entregaTexto();
-          a.desde = d1; a.hasta = d2; a.entregaTocada = true; a.calAbierto = false;
+          a.desde = d1; a.hasta = d2; a.entregaTocada = true; a.calAbierto = false; a.entregaModo = 'fecha';
           this.normalizarEntrega();
           this.cambio(`Cambió la fecha de entrega (${ant} → ${this.entregaTexto()})`, antes);
           this.pintarAdicionales(); this.refrescarResumen(); this.pintarSide();
@@ -1332,10 +1394,19 @@
         <div class="tiva">${UI.esc(global.DB.IVA_LEYENDA)}</div>
         <div class="tacc">
           <button class="btn sm" id="cz-preview">Vista previa</button>
+          <button class="btn sm" id="cz-guardar">Guardar</button>
+          ${this.esOrden()
+            ? '<button class="btn sm" id="cz-nueva">Nueva cotización</button>'
+            : '<button class="btn sm primary" id="cz-venta">Confirmar → Venta</button>'}
         </div>
       </div>`;
       document.getElementById('cz-dto').onclick = () => this.modalDescuento();
       document.getElementById('cz-preview').onclick = () => this.accion('preview');
+      document.getElementById('cz-guardar').onclick = () => this.accion('guardar');
+      const venta = document.getElementById('cz-venta');
+      if (venta) venta.onclick = () => this.convertir();
+      const nueva = document.getElementById('cz-nueva');
+      if (nueva) nueva.onclick = () => { this.reset(); this.render(this._mount); };
     },
 
     // Pop-up del descuento comercial: % o $, sobre todo o sobre un producto.
@@ -1668,7 +1739,8 @@
       // Si la anterior nunca se guardó ni se convirtió, su número se reutiliza.
       if (this.nro != null && !this.guardada) global.DB.liberarNumeroCotizacion(this.nro);
       this.nro = global.DB.tomarNumeroCotizacion(); this.guardada = false;
-      this.cli = { nombre: '', telefono: '', email: '', instagram: '', dni: '', tel2: '', canal: '', domicilio: '', localidad: '' };
+      this.cli = { nombre: '', telefono: '', email: '', instagram: '', dni: '', tel2: '', canal: '',
+        domicilio: '', localidad: '', factura: 'no', envio: 'si' };
       this.abiertos = {}; this.etapa = 'cliente'; this.lado = 'notas'; this.cantNueva = 1;
       this.modo = 'cotizacion'; this.nroOrden = null; this.fechaOrden = ''; this.confirmadas = {};
       this.cabAbierta = false;
@@ -1682,6 +1754,7 @@
         entregaAbierta: false, entregaTocada: false,
         saldoEn: this.terminoLabel(),
         envio: 0, envioAbierto: false, envioTocado: false,
+        entregaModo: 'plazo',   // plazo (fábrica) | fecha (elegida a mano)
         instalacion: 'convenir', instalacionAbierta: false, instalacionCosto: 0,
         calAbierto: false,
         escalera: global.DB.ESCALERA_DEFAULT, escaleraAbierta: false, escaleraTocada: false,
@@ -1726,6 +1799,7 @@
           ${dato('Nombre:', c.nombre || this.nombreCli() || '—')}
           ${contacto ? dato('Contacto:', contacto) : ''}
           ${dom ? dato('Domicilio:', dom) : ''}
+          ${c.factura === 'si' ? dato('Factura — DNI/CUIT:', c.dni || '—') : ''}
         </div>
 
         <div class="pv-sec">Productos</div>
@@ -1733,6 +1807,7 @@
           <thead><tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Subtotal</th></tr></thead>
           <tbody>${this.lineas.map(l => {
             const u = this.unit(l), sub = u * l.cantidad, sin = this.sinPrecio(l);
+            // Ojo: el estado (listo / a fabricar) NO se imprime, es interno.
             const pie = [l.ejes, l.medidas, l.colores, l.obs].filter(Boolean).join(' · ');
             return `<tr>
               <td><b>${UI.esc(l.prodNombre || 'Mueble a medida')}</b>
@@ -1757,7 +1832,7 @@
             ${desc ? tot('Descuento', '−' + UI.pesos(desc), 'neg') : ''}
             ${extra ? tot('Descuento comercial', '−' + UI.pesos(extra), 'neg') : ''}
             ${this.instalacionMonto() ? tot('Instalación', UI.pesos(this.instalacionMonto())) : ''}
-            ${tot('Envío', this.envioCotizable() ? UI.pesos(this.envioMonto()) : 'A confirmar')}
+            ${this.pideEnvio() ? tot('Envío', this.envioCotizable() ? UI.pesos(this.envioMonto()) : 'A confirmar') : tot('Envío', 'Retira')}
             <div class="pv-total"><span>Total</span><b>${UI.esc(UI.pesos(this.totalFinal()))}</b></div>
           </div>
         </div>
@@ -2151,7 +2226,7 @@
         
         /* El buscador va alineado con la columna Producto, arriba de las líneas:
            lo que se elige completa directamente ese renglón. */
-        .srow{display:grid;grid-template-columns:62px minmax(0,1.5fr) 122px 104px 96px 106px 50px;gap:8px;align-items:center;padding:9px 0 4px}
+        .srow{display:grid;grid-template-columns:56px minmax(0,1.4fr) 116px 96px 96px 90px 100px 48px;gap:8px;align-items:center;padding:9px 0 4px}
         .bwrap{position:relative}
         .srow .busca{width:100%;padding:7px 10px;font-size:13px}
         .lnk{border:0;background:none;color:var(--brand);font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:0;justify-self:start}
@@ -2162,7 +2237,7 @@
         .drop .it:last-child{border-bottom:0} .drop .it:hover{background:var(--brand-soft)} .drop .it .cnt{color:var(--muted);font-size:12px}
 
         /* Cantidad adelante · los dos precios juntos al final. */
-        .lhead,.lrow{display:grid;grid-template-columns:62px minmax(0,1.5fr) 122px 104px 96px 106px 50px;gap:8px;align-items:center;padding:0}
+        .lhead,.lrow{display:grid;grid-template-columns:56px minmax(0,1.4fr) 116px 96px 96px 90px 100px 48px;gap:7px;align-items:center;padding:0}
         .lcant{display:flex;align-items:center}
         .cantv{border:1px solid transparent;background:none;font:inherit;font-size:14px;font-weight:650;color:var(--navy);
           cursor:pointer;padding:4px 10px;border-radius:7px;min-width:42px;text-align:center}
@@ -2174,13 +2249,17 @@
         .litem.abierta{background:var(--panel-2);border-radius:8px;padding:0 8px;margin:2px -8px;border:1px solid var(--brand)}
         .lacc{display:flex;align-items:center;gap:2px;justify-content:flex-end}
         .cantf{font-size:14px;font-weight:650;color:var(--navy);padding:4px 10px;min-width:42px;text-align:center;display:inline-block}
+        .est{width:100%;padding:4px 6px;font-size:11.5px}
+        .est.fijo{display:inline-block;border:1px solid transparent;border-radius:6px;padding:4px 7px;
+          font-size:11.5px;font-weight:700;color:var(--warn);background:var(--warn-bg);text-align:center}
+        .est.fijo.ok{color:var(--ok);background:var(--ok-bg,#e9f7f0)}
         .tipo.fijo{display:inline-block;cursor:default;background:none;border-color:transparent;color:var(--muted);text-align:center}
         .tipo.fijo.med{color:var(--warn);border-color:var(--warn);background:var(--warn-bg)}
         .lobs.leido{gap:9px;flex-direction:row;align-items:flex-start;padding-bottom:9px}
         .lobs.leido .obst{font-size:12.5px;color:var(--ink-soft);line-height:1.45;flex:1}
         /* Observaciones: sólo en los a medida y ABAJO del renglón, con lugar
            para escribir y para adjuntar la foto del diseño que pidió el cliente. */
-        .lobs{padding:0 0 11px 70px;display:flex;flex-direction:column;gap:7px}
+        .lobs{padding:0 0 11px 63px;display:flex;flex-direction:column;gap:7px}
         .adef{text-align:right;font-size:12.5px;font-weight:700;color:var(--warn)}
         .lmed{display:flex;align-items:flex-end;gap:11px;flex-wrap:wrap}
         .lmed label{display:flex;flex-direction:column;gap:4px;font-size:11.5px;color:var(--ink-soft)}
@@ -2215,7 +2294,7 @@
         .tipo:hover{border-color:var(--brand);color:var(--brand)}
         .tipo.med{border-color:var(--warn);color:var(--warn);background:var(--warn-bg)}
         .lx{color:var(--muted);cursor:pointer;font-size:15px;border:0;background:transparent;padding:3px}
-        @media(max-width:1000px){.lhead{display:none}.lrow{grid-template-columns:62px 1fr 1fr;gap:8px}.lrow .sub,.lrow .lock,.lrow .pnum{text-align:left}}
+        @media(max-width:1100px){.lhead{display:none}.lrow{grid-template-columns:56px 1fr 1fr;gap:8px}.lrow .sub,.lrow .lock,.lrow .pnum{text-align:left}}
 
         .cz-foot{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px 30px;padding:16px}
         @media(max-width:820px){.cz-foot{grid-template-columns:1fr}}
@@ -2265,8 +2344,8 @@
         .cz-tots .big{border-top:1px solid var(--line);margin-top:5px;padding-top:9px;font-size:15px;font-weight:700;color:var(--navy)}
         .cz-tots .big b{font-size:19px}
         .cz-tots .tiva{font-size:11.5px;color:var(--muted);margin-top:7px}
-        .tacc{display:flex;gap:8px;margin-top:12px}
-        .tacc .btn{flex:1}
+        .tacc{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+        .tacc .btn{flex:1;min-width:110px}
         .tdto{display:flex;justify-content:space-between;align-items:center;gap:12px;width:calc(100% + 20px);margin:4px -10px;
           border:1px dashed var(--line);background:var(--line-soft);border-radius:8px;padding:5px 10px;
           font:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;text-align:left}

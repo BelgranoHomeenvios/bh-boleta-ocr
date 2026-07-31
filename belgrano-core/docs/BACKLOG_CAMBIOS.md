@@ -311,6 +311,30 @@
 - ✅ 170. En **transferencia** se piden **nombre y DNI del depositante**.
 - ✅ 171. Cada seña registrada muestra **"Seña $X"** con su **fecha**.
 
+### Lote 5 — APLICADO (factura, estado por producto, envío y botonera)
+- ✅ 172. En **Datos del cliente**, campo opcional **"Solicita factura"** con
+  **No** por default. Si pasa a **Sí**, se abre **obligatorio** el campo
+  **DNI o CUIT** y sin completarlo no se puede avanzar.
+- ✅ 173. La factura **nunca se imprime** salvo que se haya pedido: recién ahí el
+  A4 muestra "Factura — DNI/CUIT".
+- ✅ 174. En **Datos del cliente**, **"¿Necesita envío?"** (Sí, se entrega / No,
+  retira) —también en la **cotización**, para saber de entrada si suma envío.
+  Con "No, retira" el envío deja de cotizarse y el A4 imprime **"Retira"**.
+- ✅ 175. Nueva columna **Estado** por producto (corriendo "Tipo" a la izquierda)
+  con **LISTO / A FABRICAR**; por default **A fabricar**. **Oculta en la
+  impresión**.
+- ✅ 176. Si **todos** los productos están en **LISTO**, en Adicionales desaparece
+  el plazo de 30 a 35 días: queda **"A convenir con logística"** y el vendedor
+  puede poner una fecha mucho más corta (con link para volver a "a convenir").
+- ✅ 177. **Toda la botonera pasa abajo**, debajo del saldo restante: **Vista
+  previa · Guardar · Confirmar → Venta**. Arriba no queda ningún botón, así se
+  recorre paso por paso antes de generar la orden.
+
+### Lote 5 bis — Solapas de Ventas
+- ✅ 178. La solapa **"Órdenes"** pasa a llamarse **"Or. Venta"**.
+- ✅ 179. Se sacan **"A confirmar"**, **"Modificaciones"** y **"Autorizaciones"**
+  como solapas propias: se resuelven **adentro de Resumen y de Or. Venta**.
+
 > Pendientes:
 > - Confirmación de la transferencia contra el banco (CUIT + comprobante) — ya
 >   existe en `DB.confirmarSenaBanco()`; falta engancharla desde acá.

@@ -29,12 +29,11 @@
       S('resumen', 'Resumen', m => global.VentasPanel.render(m)),
       S('nueva', 'Nueva cotización', m => global.Presupuesto.render(m)),
       S('cotizaciones', 'Cotizaciones', m => global.Cotizaciones.render(m)),
-      S('ordenes', 'Órdenes', m => global.Ordenes.render(m)),
-      S('aconfirmar', 'A confirmar', skel('Órdenes a confirmar (esperando seña)')),
-      S('modificaciones', 'Modificaciones', skel('Modificaciones sobre órdenes confirmadas')),
+      // "A confirmar", "Modificaciones" y "Autorizaciones" no son solapas propias:
+      // se resuelven adentro de Resumen y de Or. Venta.
+      S('ordenes', 'Or. Venta', m => global.Ordenes.render(m)),
       S('clientes', 'Clientes', m => global.Clientes.render(m)),
       S('agenda', 'Agenda', skel('Agenda del vendedor')),
-      S('autorizaciones', 'Autorizaciones', skel('Precios a medida / con observaciones a verificar')),
       S('comisiones', 'Comisiones', skel('Comisiones (con venta compartida)')),
       S('indicadores', 'Indicadores', skel('Indicadores de ventas')),
     ]},
