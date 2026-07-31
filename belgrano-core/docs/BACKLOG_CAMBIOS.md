@@ -66,7 +66,21 @@
   entrega · Localidad**, columna derecha **Teléfono · Email · ¿Cómo nos conoció?**,
   y debajo los opcionales en el orden **+ Teléfono · + IG · + DNI**.
 
+- ✅ 77. El **buscador de producto sube arriba de las líneas**, alineado con la
+  columna Producto: lo que se elige completa ese renglón directamente.
+- ✅ 78. **Cantidad adelante de todo** (primera columna) y también dentro del
+  armador, con − / + y botones más chicos para que entren Cantidad, Medida,
+  Estructura y Frente, con el precio y Agregar abajo.
+- ✅ 79. "Detalle" pasa a **Observaciones** y arranca **cerrado**: sólo se abre al
+  pasar la línea a **A medida**.
+- ✅ 80. Las observaciones van **abajo del renglón** y a lo ancho (no al costado),
+  para poder escribir de verdad, con botón de **📷 Adjuntar foto** del diseño.
+- ✅ 81. Se saca el **candado** del precio unitario (sigue bloqueado en estándar).
+- ✅ 82. La columna de descuento dice **"Dto. 35%"** en el encabezado y en cada
+  línea el **monto descontado**; el descuento total de la orden queda abajo.
+
 > Pendientes:
+> - La foto del diseño hoy se carga por **URL**; falta la subida real del archivo.
 > - Brian va a definir **qué campos son obligatorios** para poder crear el presupuesto.
 > - **Elegir el local al iniciar sesión**: hoy sale de `DB.sesion()` fijo; cuando
 >   se active el login hay que pedirlo al entrar para que quede como default real.
