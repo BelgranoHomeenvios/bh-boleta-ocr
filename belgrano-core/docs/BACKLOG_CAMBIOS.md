@@ -6,6 +6,14 @@
 
 ## Por aplicar (lote actual)
 
+**Nueva cotización — pendientes de este lote**
+- ⬜ 122. **Teléfono: sólo números** (no deja escribir letras).
+- ⬜ 123. **Sacar "Precio en efectivo"** del panel del a medida: el precio se
+  anota únicamente en el **subtotal**. Al sacarlo, el panel queda en **2 renglones**.
+- ⬜ 124. El campo **Subtotal** queda libre pero **sin las flechitas** de arriba/abajo:
+  es sólo para tipear el número.
+- ⬜ 125. **"Colores" → "Terminaciones"**.
+
 **Refinamientos del Detalle de la orden (post-Lote 2)**
 - ⬜ 27. Forma de pago NO debe ser dropdown editable directamente; pasa a **"Modificar orden"** (necesita autorización).
 - ⬜ 28. **Comentarios/mensajes** se mueven al **sidebar lateral** donde hoy está "Totales y Pagos" (no en card inferior).
