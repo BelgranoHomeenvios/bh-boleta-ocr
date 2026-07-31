@@ -6,7 +6,19 @@
 (function (global) {
   const Clientes = {
     texto: '',
-    async render(mount = 'view') {
+    // Se puede entrar directo a la ficha de un cliente (desde una cotización,
+    // por ejemplo) pasando {id} o {buscar: 'nombre o teléfono'}.
+    async render(mount = 'view', data) {
+      this._mount = mount;
+      if (data && data.id != null) return this.detalle(data.id);
+      if (data && data.buscar) {
+        this.texto = String(data.buscar);
+        const cs = await global.DB.clientes({ texto: this.texto });
+        if (cs.length === 1) return this.detalle(cs[0].id);
+      }
+      return this._lista(mount);
+    },
+    async _lista(mount = 'view') {
       this._mount = mount;
       const v = document.getElementById(mount);
       v.innerHTML = UI.head('Ventas', 'Clientes',

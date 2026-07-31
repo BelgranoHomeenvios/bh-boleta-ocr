@@ -47,12 +47,13 @@
     cli: null,
     abiertos: {},        // campos opcionales revelados
     etapa: 'cliente',    // desplegable abierto: cliente | productos | adicionales | ''
-    lado: 'actividad',   // actividad | notas
+    lado: 'notas',       // notas | historico | actividad
     vendedor: '', local: '', fecha: '', termino: 'efectivo',
     nro: null, guardada: false,   // el número se toma al abrir; si no se usa, vuelve
     cabAbierta: false,            // la cabecera se lee; el lápiz la abre
     cantNueva: 1,                 // cantidad del renglón de carga (cantidad + producto)
     obsExt: '', obsInt: '', terminos: '',
+    pendientes: [],               // recordatorios / mensajes agendados
     dto: null,                    // descuento comercial extra {modo, alcance, linea, valor}
     archivos: [],                 // adjuntos de la cotización (van a Documentos)
     registrando: false,           // el historial arranca al guardar / confirmar
@@ -211,11 +212,8 @@
         <div class="cz-bar">
           <div class="kick">Ventas · Cotizaciones</div>
           <div class="sp" style="flex:1"></div>
-          <button class="btn sm" id="pr-preview">Vista previa</button>
-          <button class="btn sm" id="pr-descargar">Descargar</button>
-          <button class="btn sm" id="pr-print">Imprimir</button>
-          <span class="cz-sep"></span>
           <button class="btn sm" id="pr-guardar">Guardar</button>
+          <button class="btn sm" id="pr-preview">Vista previa</button>
           <button class="btn sm primary" id="pr-venta">Confirmar → Venta</button>
         </div>
         <div class="cz-wrap">
@@ -225,8 +223,6 @@
         ${this.estilos()}`;
 
       document.getElementById('pr-preview').onclick = () => this.accion('preview');
-      document.getElementById('pr-descargar').onclick = () => this.accion('descargar');
-      document.getElementById('pr-print').onclick = () => this.accion('print');
       document.getElementById('pr-guardar').onclick = () => this.accion('guardar');
       document.getElementById('pr-venta').onclick = () => this.convertir();
       this.pintarTodo();
@@ -415,7 +411,7 @@
             ${f('c-mail', 'Email', this.cli.email, 'cliente@correo.com')}
           </div>
         </div>
-        <div class="sec-go"><button class="btn sm primary" id="c-sig">Continuar → Productos</button></div>`;
+        <div class="sec-go"><button class="btn sm primary" id="c-sig">Continuar</button></div>`;
 
       // `soloNum` deja escribir únicamente números (teléfonos y DNI).
       const bind = (id, campo, soloNum) => {
@@ -650,7 +646,7 @@
         <div class="pr-pie">
           <div class="pr-sum">Total de los muebles <b class="tnum">${UI.pesos(this.total())}</b></div>
         </div>
-        <div class="sec-go"><button class="btn sm primary" id="p-sig">Continuar → Adicionales</button></div>`;
+        <div class="sec-go"><button class="btn sm primary" id="p-sig">Continuar</button></div>`;
 
       document.getElementById('op-term').onchange = e => {
         const antes = this.antes(), ant = this.terminoLabel();
@@ -710,14 +706,26 @@
         // Observaciones sólo en los a medida, y abajo del renglón: es donde el
         // vendedor explica lo que pidió el cliente, con la foto del diseño.
         const obs = !medida ? '' : abierta
-          ? `<div class="lobs">
-              <div class="lmed">
-                <label>Medidas <input data-med="${l.key}" value="${UI.esc(l.medidas || '')}" placeholder="ej. 2.40 × 0.50 × 0.90"></label>
-                <label>Terminaciones <input data-col="${l.key}" value="${UI.esc(l.colores || '')}" placeholder="ej. estructura negra, frente paraíso"></label>
-                <label class="ancho">Detalles <input data-obs="${l.key}" value="${UI.esc(l.obs)}" placeholder="lo que pidió el cliente"></label>
-                ${l.img ? `<img class="lobs-img" src="${UI.esc(l.img)}" alt="Foto del diseño">` : ''}
-              </div>
-            </div>`
+          ? (() => {
+              // Los tres campos arrancan cerrados: se abre sólo el que hace falta.
+              const CAMPOS = [
+                { k: 'medidas', lbl: 'Medidas', at: 'data-med', ph: 'ej. 2.40 × 0.50 × 0.90' },
+                { k: 'colores', lbl: 'Terminaciones', at: 'data-col', ph: 'ej. estructura negra, frente paraíso' },
+                { k: 'obs', lbl: 'Detalles', at: 'data-obs', ph: 'lo que pidió el cliente' },
+              ];
+              l.abre = l.abre || {};
+              const abiertos = CAMPOS.filter(x => l.abre[x.k] || l[x.k]);
+              const cerrados = CAMPOS.filter(x => !(l.abre[x.k] || l[x.k]));
+              return `<div class="lobs">
+                ${abiertos.length ? `<div class="lmed">${abiertos.map(x =>
+                  `<label class="${x.k === 'obs' ? 'ancho' : ''}">${UI.esc(x.lbl)}
+                    <input ${x.at}="${l.key}" value="${UI.esc(l[x.k] || '')}" placeholder="${UI.esc(x.ph)}"></label>`).join('')}
+                  ${l.img ? `<img class="lobs-img" src="${UI.esc(l.img)}" alt="Foto del diseño">` : ''}
+                </div>` : ''}
+                ${cerrados.length ? `<div class="adds">${cerrados.map(x =>
+                  `<button class="chip-add" data-abrec="${l.key}:${x.k}">+ ${UI.esc(x.lbl)}</button>`).join('')}</div>` : ''}
+              </div>`;
+            })()
           : (l.medidas || l.colores || l.obs || l.img) ? `<div class="lobs leido">
               <div class="obst">${[
                 l.medidas && `<b>Medidas:</b> ${UI.esc(l.medidas)}`,
@@ -760,6 +768,11 @@
       });
       this.bindCant(cont);
       cont.querySelectorAll('[data-obs]').forEach(i => i.oninput = () => { const l = this.get(i.dataset.obs); if (l) l.obs = i.value; });
+      cont.querySelectorAll('[data-abrec]').forEach(b => b.onclick = () => {
+        const [key, campo] = b.dataset.abrec.split(':');
+        const l = this.get(key); if (!l) return;
+        l.abre = l.abre || {}; l.abre[campo] = true; this.pintar();
+      });
       cont.querySelectorAll('[data-med]').forEach(i => i.oninput = () => { const l = this.get(i.dataset.med); if (l) l.medidas = i.value; });
       cont.querySelectorAll('[data-col]').forEach(i => i.oninput = () => { const l = this.get(i.dataset.col); if (l) l.colores = i.value; });
       // El precio se carga en la condición elegida arriba (efectivo, lista…) y
@@ -936,9 +949,9 @@
       this.modalVariante(prod, vars);
     },
 
-    agregarEstandar(prodNombre, variante, img = '', cantidad = 1, tipo = 'estandar') {
+    agregarEstandar(prodNombre, variante, img = '', cantidad = 1, tipo = 'estandar', partesArmadas = null) {
       const antes = this.antes();
-      const partes = EJES.filter(e => variante[e.k]).map(e => ({ lbl: e.label, val: variante[e.k] }));
+      const partes = partesArmadas || EJES.filter(e => variante[e.k]).map(e => ({ lbl: e.label, val: variante[e.k] }));
       const medida = tipo === 'medida';
       this.lineas.push({
         key: ++this._uid, tipo, prodNombre, varId: variante.id,
@@ -1126,8 +1139,14 @@
         ${this.instalacionMonto() ? fila('Instalación', UI.pesos(this.instalacionMonto())) : ''}
         ${fila('Saldo restante', UI.pesos(this.totalFinal()), 'big')}
         <div class="tiva">${UI.esc(global.DB.IVA_LEYENDA)}</div>
+        <div class="tacc">
+          <button class="btn sm" id="cz-print">Imprimir</button>
+          <button class="btn sm" id="cz-baja">Descargar</button>
+        </div>
       </div>`;
       document.getElementById('cz-dto').onclick = () => this.modalDescuento();
+      document.getElementById('cz-print').onclick = () => this.accion('print');
+      document.getElementById('cz-baja').onclick = () => this.accion('descargar');
     },
 
     // Pop-up del descuento comercial: % o $, sobre todo o sobre un producto.
@@ -1215,13 +1234,15 @@
       s.innerHTML = `
         <div class="card cz-sc">
           <div class="tabs sm">
-            <button class="tab ${this.lado === 'actividad' ? 'on' : ''}" data-l="actividad">Actividad</button>
             <button class="tab ${this.lado === 'notas' ? 'on' : ''}" data-l="notas">Notas</button>
+            <button class="tab ${this.lado === 'historico' ? 'on' : ''}" data-l="historico">Histórico</button>
+            <button class="tab ${this.lado === 'actividad' ? 'on' : ''}" data-l="actividad">Actividad</button>
           </div>
-          <div class="cz-sb">${this.lado === 'actividad'
-            ? (this.cambios.length ? `<div class="cbav">${this.cambios.length} ${this.cambios.length === 1 ? 'cambio sin confirmar' : 'cambios sin confirmar'} — se revisan al guardar</div>` : '')
-              + this.actividadHTML()
-            : this.notasHTML()}</div>
+          <div class="cz-sb">${
+            this.lado === 'notas' ? this.notasHTML()
+            : this.lado === 'historico'
+              ? (this.cambios.length ? `<div class="cbav">${this.cambios.length} ${this.cambios.length === 1 ? 'cambio sin confirmar' : 'cambios sin confirmar'} — se revisan al guardar</div>` : '') + this.actividadHTML()
+              : this.pendientesHTML()}</div>
         </div>
 
         <div class="card cz-sc">
@@ -1259,16 +1280,38 @@
         </div>`;
 
       s.querySelectorAll('[data-l]').forEach(b => b.onclick = () => { this.lado = b.dataset.l; this.pintarSide(); });
+      const at = document.getElementById('ac-tipo');
+      if (at) {
+        at.onchange = e => { this._nuevaAct.tipo = e.target.value; this.pintarSide(); };
+        document.getElementById('ac-fecha').onchange = e => { this._nuevaAct.fecha = e.target.value; };
+        document.getElementById('ac-nota').oninput = e => { this._nuevaAct.nota = e.target.value; };
+        document.getElementById('ac-ok').onclick = () => {
+          const p = this._nuevaAct;
+          if (!p.nota.trim()) return UI.aviso('Escribí de qué se trata', 'warn');
+          if (!p.fecha) return UI.aviso('Poné la fecha', 'warn');
+          this.pendientes.unshift({ ...p });
+          // Queda agendado y también en el histórico, para que no se pierda.
+          this.log(this.vendedor, `Agendó ${p.tipo === 'mensaje' ? 'un mensaje' : 'un recordatorio'} para el ${fechaLarga(p.fecha)}: ${p.nota.trim()}`);
+          this._nuevaAct = { tipo: p.tipo, fecha: enDias(7), nota: '' };
+          UI.aviso('Agendado', 'ok');
+          this.lado = 'notas'; this.pintarSide();
+        };
+      }
       const fi = document.getElementById('cz-ficha');
-      if (fi) fi.onclick = () => global.App.goSub('crm', 'clientes');
+      // Va directo a la ficha de ESTE cliente, no al listado.
+      if (fi) fi.onclick = () => {
+        const busca = (c.telefono || '').trim() || (c.nombre || '').trim() || ident;
+        global.App.goSub('ventas', 'clientes');
+        setTimeout(() => global.Clientes.render('mview', { buscar: busca }), 0);
+      };
       const na = document.getElementById('cz-nota');
       if (na) na.oninput = () => { this.obsInt = na.value; };
     },
 
     actividadHTML() {
       if (!this.registrando) return `<div class="muted" style="font-size:12.5px">
-        El historial arranca cuando se <b>guarda</b> la cotización. Desde ahí queda
-        registrado quién cambió qué.</div>`;
+        El histórico arranca cuando se <b>guarda</b>, imprime, descarga o confirma la
+        cotización. Desde ahí queda registrado quién cambió qué.</div>`;
       if (!this.actividad.length) return '<div class="muted" style="font-size:12.5px">Sin movimientos todavía.</div>';
       return this.actividad.map(a => `<div class="act">
         <span class="ava ${a.quien === 'Sistema' ? 'sys' : ''}">${UI.esc(inic(a.quien))}</span>
@@ -1277,7 +1320,32 @@
     },
     notasHTML() {
       return `<div class="muted" style="font-size:12px;margin-bottom:7px">Observaciones <b>internas</b> — no salen impresas.</div>
-        <textarea id="cz-nota" rows="7" placeholder="Notas para producción, administración o para vos…">${UI.esc(this.obsInt)}</textarea>`;
+        <textarea id="cz-nota" rows="5" placeholder="Notas para producción, administración o para vos…">${UI.esc(this.obsInt)}</textarea>
+        ${this.pendientes.length ? `<div class="pend-tit">Agendado</div>${this.pendientesLista()}` : ''}`;
+    },
+
+    // Actividad: agendar algo para esta cotización (recordatorio o mensaje).
+    pendientesHTML() {
+      const p = this._nuevaAct || { tipo: 'recordatorio', fecha: enDias(7), nota: '' };
+      this._nuevaAct = p;
+      return `<div class="muted" style="font-size:12px;margin-bottom:9px">
+          Agendá algo para esta cotización. Ese día te salta el aviso.</div>
+        <div class="fr sm"><label for="ac-tipo">Tipo</label>
+          <select id="ac-tipo">
+            <option value="recordatorio" ${p.tipo === 'recordatorio' ? 'selected' : ''}>Recordatorio</option>
+            <option value="mensaje" ${p.tipo === 'mensaje' ? 'selected' : ''}>Mensaje</option>
+          </select></div>
+        <div class="fr sm" style="margin-top:7px"><label for="ac-fecha">Fecha</label>
+          <input id="ac-fecha" type="date" value="${UI.esc(p.fecha)}"></div>
+        <textarea id="ac-nota" rows="3" style="margin-top:9px" placeholder="${p.tipo === 'mensaje' ? 'Qué mensaje mandarle…' : 'De qué te tenés que acordar…'}">${UI.esc(p.nota)}</textarea>
+        <button class="btn sm primary" id="ac-ok" style="width:100%;margin-top:9px">Guardar</button>
+        ${this.pendientes.length ? `<div class="pend-tit">Agendado</div>${this.pendientesLista()}` : ''}`;
+    },
+    pendientesLista() {
+      return this.pendientes.map(a => `<div class="pend">
+        <span class="pi">${a.tipo === 'mensaje' ? '💬' : '🔔'}</span>
+        <div><div class="pf">${UI.esc(fechaLarga(a.fecha))}</div>
+          <div class="pn">${UI.esc(a.nota)}</div></div></div>`).join('');
     },
 
     // ---- Acciones ---------------------------------------------------------
@@ -1288,9 +1356,19 @@
       }
       if (tipo !== 'guardar' && !this.lineas.length) { UI.aviso('Agregá al menos un producto', 'warn'); return; }
       if (tipo === 'preview') return this.modalPreview('ver');
-      if (tipo === 'print') return this.modalPreview('print');
+      if (tipo === 'print') { this.arrancarRegistro('Imprimió la cotización'); return this.modalPreview('print'); }
       if (tipo === 'descargar') return this.modalPreview('descargar');
       if (tipo === 'guardar') return this.conCambiosConfirmados(() => this.guardar());
+    },
+
+    // Guardar, imprimir, descargar o confirmar dejan la cotización "en el sistema":
+    // de ahí en más todo lo que se toque queda registrado.
+    arrancarRegistro(texto) {
+      const primera = !this.registrando;
+      this.registrando = true;
+      this.log(this.vendedor, texto);
+      if (primera) this.pintarSide();
+      return primera;
     },
 
     guardar() {
@@ -1408,7 +1486,7 @@
       if (this.nro != null && !this.guardada) global.DB.liberarNumeroCotizacion(this.nro);
       this.nro = global.DB.tomarNumeroCotizacion(); this.guardada = false;
       this.cli = { nombre: '', telefono: '', email: '', instagram: '', dni: '', tel2: '', canal: '', domicilio: '', localidad: '' };
-      this.abiertos = {}; this.etapa = 'cliente'; this.lado = 'actividad'; this.cantNueva = 1;
+      this.abiertos = {}; this.etapa = 'cliente'; this.lado = 'notas'; this.cantNueva = 1;
       this.cabAbierta = false;
       // Vendedor y local salen del usuario de la sesión; igual se pueden editar.
       this.vendedor = s.vendedor; this.local = s.local; this.fecha = hoy(); this.termino = 'efectivo';
@@ -1425,7 +1503,8 @@
         escalera: global.DB.ESCALERA_DEFAULT, escaleraAbierta: false, escaleraTocada: false,
       };
       this.lineas = []; this._uid = 0; this.dto = null; this.archivos = [];
-      this.actividad = []; this.registrando = false; this.cambios = [];
+      this.actividad = []; this.registrando = false; this.cambios = []; this.pendientes = [];
+      this._nuevaAct = null;
     },
 
     // ---- Vista previa / descarga / impresión -------------------------------
@@ -1495,7 +1574,7 @@
         a.href = 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
         a.download = nombre;
         document.body.appendChild(a); a.click(); a.remove();
-        this.log(this.vendedor, 'Descargó la cotización'); this.pintarSide();
+        this.arrancarRegistro('Descargó la cotización'); this.pintarSide();
         UI.aviso('Cotización descargada', 'ok');
       } catch (e) { UI.aviso('No se pudo descargar', 'crit'); }
     },
@@ -1524,28 +1603,38 @@
       const caja = m.firstChild;
       const cant = Math.max(1, this.cantNueva || 1);   // copiada del renglón de carga
       let tipo = 'estandar';   // estándar toma el precio del catálogo; a medida queda a definir
+      const libre = {};        // en a medida cada eje admite un valor escrito a mano
 
       const calzan = () => vars.filter(v => ejes.every(e => sel[e.k] == null || v[e.k] === sel[e.k]));
       const elegida = () => { const c = calzan(); return c.length === 1 || ejes.every(e => sel[e.k] != null) ? c[0] : null; };
+      // Valor final de cada eje: lo escrito a mano gana sobre lo elegido.
+      const valorDe = k => (libre[k] || '').trim() || sel[k] || '';
+      const armado = () => ejes.filter(e => valorDe(e.k)).map(e => ({ lbl: e.label, val: valorDe(e.k) }));
+      // Estándar necesita una variante exacta; a medida alcanza con algo definido.
+      const listo = () => tipo === 'medida' ? armado().length > 0 : !!elegida();
 
       const pintar = () => {
         const v = elegida();
-        const partes = ejes.filter(e => sel[e.k]).map(e => ({ lbl: e.label, val: sel[e.k] }));
+        const partes = armado();
         caja.innerHTML = `
           <div class="row" style="margin-bottom:4px"><h3 style="color:var(--navy);margin:0">${UI.esc(prod.nombre)}</h3>
             <div class="sp" style="flex:1"></div><button class="lx" id="mv-x" style="font-size:20px">✕</button></div>
           <p class="muted" style="margin:0 0 12px;font-size:13px">Armá el mueble: elegí ${ejes.map(e => e.label.toLowerCase()).join(', ')}.</p>
-          ${ejes.map(e => {
-            const opts = opciones(vars, e.k, sel);
-            return `<div class="vgrp"><div class="vlbl">${UI.esc(e.label)}</div>
-              <div class="vopts">${opts.map(o =>
-                `<button class="vopt ${sel[e.k] === o ? 'on' : ''}" data-e="${e.k}" data-o="${UI.esc(o)}">${UI.esc(o)}</button>`).join('')}</div></div>`;
-          }).join('')}
           <div class="vgrp"><div class="vlbl">Tipo</div>
             <div class="vopts">
               <button class="vopt ${tipo === 'estandar' ? 'on' : ''}" data-t="estandar">Estándar</button>
               <button class="vopt ${tipo === 'medida' ? 'on med' : ''}" data-t="medida">A medida</button>
             </div></div>
+          ${ejes.map(e => {
+            const opts = opciones(vars, e.k, sel);
+            return `<div class="vgrp"><div class="vlbl">${UI.esc(e.label)}</div>
+              <div class="vopts">${opts.map(o =>
+                `<button class="vopt ${!libre[e.k] && sel[e.k] === o ? 'on' : ''}" data-e="${e.k}" data-o="${UI.esc(o)}">${UI.esc(o)}</button>`).join('')}
+                ${tipo === 'medida'
+                  ? `<input class="vlibre" data-lib="${e.k}" value="${UI.esc(libre[e.k] || '')}"
+                       placeholder="otra ${e.label.toLowerCase()}… (ej. a convenir)">`
+                  : ''}</div></div>`;
+          }).join('')}
           <div class="vpre">
             <div>
               <div class="muted" style="font-size:12px">${partes.length ? UI.esc(textoEjes(partes)) : 'Elegí las opciones'}</div>
@@ -1556,9 +1645,23 @@
                    <span class="muted" style="font-size:12px">precio de lista${cant > 1 && v ? ` · ${cant} × ${UI.pesos(v.precio)}` : ''}</span>`}
             </div>
             <div class="sp" style="flex:1"></div>
-            <button class="btn primary" id="mv-ok" ${v ? '' : 'disabled'}>Agregar${cant > 1 ? ` ${cant}` : ''}</button>
+            <button class="btn primary" id="mv-ok" ${listo() ? '' : 'disabled'}>Agregar${cant > 1 ? ` ${cant}` : ''}</button>
           </div>`;
-        caja.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { tipo = b.dataset.t; pintar(); });
+        caja.querySelectorAll('[data-t]').forEach(b => b.onclick = () => {
+          tipo = b.dataset.t;
+          if (tipo !== 'medida') Object.keys(libre).forEach(k => delete libre[k]);
+          pintar();
+        });
+        caja.querySelectorAll('[data-lib]').forEach(i => {
+          i.oninput = () => {
+            libre[i.dataset.lib] = i.value;
+            // Sólo se refresca lo que depende del valor escrito, para no perder el foco.
+            const pre = caja.querySelector('.vpre .muted');
+            if (pre) pre.textContent = armado().length ? textoEjes(armado()) : 'Elegí las opciones';
+            const ok2 = document.getElementById('mv-ok'); if (ok2) ok2.disabled = !listo();
+            caja.querySelectorAll(`[data-e="${i.dataset.lib}"]`).forEach(b => b.classList.remove('on'));
+          };
+        });
 
         document.getElementById('mv-x').onclick = () => m.remove();
         caja.querySelectorAll('[data-e]').forEach(b => b.onclick = () => {
@@ -1569,7 +1672,11 @@
           pintar();
         });
         const ok = document.getElementById('mv-ok');
-        if (ok && v) ok.onclick = () => { this.agregarEstandar(prod.nombre, v, prod.img, cant, tipo); m.remove(); };
+        if (ok) ok.onclick = () => {
+          if (!listo()) return;
+          this.agregarEstandar(prod.nombre, elegida() || { id: null, precio: 0 }, prod.img, cant, tipo, armado());
+          m.remove();
+        };
       };
       pintar();
     },
@@ -1836,6 +1943,8 @@
         .cz-tots .big{border-top:1px solid var(--line);margin-top:5px;padding-top:9px;font-size:15px;font-weight:700;color:var(--navy)}
         .cz-tots .big b{font-size:19px}
         .cz-tots .tiva{font-size:11.5px;color:var(--muted);margin-top:7px}
+        .tacc{display:flex;gap:8px;margin-top:12px}
+        .tacc .btn{flex:1}
         .tdto{display:flex;justify-content:space-between;align-items:center;gap:12px;width:calc(100% + 20px);margin:4px -10px;
           border:1px dashed var(--line);background:var(--line-soft);border-radius:8px;padding:5px 10px;
           font:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;text-align:left}
@@ -1851,6 +1960,11 @@
         .cz-sb textarea{width:100%;padding:8px 10px;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);resize:vertical}
         .ava{width:26px;height:26px;flex:none;border-radius:50%;background:var(--brand);color:#fff;display:inline-grid;place-items:center;font-size:10.5px;font-weight:800}
         .ava.sys{background:var(--muted)}
+        .pend-tit{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:14px 0 6px}
+        .pend{display:flex;gap:8px;padding:6px 0;align-items:flex-start;border-top:1px solid var(--line-soft)}
+        .pend .pi{font-size:13px}
+        .pend .pf{font-size:12px;font-weight:650;color:var(--navy)}
+        .pend .pn{font-size:12px;color:var(--ink-soft);line-height:1.4}
         .cbav{background:var(--warn-bg);border:1px solid var(--warn);color:var(--warn);border-radius:8px;
           padding:7px 10px;font-size:12px;font-weight:600;margin-bottom:10px}
         .cblist{max-height:300px;overflow:auto}
@@ -1884,6 +1998,7 @@
         .vopt:hover{border-color:var(--brand);color:var(--brand)}
         .vopt.on{border-color:var(--brand);background:var(--brand);color:#fff}
         .vopt.on.med{border-color:var(--warn);background:var(--warn)}
+        .vlibre{width:190px;padding:5px 10px;font-size:12.5px;border-style:dashed}
         .vpre{display:flex;align-items:center;gap:12px;border-top:1px solid var(--line);padding-top:12px;margin-top:6px}
         .ddrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 

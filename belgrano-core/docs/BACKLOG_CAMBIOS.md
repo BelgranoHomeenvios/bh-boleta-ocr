@@ -237,6 +237,26 @@
   o pasar a venta, sale un pop-up con **antes → después y la diferencia**, que
   hay que confirmar ("Confirmo que vi los cambios") para poder seguir.
 
+- ✅ 149. Los botones dicen **"Continuar"** a secas.
+- ✅ 150. En el armador el **Tipo va primero** (Estándar / A medida) y después los
+  tres ejes.
+- ✅ 151. Con **A medida**, cada eje suma un **campo libre**: se puede poner "1.10"
+  en vez de 1.00, o "a convenir" en vez de una estructura del catálogo.
+- ✅ 152. **Medidas · Terminaciones · Detalles arrancan cerrados**, cada uno con
+  su **+**: se abre sólo el que hace falta.
+- ✅ 153. Acciones repartidas: arriba **Guardar · Vista previa · Confirmar → Venta**;
+  abajo del "los precios no incluyen IVA", **Imprimir · Descargar**.
+- ✅ 154. El costado pasa a tres solapas: **Notas · Histórico · Actividad**,
+  con **Notas** seleccionada por default.
+- ✅ 155. **Actividad** agenda algo para la cotización: **Recordatorio** o
+  **Mensaje**, con fecha y nota. Al guardarlo aparece en **Notas** (bloque
+  "Agendado") y queda en el **Histórico**.
+- ✅ 156. El **Histórico** arranca también al **imprimir** o **descargar**, no sólo
+  al guardar o confirmar.
+- ✅ 157. **"Ver ficha completa" abre la ficha de ESE cliente**, no el listado
+  (`Clientes.render(mount, { id })` o `{ buscar }`); si todavía no existe, deja el
+  listado filtrado.
+
 > Pendientes:
 > - La lista de localidades es **demo del AMBA**; se reemplaza por la real del mapa.
 > - La foto del diseño hoy se carga por **URL**; falta la subida real del archivo.
