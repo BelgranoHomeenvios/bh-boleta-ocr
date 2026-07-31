@@ -1899,7 +1899,7 @@ tr:hover td{background:var(--panel-2)}
         <div class="lhead" id="pr-head"></div>
         <div id="pr-lineas"></div>
         <div class="srow">
-          <div class="lcant">${this.cantHTML(this.cantNueva, 'nueva')}</div>
+          <input id="pr-cant" class="cantn" type="number" min="1" value="${this.cantNueva}" aria-label="Cantidad a agregar">
           <div class="bwrap">
             <input id="pr-buscar" class="busca" placeholder="Buscar un producto…" autocomplete="off">
             <div id="pr-drop"></div>
@@ -1919,7 +1919,8 @@ tr:hover td{background:var(--panel-2)}
       };
       document.getElementById('pr-catalogo').onclick = () => this.modalCatalogo();
       document.getElementById('p-sig').onclick = () => { this.etapa = 'adicionales'; this.pintarMain(); };
-      this.bindCant(cont);
+      const cn = document.getElementById('pr-cant');
+      cn.oninput = () => { this.cantNueva = Math.max(1, Math.floor(Number(cn.value)) || 1); };
       const inp = document.getElementById('pr-buscar');
       let t; inp.oninput = () => { clearTimeout(t); t = setTimeout(() => this.buscarInline(inp.value.trim()), 220); };
       inp.onblur = () => setTimeout(() => { const d = document.getElementById('pr-drop'); if (d) d.innerHTML = ''; }, 180);
@@ -1939,10 +1940,7 @@ tr:hover td{background:var(--panel-2)}
         <span style="text-align:right">${pct ? `Dto. ${pct}%` : 'Dto.'}</span>
         <span style="text-align:right">Subtotal</span><span></span>`;
 
-      if (!this.lineas.length) {
-        cont.innerHTML = UI.vacio('Buscá un mueble abajo para empezar la cotización.');
-        this.refrescarProductos(); return;
-      }
+      if (!this.lineas.length) { cont.innerHTML = ''; this.refrescarProductos(); return; }
       // Una vez cargado, el renglón queda QUIETO: se lee, no se edita. Con el
       // lápiz se vuelve a abrir esa línea y ahí sí se toca todo.
       cont.innerHTML = this.lineas.map(l => {
@@ -2726,7 +2724,7 @@ tr:hover td{background:var(--panel-2)}
         
         /* El buscador va alineado con la columna Producto, arriba de las líneas:
            lo que se elige completa directamente ese renglón. */
-        .srow{display:grid;grid-template-columns:62px minmax(0,1.6fr) auto;gap:8px;align-items:center;padding:11px 0 4px}
+        .srow{display:grid;grid-template-columns:62px minmax(0,1.6fr) auto;gap:8px;align-items:center;padding:9px 0 4px}
         .bwrap{position:relative}
         .srow .busca{width:100%;padding:7px 10px;font-size:13px}
         .lnk{border:0;background:none;color:var(--brand);font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:0;justify-self:start}
@@ -2743,6 +2741,7 @@ tr:hover td{background:var(--panel-2)}
           cursor:pointer;padding:4px 10px;border-radius:7px;min-width:42px;text-align:center}
         .cantv:hover{border-color:var(--line);background:var(--panel)}
         .cante{width:56px;text-align:center;padding:4px 6px;font-size:14px;font-weight:650}
+        .cantn{width:100%;text-align:center;padding:7px 6px;font-size:14px;font-weight:650;color:var(--navy)}
         .lrow .dto{text-align:right;font-size:12.5px;color:var(--ok)}
         .litem{border-bottom:1px solid var(--line-soft)}
         .litem.abierta{background:var(--panel-2);border-radius:8px;padding:0 8px;margin:2px -8px;border:1px solid var(--brand)}

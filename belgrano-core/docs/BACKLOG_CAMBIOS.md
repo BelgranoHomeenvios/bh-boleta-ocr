@@ -138,6 +138,12 @@
 - ✅ 104. La **actividad no repite el mismo cambio**: mover la fecha tres veces
   deja una sola línea actualizada en lugar de tres.
 
+- ✅ 105. Se saca el cartel de "Buscá un mueble…": con la tabla vacía el
+  **renglón de carga aparece directo**, sin espacio muerto arriba.
+- ✅ 106. La **cantidad del renglón de carga se escribe de entrada** (campo
+  siempre editable), y queda aplicada al elegir el producto. En las líneas ya
+  cargadas se mantiene el texto que se toca para editar.
+
 > Pendientes:
 > - La lista de localidades es **demo del AMBA**; se reemplaza por la real del mapa.
 > - La foto del diseño hoy se carga por **URL**; falta la subida real del archivo.
