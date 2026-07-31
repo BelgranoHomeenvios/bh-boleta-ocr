@@ -65,24 +65,62 @@
   const DEMO = {
     categorias: [
       { id: 1, nombre: 'DORMITORIO', padre_id: null, nivel: 2 },
-      { id: 2, nombre: 'CÓMODAS',    padre_id: 1,    nivel: 3 },
-      { id: 3, nombre: 'PLACARD',    padre_id: 1,    nivel: 3 },
-      { id: 4, nombre: 'LIVING',     padre_id: null, nivel: 2 },
-      { id: 5, nombre: 'MESAS RATONAS', padre_id: 4, nivel: 3 },
+      { id: 2, nombre: 'CÓMODAS',      padre_id: 1,  nivel: 3 },
+      { id: 3, nombre: 'PLACARDS',     padre_id: 1,  nivel: 3 },
+      { id: 6, nombre: 'MESAS DE LUZ', padre_id: 1,  nivel: 3 },
+      { id: 4, nombre: 'LIVING',       padre_id: null, nivel: 2 },
+      { id: 5, nombre: 'MESAS RATONAS',   padre_id: 4, nivel: 3 },
+      { id: 7, nombre: 'RACKS Y MESAS DE TV', padre_id: 4, nivel: 3 },
     ],
+    // Diez muebles de ejemplo repartidos en cinco tipos, con la ficha que
+    // necesita el vendedor: qué es, de qué está hecho y cuánto tarda.
     productos: [
-      { id: 1, categoria_id: 2, nombre: 'CÓMODA AMBERES 55', publicado_tn: true },
-      { id: 4, categoria_id: 2, nombre: 'CÓMODA OLIVER 60', publicado_tn: true },
-      { id: 5, categoria_id: 2, nombre: 'CÓMODA NÓRDICA 90', publicado_tn: false },
-      { id: 2, categoria_id: 3, nombre: 'PLACARD OLIVER', publicado_tn: true },
-      { id: 3, categoria_id: 5, nombre: 'MESA RATONA NORUEGA', publicado_tn: false },
+      { id: 1, categoria_id: 2, nombre: 'CÓMODA AMBERES 55', publicado_tn: true, sku: 'CO-AMB-55',
+        desc: 'Cómoda de 4 cajones con guías de extracción total y tiradores embutidos. El clásico de la línea Amberes.',
+        alto: 0.85, prof: 0.45, materiales: 'MDF 18 mm laqueado · guías telescópicas · tiradores de aluminio', dias: 32 },
+      { id: 4, categoria_id: 2, nombre: 'CÓMODA OLIVER 60', publicado_tn: true, sku: 'CO-OLI-60',
+        desc: 'Seis cajones sobre patas de madera maciza. Frente ranurado, sin tiradores a la vista.',
+        alto: 0.90, prof: 0.45, materiales: 'MDF 18 mm · patas de paraíso macizo · guías telescópicas', dias: 35 },
+      { id: 5, categoria_id: 2, nombre: 'CÓMODA NÓRDICA 90', publicado_tn: false, sku: 'CO-NOR-90',
+        desc: 'Tres cajones amplios y estructura baja. Se fabrica sólo en natural, a pedido.',
+        alto: 0.75, prof: 0.42, materiales: 'MDF 18 mm enchapado · patas torneadas', dias: 35 },
+      { id: 2, categoria_id: 3, nombre: 'PLACARD OLIVER', publicado_tn: true, sku: 'PL-OLI',
+        desc: 'Placard de dos y tres puertas con interior armado: barral, estantes y cajonera.',
+        alto: 2.10, prof: 0.55, materiales: 'MDF 18 mm · barral cromado · bisagras con freno', dias: 40 },
+      { id: 6, categoria_id: 3, nombre: 'PLACARD AMBERES 2 PUERTAS', publicado_tn: true, sku: 'PL-AMB-2P',
+        desc: 'Dos puertas batientes con cajonera interna de tres cajones y estante alto.',
+        alto: 2.00, prof: 0.55, materiales: 'MDF 18 mm laqueado · bisagras con freno', dias: 40 },
+      { id: 7, categoria_id: 6, nombre: 'MESA DE LUZ AMBERES', publicado_tn: true, sku: 'ML-AMB',
+        desc: 'Un cajón y un estante inferior. Combina con la cómoda de la misma línea.',
+        alto: 0.50, prof: 0.35, materiales: 'MDF 18 mm laqueado · guía telescópica', dias: 25 },
+      { id: 8, categoria_id: 6, nombre: 'MESA DE LUZ NÓRDICA', publicado_tn: false, sku: 'ML-NOR',
+        desc: 'Un cajón sobre patas torneadas. Se fabrica a pedido en cualquiera de las terminaciones.',
+        alto: 0.52, prof: 0.35, materiales: 'MDF 18 mm · patas de paraíso macizo', dias: 25 },
+      { id: 3, categoria_id: 5, nombre: 'MESA RATONA NORUEGA', publicado_tn: false, sku: 'MR-NOR',
+        desc: 'Tapa rectangular con bandeja inferior y patas en V. Se hace a medida sin costo extra.',
+        alto: 0.40, prof: 0.50, materiales: 'MDF 18 mm enchapado · patas de paraíso macizo', dias: 30 },
+      { id: 9, categoria_id: 5, nombre: 'MESA RATONA OSLO', publicado_tn: true, sku: 'MR-OSL',
+        desc: 'Tapa redonda sobre base central. Entra en cualquier living sin comer lugar.',
+        alto: 0.42, prof: 0.60, materiales: 'MDF 18 mm laqueado · base metálica negra', dias: 30 },
+      { id: 10, categoria_id: 7, nombre: 'RACK BERGEN 1.60', publicado_tn: true, sku: 'RK-BER-160',
+        desc: 'Dos puertas rebatibles y un estante pasacables. Soporta televisores de hasta 65".',
+        alto: 0.45, prof: 0.40, materiales: 'MDF 18 mm laqueado · bisagras con freno · pasacables', dias: 30 },
+      { id: 11, categoria_id: 7, nombre: 'RACK OSLO 1.80', publicado_tn: true, sku: 'RK-OSL-180',
+        desc: 'Dos cajones y un módulo abierto, sobre patas de madera. La versión larga del living Oslo.',
+        alto: 0.48, prof: 0.40, materiales: 'MDF 18 mm · patas de paraíso macizo · guías telescópicas', dias: 32 },
     ],
     variantes: [
       ...combinar(1, ['1.00', '1.20', '1.40', '1.60'], ['Blanca', 'Negra'], ['Paraíso', 'Blanco'], 385000, 42000),
       ...combinar(4, ['1.20', '1.60'], ['Blanca', 'Negra'], ['Paraíso', 'Nogal'], 410000, 55000),
       ...combinar(5, ['0.90'], ['Natural'], ['Paraíso'], 352000, 0),
       ...combinar(2, ['1.80', '2.00', '2.20'], ['Blanca', 'Negra'], ['Paraíso', 'Blanco'], 860000, 90000),
+      ...combinar(6, ['1.20', '1.40'], ['Blanca', 'Negra'], ['Paraíso', 'Blanco'], 690000, 74000),
+      ...combinar(7, ['0.45'], ['Blanca', 'Negra'], ['Paraíso', 'Blanco'], 148000, 0),
+      ...combinar(8, ['0.45'], ['Natural'], ['Paraíso', 'Nogal'], 132000, 0),
       ...combinar(3, ['0.80x0.50', '1.00x0.60'], ['Paraíso'], ['Negro', 'Natural'], 720000, 148000),
+      ...combinar(9, ['0.80', '1.00'], ['Negra'], ['Paraíso', 'Blanco'], 268000, 46000),
+      ...combinar(10, ['1.60'], ['Blanca', 'Negra'], ['Paraíso', 'Blanco'], 415000, 0),
+      ...combinar(11, ['1.80', '2.00'], ['Blanca', 'Negra'], ['Paraíso', 'Nogal'], 498000, 62000),
     ],
     // Órdenes de venta de ejemplo (para ver la vista antes de conectar).
     // saldo = total - sena. sena = suma de señas/cobros CONFIRMADOS hasta hoy.
@@ -253,7 +291,13 @@
         let ps = DEMO.productos.filter(p =>
           (!t || sinTilde(p.nombre).includes(t)) &&
           (categoriaId == null || p.categoria_id === categoriaId));
-        return ps.map(p => ({ ...p, variantes: DEMO.variantes.filter(v => v.producto_id === p.id).length }));
+        return ps.map(p => {
+          const vs = DEMO.variantes.filter(v => v.producto_id === p.id);
+          const pr = vs.map(v => v.precio);
+          // La grilla muestra "desde": el vendedor necesita el piso de precio
+          // antes de abrir el mueble.
+          return { ...p, variantes: vs.length, desde: pr.length ? Math.min(...pr) : 0, hasta: pr.length ? Math.max(...pr) : 0 };
+        });
       }
       let q = cliente().from('producto')
         .select('id,categoria_id,nombre,publicado_tn,variante(count)')
@@ -265,6 +309,27 @@
       const { data, error } = await q;
       if (error) throw error;
       return (data || []).map(p => ({ ...p, variantes: p.variante?.[0]?.count ?? 0 }));
+    },
+
+    // La ficha de un mueble: el producto con su categoría y su rango de precios.
+    async producto(id) {
+      const n = Number(id);
+      if (!hayConexion()) {
+        const p = DEMO.productos.find(x => x.id === n);
+        if (!p) return null;
+        const vs = DEMO.variantes.filter(v => v.producto_id === n).map(v => v.precio);
+        const cat = DEMO.categorias.find(c => c.id === p.categoria_id) || null;
+        const padre = cat && cat.padre_id ? DEMO.categorias.find(c => c.id === cat.padre_id) : null;
+        return { ...p, categoria: cat, ambiente: padre, variantes: vs.length,
+          desde: vs.length ? Math.min(...vs) : 0, hasta: vs.length ? Math.max(...vs) : 0 };
+      }
+      const { data, error } = await cliente().from('producto')
+        .select('id,categoria_id,nombre,publicado_tn,sku,desc,alto,prof,materiales,dias,categoria(id,nombre,padre_id)')
+        .eq('id', n).single();
+      if (error) throw error;
+      const vs = (await this.variantes(n)).map(v => v.precio);
+      return { ...data, ambiente: null, variantes: vs.length,
+        desde: vs.length ? Math.min(...vs) : 0, hasta: vs.length ? Math.max(...vs) : 0 };
     },
 
     async variantes(productoId) {

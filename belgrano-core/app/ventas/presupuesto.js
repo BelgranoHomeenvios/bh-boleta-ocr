@@ -265,6 +265,12 @@
         </div>
         ${this.estilos()}`;
 
+      // Si se llegó desde la ficha de un mueble, ya viene cargado.
+      const pre = this._precarga; this._precarga = null;
+      if (pre) {
+        this.agregarEstandar(pre.nombre, pre.variante, pre.img || '', 1);
+        this.etapa = 'productos';
+      }
       this.pintarTodo();
     },
 
