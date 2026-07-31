@@ -6,14 +6,6 @@
 
 ## Por aplicar (lote actual)
 
-**Nueva cotización — pendientes de este lote**
-- ⬜ 122. **Teléfono: sólo números** (no deja escribir letras).
-- ⬜ 123. **Sacar "Precio en efectivo"** del panel del a medida: el precio se
-  anota únicamente en el **subtotal**. Al sacarlo, el panel queda en **2 renglones**.
-- ⬜ 124. El campo **Subtotal** queda libre pero **sin las flechitas** de arriba/abajo:
-  es sólo para tipear el número.
-- ⬜ 125. **"Colores" → "Terminaciones"**.
-
 **Refinamientos del Detalle de la orden (post-Lote 2)**
 - ⬜ 27. Forma de pago NO debe ser dropdown editable directamente; pasa a **"Modificar orden"** (necesita autorización).
 - ⬜ 28. **Comentarios/mensajes** se mueven al **sidebar lateral** donde hoy está "Totales y Pagos" (no en card inferior).
@@ -190,6 +182,22 @@
   **% o $**, sobre **todos los muebles** o sobre **un producto** (con selector de
   cuál), con el monto calculado en vivo y opción de quitarlo. Nunca descuenta más
   que la base sobre la que se aplica, y sale en la vista previa.
+
+- ✅ 122. **Teléfono: sólo números** (no deja escribir letras).
+- ✅ 123. **Sacar "Precio en efectivo"** del panel del a medida: el precio se
+  anota únicamente en el **subtotal**. Al sacarlo, el panel queda en **2 renglones**.
+- ✅ 124. El campo **Subtotal** queda libre pero **sin las flechitas** de arriba/abajo:
+  es sólo para tipear el número.
+- ✅ 125. **"Colores" → "Terminaciones"**.
+- ✅ 126. El lápiz de **Entrega abre un calendario de rango**: un solo calendario
+  donde se marca primero el desde y después el hasta, con el rango resaltado.
+- ✅ 127. Pop-up de descuento: primero **Sobre**, después **En**, y el campo de
+  monto/porcentaje **al lado**, en el mismo renglón.
+- ✅ 128. En los totales, **Descuento va antes que Envío**.
+- ✅ 129. **Términos y condiciones sin recuadro**.
+- ✅ 130. El cuadro de totales se **distribuye a lo ancho**, proporcionado con el
+  bloque de Términos y condiciones.
+- ✅ 131. **Achicar el alto** de Observaciones para el cliente y Comentarios internos.
 
 > Pendientes:
 > - La lista de localidades es **demo del AMBA**; se reemplaza por la real del mapa.

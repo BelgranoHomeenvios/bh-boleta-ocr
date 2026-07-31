@@ -1665,17 +1665,19 @@ tr:hover td{background:var(--panel-2)}
           <div class="cz-tyc">
             <div class="lbl">Observaciones para el cliente
               <span class="muted">salen impresas en la cotización</span></div>
-            <textarea id="obs-ext" rows="2" placeholder="Lo que tiene que ver el cliente…">${UI.esc(this.obsExt)}</textarea>
+            <textarea id="obs-ext" rows="1" placeholder="Lo que tiene que ver el cliente…">${UI.esc(this.obsExt)}</textarea>
             <div class="int-box">
               <div class="lbl">Comentarios internos
                 <span class="muted">no salen impresas — para nosotros o producción</span></div>
-              <textarea id="obs-int" rows="2" placeholder="Notas para producción, administración o para vos…">${UI.esc(this.obsInt)}</textarea>
+              <textarea id="obs-int" rows="1" placeholder="Notas para producción, administración o para vos…">${UI.esc(this.obsInt)}</textarea>
             </div>
-            <div class="lbl" style="margin-top:11px">Términos y condiciones
+          </div>
+          <div id="cz-tot"></div>
+          <div class="cz-tyc tyc-full">
+            <div class="lbl">Términos y condiciones
               <span class="muted">salen siempre, no se editan</span></div>
             <div class="tyc-fijo">${UI.esc(global.DB.TYC_DEFAULT)}</div>
           </div>
-          <div id="cz-tot"></div>
         </div>`;
 
       m.querySelectorAll('[data-sec]').forEach(b => b.onclick = () => {
@@ -1799,7 +1801,7 @@ tr:hover td{background:var(--panel-2)}
               ${locActual.manual ? '<b>· cargada a mano</b>' : ''}</span></div>` : ''}
           </div>
           <div class="cz-col">
-            ${f('c-tel', 'Teléfono', this.cli.telefono, '11 5555-2020')}
+            ${f('c-tel', 'Teléfono', this.cli.telefono, '11 5555-2020', 'inputmode="tel"')}
             ${f('c-mail', 'Email', this.cli.email, 'cliente@correo.com')}
             ${sel('c-canal', '¿Cómo nos conoció?', `<option value="">—</option>` +
               ['Instagram', 'Facebook', 'Recomendación', 'Pasó por el local', 'Google', 'Otro']
@@ -1810,13 +1812,21 @@ tr:hover td{background:var(--panel-2)}
         ${addBtns ? `<div class="adds">${addBtns}</div>` : ''}
         <div class="sec-go"><button class="btn sm primary" id="c-sig">Continuar → Productos</button></div>`;
 
-      const bind = (id, campo) => {
+      // `soloNum` deja escribir únicamente números (teléfonos y DNI).
+      const bind = (id, campo, soloNum) => {
         const el = document.getElementById(id); if (!el) return;
-        el.oninput = () => { this.cli[campo] = el.value; this.avisoCliente(); this.pintarCabecera(); this.refrescarResumen(); this.pintarSide(); };
+        el.oninput = () => {
+          if (soloNum) {
+            const limpio = el.value.replace(/[^\d]/g, '');
+            if (limpio !== el.value) el.value = limpio;
+          }
+          this.cli[campo] = el.value;
+          this.avisoCliente(); this.pintarCabecera(); this.refrescarResumen(); this.pintarSide();
+        };
       };
-      bind('c-nombre', 'nombre'); bind('c-tel', 'telefono');
+      bind('c-nombre', 'nombre'); bind('c-tel', 'telefono', true);
       bind('c-mail', 'email'); bind('c-dom', 'domicilio');
-      OPCIONALES.forEach(o => bind('c-' + o.k, o.k));
+      OPCIONALES.forEach(o => bind('c-' + o.k, o.k, o.k === 'tel2' || o.k === 'dni'));
       c.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { this.abiertos[b.dataset.add] = true; this.pintarCliente(); });
       c.querySelectorAll('[data-quitar]').forEach(b => b.onclick = () => {
         const k = b.dataset.quitar;
@@ -1875,6 +1885,66 @@ tr:hover td{background:var(--panel-2)}
         if (!this.ad.envioTocado) this.ad.envio = 0;
         this.pintarTodo();
       };
+    },
+
+    // Calendario de rango: se toca el primer día y después el último, y el
+    // tramo del medio queda pintado. Nunca se acepta un solo día.
+    modalCalendario(desde, hasta, onlisto) {
+      let d1 = desde || '', d2 = hasta || '';
+      let mes = mesDe(d1 || enDias(0));
+      const m = this.modal('', null, 380);
+      const caja = m.firstChild;
+
+      const pintar = () => {
+        const hoyISO = enDias(0);
+        const [y, mm] = mes.split('-').map(Number);
+        const primero = new Date(y, mm - 1, 1);
+        const dias = new Date(y, mm, 0).getDate();
+        const arranque = (primero.getDay() + 6) % 7;   // la semana empieza el lunes
+        const celdas = [];
+        for (let i = 0; i < arranque; i++) celdas.push('<span></span>');
+        for (let d = 1; d <= dias; d++) {
+          const iso = `${y}-${String(mm).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          const dentro = d1 && d2 && iso > d1 && iso < d2;
+          const cls = [
+            iso === d1 ? 'ini' : '', iso === d2 ? 'fin' : '', dentro ? 'medio' : '',
+            iso < hoyISO ? 'pasado' : '',
+          ].filter(Boolean).join(' ');
+          celdas.push(`<button class="cd ${cls}" data-d="${iso}" ${iso < hoyISO ? 'disabled' : ''}>${d}</button>`);
+        }
+        caja.innerHTML = `
+          <div class="row" style="margin-bottom:10px"><h3 style="color:var(--navy);margin:0;font-size:16px">Fechas de entrega</h3>
+            <div class="sp" style="flex:1"></div><button class="lx" id="cal-x" style="font-size:20px">✕</button></div>
+          <div class="cal-h">
+            <button class="cal-nav" id="cal-prev" aria-label="Mes anterior">‹</button>
+            <b>${UI.esc(MESES[mm - 1].toUpperCase())} ${y}</b>
+            <button class="cal-nav" id="cal-next" aria-label="Mes siguiente">›</button>
+          </div>
+          <div class="cal-dow">${['LU', 'MA', 'MI', 'JU', 'VI', 'SÁ', 'DO'].map(x => `<span>${x}</span>`).join('')}</div>
+          <div class="cal-g">${celdas.join('')}</div>
+          <div class="cal-pie">
+            <div class="muted">${d1 && d2
+              ? `<b style="color:var(--navy)">entre el ${fechaLarga(d1)} y el ${fechaLarga(d2)}</b>`
+              : d1 ? `Desde el <b>${fechaLarga(d1)}</b> — ahora marcá hasta cuándo`
+                   : 'Marcá desde qué día'}</div>
+            <div class="sp" style="flex:1"></div>
+            <button class="btn primary" id="cal-ok" ${d1 && d2 ? '' : 'disabled'}>Listo</button>
+          </div>`;
+
+        document.getElementById('cal-x').onclick = () => m.remove();
+        document.getElementById('cal-prev').onclick = () => { mes = correrMes(mes, -1); pintar(); };
+        document.getElementById('cal-next').onclick = () => { mes = correrMes(mes, 1); pintar(); };
+        caja.querySelectorAll('[data-d]').forEach(b => b.onclick = () => {
+          const iso = b.dataset.d;
+          // Primer toque abre el rango; segundo lo cierra. Si cae antes del
+          // inicio, se arranca de nuevo desde ahí.
+          if (!d1 || d2 || iso <= d1) { d1 = iso; d2 = ''; } else { d2 = iso; }
+          pintar();
+        });
+        const ok = document.getElementById('cal-ok');
+        if (d1 && d2) ok.onclick = () => { m.remove(); onlisto(d1, d2); };
+      };
+      pintar();
     },
 
     // Alta de una localidad que todavía no está en el mapa.
@@ -2024,18 +2094,15 @@ tr:hover td{background:var(--panel-2)}
           ? `<div class="lobs">
               <div class="lmed">
                 <label>Medidas <input data-med="${l.key}" value="${UI.esc(l.medidas || '')}" placeholder="ej. 2.40 × 0.50 × 0.90"></label>
-                <label>Colores <input data-col="${l.key}" value="${UI.esc(l.colores || '')}" placeholder="ej. estructura negra, frente paraíso"></label>
+                <label>Terminaciones <input data-col="${l.key}" value="${UI.esc(l.colores || '')}" placeholder="ej. estructura negra, frente paraíso"></label>
                 <label class="ancho">Observaciones <input data-obs="${l.key}" value="${UI.esc(l.obs)}" placeholder="lo que pidió el cliente"></label>
-              </div>
-              <div class="lmed">
-                <label>${UI.esc(this.labelPrecio())} <input type="number" min="0" data-pcond="${l.key}" value="${l.precioManual != null ? Math.round(this.unit(l)) : ''}" placeholder="0"></label>
                 ${l.img ? `<img class="lobs-img" src="${UI.esc(l.img)}" alt="Foto del diseño">` : ''}
               </div>
             </div>`
           : (l.medidas || l.colores || l.obs || l.img) ? `<div class="lobs leido">
               <div class="obst">${[
                 l.medidas && `<b>Medidas:</b> ${UI.esc(l.medidas)}`,
-                l.colores && `<b>Colores:</b> ${UI.esc(l.colores)}`,
+                l.colores && `<b>Terminaciones:</b> ${UI.esc(l.colores)}`,
                 l.obs && UI.esc(l.obs),
               ].filter(Boolean).join(' · ')}</div>
               ${l.img ? `<img class="lobs-img" src="${UI.esc(l.img)}" alt="Foto del diseño">` : ''}
@@ -2049,7 +2116,7 @@ tr:hover td{background:var(--panel-2)}
             ${precioCel}
             <div class="dto tnum">${dto ? '−' + UI.pesos(dto) : '—'}</div>
             ${abierta && medida
-              ? `<input type="number" min="0" class="pnum sube" data-subt="${l.key}" value="${this.sinPrecio(l) ? '' : Math.round(sub)}" placeholder="subtotal" aria-label="Subtotal">`
+              ? `<input inputmode="numeric" class="pnum sube" data-subt="${l.key}" value="${this.sinPrecio(l) ? '' : Math.round(sub)}" placeholder="precio" aria-label="Subtotal">`
               : `<div class="sub tnum">${this.sinPrecio(l) ? '<span class="adef">—</span>' : UI.pesos(sub)}</div>`}
             <div class="lacc">
               <button class="lx" data-ed="${l.key}" title="${abierta ? 'Listo' : 'Editar el renglón'}">${abierta ? '✓' : '✏️'}</button>
@@ -2078,17 +2145,17 @@ tr:hover td{background:var(--panel-2)}
       cont.querySelectorAll('[data-col]').forEach(i => i.oninput = () => { const l = this.get(i.dataset.col); if (l) l.colores = i.value; });
       // El precio se carga en la condición elegida arriba (efectivo, lista…) y
       // el de lista se deduce solo.
-      cont.querySelectorAll('[data-pcond]').forEach(i => i.onchange = () => {
-        const l = this.get(i.dataset.pcond); if (!l) return;
-        l.precioManual = i.value === '' ? null : this.desdeCondicion(Number(i.value) || 0);
-        this.repintar();
-      });
       // También se puede tipear el SUBTOTAL y el unitario sale solo.
-      cont.querySelectorAll('[data-subt]').forEach(i => i.onchange = () => {
-        const l = this.get(i.dataset.subt); if (!l) return;
-        const total = Math.max(0, Number(i.value) || 0);
-        l.precioManual = i.value === '' ? null : this.desdeCondicion(total / Math.max(1, l.cantidad));
-        this.repintar();
+      // Único lugar donde se carga el precio del a medida: se tipea el total de
+      // la línea y el unitario (y el de lista) salen solos.
+      cont.querySelectorAll('[data-subt]').forEach(i => {
+        i.oninput = () => { const n = i.value.replace(/[^\d]/g, ''); if (n !== i.value) i.value = n; };
+        i.onchange = () => {
+          const l = this.get(i.dataset.subt); if (!l) return;
+          const total = Math.max(0, Number(i.value) || 0);
+          l.precioManual = i.value === '' ? null : this.desdeCondicion(total / Math.max(1, l.cantidad));
+          this.repintar();
+        };
       });
       cont.querySelectorAll('[data-nom]').forEach(i => i.oninput = () => { const l = this.get(i.dataset.nom); if (l) l.prodNombre = i.value; });
       // Se carga el de lista o el de efectivo; el otro se completa solo.
@@ -2247,17 +2314,12 @@ tr:hover td{background:var(--panel-2)}
 
       c.innerHTML = `<div class="cz-cols">
         <div class="cz-col">
-          ${a.entregaAbierta ? `
-            <div class="fr"><label for="ad-desde">Entrega</label>
-              <div class="fx rango">
-                <input id="ad-desde" type="date" value="${UI.esc(a.desde)}" aria-label="Entrega desde">
-                <span class="ent">y el</span>
-                <input id="ad-hasta" type="date" value="${UI.esc(a.hasta)}" aria-label="Entrega hasta">
-                <button class="lapiz" data-cerrar="entrega" title="Volver al plazo estándar" aria-label="Volver al plazo estándar">↺</button>
-              </div></div>
-            <div class="fr"><label></label><span class="hint" id="ad-plazo"></span></div>`
-            : cerrado('Entrega', this.entregaTexto(), 'entrega',
-                `Plazo de fabricación: <b>${UI.esc(this.entregaDias())}</b>.`)}
+          <div class="fr"><label>Entrega</label>
+            <div class="fx"><span class="valf">${UI.esc(this.entregaTexto())}</span>
+              <button class="lapiz" id="ad-cal" title="Elegir las fechas de entrega" aria-label="Elegir las fechas de entrega">✏️</button>
+              ${a.entregaTocada ? `<button class="lapiz" data-cerrar="entrega" title="Volver al plazo estándar" aria-label="Volver al plazo estándar">↺</button>` : ''}
+            </div></div>
+          <div class="fr"><label></label><span class="hint" id="ad-plazo">Plazo de fabricación: <b>${UI.esc(this.entregaDias())}</b>.</span></div>
 
           <div class="fr"><label>Saldo se abona en</label>
             <span class="valf">${UI.esc(a.saldoEn)}</span></div>
@@ -2325,26 +2387,13 @@ tr:hover td{background:var(--panel-2)}
         box.innerHTML = out.join('');
       };
 
-      const plazoHint = () => {
-        const h = document.getElementById('ad-plazo'); if (!h) return;
-        h.innerHTML = `Queda <b>${UI.esc(this.entregaTexto())}</b> · ${UI.esc(this.entregaDias())}`
-          + (this._rangoCorregido ? ' <b style="color:var(--warn)">— la entrega siempre va entre dos fechas</b>' : '');
-      };
 
-      // La entrega siempre es un rango: si queda un solo día, se corrige solo.
-      const tocarEntrega = () => {
-        a.entregaTocada = true;
-        const corregido = this.normalizarEntrega();
-        const ha2 = document.getElementById('ad-hasta');
-        if (corregido && ha2) ha2.value = a.hasta;
-        this._rangoCorregido = corregido;
+      document.getElementById('ad-cal').onclick = () => this.modalCalendario(a.desde, a.hasta, (d1, d2) => {
+        a.desde = d1; a.hasta = d2; a.entregaTocada = true;
+        this.normalizarEntrega();
         this.log(this.vendedor, `Cambió la fecha de entrega: ${this.entregaTexto()}`, 'entrega');
-        plazoHint(); av(); this.refrescarResumen(); this.pintarSide();
-      };
-      const de = document.getElementById('ad-desde');
-      if (de) de.onchange = e => { a.desde = e.target.value; tocarEntrega(); };
-      const ha = document.getElementById('ad-hasta');
-      if (ha) ha.onchange = e => { a.hasta = e.target.value; tocarEntrega(); };
+        this.pintarAdicionales(); this.refrescarResumen(); this.pintarSide();
+      });
       const en = document.getElementById('ad-envio');
       if (en) en.oninput = e => {
         a.envio = Math.max(0, Number(e.target.value) || 0); a.envioTocado = true;
@@ -2354,7 +2403,7 @@ tr:hover td{background:var(--panel-2)}
       if (ins) ins.onchange = e => { a.instalacion = e.target.value; av(); this.refrescarResumen(); };
       const es = document.getElementById('ad-esc');
       if (es) es.oninput = e => { a.escalera = Math.max(0, Number(e.target.value) || 0); a.escaleraTocada = true; av(); };
-      plazoHint(); av();
+      av();
     },
 
     // ---- Desglose de totales ----------------------------------------------
@@ -2368,11 +2417,11 @@ tr:hover td{background:var(--panel-2)}
         ${fila('Total', UI.pesos(lista))}
         ${desc ? fila('Dto. efvo.' + pct, '−' + UI.pesos(desc), 'neg') : ''}
         ${desc ? fila('Subtotal', UI.pesos(this.total())) : ''}
-        ${fila('Envío', this.envioTexto())}
         <button class="tdto ${extra ? 'on' : ''}" id="cz-dto">
           <span>Descuento${extra ? `<small>${UI.esc(this.dtoTexto())}</small>` : ''}</span>
           <b class="tnum">${extra ? '−' + UI.pesos(extra) : '+ Agregar'}</b>
         </button>
+        ${fila('Envío', this.envioTexto())}
         ${fila('Total a pagar', UI.pesos(this.totalFinal()), 'big')}
         <div class="tiva">${UI.esc(global.DB.IVA_LEYENDA)}</div>
       </div>`;
@@ -2395,11 +2444,6 @@ tr:hover td{background:var(--panel-2)}
           <div class="row" style="margin-bottom:4px"><h3 style="color:var(--navy);margin:0">Descuento</h3>
             <div class="sp" style="flex:1"></div><button class="lx" id="dd-x" style="font-size:20px">✕</button></div>
           <p class="muted" style="margin:0 0 14px;font-size:13px">Aparte del descuento de la condición de pago.</p>
-          <div class="vgrp"><div class="vlbl">En</div>
-            <div class="vopts">
-              <button class="vopt ${d.modo === 'pct' ? 'on' : ''}" data-m="pct">Porcentaje %</button>
-              <button class="vopt ${d.modo === 'monto' ? 'on' : ''}" data-m="monto">Pesos $</button>
-            </div></div>
           <div class="vgrp"><div class="vlbl">Sobre</div>
             <div class="vopts">
               <button class="vopt ${d.alcance === 'total' ? 'on' : ''}" data-a="total">Todos los muebles</button>
@@ -2408,9 +2452,15 @@ tr:hover td{background:var(--panel-2)}
           ${d.alcance === 'linea' ? `<div class="vgrp"><div class="vlbl">Producto</div>
             <select id="dd-linea">${this.lineas.map(l =>
               `<option value="${l.key}" ${String(d.linea) === String(l.key) ? 'selected' : ''}>${UI.esc(l.prodNombre || 'Mueble a medida')} — ${UI.pesos(this.unit(l) * l.cantidad)}</option>`).join('')}</select></div>` : ''}
-          <div class="vgrp"><div class="vlbl">${d.modo === 'pct' ? 'Porcentaje' : 'Monto'}</div>
-            <div class="vcant"><input id="dd-valor" type="number" min="0" ${d.modo === 'pct' ? 'max="100"' : ''} value="${d.valor}" placeholder="0">
-              <span class="muted">${d.modo === 'pct' ? '%' : '$'}</span></div></div>
+          <div class="vgrp"><div class="vlbl">En</div>
+            <div class="ddrow">
+              <div class="vopts">
+                <button class="vopt ${d.modo === 'pct' ? 'on' : ''}" data-m="pct">Porcentaje %</button>
+                <button class="vopt ${d.modo === 'monto' ? 'on' : ''}" data-m="monto">Pesos $</button>
+              </div>
+              <div class="vcant"><input id="dd-valor" inputmode="numeric" value="${d.valor}" placeholder="0" aria-label="${d.modo === 'pct' ? 'Porcentaje' : 'Monto'}">
+                <span class="muted">${d.modo === 'pct' ? '%' : '$'}</span></div>
+            </div></div>
           <div class="vpre">
             <div><div class="muted" style="font-size:12px">Descuento</div>
               <b class="tnum" style="font-size:21px;color:var(--ok)">${prev ? '−' + UI.pesos(prev) : '—'}</b></div>
@@ -2429,7 +2479,15 @@ tr:hover td{background:var(--panel-2)}
         const sel = document.getElementById('dd-linea');
         if (sel) sel.onchange = e => { d.linea = Number(e.target.value); pintar(); };
         const val = document.getElementById('dd-valor');
-        val.oninput = () => { d.valor = val.value; pintar(); };
+        val.oninput = () => {
+          const n = val.value.replace(/[^\d]/g, '');
+          d.valor = n;
+          if (n !== val.value) { val.value = n; }
+          const prevb = caja.querySelector('.vpre b');
+          if (prevb) { const g = this.dto; this.dto = Number(n) > 0 ? d : null;
+            const x = this.descuentoExtra(); this.dto = g;
+            prevb.textContent = x ? '−' + UI.pesos(x) : '—'; }
+        };
         const q = document.getElementById('dd-quitar');
         if (q) q.onclick = () => {
           this.dto = null; this.log(this.vendedor, 'Quitó el descuento');
@@ -2966,7 +3024,7 @@ tr:hover td{background:var(--panel-2)}
         .lx{color:var(--muted);cursor:pointer;font-size:15px;border:0;background:transparent;padding:3px}
         @media(max-width:1000px){.lhead{display:none}.lrow{grid-template-columns:62px 1fr 1fr;gap:8px}.lrow .sub,.lrow .lock,.lrow .pnum{text-align:left}}
 
-        .cz-foot{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:26px;padding:16px}
+        .cz-foot{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px 30px;padding:16px}
         @media(max-width:820px){.cz-foot{grid-template-columns:1fr}}
         .cz-tyc .lbl{font-size:12.5px;color:var(--ink-soft);margin-bottom:6px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
         .cz-tyc .lbl .muted{font-size:11.5px}
@@ -2979,6 +3037,23 @@ tr:hover td{background:var(--panel-2)}
         .valf{flex:1;min-width:0;font-size:13px;color:var(--ink);padding:6px 0}
         .lapiz{flex:none;border:0;background:none;cursor:pointer;font-size:13px;line-height:1;padding:5px 7px;border-radius:6px;color:var(--muted)}
         .lapiz:hover{background:var(--line-soft)}
+        .cal-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+        .cal-h b{font-size:13.5px;color:var(--navy);letter-spacing:.04em}
+        .cal-nav{border:0;background:none;font-size:19px;color:var(--ink-soft);cursor:pointer;padding:2px 9px;border-radius:7px;line-height:1}
+        .cal-nav:hover{background:var(--line-soft)}
+        .cal-dow,.cal-g{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+        .cal-dow{margin-bottom:4px}
+        .cal-dow span{text-align:center;font-size:10.5px;font-weight:700;color:var(--muted);letter-spacing:.04em}
+        .cd{border:0;background:none;font:inherit;font-size:13px;color:var(--ink);cursor:pointer;
+          height:34px;border-radius:9px;display:grid;place-items:center}
+        .cd:not(:disabled):not(.ini):not(.fin):not(.medio):hover{background:var(--line-soft)}
+        .cd:disabled{color:var(--line);cursor:default}
+        .cd.medio{background:var(--brand-soft);border-radius:0;color:var(--brand);font-weight:600}
+        .cd.ini,.cd.fin{background:var(--brand);color:#fff;font-weight:800}
+        .cd.ini{border-radius:9px 0 0 9px}
+        .cd.fin{border-radius:0 9px 9px 0}
+        .cd.ini.fin{border-radius:9px}
+        .cal-pie{display:flex;align-items:center;gap:12px;border-top:1px solid var(--line);margin-top:12px;padding-top:12px;font-size:12.5px}
         .rango{gap:7px}
         .rango input{flex:1;min-width:0}
         .rango .ent{flex:none;font-size:12.5px;color:var(--muted)}
@@ -2986,9 +3061,10 @@ tr:hover td{background:var(--panel-2)}
         .locw .drop{width:100%;min-width:250px}
         .bwrap .drop{margin-top:4px}
         .drop .it.nueva{color:var(--brand);font-weight:600}
-        .tyc-fijo{font-size:12.5px;color:var(--ink-soft);line-height:1.5;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:9px 11px}
+        .tyc-fijo{font-size:12.5px;color:var(--ink-soft);line-height:1.55}
+        .tyc-full{grid-column:1/-1;border-top:1px solid var(--line);padding-top:12px;margin-top:2px}
         .cz-tyc textarea,.cz-foot textarea{width:100%;padding:8px 10px;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);resize:vertical}
-        .cz-tots .tr{display:flex;justify-content:space-between;gap:12px;padding:4px 0;font-size:13px;color:var(--ink-soft)}
+        .cz-tots .tr{display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:13px;color:var(--ink-soft)}
         .cz-tots .tr b{color:var(--navy)}
         .cz-tots .neg b{color:var(--ok)}
         .cz-tots .big{border-top:1px solid var(--line);margin-top:5px;padding-top:9px;font-size:15px;font-weight:700;color:var(--navy)}
@@ -3033,6 +3109,7 @@ tr:hover td{background:var(--panel-2)}
         .vopt.on{border-color:var(--brand);background:var(--brand);color:#fff}
         .vopt.on.med{border-color:var(--warn);background:var(--warn)}
         .vpre{display:flex;align-items:center;gap:12px;border-top:1px solid var(--line);padding-top:12px;margin-top:6px}
+        .ddrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 
         .mdlbg{position:fixed;inset:0;background:rgba(20,26,38,.4);z-index:50;display:grid;place-items:center;padding:20px}
       </style>`;
@@ -3086,6 +3163,12 @@ tr:hover td{background:var(--panel-2)}
   function fechaLarga(s) {
     const p = String(s || '').split('-');
     return p.length === 3 ? `${Number(p[2])} de ${MESES[Number(p[1]) - 1] || ''}` : String(s || '');
+  }
+  function mesDe(iso) { return String(iso || '').slice(0, 7) || iso; }
+  function correrMes(mesISO, n) {
+    const [y, m] = String(mesISO).split('-').map(Number);
+    const d = new Date(y, m - 1 + n, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   }
   function sumarDias(fecha, n) {
     try {
