@@ -374,7 +374,27 @@
 
     // Sesión del vendedor: el que vende entra con su usuario, así que el
     // vendedor y el local salen precargados (igual se pueden editar).
+    // El local se elige al iniciar sesión — de ahí sale este default.
     sesion() { return { vendedor: 'Brian', local: '2020' }; },
+
+    // ---- Numeración de cotizaciones -------------------------------------
+    // La cotización toma número apenas se abre, aunque todavía no se guarde,
+    // así el vendedor ya la puede nombrar. Si al final no se usa, el número
+    // vuelve al pozo y lo agarra la siguiente (no se queman números).
+    _serieCot: 1842,
+    _cotLibres: [],
+    tomarNumeroCotizacion() {
+      const n = this._cotLibres.length ? this._cotLibres.shift() : ++this._serieCot;
+      return n;
+    },
+    liberarNumeroCotizacion(n) {
+      if (n == null) return;
+      const x = Number(n);
+      if (!Number.isFinite(x) || this._cotLibres.includes(x)) return;
+      this._cotLibres.push(x);
+      this._cotLibres.sort((a, b) => a - b);   // se reutiliza el más bajo primero
+    },
+    numeroCotizacion(n) { return 'C-' + n; },
 
     // Ficha resumida + documentos relacionados del cliente, para el costado de
     // la cotización. Sale del CRM: acá va el demo hasta enganchar la tabla real.

@@ -54,6 +54,7 @@
     etapa: 'cliente',    // desplegable abierto: cliente | productos | adicionales | ''
     lado: 'actividad',   // actividad | notas
     vendedor: '', local: '', fecha: '', termino: 'efectivo',
+    nro: null, guardada: false,   // el número se toma al abrir; si no se usa, vuelve
     notas: '', terminos: '',
     ad: null,            // adicionales
     actividad: [],       // historial de la cotización (se arma sola)
@@ -157,7 +158,7 @@
             <button class="sec-h" data-sec="${s.k}" aria-expanded="${on}">
               <span class="sec-n">${s.n}</span>
               <span class="sec-t">${UI.esc(s.tit)}</span>
-              <span class="sec-r">${this.resumen(s.k)}</span>
+              <span class="sec-r" id="res-${s.k}">${this.resumen(s.k)}</span>
               <span class="sec-c">${on ? '▲' : '▼'}</span>
             </button>
             ${on ? `<div class="sec-b" id="sec-${s.k}"></div>` : ''}
@@ -203,6 +204,14 @@
       return `${UI.esc(this.ad.entrega)} · ${env}`;
     },
 
+    // Refresca el resumen de las cabeceras plegadas mientras se escribe.
+    refrescarResumen() {
+      ['cliente', 'productos', 'adicionales'].forEach(k => {
+        const el = document.getElementById('res-' + k);
+        if (el) el.innerHTML = this.resumen(k);
+      });
+    },
+
     // Cabecera: quién y cuándo hace el presupuesto (no el total — eso va abajo).
     pintarCabecera() {
       const c = document.getElementById('cz-cab'); if (!c) return;
@@ -210,11 +219,13 @@
       c.innerHTML = `
         <div class="cz-tit">
           <div>
-            <div class="kick">Cotización</div>
+            <div class="kick">Cotización ${UI.esc(global.DB.numeroCotizacion(this.nro))}</div>
             <h1 class="h-title" style="margin:2px 0 0">${UI.esc(this.nombreCli() || 'Nueva')}</h1>
           </div>
           <div class="sp" style="flex:1"></div>
           <div class="cz-box">
+            <div class="fr sm nro"><label>N° de cotización</label>
+              <b class="tnum">${UI.esc(global.DB.numeroCotizacion(this.nro))}</b></div>
             <div class="fr sm"><label for="op-vend">Vendedor</label>
               <select id="op-vend">${vends.map(v => `<option ${this.vendedor === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
             <div class="fr sm"><label for="op-local">Local de origen</label>
@@ -239,8 +250,13 @@
       const sel = (id, lbl, opts) => `<div class="fr"><label for="${id}">${UI.esc(lbl)}</label>
         <select id="${id}">${opts}</select></div>`;
 
-      const ocultos = OPCIONALES.filter(o => this.abiertos[o.k])
-        .map(o => f('c-' + o.k, o.lbl, this.cli[o.k], o.ph)).join('');
+      // Los opcionales abiertos llevan una X para volver a cerrarlos: si se
+      // abrió uno por error, se borra lo cargado y vuelve a quedar oculto.
+      const ocultos = OPCIONALES.filter(o => this.abiertos[o.k]).map(o =>
+        `<div class="fr"><label for="c-${o.k}">${UI.esc(o.lbl)}</label>
+          <div class="fx"><input id="c-${o.k}" value="${UI.esc(this.cli[o.k])}" placeholder="${UI.esc(o.ph)}">
+            <button class="cx" data-quitar="${o.k}" title="Quitar ${UI.esc(o.lbl)}" aria-label="Quitar ${UI.esc(o.lbl)}">✕</button></div>
+        </div>`).join('');
       const addBtns = OPCIONALES.filter(o => !this.abiertos[o.k])
         .map(o => `<button class="chip-add" data-add="${o.k}">${UI.esc(o.btn)}</button>`).join('');
 
@@ -267,12 +283,17 @@
 
       const bind = (id, campo) => {
         const el = document.getElementById(id); if (!el) return;
-        el.oninput = () => { this.cli[campo] = el.value; this.avisoCliente(); this.pintarCabecera(); this.pintarSide(); };
+        el.oninput = () => { this.cli[campo] = el.value; this.avisoCliente(); this.pintarCabecera(); this.refrescarResumen(); this.pintarSide(); };
       };
       bind('c-nombre', 'nombre'); bind('c-tel', 'telefono');
       bind('c-mail', 'email'); bind('c-dom', 'domicilio');
       OPCIONALES.forEach(o => bind('c-' + o.k, o.k));
       c.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { this.abiertos[b.dataset.add] = true; this.pintarCliente(); });
+      c.querySelectorAll('[data-quitar]').forEach(b => b.onclick = () => {
+        const k = b.dataset.quitar;
+        this.cli[k] = ''; delete this.abiertos[k];
+        this.pintarCliente(); this.pintarCabecera(); this.refrescarResumen(); this.pintarSide();
+      });
       document.getElementById('c-canal').onchange = e => { this.cli.canal = e.target.value; };
       // Elegir localidad trae el costo de envío por default (editable en Adicionales).
       document.getElementById('c-locd').onchange = e => {
@@ -396,7 +417,7 @@
     },
     // Refresca lo que depende de las líneas sin volver a dibujar la tabla.
     refrescarProductos() {
-      this.pintarTotales();
+      this.pintarTotales(); this.refrescarResumen();
       const s = document.querySelector('.pr-sum b');
       if (s) s.textContent = UI.pesos(this.total());
     },
@@ -521,10 +542,10 @@
         box.innerHTML = out.join('');
       };
 
-      document.getElementById('ad-entrega').oninput = e => { a.entrega = e.target.value; av(); };
+      document.getElementById('ad-entrega').oninput = e => { a.entrega = e.target.value; av(); this.refrescarResumen(); };
       document.getElementById('ad-envio').oninput = e => {
         a.envio = Math.max(0, Number(e.target.value) || 0); a.envioTocado = true;
-        this.pintarTotales();
+        this.pintarTotales(); this.refrescarResumen();
       };
       document.getElementById('ad-inst').onchange = e => { a.instalacion = e.target.value; av(); };
       document.getElementById('ad-esc').oninput = e => { a.escalera = Math.max(0, Number(e.target.value) || 0); av(); };
@@ -621,7 +642,11 @@
       if (tipo === 'preview') return this.modalPreview('ver');
       if (tipo === 'print') return this.modalPreview('print');
       if (tipo === 'descargar') return this.modalPreview('descargar');
-      if (tipo === 'guardar') { this.log(this.vendedor, 'Guardó la cotización'); this.pintarSide(); return UI.aviso('Borrador guardado (demo)', 'ok'); }
+      if (tipo === 'guardar') {
+        this.guardada = true;   // ya tiene número tomado en firme
+        this.log(this.vendedor, 'Guardó la cotización'); this.pintarSide();
+        return UI.aviso(`${global.DB.numeroCotizacion(this.nro)} guardada (demo)`, 'ok');
+      }
     },
 
     // Pop-up: se entrega un presupuesto sin los datos para registrarlo.
@@ -676,6 +701,7 @@
             lineas: this.lineas.map(l => ({ nombre: l.prodNombre, cant: l.cantidad, unit: this.unit(l), obs: l.obs, tipo: l.tipo, img: l.img })),
           });
           m.remove();
+          this.guardada = true;   // el número queda usado por la venta
           this.reset();
           UI.aviso(`Orden ${orden.numero} creada en estado Confirmar`, 'ok');
           global.App.goSub('ventas', 'ordenes');
@@ -685,6 +711,9 @@
 
     reset() {
       const s = global.DB.sesion();
+      // Si la anterior nunca se guardó ni se convirtió, su número se reutiliza.
+      if (this.nro != null && !this.guardada) global.DB.liberarNumeroCotizacion(this.nro);
+      this.nro = global.DB.tomarNumeroCotizacion(); this.guardada = false;
       this.cli = { nombre: '', telefono: '', email: '', instagram: '', dni: '', tel2: '', canal: '', domicilio: '', localidad: '' };
       this.abiertos = {}; this.etapa = 'cliente'; this.lado = 'actividad';
       // Vendedor y local salen del usuario de la sesión; igual se pueden editar.
@@ -865,6 +894,7 @@
         .cz-tit{display:flex;align-items:flex-start;gap:20px}
         .cz-box{border:1px solid var(--line);border-radius:10px;padding:10px 14px;background:var(--panel-2);min-width:290px;display:flex;flex-direction:column;gap:7px}
         .fr.sm{grid-template-columns:106px minmax(0,1fr);gap:8px}
+        .fr.sm.nro b{font-size:16px;color:var(--navy);font-weight:800}
         .fr.sm>label{font-size:12px}
         .fr.sm input,.fr.sm select{padding:5px 8px;font-size:12.5px}
         @media(max-width:640px){.cz-tit{flex-direction:column}.cz-box{min-width:0;width:100%}}
@@ -897,6 +927,10 @@
         @media(max-width:520px){.fr{grid-template-columns:1fr;gap:3px}}
         .adds{display:flex;gap:7px;flex-wrap:wrap;padding-left:142px}
         @media(max-width:520px){.adds{padding-left:0}}
+        .fx{display:flex;align-items:center;gap:5px}
+        .fx input{flex:1;min-width:0}
+        .cx{flex:none;border:0;background:none;color:var(--muted);cursor:pointer;font-size:13px;line-height:1;padding:5px 6px;border-radius:6px}
+        .cx:hover{background:var(--crit-bg,var(--line-soft));color:var(--crit)}
         .chip-add{border:1px dashed var(--line);background:none;color:var(--brand);border-radius:16px;padding:3px 11px;font-size:12px;font-weight:600;cursor:pointer}
         .chip-add:hover{border-color:var(--brand);background:var(--brand-soft)}
 

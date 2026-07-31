@@ -46,8 +46,18 @@
   los dos precios (que siguen juntos al final). La columna "Precio unit." pasa a
   mostrar siempre el **precio de lista** y el subtotal ya viene descontado.
 
-> Pendiente: Brian va a definir **qué campos son obligatorios** para poder crear
-> el presupuesto.
+- ✅ 71. Los campos opcionales abiertos llevan una **X** al lado: si se abrió uno
+  por error, borra lo cargado y vuelve a quedar oculto (reaparece su chip).
+- ✅ 72. El resumen de las cabeceras plegadas se **actualiza mientras se escribe**.
+- ✅ 73. La caja de la cabecera muestra **N° de cotización · Vendedor · Local de
+  origen · Fecha**. El **número se asigna al abrir la pantalla**, aunque todavía
+  no se guarde; si la cotización se descarta sin usar, **el número vuelve al pozo**
+  y lo toma la siguiente (`DB.tomarNumeroCotizacion()` / `liberarNumeroCotizacion()`).
+
+> Pendientes:
+> - Brian va a definir **qué campos son obligatorios** para poder crear el presupuesto.
+> - **Elegir el local al iniciar sesión**: hoy sale de `DB.sesion()` fijo; cuando
+>   se active el login hay que pedirlo al entrar para que quede como default real.
 
 ## Lote 3 — APLICADO (Nueva cotización)
 
