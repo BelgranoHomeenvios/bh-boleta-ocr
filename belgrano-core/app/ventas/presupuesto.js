@@ -512,7 +512,7 @@
           </div>
         </div>
 
-        <div class="cz-tit">Entrega</div>
+        <div class="cz-sub">Entrega</div>
         <div class="cz-cols">
           <div class="cz-col">
             <div class="fr"><label for="c-entrega">Forma de entrega</label>
@@ -530,7 +530,7 @@
           </div>
         </div>
 
-        <div class="cz-tit">Facturación</div>
+        <div class="cz-sub">Facturación</div>
         <div class="cz-cols">
           <div class="cz-col">
             <div class="fr"><label for="c-fact">Solicita factura</label>
@@ -2257,21 +2257,25 @@
         .cz-wrap{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
         @media(max-width:1180px){.cz-wrap{grid-template-columns:1fr}}
 
-        .cz-head{margin-bottom:10px;padding-bottom:14px}
-        .cz-tit{display:flex;align-items:flex-start;gap:20px}
-        .cz-box{position:relative;border:1px solid var(--line);border-radius:10px;padding:9px 13px;background:var(--panel-2);min-width:282px;display:flex;flex-direction:column;gap:1px}
-        .cz-box .cabx{position:absolute;top:5px;right:5px}
-        .cz-box .valf{font-size:13px;font-weight:600;color:var(--navy);padding:2px 0}
-        .fr.sm{grid-template-columns:106px minmax(0,1fr);gap:8px}
+        .cz-head{margin-bottom:9px;padding:13px 15px}
+        .cz-tit{display:flex;align-items:center;gap:18px}
+        .cz-head .h-title{font-size:19px;line-height:1.2}
+        .cz-box{position:relative;border:1px solid var(--line);border-radius:9px;padding:8px 34px 8px 12px;
+          background:var(--panel-2);display:flex;flex-direction:column;gap:0}
+        .cz-box .cabx{position:absolute;top:4px;right:4px}
+        .cz-box .valf{font-size:12.5px;font-weight:600;color:var(--navy);padding:1px 0}
+        .fr.sm{grid-template-columns:112px minmax(0,1fr);gap:8px}
+        /* El renglón de la cabecera no puede partirse en dos líneas. */
         .cz-box .fr.sm{align-items:baseline}
-        .fr.sm.nro b{font-size:16px;color:var(--navy);font-weight:800}
-        .fr.sm>label{font-size:12px}
-        .fr.sm input,.fr.sm select{padding:4px 8px;font-size:12.5px}
+        .cz-box .fr.sm>label{white-space:nowrap}
+        .fr.sm.nro b{font-size:15px;color:var(--navy);font-weight:800}
+        .fr.sm>label{font-size:11.5px;line-height:1.35}
+        .fr.sm input,.fr.sm select{padding:3px 7px;font-size:12.5px}
         @media(max-width:640px){.cz-tit{flex-direction:column}.cz-box{min-width:0;width:100%}}
 
-        .sec{margin-bottom:10px;overflow:visible}
+        .sec{margin-bottom:8px;overflow:visible}
         .sec.on{border-color:var(--brand)}
-        .sec-h{width:100%;display:flex;align-items:center;gap:11px;padding:12px 15px;background:none;border:0;cursor:pointer;text-align:left;font:inherit}
+        .sec-h{width:100%;display:flex;align-items:center;gap:10px;padding:10px 15px;background:none;border:0;cursor:pointer;text-align:left;font:inherit}
         .sec-h:hover{background:var(--panel-2)}
         .sec-n{width:22px;height:22px;flex:none;border-radius:50%;background:var(--line-soft);color:var(--ink-soft);display:grid;place-items:center;font-size:12px;font-weight:800}
         .sec.on .sec-n{background:var(--brand);color:#fff}
@@ -2286,11 +2290,11 @@
         .ob-der input{padding:4px 8px;font-size:12.5px}
         .ob-edit{display:flex;gap:20px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--line-soft)}
         .ob-edit .fr.sm{grid-template-columns:106px 200px}
-        .sec-t{font-weight:700;color:var(--navy);font-size:14.5px;flex:none}
+        .sec-t{font-weight:700;color:var(--navy);font-size:13.5px;flex:none}
         .sec-r{flex:1;color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .sec-c{color:var(--muted);font-size:11px}
-        .sec-b{padding:14px 15px 15px;border-top:1px solid var(--line-soft)}
-        .sec-go{display:flex;justify-content:flex-end;margin-top:14px}
+        .sec-b{padding:12px 15px 14px;border-top:1px solid var(--line-soft)}
+        .sec-go{display:flex;justify-content:flex-end;margin-top:12px}
 
         .pr-cond{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding-bottom:13px;margin-bottom:4px;border-bottom:1px solid var(--line)}
         .pr-cond .fr{grid-template-columns:126px 230px}
@@ -2298,21 +2302,23 @@
         .pr-sum b{color:var(--navy);font-size:15px;margin-left:7px}
         .int{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 5px;margin-left:5px}
 
-        .cz-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px 26px}
+        .cz-cols{display:grid;grid-template-columns:1fr 1fr;gap:11px 24px}
         @media(max-width:820px){.cz-cols{grid-template-columns:1fr}}
-        .cz-col{display:flex;flex-direction:column;gap:9px}
-        .fr{display:grid;grid-template-columns:132px minmax(0,1fr);align-items:center;gap:10px}
-        .fr>label{font-size:12.5px;color:var(--ink-soft)}
-        .fr input,.fr select{padding:7px 10px;font-size:13px;width:100%}
+        .cz-col{display:flex;flex-direction:column;gap:8px}
+        .fr{display:grid;grid-template-columns:126px minmax(0,1fr);align-items:center;gap:9px}
+        .fr>label{font-size:12px;color:var(--ink-soft)}
+        .fr input,.fr select{padding:6px 9px;font-size:12.5px;width:100%}
         /* Los datos del cliente son cortos: los campos no tienen por qué
            estirarse hasta el borde de la columna. */
         #sec-cliente .fr input,#sec-cliente .fr select,#sec-cliente .fx{max-width:340px}
         .fr input[readonly]{background:var(--panel-2);color:var(--ink-soft)}
         .fr .hint{font-size:11.5px;color:var(--muted)}
         @media(max-width:520px){.fr{grid-template-columns:1fr;gap:3px}}
-        /* Subtítulo adentro de una etapa (Entrega), con una línea que lo separa. */
-        .cz-tit{margin:14px 0 9px;padding-top:11px;border-top:1px solid var(--line);
-          font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--navy)}
+        /* Subtítulo adentro de una etapa (Entrega), con una línea que lo separa.
+           Va con su propia clase: antes compartía nombre con la fila de la
+           cabecera y le pisaba el tamaño, las mayúsculas y el borde. */
+        .cz-sub{margin:13px 0 8px;padding-top:10px;border-top:1px solid var(--line);
+          font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--navy)}
         .opt{font-weight:400;color:var(--muted)}
         .adds{display:flex;gap:7px;flex-wrap:wrap}
         .fr>label .chip-add{padding:0 7px;font-size:11.5px;line-height:1.5;margin-left:4px}

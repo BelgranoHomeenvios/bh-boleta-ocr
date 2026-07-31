@@ -415,6 +415,40 @@ Todo en **una sola columna**, un bloque abajo del otro, y en modo edición.
   muebles publicados desde Inventario). **Producción ve todo menos costo,
   markup, margen y ganancia**, y sólo lee.
 
+### Lote 8 bis — APLICADO (Propiedades, categorías y proporción)
+
+**Propiedades — se entra a cada una**
+- ✅ 208. El bloque muestra la lista de propiedades del mueble, cada una con
+  sus valores y una flecha para **entrar**.
+- ✅ 209. **Agregar propiedad** no crea una nueva: abre un desplegable con
+  **todas las que ya existen en el sistema**, y recién abajo de todo está
+  **+ Nueva propiedad**.
+- ✅ 210. Adentro de una propiedad se **cargan sus valores**: se ve la lista
+  completa del catálogo, tildados los que usa este mueble, cada uno se puede
+  **renombrar** y se **arrastra para ordenar**.
+- ✅ 211. **Destildar no borra, apaga**: si un tapizado no se consigue más se
+  destilda y esas variantes quedan desactivadas. Cuando vuelve, se tilda y
+  regresan con su precio.
+- ✅ 212. Si una propiedad entera no se puede hacer más, **se quita del
+  mueble** — sigue en el catálogo para volver a agregarla. Avisa cuántas
+  variantes quedan, porque sin ese eje algunas pasan a estar repetidas.
+- ✅ 213. El **primer valor** de una propiedad recién agregada se le pone a las
+  variantes que ya existen (no duplica); del segundo en adelante multiplica.
+
+**Categorías**
+- ✅ 214. Se pueden marcar **varias a la vez**: un mueble puede estar en más de
+  una familia. Los ambientes de los que cuelgan se muestran aparte, en gris, y
+  se heredan solos.
+
+**Proporción**
+- ✅ 215. El **nombre** pasó a ser un campo con su etiqueta, como el resto.
+- ✅ 216. Los bloques cortos van **de a dos por fila**; la pantalla del mueble
+  pasó de 2.177 a ~1.570 px de alto.
+- ✅ 217. **Cotización**: `cz-tit` nombraba dos cosas distintas y el subtítulo
+  de etapa le pisaba los estilos a la cabecera — de ahí que saliera todo en
+  mayúsculas, con espaciado de letras y una línea de más. La cabecera bajó de
+  215 a 131 px y los renglones dejaron de partirse en dos.
+
 > Pendientes de este lote:
 > - **Edición masiva** de costo y precio **por categoría, por mueble y por
 >   variante** — con 16.077 variantes no alcanza con ir de a una.
