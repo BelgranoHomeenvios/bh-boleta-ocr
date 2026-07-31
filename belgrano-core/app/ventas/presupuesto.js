@@ -50,7 +50,7 @@
     lado: 'actividad',   // actividad | notas
     vendedor: '', local: '', fecha: '', termino: 'efectivo',
     nro: null, guardada: false,   // el número se toma al abrir; si no se usa, vuelve
-    notas: '', terminos: '',
+    obsExt: '', obsInt: '', terminos: '',
     ad: null,            // adicionales
     actividad: [],       // historial de la cotización (se arma sola)
     lineas: [],   // {key,tipo,prodNombre,varId,ejes,partes,base,cantidad,obs,precioManual,img}
@@ -74,7 +74,8 @@
     totalLista() { return this.lineas.reduce((a, l) => a + this.lista(l) * l.cantidad, 0); },
     total() { return this.lineas.reduce((a, l) => a + this.unit(l) * l.cantidad, 0); },
     descuento() { return this.totalLista() - this.total(); },
-    totalFinal() { return this.total() + (this.ad.envio || 0); },
+    envioMonto() { return this.envioCotizable() ? (this.ad.envio || 0) : 0; },
+    totalFinal() { return this.total() + this.envioMonto(); },
     items() { return this.lineas.reduce((a, l) => a + l.cantidad, 0); },
 
     // Estándar → precio bloqueado (sale del catálogo). A medida → se libera.
@@ -86,7 +87,25 @@
     // Un ítem salta a verificación de administración si es a medida o tiene detalle.
     requiereVerif(l) { return l.tipo === 'medida' || !!String(l.obs).trim(); },
     // Cambiar el plazo de entrega no es una edición libre: se audita.
-    entregaEditada() { return this.ad.entrega.trim() !== global.DB.ENTREGA_DEFAULT; },
+    entregaEditada() { return !!this.ad.entregaTocada; },
+    // "entre 15/09 y el 20/09 (entre 30 y 35 días)" — o con una sola fecha,
+    // "15/09 (15 días)". Los días se cuentan desde hoy.
+    entregaTexto() {
+      const a = this.ad;
+      if (!a.desde) return 'A confirmar';
+      const d1 = diasHasta(a.desde);
+      if (!a.hasta || a.hasta === a.desde) return `${fechaCorta(a.desde)} (${plural(d1)})`;
+      return `entre ${fechaCorta(a.desde)} y el ${fechaCorta(a.hasta)} (entre ${d1} y ${diasHasta(a.hasta)} días)`;
+    },
+    // Sin domicilio + localidad no se cotiza el envío: no puede salir un número.
+    envioCotizable() { return !!(String(this.cli.domicilio).trim() && this.cli.localidad); },
+    envioTexto() {
+      return this.envioCotizable() ? UI.pesos(this.ad.envio) : global.DB.ENVIO_SIN_DOMICILIO;
+    },
+    instalacionTexto() {
+      const i = this.ad.instalacion;
+      return i === 'si' ? 'Sí' : i === 'no' ? 'No' : global.DB.INSTALACION_DEFAULT;
+    },
     terminoLabel() { return global.DB.condicion(this.termino).label; },
     nombreCli() {
       const c = this.cli;
@@ -157,10 +176,14 @@
         }).join('')}
         <div class="card cz-foot">
           <div class="cz-tyc">
-            <div class="lbl">Observaciones</div>
-            <textarea id="op-nota2" rows="2" placeholder="Observaciones de la orden…">${UI.esc(this.notas)}</textarea>
-            <div class="lbl" style="margin-top:12px">Términos y condiciones</div>
-            <textarea id="cz-tyc" rows="2" placeholder="Escribir términos y condiciones…">${UI.esc(this.terminos)}</textarea>
+            <div class="lbl">Observaciones <span class="tag ext">Externas</span>
+              <span class="muted">salen impresas en la cotización</span></div>
+            <textarea id="obs-ext" rows="2" placeholder="Lo que tiene que ver el cliente…">${UI.esc(this.obsExt)}</textarea>
+            <div class="lbl" style="margin-top:11px">Observaciones <span class="tag int">Internas</span>
+              <span class="muted">no salen impresas — para nosotros o producción</span></div>
+            <textarea id="obs-int" rows="2" placeholder="Notas para producción, administración o para vos…">${UI.esc(this.obsInt)}</textarea>
+            <div class="lbl" style="margin-top:11px">Términos y condiciones</div>
+            <textarea id="cz-tyc" rows="3">${UI.esc(this.terminos)}</textarea>
           </div>
           <div id="cz-tot"></div>
         </div>`;
@@ -169,7 +192,8 @@
         this.etapa = this.etapa === b.dataset.sec ? '' : b.dataset.sec;
         this.pintarMain();
       });
-      document.getElementById('op-nota2').oninput = e => { this.notas = e.target.value; };
+      document.getElementById('obs-ext').oninput = e => { this.obsExt = e.target.value; };
+      document.getElementById('obs-int').oninput = e => { this.obsInt = e.target.value; };
       document.getElementById('cz-tyc').oninput = e => { this.terminos = e.target.value; };
 
       this.pintarCabecera();
@@ -191,8 +215,7 @@
         return n ? `${n} ${n === 1 ? 'producto' : 'productos'} · ${UI.pesos(this.total())} · ${UI.esc(this.terminoLabel())}`
           : '<i>sin productos</i>';
       }
-      const env = this.ad.envio ? UI.pesos(this.ad.envio) : 'envío a definir';
-      return `${UI.esc(this.ad.entrega)} · ${env}`;
+      return `${UI.esc(this.entregaTexto())} · envío ${UI.esc(this.envioTexto())}`;
     },
 
     // Refresca el resumen de las cabeceras plegadas mientras se escribe.
@@ -516,64 +539,138 @@
       const a = this.ad, DB = global.DB;
       const locd = (DB.localidades().find(l => l.k === this.cli.localidad) || {}).label;
 
+      // Los tres campos vienen BLOQUEADOS con su valor estándar. Si el vendedor
+      // necesita poner otra cosa, los abre con "Modificar" — y ahí sí salta el
+      // aviso para que Administración lo revise.
+      const cerrado = (lbl, valor, k, nota) => `
+        <div class="fr"><label>${UI.esc(lbl)}</label>
+          <div class="fx"><input value="${UI.esc(valor)}" readonly>
+            <button class="lnk mod" data-abrir="${k}">Modificar</button></div></div>
+        ${nota ? `<div class="fr"><label></label><span class="hint">${nota}</span></div>` : ''}`;
+
+      const hayDom = this.envioCotizable();
+
       c.innerHTML = `<div class="cz-cols">
         <div class="cz-col">
-          <div class="fr"><label for="ad-entrega">Tiempo de entrega</label>
-            <input id="ad-entrega" value="${UI.esc(a.entrega)}"></div>
+          ${a.entregaAbierta ? `
+            <div class="fr"><label for="ad-desde">Entrega desde</label>
+              <div class="fx"><input id="ad-desde" type="date" value="${UI.esc(a.desde)}">
+                <button class="lnk mod" data-cerrar="entrega">Volver al plazo estándar</button></div></div>
+            <div class="fr"><label for="ad-hasta">Hasta <span class="muted">(opcional)</span></label>
+              <input id="ad-hasta" type="date" value="${UI.esc(a.hasta)}"></div>
+            <div class="fr"><label></label><span class="hint" id="ad-plazo"></span></div>`
+            : cerrado('Tiempo de entrega', this.entregaTexto(), 'entrega')}
+
           <div class="fr"><label for="ad-saldo">Saldo se abona en</label>
             <input id="ad-saldo" value="${UI.esc(a.saldoEn)}" readonly title="Sale de la condición de pago"></div>
-          <div class="fr"><label for="ad-envio">Costo de envío</label>
-            <input id="ad-envio" type="number" min="0" value="${a.envio}"></div>
-          <div class="fr"><label></label><span class="hint">${locd
-            ? `Por default de <b>${UI.esc(locd)}</b>.` : 'Elegí la localidad arriba.'}</span></div>
+
+          ${!hayDom
+            ? `<div class="fr"><label>Costo de envío</label>
+                 <input value="${UI.esc(DB.ENVIO_SIN_DOMICILIO)}" readonly></div>
+               <div class="fr"><label></label><span class="hint">Cargá el <b>domicilio de entrega</b> y la localidad para que salga el costo.</span></div>`
+            : a.envioAbierto
+              ? `<div class="fr"><label for="ad-envio">Costo de envío</label>
+                   <div class="fx"><input id="ad-envio" type="number" min="0" value="${a.envio}">
+                     <button class="lnk mod" data-cerrar="envio">Volver al de la localidad</button></div></div>`
+              : cerrado('Costo de envío', UI.pesos(a.envio), 'envio',
+                  `Por la localidad <b>${UI.esc(locd)}</b>.`)}
         </div>
+
         <div class="cz-col">
-          <div class="fr"><label for="ad-inst">¿Requiere instalación?</label>
-            <select id="ad-inst">
-              <option value="no" ${a.instalacion === 'no' ? 'selected' : ''}>No</option>
-              <option value="si" ${a.instalacion === 'si' ? 'selected' : ''}>Sí</option>
-            </select></div>
-          <div class="fr"><label for="ad-esc">Subida por escalera</label>
-            <input id="ad-esc" type="number" min="0" value="${a.escalera}"></div>
-          <div class="fr"><label></label><span class="hint">No se calcula: va como aviso en la cotización.</span></div>
-          <div class="fr"><label>IVA</label><input value="${UI.esc(DB.IVA_LEYENDA)}" readonly></div>
+          ${a.instalacionAbierta
+            ? `<div class="fr"><label for="ad-inst">¿Requiere instalación?</label>
+                 <div class="fx"><select id="ad-inst">
+                   <option value="convenir" ${a.instalacion === 'convenir' ? 'selected' : ''}>${UI.esc(DB.INSTALACION_DEFAULT)}</option>
+                   <option value="si" ${a.instalacion === 'si' ? 'selected' : ''}>Sí</option>
+                   <option value="no" ${a.instalacion === 'no' ? 'selected' : ''}>No</option>
+                 </select><button class="lnk mod" data-cerrar="instalacion">Volver</button></div></div>`
+            : cerrado('¿Requiere instalación?', this.instalacionTexto(), 'instalacion')}
+
+          ${a.escaleraAbierta
+            ? `<div class="fr"><label for="ad-esc">Subida por escalera</label>
+                 <div class="fx"><input id="ad-esc" type="number" min="0" value="${a.escalera}">
+                   <button class="lnk mod" data-cerrar="escalera">Volver a $5.000</button></div></div>
+               <div class="fr"><label></label><span class="hint">Por piso por bulto. No se calcula: va como aviso.</span></div>`
+            : cerrado('Subida por escalera', DB.escaleraTexto(a.escalera), 'escalera',
+                'No se calcula: va como aviso en la cotización.')}
         </div>
       </div><div id="ad-avisos"></div>
-      <div class="sec-go"><button class="btn sm" id="a-cerrar">Listo — cerrar</button></div>`;
+      <div class="sec-go"><button class="btn sm primary" id="a-cerrar">Listo — cerrar</button></div>`;
 
       document.getElementById('a-cerrar').onclick = () => { this.etapa = ''; this.pintarMain(); };
+
+      // Abrir un campo es un acto deliberado: queda registrado y avisa a Administración.
+      const ABRE = { entrega: 'entregaAbierta', envio: 'envioAbierto', instalacion: 'instalacionAbierta', escalera: 'escaleraAbierta' };
+      const NOMBRE = { entrega: 'el plazo de entrega', envio: 'el costo de envío', instalacion: 'la instalación', escalera: 'la subida por escalera' };
+      c.querySelectorAll('[data-abrir]').forEach(b => b.onclick = () => {
+        const k = b.dataset.abrir;
+        a[ABRE[k]] = true;
+        this.log(this.vendedor, `Abrió ${NOMBRE[k]} para modificarlo`);
+        this.pintarAdicionales(); this.pintarSide();
+      });
+      c.querySelectorAll('[data-cerrar]').forEach(b => b.onclick = () => {
+        const k = b.dataset.cerrar;
+        a[ABRE[k]] = false;
+        if (k === 'entrega') { const d = DB.ENTREGA_DIAS; a.desde = enDias(d.min); a.hasta = enDias(d.max); a.entregaTocada = false; }
+        if (k === 'envio') { a.envio = this.envioCotizable() ? DB.fleteDe(this.cli.localidad) : 0; a.envioTocado = false; }
+        if (k === 'instalacion') { a.instalacion = 'convenir'; }
+        if (k === 'escalera') { a.escalera = DB.ESCALERA_DEFAULT; a.escaleraTocada = false; }
+        this.pintarAdicionales(); this.pintarTotales(); this.refrescarResumen();
+      });
 
       const av = () => {
         const box = document.getElementById('ad-avisos'); if (!box) return;
         const out = [];
-        if (this.entregaEditada()) out.push(`<div class="banner warn">Cambiaste el plazo de entrega — la orden va a <b>verificarse</b> y el cambio queda registrado.</div>`);
+        if (a.entregaTocada) out.push(`<div class="banner warn">El vendedor <b>cambió la fecha de entrega</b> a ${UI.esc(this.entregaTexto())} — <b>Administración</b> tiene que verificarlo y el cambio queda registrado.</div>`);
+        if (a.envioTocado) out.push(`<div class="banner warn">El <b>costo de envío</b> se cambió a mano (no es el de ${UI.esc(locd || 'la localidad')}) — queda registrado.</div>`);
+        if (a.escaleraTocada) out.push(`<div class="banner warn">La <b>subida por escalera</b> se cambió — queda registrado.</div>`);
         out.push(`<div class="banner">Subida por escalera: <b>${UI.esc(DB.escaleraTexto(a.escalera))}</b>. Se cobra según los pisos reales al momento de la entrega.</div>`);
         if (a.instalacion === 'si') out.push(`<div class="banner">La orden pide <b>instalación</b> — Logística la agenda con el armador.</div>`);
         box.innerHTML = out.join('');
       };
 
-      document.getElementById('ad-entrega').oninput = e => { a.entrega = e.target.value; av(); this.refrescarResumen(); };
-      document.getElementById('ad-envio').oninput = e => {
-        a.envio = Math.max(0, Number(e.target.value) || 0); a.envioTocado = true;
-        this.pintarTotales(); this.refrescarResumen();
+      const plazoHint = () => {
+        const h = document.getElementById('ad-plazo'); if (!h) return;
+        h.innerHTML = `Queda como <b>${UI.esc(this.entregaTexto())}</b>`;
       };
-      document.getElementById('ad-inst').onchange = e => { a.instalacion = e.target.value; av(); };
-      document.getElementById('ad-esc').oninput = e => { a.escalera = Math.max(0, Number(e.target.value) || 0); av(); };
-      av();
+
+      const de = document.getElementById('ad-desde');
+      if (de) de.onchange = e => {
+        a.desde = e.target.value;
+        if (a.hasta && a.hasta < a.desde) a.hasta = '';
+        a.entregaTocada = true;
+        this.log(this.vendedor, `Cambió la fecha de entrega: ${this.entregaTexto()}`);
+        plazoHint(); av(); this.refrescarResumen(); this.pintarSide();
+      };
+      const ha = document.getElementById('ad-hasta');
+      if (ha) ha.onchange = e => {
+        a.hasta = e.target.value; a.entregaTocada = true;
+        plazoHint(); av(); this.refrescarResumen();
+      };
+      const en = document.getElementById('ad-envio');
+      if (en) en.oninput = e => {
+        a.envio = Math.max(0, Number(e.target.value) || 0); a.envioTocado = true;
+        av(); this.pintarTotales(); this.refrescarResumen();
+      };
+      const ins = document.getElementById('ad-inst');
+      if (ins) ins.onchange = e => { a.instalacion = e.target.value; av(); this.refrescarResumen(); };
+      const es = document.getElementById('ad-esc');
+      if (es) es.oninput = e => { a.escalera = Math.max(0, Number(e.target.value) || 0); a.escaleraTocada = true; av(); };
+      plazoHint(); av();
     },
 
     // ---- Desglose de totales ----------------------------------------------
     pintarTotales() {
       const t = document.getElementById('cz-tot'); if (!t) return;
       const lista = this.totalLista(), desc = this.descuento(), muebles = this.total();
-      const envio = this.ad.envio || 0;
+      const envio = this.envioMonto();
       const pct = this.descPct() ? ` (${this.descPct()}%)` : '';
       const fila = (l, v, cls = '') => `<div class="tr ${cls}"><span>${l}</span><b class="tnum">${v}</b></div>`;
       t.innerHTML = `<div class="cz-tots">
         ${fila('Muebles (lista)', UI.pesos(lista))}
         ${desc ? fila('Descuento' + pct, '−' + UI.pesos(desc), 'neg') : ''}
         ${desc ? fila('Subtotal muebles', UI.pesos(muebles)) : ''}
-        ${fila('Envío', envio ? UI.pesos(envio) : 'a definir')}
+        ${fila('Envío', this.envioTexto())}
         ${fila('Total', UI.pesos(this.totalFinal()), 'big')}
         <div class="tiva">${UI.esc(global.DB.IVA_LEYENDA)}</div>
       </div>`;
@@ -628,7 +725,7 @@
       const fi = document.getElementById('cz-ficha');
       if (fi) fi.onclick = () => global.App.goSub('crm', 'clientes');
       const na = document.getElementById('cz-nota');
-      if (na) na.oninput = () => { this.notas = na.value; };
+      if (na) na.oninput = () => { this.obsInt = na.value; };
     },
 
     actividadHTML() {
@@ -639,7 +736,8 @@
           <div class="at">${UI.esc(a.texto)}</div></div></div>`).join('');
     },
     notasHTML() {
-      return `<textarea id="cz-nota" rows="7" placeholder="Notas internas de la cotización…">${UI.esc(this.notas)}</textarea>`;
+      return `<div class="muted" style="font-size:12px;margin-bottom:7px">Observaciones <b>internas</b> — no salen impresas.</div>
+        <textarea id="cz-nota" rows="7" placeholder="Notas para producción, administración o para vos…">${UI.esc(this.obsInt)}</textarea>`;
     },
 
     // ---- Acciones ---------------------------------------------------------
@@ -684,7 +782,7 @@
 
       const verif = this.lineas.filter(l => this.requiereVerif(l)).length;
       const plazo = this.entregaEditada();
-      const muebles = this.total(), envio = this.ad.envio || 0, total = this.totalFinal();
+      const muebles = this.total(), envio = this.envioMonto(), total = this.totalFinal();
       const nombreCli = this.nombreCli();
       this.modal(`<h3 style="color:var(--navy)">Confirmar → Venta</h3>
         <p style="margin:10px 0 0">Se crea la orden en estado <span class="pill warn">Confirmar</span> — a la espera de la seña (mínimo 30%).</p>
@@ -692,14 +790,14 @@
           <tr><td class="muted">Cliente</td><td style="text-align:right"><b>${UI.esc(nombreCli)}</b></td></tr>
           <tr><td class="muted">Vendedor · Local</td><td style="text-align:right">${UI.esc(this.vendedor)} · ${UI.esc(this.local)}</td></tr>
           <tr><td class="muted">Condición de pago</td><td style="text-align:right">${UI.esc(this.terminoLabel())}</td></tr>
-          <tr><td class="muted">Entrega</td><td style="text-align:right">${UI.esc(this.ad.entrega)}</td></tr>
+          <tr><td class="muted">Entrega</td><td style="text-align:right">${UI.esc(this.entregaTexto())}</td></tr>
           <tr><td class="muted">Productos</td><td style="text-align:right">${this.lineas.length}${verif ? ` · <span style="color:var(--warn)">${verif} a verificar</span>` : ''}</td></tr>
           <tr><td class="muted">Muebles</td><td style="text-align:right" class="tnum">${UI.pesos(muebles)}</td></tr>
-          <tr><td class="muted">Envío</td><td style="text-align:right" class="tnum">${envio ? UI.pesos(envio) : 'a definir'}</td></tr>
+          <tr><td class="muted">Envío</td><td style="text-align:right" class="tnum">${UI.esc(this.envioTexto())}</td></tr>
           <tr><td class="muted">Total</td><td style="text-align:right"><b class="tnum">${UI.pesos(total)}</b></td></tr>
         </tbody></table>
         ${verif ? `<div class="banner warn" style="margin-top:12px">${verif} producto(s) a medida / con detalle van a <b>verificarse en Administración</b>.</div>` : ''}
-        ${plazo ? `<div class="banner warn" style="margin-top:10px">El <b>plazo de entrega</b> se cambió (${UI.esc(this.ad.entrega)}) — queda registrado y va a verificación.</div>` : ''}
+        ${plazo ? `<div class="banner warn" style="margin-top:10px">El <b>plazo de entrega</b> se cambió (${UI.esc(this.entregaTexto())}) — queda registrado y va a verificación.</div>` : ''}
         <div class="row" style="margin-top:16px;justify-content:flex-end;gap:10px">
           <button class="btn" id="cv-cancel">Cancelar</button>
           <button class="btn primary" id="cv-ok">Crear orden en Confirmar</button></div>`, m => {
@@ -728,13 +826,16 @@
       this.abiertos = {}; this.etapa = 'cliente'; this.lado = 'actividad';
       // Vendedor y local salen del usuario de la sesión; igual se pueden editar.
       this.vendedor = s.vendedor; this.local = s.local; this.fecha = hoy(); this.termino = 'efectivo';
-      this.notas = ''; this.terminos = '';
+      this.obsExt = ''; this.obsInt = ''; this.terminos = global.DB.TYC_DEFAULT;
+      const d = global.DB.ENTREGA_DIAS;
       this.ad = {
-        entrega: global.DB.ENTREGA_DEFAULT,
+        // Plazo estándar como fechas concretas; se puede abrir y cambiar.
+        desde: enDias(d.min), hasta: enDias(d.max),
+        entregaAbierta: false, entregaTocada: false,
         saldoEn: this.terminoLabel(),
-        envio: 0, envioTocado: false,
-        instalacion: 'no',
-        escalera: global.DB.ESCALERA_DEFAULT,
+        envio: 0, envioAbierto: false, envioTocado: false,
+        instalacion: 'convenir', instalacionAbierta: false,
+        escalera: global.DB.ESCALERA_DEFAULT, escaleraAbierta: false, escaleraTocada: false,
       };
       this.lineas = []; this._uid = 0;
       this.actividad = [];
@@ -747,7 +848,7 @@
       const c = this.cli;
       const ident = [c.telefono, c.tel2, c.email, c.instagram].filter(Boolean).join(' · ');
       const dom = [c.domicilio, (DB.localidades().find(l => l.k === c.localidad) || {}).label].filter(Boolean).join(' · ');
-      const lista = this.totalLista(), desc = this.descuento(), envio = a.envio || 0;
+      const lista = this.totalLista(), desc = this.descuento(), envio = this.envioMonto();
       return `<div class="pv">
         <div class="pv-h"><h2>Belgrano Home</h2><div class="muted">Cotización · ${UI.esc(term)}</div></div>
         <div class="pv-cli"><b>${UI.esc(c.nombre || 'Cliente')}</b>
@@ -759,17 +860,19 @@
         <div class="pv-tot">
           <div>Muebles (lista) <b class="tnum">${UI.pesos(lista)}</b></div>
           ${desc ? `<div>Descuento <b class="tnum">−${UI.pesos(desc)}</b></div>` : ''}
-          <div>Envío <b class="tnum">${envio ? UI.pesos(envio) : 'a definir'}</b></div>
+          <div>Envío <b class="tnum">${UI.esc(this.envioTexto())}</b></div>
           <div class="big">Total <b class="tnum">${UI.pesos(this.totalFinal())}</b></div>
         </div>
         <div class="pv-ad">
-          <div><b>Tiempo de entrega:</b> ${UI.esc(a.entrega)}</div>
+          <div><b>Tiempo de entrega:</b> ${UI.esc(this.entregaTexto())}</div>
           <div><b>Saldo se abona en:</b> ${UI.esc(a.saldoEn)}</div>
-          <div><b>Instalación:</b> ${a.instalacion === 'si' ? 'Sí' : 'No'}</div>
+          <div><b>Instalación:</b> ${UI.esc(this.instalacionTexto())}</div>
           <div><b>Subida por escalera:</b> ${UI.esc(DB.escaleraTexto(a.escalera))}</div>
           <div>${UI.esc(DB.IVA_LEYENDA)}</div>
+          ${this.obsExt ? `<div style="margin-top:8px"><b>Observaciones:</b> ${UI.esc(this.obsExt)}</div>` : ''}
           ${this.terminos ? `<div style="margin-top:8px">${UI.esc(this.terminos)}</div>` : ''}
         </div></div>`;
+      // Las observaciones INTERNAS nunca entran acá: son para nosotros.
     },
     estiloPreview() {
       return `<style>.pv{color:#141a26;font-family:-apple-system,system-ui,sans-serif}
@@ -884,24 +987,86 @@
       pintar();
     },
 
+    // Al catálogo se entra por los dos lados: bajando por categorías (rubro →
+    // tipo de mueble) o escribiendo el nombre. Se combinan: se puede filtrar
+    // una categoría y encima buscar por texto adentro.
     modalCatalogo() {
-      this.modal(`<div class="row" style="margin-bottom:12px"><h3 style="color:var(--navy)">Buscar: Producto</h3><div class="sp" style="flex:1"></div><button class="lx" id="mc-x" style="font-size:20px">✕</button></div>
-        <input id="mc-q" placeholder="Buscar por nombre…" autocomplete="off" style="margin-bottom:12px"><div id="mc-lista" style="overflow:auto">${UI.spinner()}</div>`,
+      this.modal(`<div class="row" style="margin-bottom:12px"><h3 style="color:var(--navy)">Catálogo</h3><div class="sp" style="flex:1"></div><button class="lx" id="mc-x" style="font-size:20px">✕</button></div>
+        <input id="mc-q" placeholder="Buscar por nombre…" autocomplete="off" style="margin-bottom:12px">
+        <div class="mc-wrap">
+          <div class="mc-cats" id="mc-cats">${UI.spinner()}</div>
+          <div class="mc-prods" id="mc-lista">${UI.spinner()}</div>
+        </div>
+        <style>
+          .mc-wrap{display:grid;grid-template-columns:216px minmax(0,1fr);gap:14px;align-items:start}
+          @media(max-width:640px){.mc-wrap{grid-template-columns:1fr}}
+          .mc-cats{border-right:1px solid var(--line);padding-right:12px;max-height:400px;overflow:auto}
+          @media(max-width:640px){.mc-cats{border-right:0;border-bottom:1px solid var(--line);padding:0 0 10px;max-height:150px}}
+          .mc-prods{max-height:400px;overflow:auto}
+          .mc-cat{display:flex;align-items:center;gap:6px;width:100%;border:0;background:none;font:inherit;font-size:13px;color:var(--ink);
+            text-align:left;padding:6px 8px;border-radius:7px;cursor:pointer}
+          .mc-cat:hover{background:var(--panel-2)}
+          .mc-cat.on{background:var(--brand-soft);color:var(--brand);font-weight:700}
+          .mc-cat.hija{padding-left:22px;font-size:12.5px;color:var(--ink-soft)}
+          .mc-cat .cn{margin-left:auto;font-size:11.5px;color:var(--muted)}
+          .mc-cat.on .cn{color:var(--brand)}
+        </style>`,
         m => {
           document.getElementById('mc-x').onclick = () => m.remove();
-          const pintar = async (texto) => {
+          let cat = null, texto = '', cats = [];
+
+          const pintarCats = () => {
+            const c = document.getElementById('mc-cats'); if (!c) return;
+            // Se listan los rubros y, debajo, los tipos de mueble de cada uno.
+            const padres = cats.filter(x => x.padre_id == null);
+            const fila = (x, hija) => `<button class="mc-cat ${hija ? 'hija' : ''} ${cat === x.id ? 'on' : ''}" data-cat="${x.id}">
+              ${UI.esc(x.nombre)}<span class="cn">${this._cuenta[x.id] ?? ''}</span></button>`;
+            c.innerHTML = `<button class="mc-cat ${cat == null ? 'on' : ''}" data-cat="">Todas<span class="cn">${this._cuenta.total ?? ''}</span></button>`
+              + padres.map(p => fila(p, false) + cats.filter(h => h.padre_id === p.id).map(h => fila(h, true)).join('')).join('');
+            c.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => {
+              cat = b.dataset.cat ? Number(b.dataset.cat) : null;
+              pintarCats(); pintarProds();
+            });
+          };
+
+          const pintarProds = async () => {
             const c = document.getElementById('mc-lista'); c.innerHTML = UI.spinner();
             try {
-              const prods = await global.DB.productos({ texto, limite: 80 });
+              // Los rubros no tienen productos propios: se busca en sus hijas.
+              const hijas = cat != null ? cats.filter(x => x.padre_id === cat).map(x => x.id) : [];
+              let prods;
+              if (hijas.length) {
+                const packs = await Promise.all(hijas.map(id => global.DB.productos({ texto, categoriaId: id, limite: 80 })));
+                prods = packs.flat();
+              } else {
+                prods = await global.DB.productos({ texto, categoriaId: cat, limite: 80 });
+              }
               c.innerHTML = prods.length ? `<table><thead><tr><th>Producto</th><th style="text-align:right">Var.</th><th></th></tr></thead>
                 <tbody>${prods.map(p => `<tr><td><b>${UI.esc(p.nombre)}</b> ${p.publicado_tn ? '<span class="pill ok">TN</span>' : '<span class="pill soft">interno</span>'}</td>
-                <td style="text-align:right" class="tnum">${p.variantes}</td><td style="text-align:right"><button class="btn sm primary" data-p="${p.id}">Elegir</button></td></tr>`).join('')}</tbody></table>` : UI.vacio('Sin resultados.');
+                <td style="text-align:right" class="tnum">${p.variantes}</td><td style="text-align:right"><button class="btn sm primary" data-p="${p.id}">Elegir</button></td></tr>`).join('')}</tbody></table>`
+                : UI.vacio(texto || cat != null ? 'Nada acá. Probá otra categoría o cambiá el texto.' : 'Sin resultados.');
               c.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { m.remove(); this.elegirProducto(Number(b.dataset.p), prods.find(p => p.id === Number(b.dataset.p))); });
             } catch (e) { c.innerHTML = `<div class="banner warn">${UI.esc(e.message || e)}</div>`; }
           };
-          const q = document.getElementById('mc-q'); let t; q.oninput = () => { clearTimeout(t); t = setTimeout(() => pintar(q.value.trim()), 220); };
-          pintar('');
-        }, 720);
+
+          const q = document.getElementById('mc-q');
+          let t; q.oninput = () => { clearTimeout(t); t = setTimeout(() => { texto = q.value.trim(); pintarProds(); }, 220); };
+
+          (async () => {
+            try {
+              cats = await global.DB.arbolCategorias();
+              const todos = await global.DB.productos({ limite: 500 });
+              // Cuántos productos cuelgan de cada categoría (el rubro suma sus hijas).
+              this._cuenta = { total: todos.length };
+              cats.forEach(x => { this._cuenta[x.id] = todos.filter(p => p.categoria_id === x.id).length; });
+              cats.filter(x => x.padre_id == null).forEach(p => {
+                this._cuenta[p.id] = cats.filter(h => h.padre_id === p.id)
+                  .reduce((a, h) => a + (this._cuenta[h.id] || 0), 0);
+              });
+            } catch (e) { cats = []; this._cuenta = {}; }
+            pintarCats(); pintarProds();
+          })();
+        }, 760);
     },
 
     estilos() {
@@ -1007,7 +1172,12 @@
 
         .cz-foot{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:26px;padding:16px}
         @media(max-width:820px){.cz-foot{grid-template-columns:1fr}}
-        .cz-tyc .lbl{font-size:12.5px;color:var(--ink-soft);margin-bottom:6px}
+        .cz-tyc .lbl{font-size:12.5px;color:var(--ink-soft);margin-bottom:6px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+        .cz-tyc .lbl .muted{font-size:11.5px}
+        .tag{font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;border-radius:4px;padding:1px 6px}
+        .tag.ext{background:var(--brand-soft);color:var(--brand)}
+        .tag.int{background:var(--line-soft);color:var(--ink-soft)}
+        .lnk.mod{flex:none;font-size:12px}
         .cz-tyc textarea,.cz-foot textarea{width:100%;padding:8px 10px;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);resize:vertical}
         .cz-tots .tr{display:flex;justify-content:space-between;gap:12px;padding:4px 0;font-size:13px;color:var(--ink-soft)}
         .cz-tots .tr b{color:var(--navy)}
@@ -1072,6 +1242,26 @@
     try { const d = new Date(); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; }
     catch { return ''; }
   }
+  // Fecha ISO a N días de hoy, y los helpers para mostrarla.
+  function enDias(n) {
+    try { const d = new Date(); d.setDate(d.getDate() + n); return iso(d); } catch { return ''; }
+  }
+  function iso(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  function fechaCorta(s) {
+    const p = String(s || '').split('-');
+    return p.length === 3 ? `${p[2]}/${p[1]}` : String(s || '');
+  }
+  function diasHasta(s) {
+    try {
+      const [y, m, d] = String(s).split('-').map(Number);
+      const a = new Date(); a.setHours(0, 0, 0, 0);
+      return Math.max(0, Math.round((new Date(y, m - 1, d) - a) / 86400000));
+    } catch { return 0; }
+  }
+  function plural(n) { return `${n} ${n === 1 ? 'día' : 'días'}`; }
+
   function hoy() {
     try { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
     catch { return ''; }

@@ -79,6 +79,27 @@
 - ✅ 82. La columna de descuento dice **"Dto. 35%"** en el encabezado y en cada
   línea el **monto descontado**; el descuento total de la orden queda abajo.
 
+- ✅ 83. **Tiempo de entrega como fechas**: "entre 15/09 y el 20/09 (entre 30 y
+  35 días)". Viene **bloqueado**; con "Modificar" se abre Desde/Hasta y los días
+  se recalculan solos. Con una sola fecha muestra "15/09 (15 días)". Al cambiarlo
+  salta el aviso de que **Administración** debe verificarlo y queda en Actividad.
+- ✅ 84. **Costo de envío bloqueado** según la localidad, con "Modificar". **Sin
+  domicilio cargado no sale ningún costo**: dice "A confirmar posteriormente" y
+  no suma al total.
+- ✅ 85. Instalación por default **"A convenir posteriormente"** (antes "No").
+- ✅ 86. **Subida por escalera** se muestra como **"$5.000 por piso por bulto"**,
+  bloqueada y con "Modificar".
+- ✅ 87. El **IVA sale de Adicionales**: queda sólo como leyenda abajo del total.
+- ✅ 88. **Observaciones Externas / Internas**: las externas salen impresas en la
+  cotización, las internas son para nosotros o producción y **nunca** se imprimen.
+  El costado de "Notas" edita las internas.
+- ✅ 89. **Términos y condiciones con texto por default** (verificar medidas,
+  colores y terminaciones antes de confirmar; sin cambios ni reclamos una vez
+  iniciada la fabricación).
+- ✅ 90. Al **Catálogo se entra por los dos lados**: por **categorías** (rubro →
+  tipo de mueble, con la cuenta de productos de cada una) o por **nombre**, y se
+  combinan para filtrar más fino.
+
 > Pendientes:
 > - La foto del diseño hoy se carga por **URL**; falta la subida real del archivo.
 > - Brian va a definir **qué campos son obligatorios** para poder crear el presupuesto.

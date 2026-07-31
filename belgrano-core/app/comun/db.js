@@ -363,7 +363,17 @@
 
     // Plazo de entrega estándar. Si el vendedor lo edita, la orden salta a
     // verificación (queda contabilizado el cambio de plazo).
+    // Plazo estándar de fabricación, en días. La cotización muestra las fechas
+    // que salen de acá ("entre 15/09 y el 20/09") con el plazo entre paréntesis.
+    ENTREGA_DIAS: { min: 30, max: 35 },
     ENTREGA_DEFAULT: 'entre 30 y 35 días',
+    // Cuando no hay domicilio cargado no se puede cotizar el envío.
+    ENVIO_SIN_DOMICILIO: 'A confirmar posteriormente',
+    INSTALACION_DEFAULT: 'A convenir posteriormente',
+    TYC_DEFAULT: 'Antes de confirmar el pedido, verificá cuidadosamente las medidas, ' +
+      'colores, terminaciones y productos cotizados. Una vez aprobada la orden e ' +
+      'iniciada la fabricación, no podrán realizarse cambios ni reclamos por errores ' +
+      'en la información aprobada.',
     // La subida por escalera NO se calcula: es muy variable. Va como leyenda.
     ESCALERA_DEFAULT: 5000,
     escaleraTexto(monto) {
