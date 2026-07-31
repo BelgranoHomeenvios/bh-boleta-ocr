@@ -330,6 +330,23 @@
   previa · Guardar · Confirmar → Venta**. Arriba no queda ningún botón, así se
   recorre paso por paso antes de generar la orden.
 
+### Lote 6 — APLICADO (Datos del cliente · forma de entrega)
+- ✅ 180. El **+ IG** queda **al lado de "Cliente"**, igual que el **+** del
+  teléfono (ya no desfasado en su propio renglón).
+- ✅ 181. Orden nuevo: arriba **Cliente / Teléfono**, y debajo **¿Cómo nos
+  conoció?** y **Email**, uno en cada columna.
+- ✅ 182. Bloque **Entrega** con las cuatro formas: **Envío CABA o GBA ·
+  Retira cliente · Expreso · A confirmar**.
+  - **Retira cliente**: no se pide domicilio ni localidad y **no se cotiza flete**.
+  - **Envío CABA o GBA**: pide **Localidad** y **Domicilio**; el flete sale
+    solo de la localidad.
+  - **A confirmar**: los campos quedan **opcionales** y el envío **se puede
+    cargar igual o dejarlo a confirmar**.
+  - **Expreso**: agrega **Expreso** y **Domicilio del expreso**, los dos se
+    pueden dejar en blanco y completar después.
+- ✅ 183. La forma de entrega **se imprime** en el documento; el expreso sale
+  con su domicilio cuando está cargado.
+
 ### Lote 5 bis — Solapas de Ventas
 - ✅ 178. La solapa **"Órdenes"** pasa a llamarse **"Or. Venta"**.
 - ✅ 179. Se sacan **"A confirmar"**, **"Modificaciones"** y **"Autorizaciones"**

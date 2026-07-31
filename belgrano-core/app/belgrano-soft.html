@@ -1493,6 +1493,16 @@ tr:hover td{background:var(--panel-2)}
     { k: 'dni',       btn: '+ DNI',      lbl: 'DNI o CUIT',         ph: '00.000.000' },
   ];
 
+  // Cómo llega el mueble. Decide qué domicilio se pregunta y si hay flete que
+  // cotizar: retirando no hay envío; por expreso el flete es hasta el expreso;
+  // "a confirmar" deja todo cargable pero sin exigirlo.
+  const ENTREGAS = [
+    { k: 'envio',     label: 'Envío CABA o GBA' },
+    { k: 'retira',    label: 'Retira cliente' },
+    { k: 'expreso',   label: 'Expreso' },
+    { k: 'confirmar', label: 'A confirmar' },
+  ];
+
   const Presupuesto = {
     cli: null,
     abiertos: {},        // campos opcionales revelados
@@ -1561,7 +1571,7 @@ tr:hover td{background:var(--panel-2)}
     totalLista() { return this.lineas.reduce((a, l) => a + this.lista(l) * l.cantidad, 0); },
     total() { return this.lineas.reduce((a, l) => a + this.unit(l) * l.cantidad, 0); },
     descuento() { return this.totalLista() - this.total(); },
-    envioMonto() { return this.envioCotizable() ? (this.ad.envio || 0) : 0; },
+    envioMonto() { return this.pideEnvio() ? (this.ad.envio || 0) : 0; },
     // Descuento comercial extra, aparte del que da la condición de pago. Puede
     // ser en % o en $, sobre todos los muebles o sobre un producto puntual.
     descuentoExtra() {
@@ -1630,12 +1640,18 @@ tr:hover td{background:var(--panel-2)}
       }
       return false;
     },
-    // Sin domicilio + localidad no se cotiza el envío: no puede salir un número.
-    pideEnvio() { return this.cli.envio !== 'no'; },
-    envioCotizable() { return this.pideEnvio() && !!(String(this.cli.domicilio).trim() && this.cli.localidad); },
+    // Retirando no hay flete. Con envío a CABA/GBA el costo sale solo de la
+    // localidad; por expreso o a confirmar se puede cargar a mano, pero no
+    // se inventa un número.
+    entregaModoLabel() { return (ENTREGAS.find(o => o.k === this.cli.entrega) || ENTREGAS[0]).label; },
+    pideEnvio() { return this.cli.entrega !== 'retira'; },
+    envioCotizable() { return this.cli.entrega === 'envio' && !!(String(this.cli.domicilio).trim() && this.cli.localidad); },
+    // El flete se puede escribir a mano siempre que haya algo que enviar.
+    envioCargable() { return this.pideEnvio(); },
     envioTexto() {
       if (!this.pideEnvio()) return 'Sin envío — retira';
-      return this.envioCotizable() ? UI.pesos(this.ad.envio) : global.DB.ENVIO_SIN_DOMICILIO;
+      if (this.envioCotizable() || this.ad.envioTocado) return UI.pesos(this.ad.envio);
+      return global.DB.ENVIO_SIN_DOMICILIO;
     },
     instalacionTexto() {
       const i = this.ad.instalacion;
@@ -1767,7 +1783,8 @@ tr:hover td{background:var(--panel-2)}
       if (k === 'cliente') {
         const c = this.cli;
         const partes = [c.nombre.trim(), c.telefono.trim() || c.email.trim() || c.instagram.trim()].filter(Boolean);
-        return partes.length ? UI.esc(partes.join(' · ')) : '<i>sin cargar</i>';
+        if (!partes.length) return '<i>sin cargar</i>';
+        return UI.esc(partes.concat(this.entregaModoLabel()).join(' · '));
       }
       if (k === 'productos') {
         const n = this.items();
@@ -1888,13 +1905,35 @@ tr:hover td{background:var(--panel-2)}
       const mas = (k, txt) => this.abiertos[k] ? ''
         : `<button class="chip-add" data-add="${k}">${UI.esc(txt)}</button>`;
 
+      // La forma de entrega decide qué domicilio hace falta: si retira no se
+      // pregunta ninguno, si va por expreso se agrega el del expreso, y con
+      // "a confirmar" los campos quedan disponibles pero sin exigirse.
+      const ent = this.cli.entrega;
+      const pideDom = ent !== 'retira';
+      const opc = ent === 'confirmar' || ent === 'expreso' ? ' <span class="opt">(opcional)</span>' : '';
+
+      const campoLoc = !pideDom ? '' : `
+        <div class="fr"><label for="c-locd">Localidad${opc}</label>
+          <div class="fx locw">
+            <input id="c-locd" value="${UI.esc(locActual ? locActual.label : '')}"
+              placeholder="Escribí la localidad…" autocomplete="off">
+            ${locActual ? `<button class="cx" id="c-locx" title="Quitar la localidad" aria-label="Quitar la localidad">✕</button>` : ''}
+            <div id="c-locdrop"></div>
+          </div></div>
+        ${locActual ? `<div class="fr"><label></label><span class="hint">
+          ${UI.esc(locActual.zona)} · envío ${locActual.flete ? UI.pesos(locActual.flete) : 'a cotizar'}
+          ${locActual.manual ? '<b>· cargada a mano</b>' : ''}</span></div>` : ''}`;
+
+      const campoDom = !pideDom ? '' : `
+        <div class="fr"><label for="c-dom">Domicilio de entrega${opc}</label>
+          <input id="c-dom" value="${UI.esc(this.cli.domicilio)}" placeholder="Calle 1234, piso/depto"></div>`;
+
       c.innerHTML = `
         <div class="cz-cols">
           <div class="cz-col">
-            ${f('c-nombre', 'Cliente', this.cli.nombre, 'Nombre y apellido')}
-            ${mas('instagram', '+ IG') ? `<div class="fr"><label></label><div class="adds">${mas('instagram', '+ IG')}</div></div>` : ''}
+            <div class="fr"><label for="c-nombre">Cliente ${mas('instagram', '+ IG')}</label>
+              <input id="c-nombre" value="${UI.esc(this.cli.nombre)}" placeholder="Nombre y apellido"></div>
             ${opcional('instagram')}
-            ${f('c-dom', 'Domicilio de entrega', this.cli.domicilio, 'Calle 1234, piso/depto')}
             ${sel('c-canal', '¿Cómo nos conoció?', `<option value="">—</option>` +
               ['Instagram', 'Facebook', 'Recomendación', 'Pasó por el local', 'Google', 'Otro']
                 .map(o => `<option ${this.cli.canal === o ? 'selected' : ''}>${o}</option>`).join(''))}
@@ -1903,29 +1942,31 @@ tr:hover td{background:var(--panel-2)}
             <div class="fr"><label for="c-tel">Teléfono ${mas('tel2', '+')}</label>
               <input id="c-tel" value="${UI.esc(this.cli.telefono)}" placeholder="11 5555-2020" inputmode="tel"></div>
             ${opcional('tel2')}
-            <div class="fr"><label for="c-locd">Localidad</label>
-              <div class="fx locw">
-                <input id="c-locd" value="${UI.esc(locActual ? locActual.label : '')}"
-                  placeholder="Escribí la localidad…" autocomplete="off">
-                ${locActual ? `<button class="cx" id="c-locx" title="Quitar la localidad" aria-label="Quitar la localidad">✕</button>` : ''}
-                <div id="c-locdrop"></div>
-              </div></div>
-            ${locActual ? `<div class="fr"><label></label><span class="hint">
-              ${UI.esc(locActual.zona)} · envío ${locActual.flete ? UI.pesos(locActual.flete) : 'a cotizar'}
-              ${locActual.manual ? '<b>· cargada a mano</b>' : ''}</span></div>` : ''}
             ${f('c-mail', 'Email', this.cli.email, 'cliente@correo.com')}
           </div>
         </div>
 
-        <div class="cz-cols" style="margin-top:4px">
+        <div class="cz-tit">Entrega</div>
+        <div class="cz-cols">
           <div class="cz-col">
-            <div class="fr"><label for="c-envio">¿Necesita envío?</label>
-              <select id="c-envio">
-                <option value="si" ${this.cli.envio === 'si' ? 'selected' : ''}>Sí, se entrega</option>
-                <option value="no" ${this.cli.envio === 'no' ? 'selected' : ''}>No, retira</option>
-              </select></div>
-            ${this.cli.envio === 'no' ? `<div class="fr"><label></label><span class="hint">Sin envío: no se cotiza flete.</span></div>` : ''}
+            <div class="fr"><label for="c-entrega">Forma de entrega</label>
+              <select id="c-entrega">${ENTREGAS.map(o =>
+                `<option value="${o.k}" ${ent === o.k ? 'selected' : ''}>${UI.esc(o.label)}</option>`).join('')}</select></div>
+            ${ent === 'retira' ? `<div class="fr"><label></label><span class="hint">Retira en el local: no hace falta domicilio ni flete.</span></div>` : ''}
+            ${ent === 'confirmar' ? `<div class="fr"><label></label><span class="hint">Se define después: el envío se puede cargar igual o dejarlo a confirmar.</span></div>` : ''}
+            ${campoDom}
+            ${ent === 'expreso' ? `<div class="fr"><label for="c-expdom">Domicilio del expreso <span class="opt">(opcional)</span></label>
+              <input id="c-expdom" value="${UI.esc(this.cli.expresoDom)}" placeholder="Se completa después"></div>` : ''}
           </div>
+          <div class="cz-col">
+            ${campoLoc}
+            ${ent === 'expreso' ? `<div class="fr"><label for="c-expreso">Expreso <span class="opt">(opcional)</span></label>
+              <input id="c-expreso" value="${UI.esc(this.cli.expreso)}" placeholder="Nombre del expreso"></div>` : ''}
+          </div>
+        </div>
+
+        <div class="cz-tit">Facturación</div>
+        <div class="cz-cols">
           <div class="cz-col">
             <div class="fr"><label for="c-fact">Solicita factura</label>
               <select id="c-fact">
@@ -1955,6 +1996,7 @@ tr:hover td{background:var(--panel-2)}
       };
       bind('c-nombre', 'nombre'); bind('c-tel', 'telefono', true);
       bind('c-mail', 'email'); bind('c-dom', 'domicilio');
+      bind('c-expreso', 'expreso'); bind('c-expdom', 'expresoDom');
       OPCIONALES.forEach(o => bind('c-' + o.k, o.k, o.k === 'tel2' || o.k === 'dni'));
       c.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { this.abiertos[b.dataset.add] = true; this.pintarCliente(); });
       c.querySelectorAll('[data-quitar]').forEach(b => b.onclick = () => {
@@ -1963,11 +2005,15 @@ tr:hover td{background:var(--panel-2)}
         this.pintarCliente(); this.pintarCabecera(); this.refrescarResumen(); this.pintarSide();
       });
       document.getElementById('c-canal').onchange = e => { this.cli.canal = e.target.value; };
-      // Sin envío no se cotiza flete; con factura, el documento fiscal es obligatorio.
-      document.getElementById('c-envio').onchange = e => {
+      // La forma de entrega mueve el flete: si retira no se cotiza y si es
+      // expreso o a confirmar el costo deja de salir solo. Es un cambio con
+      // impacto, así que queda registrado.
+      document.getElementById('c-entrega').onchange = ev => {
         const antes = this.antes();
-        this.cli.envio = e.target.value;
-        this.cambio(`Marcó que ${this.cli.envio === 'si' ? 'necesita envío' : 'retira (sin envío)'}`, antes);
+        this.cli.entrega = ev.target.value;
+        if (!this.pideEnvio()) { this.ad.envio = 0; this.ad.envioTocado = false; this.ad.envioAbierto = false; }
+        else if (this.envioCotizable() && !this.ad.envioTocado) this.ad.envio = global.DB.fleteDe(this.cli.localidad);
+        this.cambio(`Cambió la forma de entrega a ${this.entregaModoLabel()}`, antes);
         this.pintarTodo();
       };
       document.getElementById('c-fact').onchange = e => {
@@ -1981,7 +2027,8 @@ tr:hover td{background:var(--panel-2)}
         this.cli.dni = n; fd.classList.toggle('falta', !n);
       };
       // Con Tab o Enter se recorre en el orden en que se pregunta, no por columna.
-      const ORDEN = ['c-nombre', 'c-tel', 'c-dom', 'c-locd', 'c-canal', 'c-mail'];
+      const ORDEN = ['c-nombre', 'c-tel', 'c-canal', 'c-mail', 'c-entrega', 'c-dom', 'c-locd', 'c-expdom', 'c-expreso']
+        .filter(id => document.getElementById(id));
       ORDEN.forEach((id, i) => {
         const el = document.getElementById(id); if (!el) return;
         el.onkeydown = e => {
@@ -2583,16 +2630,23 @@ tr:hover td{background:var(--panel-2)}
           <div class="fr"><label>Saldo se abona en</label>
             <span class="valf">${UI.esc(a.saldoEn)}</span></div>
 
-          ${!hayDom
+          ${!this.pideEnvio()
             ? `<div class="fr"><label>Costo de envío</label>
-                 <span class="valf">${UI.esc(DB.ENVIO_SIN_DOMICILIO)}</span></div>
-               <div class="fr"><label></label><span class="hint">Cargá el <b>domicilio de entrega</b> y la localidad para que salga el costo.</span></div>`
+                 <span class="valf">Sin envío — retira</span></div>
+               <div class="fr"><label></label><span class="hint">El cliente <b>retira</b>: no se cotiza flete.</span></div>`
             : a.envioAbierto
               ? `<div class="fr"><label for="ad-envio">Costo de envío</label>
                    <div class="fx"><input id="ad-envio" inputmode="numeric" value="${a.envio}">
-                     <button class="lapiz" data-cerrar="envio" title="Volver al de la localidad" aria-label="Volver al de la localidad">↺</button></div></div>`
-              : cerrado('Costo de envío', UI.pesos(a.envio), 'envio',
-                  `Por la localidad <b>${UI.esc(locd)}</b>.`, '🔀')}
+                     <button class="lapiz" data-cerrar="envio" title="${hayDom ? 'Volver al de la localidad' : 'Volver a “a confirmar”'}" aria-label="Volver">↺</button></div></div>`
+              : hayDom
+                ? cerrado('Costo de envío', UI.pesos(a.envio), 'envio',
+                    `Por la localidad <b>${UI.esc(locd)}</b>.`, '🔀')
+                : a.envioTocado
+                  ? cerrado('Costo de envío', UI.pesos(a.envio), 'envio', 'Cargado a mano.', '🔀')
+                  : cerrado('Costo de envío', DB.ENVIO_SIN_DOMICILIO, 'envio',
+                      this.cli.entrega === 'expreso'
+                        ? 'El flete hasta el <b>expreso</b> se carga a mano.'
+                        : 'Se puede cargar a mano o dejarlo a confirmar.', '🔀')}
         </div>
 
         <div class="cz-col">
@@ -3190,7 +3244,8 @@ tr:hover td{background:var(--panel-2)}
       if (this.nro != null && !this.guardada) global.DB.liberarNumeroCotizacion(this.nro);
       this.nro = global.DB.tomarNumeroCotizacion(); this.guardada = false;
       this.cli = { nombre: '', telefono: '', email: '', instagram: '', dni: '', tel2: '', canal: '',
-        domicilio: '', localidad: '', factura: 'no', envio: 'si' };
+        domicilio: '', localidad: '', factura: 'no',
+        entrega: 'envio', expreso: '', expresoDom: '' };
       this.abiertos = {}; this.etapa = 'cliente'; this.lado = 'notas'; this.cantNueva = 1;
       this.modo = 'cotizacion'; this.nroOrden = null; this.fechaOrden = ''; this.confirmadas = {};
       this.cabAbierta = false;
@@ -3248,7 +3303,10 @@ tr:hover td{background:var(--panel-2)}
         <div class="pv-cli">
           ${dato('Nombre:', c.nombre || this.nombreCli() || '—')}
           ${contacto ? dato('Contacto:', contacto) : ''}
-          ${dom ? dato('Domicilio:', dom) : ''}
+          ${dato('Entrega:', this.entregaModoLabel())}
+          ${this.pideEnvio() && dom ? dato('Domicilio:', dom) : ''}
+          ${c.entrega === 'expreso' && (c.expreso || c.expresoDom)
+            ? dato('Expreso:', [c.expreso, c.expresoDom].filter(Boolean).join(' — ')) : ''}
           ${c.factura === 'si' ? dato('Factura — DNI/CUIT:', c.dni || '—') : ''}
         </div>
 
@@ -3282,7 +3340,7 @@ tr:hover td{background:var(--panel-2)}
             ${desc ? tot('Descuento', '−' + UI.pesos(desc), 'neg') : ''}
             ${extra ? tot('Descuento comercial', '−' + UI.pesos(extra), 'neg') : ''}
             ${this.instalacionMonto() ? tot('Instalación', UI.pesos(this.instalacionMonto())) : ''}
-            ${this.pideEnvio() ? tot('Envío', this.envioCotizable() ? UI.pesos(this.envioMonto()) : 'A confirmar') : tot('Envío', 'Retira')}
+            ${this.pideEnvio() ? tot('Envío', this.envioTexto()) : tot('Envío', 'Retira')}
             <div class="pv-total"><span>Total</span><b>${UI.esc(UI.pesos(this.totalFinal()))}</b></div>
           </div>
         </div>
@@ -3656,6 +3714,10 @@ tr:hover td{background:var(--panel-2)}
         .fr input[readonly]{background:var(--panel-2);color:var(--ink-soft)}
         .fr .hint{font-size:11.5px;color:var(--muted)}
         @media(max-width:520px){.fr{grid-template-columns:1fr;gap:3px}}
+        /* Subtítulo adentro de una etapa (Entrega), con una línea que lo separa. */
+        .cz-tit{margin:14px 0 9px;padding-top:11px;border-top:1px solid var(--line);
+          font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--navy)}
+        .opt{font-weight:400;color:var(--muted)}
         .adds{display:flex;gap:7px;flex-wrap:wrap}
         .fr>label .chip-add{padding:0 7px;font-size:11.5px;line-height:1.5;margin-left:4px}
         .fx{display:flex;align-items:center;gap:5px}
