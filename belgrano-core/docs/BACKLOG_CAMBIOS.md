@@ -415,6 +415,36 @@ Todo en **una sola columna**, un bloque abajo del otro, y en modo edición.
   muebles publicados desde Inventario). **Producción ve todo menos costo,
   markup, margen y ganancia**, y sólo lee.
 
+### Lote 9 — APLICADO (Escala de espaciado para toda la app)
+
+Los márgenes dejaron de ser un número puesto a ojo en cada pantalla: salen de
+una **escala en saltos de 4** definida una sola vez en `comun/estilos.css`.
+
+- ✅ 218. Variables `--s1` a `--s6`, más `--pad` (relleno de tarjeta), `--gap`
+  (separación de grilla) y `--page` (margen contra el borde). Si algo necesita
+  un número que no está en la escala, casi siempre es que el bloque está mal
+  armado.
+- ✅ 219. Se ajustó el **aire vertical**, no el tamaño de la letra: la pantalla
+  tiene que leerse sin bajar.
+- ✅ 220. Controles y botones un cuerpo más chicos (14 → 13 px), que era lo que
+  los hacía ver enormes.
+- ✅ 221. **Tablas más compactas** (14 → 13 px, celdas de 11 a 8 px). Son la
+  mitad de las pantallas del sistema, así que es donde más se nota.
+- ✅ 222. `.cols3` con `align-items:start`: la tarjeta más corta ya no se
+  estira al alto de la más larga dejando un hueco enorme adentro (se veía en
+  el Pipeline del inicio).
+- ✅ 223. Verificado en **183 pantallas** (todas las solapas de los cuatro
+  roles): ninguna se va de ancho y no hay errores.
+
+| Pantalla | Antes | Después |
+|---|---|---|
+| Inicio | 1.383 px | 1.199 px |
+| Órdenes de venta | 815 px | 725 px |
+| Mis pendientes | 1.031 px | 955 px |
+| Clientes | 635 px | 546 px |
+| Producción | 473 px | 412 px |
+| El mueble | 2.177 px | ~1.570 px |
+
 ### Lote 8 bis — APLICADO (Propiedades, categorías y proporción)
 
 **Propiedades — se entra a cada una**
