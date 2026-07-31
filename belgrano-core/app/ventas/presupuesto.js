@@ -50,6 +50,7 @@
     lado: 'actividad',   // actividad | notas
     vendedor: '', local: '', fecha: '', termino: 'efectivo',
     nro: null, guardada: false,   // el número se toma al abrir; si no se usa, vuelve
+    cabAbierta: false,            // la cabecera se lee; el lápiz la abre
     cantNueva: 1,                 // cantidad del renglón de carga (cantidad + producto)
     obsExt: '', obsInt: '', terminos: '',
     ad: null,            // adicionales
@@ -89,14 +90,28 @@
     requiereVerif(l) { return l.tipo === 'medida' || !!String(l.obs).trim(); },
     // Cambiar el plazo de entrega no es una edición libre: se audita.
     entregaEditada() { return !!this.ad.entregaTocada; },
-    // "entre 15/09 y el 20/09 (entre 30 y 35 días)" — o con una sola fecha,
-    // "15/09 (15 días)". Los días se cuentan desde hoy.
+    // "entre el 5 de septiembre y el 10 de septiembre". SIEMPRE es un rango:
+    // la fábrica no compromete un día puntual.
     entregaTexto() {
       const a = this.ad;
-      if (!a.desde) return 'A confirmar';
-      const d1 = diasHasta(a.desde);
-      if (!a.hasta || a.hasta === a.desde) return `${fechaCorta(a.desde)} (${plural(d1)})`;
-      return `entre ${fechaCorta(a.desde)} y el ${fechaCorta(a.hasta)} (entre ${d1} y ${diasHasta(a.hasta)} días)`;
+      if (!a.desde || !a.hasta) return 'A confirmar';
+      return `entre el ${fechaLarga(a.desde)} y el ${fechaLarga(a.hasta)}`;
+    },
+    // El plazo en días, para el resumen de la cabecera: "30 a 35 días".
+    entregaDias() {
+      const a = this.ad;
+      if (!a.desde || !a.hasta) return 'a confirmar';
+      return `${diasHasta(a.desde)} a ${diasHasta(a.hasta)} días`;
+    },
+    // Corrige el rango: nunca puede quedar en un solo día.
+    normalizarEntrega() {
+      const a = this.ad, d = global.DB.ENTREGA_DIAS;
+      if (!a.desde) return false;
+      if (!a.hasta || a.hasta <= a.desde) {
+        a.hasta = sumarDias(a.desde, Math.max(1, d.max - d.min));
+        return true;   // hubo que corregirlo
+      }
+      return false;
     },
     // Sin domicilio + localidad no se cotiza el envío: no puede salir un número.
     envioCotizable() { return !!(String(this.cli.domicilio).trim() && this.cli.localidad); },
@@ -114,8 +129,14 @@
     },
 
     // Cada movimiento queda anotado en el costado (y después va al CRM).
-    log(quien, texto) {
-      this.actividad.unshift({ quien, texto, hora: hora() });
+    // `clave` agrupa los cambios repetidos del mismo dato (mover la fecha tres
+    // veces deja una sola línea, no tres).
+    log(quien, texto, clave) {
+      const ult = this.actividad[0];
+      if (clave && ult && ult.clave === clave && ult.quien === quien) {
+        ult.texto = texto; ult.hora = hora(); return;
+      }
+      this.actividad.unshift({ quien, texto, clave, hora: hora() });
       if (this.actividad.length > 40) this.actividad.pop();
     },
 
@@ -224,7 +245,7 @@
         return n ? `${n} ${n === 1 ? 'producto' : 'productos'} · ${UI.pesos(this.total())} · ${UI.esc(this.terminoLabel())}`
           : '<i>sin productos</i>';
       }
-      return `${UI.esc(this.entregaTexto())} · envío ${UI.esc(this.envioTexto())}`;
+      return `entrega ${UI.esc(this.entregaDias())} · envío ${UI.esc(this.envioTexto())}`;
     },
 
     // Refresca el resumen de las cabeceras plegadas mientras se escribe.
@@ -247,19 +268,30 @@
           </div>
           <div class="sp" style="flex:1"></div>
           <div class="cz-box">
+            <button class="lapiz cabx" id="cab-ed" title="${this.cabAbierta ? 'Listo' : 'Modificar vendedor, local o fecha'}"
+              aria-label="${this.cabAbierta ? 'Listo' : 'Modificar'}">${this.cabAbierta ? '✓' : '✏️'}</button>
             <div class="fr sm nro"><label>N° de cotización</label>
               <b class="tnum">${UI.esc(global.DB.numeroCotizacion(this.nro))}</b></div>
-            <div class="fr sm"><label for="op-vend">Vendedor</label>
-              <select id="op-vend">${vends.map(v => `<option ${this.vendedor === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
-            <div class="fr sm"><label for="op-local">Local de origen</label>
-              <select id="op-local">${locs.map(l => `<option value="${l.k}" ${this.local === l.k ? 'selected' : ''}>${UI.esc(l.label)}</option>`).join('')}</select></div>
-            <div class="fr sm"><label for="op-fecha">Fecha</label>
-              <input id="op-fecha" type="date" value="${UI.esc(this.fecha)}"></div>
+            <div class="fr sm"><label ${this.cabAbierta ? 'for="op-vend"' : ''}>Vendedor</label>
+              ${this.cabAbierta
+                ? `<select id="op-vend">${vends.map(v => `<option ${this.vendedor === v ? 'selected' : ''}>${v}</option>`).join('')}</select>`
+                : `<span class="valf">${UI.esc(this.vendedor)}</span>`}</div>
+            <div class="fr sm"><label ${this.cabAbierta ? 'for="op-local"' : ''}>Local de origen</label>
+              ${this.cabAbierta
+                ? `<select id="op-local">${locs.map(l => `<option value="${l.k}" ${this.local === l.k ? 'selected' : ''}>${UI.esc(l.label)}</option>`).join('')}</select>`
+                : `<span class="valf">${UI.esc((locs.find(l => l.k === this.local) || {}).label || this.local)}</span>`}</div>
+            <div class="fr sm"><label ${this.cabAbierta ? 'for="op-fecha"' : ''}>Fecha</label>
+              ${this.cabAbierta
+                ? `<input id="op-fecha" type="date" value="${UI.esc(this.fecha)}">`
+                : `<span class="valf">${UI.esc(fechaLarga(this.fecha))}</span>`}</div>
           </div>
         </div>`;
-      document.getElementById('op-vend').onchange = e => { this.vendedor = e.target.value; };
-      document.getElementById('op-local').onchange = e => { this.local = e.target.value; };
-      document.getElementById('op-fecha').onchange = e => { this.fecha = e.target.value; };
+      document.getElementById('cab-ed').onclick = () => { this.cabAbierta = !this.cabAbierta; this.pintarCabecera(); };
+      if (this.cabAbierta) {
+        document.getElementById('op-vend').onchange = e => { this.vendedor = e.target.value; };
+        document.getElementById('op-local').onchange = e => { this.local = e.target.value; };
+        document.getElementById('op-fecha').onchange = e => { this.fecha = e.target.value; this.pintarCabecera(); };
+      }
     },
 
     // ---- 1 · Datos del cliente ------------------------------------------
@@ -691,8 +723,8 @@
       // aviso para que Administración lo revise.
       const cerrado = (lbl, valor, k, nota) => `
         <div class="fr"><label>${UI.esc(lbl)}</label>
-          <div class="fx"><input value="${UI.esc(valor)}" readonly>
-            <button class="lnk mod" data-abrir="${k}">Modificar</button></div></div>
+          <div class="fx"><span class="valf">${UI.esc(valor)}</span>
+            <button class="lapiz" data-abrir="${k}" title="Modificar ${UI.esc(lbl)}" aria-label="Modificar ${UI.esc(lbl)}">✏️</button></div></div>
         ${nota ? `<div class="fr"><label></label><span class="hint">${nota}</span></div>` : ''}`;
 
       const hayDom = this.envioCotizable();
@@ -700,13 +732,16 @@
       c.innerHTML = `<div class="cz-cols">
         <div class="cz-col">
           ${a.entregaAbierta ? `
-            <div class="fr"><label for="ad-desde">Entrega desde</label>
-              <div class="fx"><input id="ad-desde" type="date" value="${UI.esc(a.desde)}">
-                <button class="lnk mod" data-cerrar="entrega">Volver al plazo estándar</button></div></div>
-            <div class="fr"><label for="ad-hasta">Hasta <span class="muted">(opcional)</span></label>
-              <input id="ad-hasta" type="date" value="${UI.esc(a.hasta)}"></div>
+            <div class="fr"><label for="ad-desde">Entrega</label>
+              <div class="fx rango">
+                <input id="ad-desde" type="date" value="${UI.esc(a.desde)}" aria-label="Entrega desde">
+                <span class="ent">y el</span>
+                <input id="ad-hasta" type="date" value="${UI.esc(a.hasta)}" aria-label="Entrega hasta">
+                <button class="lapiz" data-cerrar="entrega" title="Volver al plazo estándar" aria-label="Volver al plazo estándar">↺</button>
+              </div></div>
             <div class="fr"><label></label><span class="hint" id="ad-plazo"></span></div>`
-            : cerrado('Tiempo de entrega', this.entregaTexto(), 'entrega')}
+            : cerrado('Entrega', this.entregaTexto(), 'entrega',
+                `Plazo de fabricación: <b>${UI.esc(this.entregaDias())}</b>.`)}
 
           <div class="fr"><label for="ad-saldo">Saldo se abona en</label>
             <input id="ad-saldo" value="${UI.esc(a.saldoEn)}" readonly title="Sale de la condición de pago"></div>
@@ -718,7 +753,7 @@
             : a.envioAbierto
               ? `<div class="fr"><label for="ad-envio">Costo de envío</label>
                    <div class="fx"><input id="ad-envio" type="number" min="0" value="${a.envio}">
-                     <button class="lnk mod" data-cerrar="envio">Volver al de la localidad</button></div></div>`
+                     <button class="lapiz" data-cerrar="envio" title="Volver al de la localidad" aria-label="Volver al de la localidad">↺</button></div></div>`
               : cerrado('Costo de envío', UI.pesos(a.envio), 'envio',
                   `Por la localidad <b>${UI.esc(locd)}</b>.`)}
         </div>
@@ -730,13 +765,13 @@
                    <option value="convenir" ${a.instalacion === 'convenir' ? 'selected' : ''}>${UI.esc(DB.INSTALACION_DEFAULT)}</option>
                    <option value="si" ${a.instalacion === 'si' ? 'selected' : ''}>Sí</option>
                    <option value="no" ${a.instalacion === 'no' ? 'selected' : ''}>No</option>
-                 </select><button class="lnk mod" data-cerrar="instalacion">Volver</button></div></div>`
+                 </select><button class="lapiz" data-cerrar="instalacion" title="Volver" aria-label="Volver">↺</button></div></div>`
             : cerrado('¿Requiere instalación?', this.instalacionTexto(), 'instalacion')}
 
           ${a.escaleraAbierta
             ? `<div class="fr"><label for="ad-esc">Subida por escalera</label>
                  <div class="fx"><input id="ad-esc" type="number" min="0" value="${a.escalera}">
-                   <button class="lnk mod" data-cerrar="escalera">Volver a $5.000</button></div></div>
+                   <button class="lapiz" data-cerrar="escalera" title="Volver a $5.000" aria-label="Volver a $5.000">↺</button></div></div>
                <div class="fr"><label></label><span class="hint">Por piso por bulto. No se calcula: va como aviso.</span></div>`
             : cerrado('Subida por escalera', DB.escaleraTexto(a.escalera), 'escalera',
                 'No se calcula: va como aviso en la cotización.')}
@@ -778,22 +813,24 @@
 
       const plazoHint = () => {
         const h = document.getElementById('ad-plazo'); if (!h) return;
-        h.innerHTML = `Queda como <b>${UI.esc(this.entregaTexto())}</b>`;
+        h.innerHTML = `Queda <b>${UI.esc(this.entregaTexto())}</b> · ${UI.esc(this.entregaDias())}`
+          + (this._rangoCorregido ? ' <b style="color:var(--warn)">— la entrega siempre va entre dos fechas</b>' : '');
       };
 
-      const de = document.getElementById('ad-desde');
-      if (de) de.onchange = e => {
-        a.desde = e.target.value;
-        if (a.hasta && a.hasta < a.desde) a.hasta = '';
+      // La entrega siempre es un rango: si queda un solo día, se corrige solo.
+      const tocarEntrega = () => {
         a.entregaTocada = true;
-        this.log(this.vendedor, `Cambió la fecha de entrega: ${this.entregaTexto()}`);
+        const corregido = this.normalizarEntrega();
+        const ha2 = document.getElementById('ad-hasta');
+        if (corregido && ha2) ha2.value = a.hasta;
+        this._rangoCorregido = corregido;
+        this.log(this.vendedor, `Cambió la fecha de entrega: ${this.entregaTexto()}`, 'entrega');
         plazoHint(); av(); this.refrescarResumen(); this.pintarSide();
       };
+      const de = document.getElementById('ad-desde');
+      if (de) de.onchange = e => { a.desde = e.target.value; tocarEntrega(); };
       const ha = document.getElementById('ad-hasta');
-      if (ha) ha.onchange = e => {
-        a.hasta = e.target.value; a.entregaTocada = true;
-        plazoHint(); av(); this.refrescarResumen();
-      };
+      if (ha) ha.onchange = e => { a.hasta = e.target.value; tocarEntrega(); };
       const en = document.getElementById('ad-envio');
       if (en) en.oninput = e => {
         a.envio = Math.max(0, Number(e.target.value) || 0); a.envioTocado = true;
@@ -971,6 +1008,7 @@
       this.nro = global.DB.tomarNumeroCotizacion(); this.guardada = false;
       this.cli = { nombre: '', telefono: '', email: '', instagram: '', dni: '', tel2: '', canal: '', domicilio: '', localidad: '' };
       this.abiertos = {}; this.etapa = 'cliente'; this.lado = 'actividad'; this.cantNueva = 1;
+      this.cabAbierta = false;
       // Vendedor y local salen del usuario de la sesión; igual se pueden editar.
       this.vendedor = s.vendedor; this.local = s.local; this.fecha = hoy(); this.termino = 'efectivo';
       this.obsExt = ''; this.obsInt = ''; this.terminos = global.DB.TYC_DEFAULT;
@@ -1215,7 +1253,9 @@
 
         .cz-head{margin-bottom:10px;padding-bottom:14px}
         .cz-tit{display:flex;align-items:flex-start;gap:20px}
-        .cz-box{border:1px solid var(--line);border-radius:10px;padding:10px 14px;background:var(--panel-2);min-width:290px;display:flex;flex-direction:column;gap:7px}
+        .cz-box{position:relative;border:1px solid var(--line);border-radius:10px;padding:10px 14px;background:var(--panel-2);min-width:290px;display:flex;flex-direction:column;gap:7px}
+        .cz-box .cabx{position:absolute;top:5px;right:5px}
+        .cz-box .valf{font-size:13px;font-weight:600;color:var(--navy);padding:4px 0}
         .fr.sm{grid-template-columns:106px minmax(0,1fr);gap:8px}
         .fr.sm.nro b{font-size:16px;color:var(--navy);font-weight:800}
         .fr.sm>label{font-size:12px}
@@ -1326,6 +1366,12 @@
         .tag.ext{background:var(--brand-soft);color:var(--brand)}
         .tag.int{background:var(--line-soft);color:var(--ink-soft)}
         .lnk.mod{flex:none;font-size:12px}
+        .valf{flex:1;min-width:0;font-size:13px;color:var(--ink);padding:6px 0}
+        .lapiz{flex:none;border:0;background:none;cursor:pointer;font-size:13px;line-height:1;padding:5px 7px;border-radius:6px;color:var(--muted)}
+        .lapiz:hover{background:var(--line-soft)}
+        .rango{gap:7px}
+        .rango input{flex:1;min-width:0}
+        .rango .ent{flex:none;font-size:12.5px;color:var(--muted)}
         .locw{position:relative}
         .locw .drop{width:100%;min-width:250px}
         .bwrap .drop{margin-top:4px}
@@ -1415,7 +1461,18 @@
       return Math.max(0, Math.round((new Date(y, m - 1, d) - a) / 86400000));
     } catch { return 0; }
   }
-  function plural(n) { return `${n} ${n === 1 ? 'día' : 'días'}`; }
+  const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  function fechaLarga(s) {
+    const p = String(s || '').split('-');
+    return p.length === 3 ? `${Number(p[2])} de ${MESES[Number(p[1]) - 1] || ''}` : String(s || '');
+  }
+  function sumarDias(fecha, n) {
+    try {
+      const [y, m, d] = String(fecha).split('-').map(Number);
+      const x = new Date(y, m - 1, d); x.setDate(x.getDate() + n); return iso(x);
+    } catch { return fecha; }
+  }
 
   function hoy() {
     try { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }

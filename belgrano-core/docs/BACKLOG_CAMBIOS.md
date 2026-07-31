@@ -124,6 +124,20 @@
   **A medida** se abre sola para cargar el detalle; cerrada, la observación y la
   foto quedan a la vista pero sin poder editarse.
 
+- ✅ 99. **Entrega escrita con el mes**: "entre el 5 de septiembre y el 10 de
+  septiembre", como **texto plano con un lápiz al costado** (no una caja de
+  input). El lápiz abre las **dos fechas con calendario**.
+- ✅ 100. La entrega **nunca puede ser un solo día**: si queda una sola fecha, o
+  la final es igual o anterior a la inicial, se corrige sola a un rango y avisa.
+- ✅ 101. El resumen de la cabecera de Adicionales dice **"entrega 30 a 35 días ·
+  envío …"** (el plazo en días, no las fechas).
+- ✅ 102. Los adicionales cerrados (envío, instalación, escalera) también son
+  **texto plano con lápiz**, y el "volver al valor estándar" es un ícono ↺.
+- ✅ 103. La **caja de la cabecera** (N° · Vendedor · Local · Fecha) sale **sin
+  desplegables**: se lee, y un **lápiz arriba a la derecha** abre los tres campos.
+- ✅ 104. La **actividad no repite el mismo cambio**: mover la fecha tres veces
+  deja una sola línea actualizada en lugar de tres.
+
 > Pendientes:
 > - La lista de localidades es **demo del AMBA**; se reemplaza por la real del mapa.
 > - La foto del diseño hoy se carga por **URL**; falta la subida real del archivo.
