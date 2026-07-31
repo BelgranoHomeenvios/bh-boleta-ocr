@@ -268,12 +268,18 @@
   los datos de contacto. Sirve igual para ver, imprimir y descargar.
 - ✅ 160. **Confirmar → Venta ya no muestra el resumen**: sale un pop-up corto
   **"¿Confirmamos la orden OV-…?"** con **No, seguir editando** / **Sí, confirmar**.
-  Con Sí se crea la orden con su **N° de orden automático** y se abre la orden
-  para terminar de cargarla.
+  Con Sí se crea la orden con su **N° de orden automático** y **vuelve al mismo
+  editor en modo orden**, con todo lo cargado: la cabecera pasa a decir
+  **N° de orden** (con la cotización de origen debajo), el kicker a *Ventas ·
+  Órdenes*, desaparece "Confirmar → Venta" y aparece **Nueva cotización** para
+  arrancar una nueva. El documento impreso también cambia a "Orden n.º" y deja
+  de mostrar la validez.
+- ✅ 161. La leyenda de la seña queda en **30% para iniciar la fabricación**
+  (coincide con el mínimo del motor de órdenes).
 
 > Pendientes:
-> - La **pantalla "Nueva orden"** la va a diseñar Brian en el próximo paso; hoy al
->   confirmar se abre el detalle de la orden ya existente.
+> - Falta definir **qué campos extra** pide la orden y que hoy la cotización no
+>   necesita: el editor ya queda abierto en modo orden esperándolos.
 > - La lista de localidades es **demo del AMBA**; se reemplaza por la real del mapa.
 > - La foto del diseño hoy se carga por **URL**; falta la subida real del archivo.
 > - Brian va a definir **qué campos son obligatorios** para poder crear el presupuesto.

@@ -419,7 +419,7 @@
     IVA_LEYENDA: 'Los precios no incluyen IVA.',
     // Leyendas del presupuesto impreso.
     VALIDEZ_DIAS: 7,
-    SENA_LEYENDA: '50% para iniciar la fabricación',
+    SENA_LEYENDA: '30% para iniciar la fabricación',
     EMPRESA: {
       nombre: 'Belgrano Home',
       lema: 'Transformamos hogares',

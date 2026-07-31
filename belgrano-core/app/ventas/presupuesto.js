@@ -50,6 +50,8 @@
     lado: 'notas',       // notas | historico | actividad
     vendedor: '', local: '', fecha: '', termino: 'efectivo',
     nro: null, guardada: false,   // el número se toma al abrir; si no se usa, vuelve
+    modo: 'cotizacion',           // cotizacion | orden (misma pantalla, otro documento)
+    nroOrden: null,
     cabAbierta: false,            // la cabecera se lee; el lápiz la abre
     cantNueva: 1,                 // cantidad del renglón de carga (cantidad + producto)
     obsExt: '', obsInt: '', terminos: '',
@@ -174,6 +176,9 @@
       return i === 'si' ? 'Sí' : i === 'no' ? 'No' : global.DB.INSTALACION_DEFAULT;
     },
     terminoLabel() { return global.DB.condicion(this.termino).label; },
+    esOrden() { return this.modo === 'orden'; },
+    // El documento se llama distinto según en qué etapa está.
+    nroDoc() { return this.esOrden() ? this.nroOrden : global.DB.numeroCotizacion(this.nro); },
     nombreCli() {
       const c = this.cli;
       return c.nombre.trim() || c.telefono.trim() || c.instagram.trim() || c.email.trim();
@@ -210,10 +215,11 @@
       if (!this.cli) this.reset();
       document.getElementById(mount).innerHTML = `
         <div class="cz-bar">
-          <div class="kick">Ventas · Cotizaciones</div>
+          <div class="kick">Ventas · ${this.esOrden() ? 'Órdenes' : 'Cotizaciones'}</div>
           <div class="sp" style="flex:1"></div>
+          ${this.esOrden() ? '<button class="btn sm" id="pr-nueva">Nueva cotización</button>' : ''}
           <button class="btn sm" id="pr-guardar">Guardar</button>
-          <button class="btn sm primary" id="pr-venta">Confirmar → Venta</button>
+          ${this.esOrden() ? '' : '<button class="btn sm primary" id="pr-venta">Confirmar → Venta</button>'}
         </div>
         <div class="cz-wrap">
           <div id="cz-main"></div>
@@ -222,7 +228,10 @@
         ${this.estilos()}`;
 
       document.getElementById('pr-guardar').onclick = () => this.accion('guardar');
-      document.getElementById('pr-venta').onclick = () => this.convertir();
+      const venta = document.getElementById('pr-venta');
+      if (venta) venta.onclick = () => this.convertir();
+      const nueva = document.getElementById('pr-nueva');
+      if (nueva) nueva.onclick = () => { this.reset(); this.render(this._mount); };
       this.pintarTodo();
     },
 
@@ -322,15 +331,17 @@
       c.innerHTML = `
         <div class="cz-tit">
           <div>
-            <div class="kick">Cotización ${UI.esc(global.DB.numeroCotizacion(this.nro))}</div>
+            <div class="kick">${this.esOrden() ? 'Orden de venta' : 'Cotización'} ${UI.esc(this.nroDoc())}</div>
             <h1 class="h-title" style="margin:2px 0 0">${UI.esc(this.nombreCli() || 'Nueva')}</h1>
           </div>
           <div class="sp" style="flex:1"></div>
           <div class="cz-box">
             <button class="lapiz cabx" id="cab-ed" title="${this.cabAbierta ? 'Listo' : 'Modificar vendedor, local o fecha'}"
               aria-label="${this.cabAbierta ? 'Listo' : 'Modificar'}">${this.cabAbierta ? '✓' : '✏️'}</button>
-            <div class="fr sm nro"><label>N° de cotización</label>
-              <b class="tnum">${UI.esc(global.DB.numeroCotizacion(this.nro))}</b></div>
+            <div class="fr sm nro"><label>${this.esOrden() ? 'N° de orden' : 'N° de cotización'}</label>
+              <b class="tnum">${UI.esc(this.nroDoc())}</b></div>
+            ${this.esOrden() ? `<div class="fr sm"><label>Cotización</label>
+              <span class="valf">${UI.esc(global.DB.numeroCotizacion(this.nro))}</span></div>` : ''}
             <div class="fr sm"><label ${this.cabAbierta ? 'for="op-vend"' : ''}>Vendedor</label>
               ${this.cabAbierta
                 ? `<select id="op-vend">${vends.map(v => `<option ${this.vendedor === v ? 'selected' : ''}>${v}</option>`).join('')}</select>`
@@ -1373,7 +1384,7 @@
       this.registrando = true;       // de acá en más sí queda historial
       this.log(this.vendedor, primera
         ? `Guardó la cotización ${global.DB.numeroCotizacion(this.nro)}`
-        : 'Guardó los cambios');
+        : `Guardó los cambios${this.esOrden() ? ` de ${this.nroOrden}` : ''}`);
       this.pintarSide();
       UI.aviso(`${global.DB.numeroCotizacion(this.nro)} guardada (demo)`, 'ok');
     },
@@ -1456,15 +1467,14 @@
             lineas: this.lineas.map(l => ({ nombre: l.prodNombre, cant: l.cantidad, unit: this.unit(l), obs: l.obs, tipo: l.tipo, img: l.img })),
           });
           m.remove();
+          // No se pierde nada: sigue el MISMO editor, ahora como orden, para
+          // completar lo que en la cotización todavía no hacía falta.
           this.guardada = true;   // el número de cotización queda usado por la venta
           this.registrando = true;
+          this.modo = 'orden'; this.nroOrden = orden.numero;
           this.log(this.vendedor, `Confirmó la venta ${orden.numero}`);
-          this.reset();
-          UI.aviso(`Orden ${orden.numero} creada`, 'ok');
-          // Se abre la orden recién creada para seguir cargándola.
-          global.App.goSub('ventas', 'ordenes');
-          setTimeout(() => global.OrdenDetalle.render('mview', { boleta: orden },
-            () => global.Ordenes.render('mview')), 0);
+          UI.aviso(`Orden ${orden.numero} creada — completala`, 'ok');
+          this.render(this._mount);
         };
       }, 420);
     },
@@ -1476,6 +1486,7 @@
       this.nro = global.DB.tomarNumeroCotizacion(); this.guardada = false;
       this.cli = { nombre: '', telefono: '', email: '', instagram: '', dni: '', tel2: '', canal: '', domicilio: '', localidad: '' };
       this.abiertos = {}; this.etapa = 'cliente'; this.lado = 'notas'; this.cantNueva = 1;
+      this.modo = 'cotizacion'; this.nroOrden = null;
       this.cabAbierta = false;
       // Vendedor y local salen del usuario de la sesión; igual se pueden editar.
       this.vendedor = s.vendedor; this.local = s.local; this.fecha = hoy(); this.termino = 'efectivo';
@@ -1520,9 +1531,9 @@
             <div class="pv-lema">${UI.esc(E.lema)}</div>
           </div>
           <div class="pv-meta">
-            <div><span>Cotización n.º</span><b class="esp">${nro}</b></div>
+            <div><span>${this.esOrden() ? 'Orden n.º' : 'Cotización n.º'}</span><b class="esp">${UI.esc(this.esOrden() ? this.nroOrden : nro)}</b></div>
             <div><span>Fecha</span><b>${UI.esc(fechaBarras(this.fecha))}</b></div>
-            <div><span>Validez</span><b>${DB.VALIDEZ_DIAS} días</b></div>
+            ${this.esOrden() ? '' : `<div><span>Validez</span><b>${DB.VALIDEZ_DIAS} días</b></div>`}
           </div>
         </header>
 
@@ -1652,7 +1663,7 @@
     // manda por la plataforma que usan, así que alcanza con el archivo.
     modalPreview(modo) {
       const cuerpo = this.estiloPreview() + this.cuerpoPreview();
-      const nombre = `Cotizacion-${(this.nombreCli() || 'cliente').replace(/[^\w\-]+/g, '_')}.html`;
+      const nombre = `${this.esOrden() ? 'Orden' : 'Cotizacion'}-${(this.nombreCli() || 'cliente').replace(/[^\w\-]+/g, '_')}.html`;
       if (modo === 'print') {
         try { const w = global.open('', '_blank'); if (w) { w.document.write(`<title>Cotización</title>${cuerpo}`); w.document.close(); w.focus(); w.print(); return; } } catch (e) {}
       }
