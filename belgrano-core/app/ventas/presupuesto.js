@@ -56,6 +56,7 @@
     cantNueva: 1,                 // cantidad del renglón de carga (cantidad + producto)
     obsExt: '', obsInt: '', terminos: '',
     pendientes: [],               // recordatorios / mensajes agendados
+    cobros: [],                   // señas registradas en la orden
     dto: null,                    // descuento comercial extra {modo, alcance, linea, valor}
     archivos: [],                 // adjuntos de la cotización (van a Documentos)
     registrando: false,           // el historial arranca al guardar / confirmar
@@ -129,6 +130,13 @@
       const l = this.get(d.linea);
       return `${cuanto} en ${l ? l.prodNombre : 'un producto'}`;
     },
+    // ---- Seña ------------------------------------------------------------
+    // La orden no entra a fábrica sin la seña mínima (30% del total).
+    senaMinima() { return Math.round(this.totalFinal() * (global.DB.SENA_PCT / 100)); },
+    senaTotal() { return (this.cobros || []).reduce((a, c) => a + (Number(c.m) || 0), 0); },
+    saldo() { return Math.max(0, this.totalFinal() - this.senaTotal()); },
+    senaSuficiente() { return this.senaTotal() >= this.senaMinima(); },
+
     instalacionMonto() { return this.ad.instalacion === 'si' ? (this.ad.instalacionCosto || 0) : 0; },
     totalFinal() { return this.total() + this.envioMonto() + this.instalacionMonto() - this.descuentoExtra(); },
     items() { return this.lineas.reduce((a, l) => a + l.cantidad, 0); },
@@ -247,6 +255,8 @@
         { k: 'cliente',     n: 1, tit: 'Datos del cliente' },
         { k: 'productos',   n: 2, tit: 'Productos' },
         { k: 'adicionales', n: 3, tit: 'Adicionales' },
+        // La seña sólo tiene sentido con la venta confirmada.
+        ...(this.esOrden() ? [{ k: 'sena', n: 4, tit: 'Seña y pago' }] : []),
       ];
       m.innerHTML = `
         <div class="card pad cz-head" id="cz-cab"></div>
@@ -298,6 +308,7 @@
       if (this.etapa === 'cliente') this.pintarCliente();
       if (this.etapa === 'productos') this.pintarProductos();
       if (this.etapa === 'adicionales') this.pintarAdicionales();
+      if (this.etapa === 'sena') this.pintarSena();
       this.pintarTotales();
     },
 
@@ -313,12 +324,15 @@
         return n ? `${n} ${n === 1 ? 'producto' : 'productos'} · ${UI.pesos(this.total())} · ${UI.esc(this.terminoLabel())}`
           : '<i>sin productos</i>';
       }
-      return `entrega ${UI.esc(this.entregaDias())} · envío ${UI.esc(this.envioTexto())}`;
+      if (k === 'adicionales') return `entrega ${UI.esc(this.entregaDias())} · envío ${UI.esc(this.envioTexto())}`;
+      const s = this.senaTotal();
+      return s ? `seña ${UI.pesos(s)} · saldo ${UI.pesos(this.saldo())}`
+        : `<i>sin seña — mínimo ${UI.pesos(this.senaMinima())}</i>`;
     },
 
     // Refresca el resumen de las cabeceras plegadas mientras se escribe.
     refrescarResumen() {
-      ['cliente', 'productos', 'adicionales'].forEach(k => {
+      ['cliente', 'productos', 'adicionales', 'sena'].forEach(k => {
         const el = document.getElementById('res-' + k);
         if (el) el.innerHTML = this.resumen(k);
       });
@@ -1129,6 +1143,98 @@
       av();
     },
 
+    // ---- 4 · Seña y pago ---------------------------------------------------
+    // Efectivo: alcanza con rendirlo a un autorizado. Transferencia: queda sin
+    // acreditar hasta que Administración la confirme contra el banco.
+    pintarSena() {
+      const c = document.getElementById('sec-sena'); if (!c) return;
+      const DB = global.DB;
+      const n = this._nuevaSena || (this._nuevaSena = {
+        metodo: 'efectivo', monto: this.senaMinima(), recibidoPor: DB.autorizadosCobro()[0], depositante: '',
+      });
+      const falta = Math.max(0, this.senaMinima() - this.senaTotal());
+
+      c.innerHTML = `
+        <div class="sn-kpis">
+          <div class="sn-k"><span>Total de la orden</span><b class="tnum">${UI.pesos(this.totalFinal())}</b></div>
+          <div class="sn-k"><span>Seña mínima (${DB.SENA_PCT}%)</span><b class="tnum">${UI.pesos(this.senaMinima())}</b></div>
+          <div class="sn-k ${this.senaTotal() ? 'ok' : ''}"><span>Señado</span><b class="tnum">${UI.pesos(this.senaTotal())}</b></div>
+          <div class="sn-k"><span>Saldo</span><b class="tnum">${UI.pesos(this.saldo())}</b></div>
+        </div>
+
+        ${this.cobros.length ? `<div class="sn-lista">${this.cobros.map(x => {
+          const e = DB.ESTADO_COBRO[x.estado] || { label: x.estado, pill: 'soft', icon: '•' };
+          return `<div class="sn-c">
+            <span class="sn-i">${e.icon}</span>
+            <div><div class="sn-m tnum">${UI.pesos(x.m)} <span class="pill ${e.pill}">${UI.esc(e.label)}</span></div>
+              <div class="sn-d">${UI.esc(x.metodo === 'transferencia' ? 'Transferencia' : 'Efectivo')} ·
+                ${UI.esc(x.recibidoPor)}${x.depositante ? ` · depositó ${UI.esc(x.depositante)}` : ''}</div></div>
+            <div class="sp" style="flex:1"></div>
+            <button class="lx" data-quitac="${UI.esc(x.id)}" title="Quitar">✕</button></div>`;
+        }).join('')}</div>` : ''}
+
+        <div class="sn-tit">${this.cobros.length ? 'Agregar otro pago' : 'Registrar la seña'}</div>
+        <div class="cz-cols">
+          <div class="cz-col">
+            <div class="fr"><label>Método</label>
+              <div class="vopts">
+                <button class="vopt ${n.metodo === 'efectivo' ? 'on' : ''}" data-sm="efectivo">Efectivo</button>
+                <button class="vopt ${n.metodo === 'transferencia' ? 'on' : ''}" data-sm="transferencia">Transferencia</button>
+              </div></div>
+            <div class="fr"><label for="sn-monto">Monto</label>
+              <input id="sn-monto" inputmode="numeric" value="${n.monto}"></div>
+            ${falta ? `<div class="fr"><label></label><span class="hint">Faltan <b>${UI.pesos(falta)}</b> para llegar al ${DB.SENA_PCT}%.</span></div>` : ''}
+          </div>
+          <div class="cz-col">
+            <div class="fr"><label for="sn-quien">Lo recibió</label>
+              <select id="sn-quien">${DB.autorizadosCobro().map(a =>
+                `<option ${n.recibidoPor === a ? 'selected' : ''}>${UI.esc(a)}</option>`).join('')}</select></div>
+            ${n.metodo === 'transferencia'
+              ? `<div class="fr"><label for="sn-dep">Quién depositó</label>
+                   <input id="sn-dep" value="${UI.esc(n.depositante)}" placeholder="No siempre es el cliente"></div>
+                 <div class="fr"><label></label><span class="hint">Queda <b>sin acreditar</b> hasta que Administración la confirme contra el banco.</span></div>`
+              : `<div class="fr"><label></label><span class="hint">Con rendirlo a un autorizado alcanza.</span></div>`}
+          </div>
+        </div>
+        <div id="sn-avisos"></div>
+        <div class="sec-go"><button class="btn sm primary" id="sn-ok">Registrar</button></div>`;
+
+      const av = () => {
+        const box = document.getElementById('sn-avisos'); if (!box) return;
+        box.innerHTML = this.senaSuficiente()
+          ? `<div class="banner ok">Seña completa — la orden puede ir a <b>fabricación</b>.</div>`
+          : `<div class="banner warn">Sin el <b>${DB.SENA_PCT}%</b> la orden queda <b>a confirmar</b> y no entra a fábrica.</div>`;
+      };
+
+      c.querySelectorAll('[data-sm]').forEach(b => b.onclick = () => { n.metodo = b.dataset.sm; this.pintarSena(); });
+      const mo = document.getElementById('sn-monto');
+      mo.oninput = () => { const x = mo.value.replace(/[^\d]/g, ''); if (x !== mo.value) mo.value = x; n.monto = Number(x) || 0; };
+      document.getElementById('sn-quien').onchange = e => { n.recibidoPor = e.target.value; };
+      const dep = document.getElementById('sn-dep');
+      if (dep) dep.oninput = e => { n.depositante = e.target.value; };
+      c.querySelectorAll('[data-quitac]').forEach(b => b.onclick = () => {
+        const antes = this.antes();
+        const x = this.cobros.find(y => y.id === b.dataset.quitac);
+        this.cobros = this.cobros.filter(y => y.id !== b.dataset.quitac);
+        if (x) this.cambio(`Quitó un pago de ${UI.pesos(x.m)}`, antes);
+        this.pintarSena(); this.refrescarResumen(); this.pintarSide();
+      });
+      document.getElementById('sn-ok').onclick = () => {
+        if (!(n.monto > 0)) return UI.aviso('Poné el monto de la seña', 'warn');
+        if (n.metodo === 'transferencia' && !n.depositante.trim()) return UI.aviso('Cargá quién depositó', 'warn');
+        this.cobros.push({
+          id: 'c' + (++this._uid), m: n.monto, metodo: n.metodo, recibidoPor: n.recibidoPor,
+          depositante: n.depositante.trim(),
+          estado: n.metodo === 'transferencia' ? 'pendiente_banco' : 'rendido',
+        });
+        this.log(this.vendedor, `Registró ${n.metodo === 'transferencia' ? 'una transferencia' : 'un pago en efectivo'} de ${UI.pesos(n.monto)} — ${n.recibidoPor}`);
+        this._nuevaSena = { metodo: n.metodo, monto: Math.max(0, this.senaMinima() - this.senaTotal()), recibidoPor: n.recibidoPor, depositante: '' };
+        UI.aviso('Pago registrado', 'ok');
+        this.pintarSena(); this.refrescarResumen(); this.pintarTotales(); this.pintarSide();
+      };
+      av();
+    },
+
     // ---- Desglose de totales ----------------------------------------------
     pintarTotales() {
       const t = document.getElementById('cz-tot'); if (!t) return;
@@ -1146,7 +1252,8 @@
         </button>
         ${fila('Envío', this.envioTexto())}
         ${this.instalacionMonto() ? fila('Instalación', UI.pesos(this.instalacionMonto())) : ''}
-        ${fila('Saldo restante', UI.pesos(this.totalFinal()), 'big')}
+        ${this.esOrden() && this.senaTotal() ? fila('Seña', '−' + UI.pesos(this.senaTotal()), 'neg') : ''}
+        ${fila('Saldo restante', UI.pesos(this.esOrden() ? this.saldo() : this.totalFinal()), 'big')}
         <div class="tiva">${UI.esc(global.DB.IVA_LEYENDA)}</div>
         <div class="tacc">
           <button class="btn sm" id="cz-preview">Vista previa</button>
@@ -1504,6 +1611,7 @@
       };
       this.lineas = []; this._uid = 0; this.dto = null; this.archivos = [];
       this.actividad = []; this.registrando = false; this.cambios = []; this.pendientes = [];
+      this.cobros = [];
       this._nuevaAct = null;
     },
 
@@ -2086,6 +2194,19 @@
         .cz-sb textarea{width:100%;padding:8px 10px;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);resize:vertical}
         .ava{width:26px;height:26px;flex:none;border-radius:50%;background:var(--brand);color:#fff;display:inline-grid;place-items:center;font-size:10.5px;font-weight:800}
         .ava.sys{background:var(--muted)}
+        .sn-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+        @media(max-width:760px){.sn-kpis{grid-template-columns:1fr 1fr}}
+        .sn-k{border:1px solid var(--line);border-radius:9px;padding:9px 11px;background:var(--panel-2)}
+        .sn-k span{display:block;font-size:11px;color:var(--muted)}
+        .sn-k b{font-size:16px;color:var(--navy)}
+        .sn-k.ok b{color:var(--ok)}
+        .sn-lista{border:1px solid var(--line);border-radius:9px;margin-bottom:14px}
+        .sn-c{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line-soft)}
+        .sn-c:last-child{border-bottom:0}
+        .sn-i{font-size:15px}
+        .sn-m{font-size:14px;font-weight:700;color:var(--navy);display:flex;align-items:center;gap:7px}
+        .sn-d{font-size:11.5px;color:var(--muted)}
+        .sn-tit{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:9px}
         .pend-tit{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:14px 0 6px}
         .pend{display:flex;gap:8px;padding:6px 0;align-items:flex-start;border-top:1px solid var(--line-soft)}
         .pend .pi{font-size:13px}

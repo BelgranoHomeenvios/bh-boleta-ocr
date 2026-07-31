@@ -279,9 +279,22 @@
 - ✅ 161. La leyenda de la seña queda en **30% para iniciar la fabricación**
   (coincide con el mínimo del motor de órdenes).
 
+- ✅ 163. **La venta se modela con la misma lógica que la cotización**: al pasar
+  a orden aparece una **4ª etapa "Seña y pago"** (sólo existe con la venta
+  confirmada), con el mismo formato de desplegable y resumen en la cabecera.
+  - KPIs arriba: **Total · Seña mínima (30%) · Señado · Saldo**.
+  - Se registran pagos con **método**: *Efectivo* → queda **rendido**;
+    *Transferencia* → **sin acreditar** hasta que Administración la confirme
+    contra el banco, y pide **quién depositó** (no siempre es el cliente).
+  - **Quién lo recibió** sale de la lista de autorizados a cobrar.
+  - Avisa si la orden **puede o no ir a fabricación** según el 30%.
+  - La **seña se descuenta en el bloque de totales** y el pie pasa a mostrar el
+    saldo real.
+
 > Pendientes:
-> - Falta definir **qué campos extra** pide la orden y que hoy la cotización no
->   necesita: el editor ya queda abierto en modo orden esperándolos.
+> - Confirmación de la transferencia contra el banco (CUIT + comprobante) — ya
+>   existe en `DB.confirmarSenaBanco()`; falta engancharla desde acá.
+> - Qué otros campos suma la orden además de la seña (factura, planos, etc.).
 > - La lista de localidades es **demo del AMBA**; se reemplaza por la real del mapa.
 > - La foto del diseño hoy se carga por **URL**; falta la subida real del archivo.
 > - Brian va a definir **qué campos son obligatorios** para poder crear el presupuesto.
