@@ -18,6 +18,11 @@
     return String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
   }
 
+  // Clave estable a partir del nombre ("Vicente López" → "vicente_lopez").
+  function slug(s) {
+    return sinTilde(s).replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  }
+
   function cfg() {
     try { return JSON.parse(localStorage.getItem(CFG_KEY)) || {}; }
     catch { return {}; }
@@ -345,20 +350,51 @@
     },
 
     // ---- Adicionales de la cotización ----------------------------------
-    // Localidad → costo de envío. Tabla DEMO: Brian pasa la lista real y se
-    // reemplaza tal cual (misma forma {k, label, flete}).
+    // Localidad → costo de envío. Tabla DEMO con las localidades del AMBA:
+    // Brian pasa la lista real del mapa y se reemplaza tal cual (misma forma
+    // {k, label, zona, flete}). Lo que no esté se carga a mano desde la
+    // cotización y queda guardado.
+    _ZONAS: [
+      { zona: 'CABA', flete: 45000, locs: ['CABA'] },
+      { zona: 'GBA Norte', flete: 62000, locs: [
+        'Vicente López', 'Olivos', 'Florida', 'Munro', 'San Isidro', 'Martínez', 'Beccar',
+        'San Fernando', 'Tigre', 'Boulogne', 'San Martín', 'Villa Ballester', 'San Miguel',
+        'José C. Paz', 'Malvinas Argentinas', 'Escobar', 'Pilar'] },
+      { zona: 'GBA Oeste', flete: 68000, locs: [
+        'Ramos Mejía', 'Haedo', 'Morón', 'Castelar', 'Ituzaingó', 'Hurlingham',
+        'San Justo', 'Merlo', 'Moreno', 'Caseros', 'Tres de Febrero'] },
+      { zona: 'GBA Sur', flete: 72000, locs: [
+        'Avellaneda', 'Wilde', 'Lanús', 'Banfield', 'Lomas de Zamora', 'Temperley',
+        'Adrogué', 'Almirante Brown', 'Bernal', 'Quilmes', 'Berazategui',
+        'Florencio Varela', 'Ezeiza', 'Monte Grande'] },
+      { zona: 'La Plata', flete: 95000, locs: ['La Plata', 'City Bell', 'Gonnet', 'Berisso', 'Ensenada'] },
+      { zona: 'Interior', flete: 0, locs: ['Interior (a cotizar)'] },
+    ],
     localidades() {
-      return [
-        { k: 'caba',      label: 'CABA',                 flete: 45000 },
-        { k: 'gba_norte', label: 'GBA Norte',            flete: 62000 },
-        { k: 'gba_oeste', label: 'GBA Oeste',            flete: 68000 },
-        { k: 'gba_sur',   label: 'GBA Sur',              flete: 72000 },
-        { k: 'laplata',   label: 'La Plata',             flete: 95000 },
-        { k: 'interior',  label: 'Interior (a cotizar)', flete: 0 },
-      ];
+      const base = [];
+      this._ZONAS.forEach(z => z.locs.forEach(l =>
+        base.push({ k: slug(l), label: l, zona: z.zona, flete: z.flete })));
+      // Las cargadas a mano se suman al final, marcadas como propias.
+      let extra = [];
+      try { extra = JSON.parse(localStorage.getItem('bh_locs') || '[]'); } catch (e) {}
+      extra.forEach(l => { if (!base.some(b => b.k === l.k)) base.push({ ...l, manual: true }); });
+      return base;
+    },
+    localidad(k) { return this.localidades().find(l => l.k === k) || null; },
+    // Alta manual: la localidad que no está en el mapa se carga acá y queda.
+    agregarLocalidad(label, flete = 0, zona = 'Cargada a mano') {
+      const l = { k: slug(label), label: String(label).trim(), zona, flete: Number(flete) || 0 };
+      if (!l.label) return null;
+      let extra = [];
+      try { extra = JSON.parse(localStorage.getItem('bh_locs') || '[]'); } catch (e) {}
+      if (!extra.some(x => x.k === l.k) && !this._ZONAS.some(z => z.locs.some(n => slug(n) === l.k))) {
+        extra.push(l);
+        try { localStorage.setItem('bh_locs', JSON.stringify(extra)); } catch (e) {}
+      }
+      return l;
     },
     fleteDe(localidadK) {
-      return (this.localidades().find(l => l.k === localidadK) || {}).flete || 0;
+      return (this.localidad(localidadK) || {}).flete || 0;
     },
 
     // Plazo de entrega estándar. Si el vendedor lo edita, la orden salta a

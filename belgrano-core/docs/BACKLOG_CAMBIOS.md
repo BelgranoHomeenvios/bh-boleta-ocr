@@ -100,7 +100,19 @@
   tipo de mueble, con la cuenta de productos de cada una) o por **nombre**, y se
   combinan para filtrar más fino.
 
+- ✅ 91. Se saca el **aviso permanente** de "Cargá al menos teléfono, Instagram o
+  mail": la pantalla arranca limpia.
+- ✅ 92. **No se pasa a Productos sin identificar al cliente**: hace falta el
+  **nombre** y **al menos un contacto** (teléfono, Instagram o mail). El aviso
+  sale recién al tocar "Continuar", y las secciones Productos y Adicionales
+  tampoco se abren desde su título hasta que estén esos datos.
+- ✅ 93. **Localidad como buscador**, no un desplegable de zonas: se escribe y
+  aparecen las localidades del mapa con su zona y su flete (insensible a tildes).
+  La que **no está se carga a mano** (nombre + costo) y **queda guardada** para
+  las próximas cotizaciones, marcada como "cargada a mano".
+
 > Pendientes:
+> - La lista de localidades es **demo del AMBA**; se reemplaza por la real del mapa.
 > - La foto del diseño hoy se carga por **URL**; falta la subida real del archivo.
 > - Brian va a definir **qué campos son obligatorios** para poder crear el presupuesto.
 > - **Elegir el local al iniciar sesión**: hoy sale de `DB.sesion()` fijo; cuando

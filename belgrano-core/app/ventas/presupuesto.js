@@ -189,7 +189,15 @@
         </div>`;
 
       m.querySelectorAll('[data-sec]').forEach(b => b.onclick = () => {
-        this.etapa = this.etapa === b.dataset.sec ? '' : b.dataset.sec;
+        const k = b.dataset.sec;
+        // No se cotiza sin saber a quién: Productos y Adicionales quedan
+        // cerrados hasta tener nombre + un contacto.
+        if (k !== 'cliente' && this.etapa !== k && !this.clienteCompleto()) {
+          this.etapa = 'cliente'; this.pintarMain(); this.avisoCliente(true);
+          UI.aviso('Primero completá los datos del cliente', 'warn');
+          return;
+        }
+        this.etapa = this.etapa === k ? '' : k;
         this.pintarMain();
       });
       document.getElementById('obs-ext').oninput = e => { this.obsExt = e.target.value; };
@@ -258,7 +266,7 @@
     // orden y hace falta para cotizar los muebles, así que vive en Productos.
     pintarCliente() {
       const c = document.getElementById('sec-cliente'); if (!c) return;
-      const locds = global.DB.localidades();
+      const locActual = global.DB.localidad(this.cli.localidad);
       const f = (id, lbl, val, ph) => `<div class="fr"><label for="${id}">${UI.esc(lbl)}</label>
         <input id="${id}" value="${UI.esc(val)}" placeholder="${UI.esc(ph)}"></div>`;
       const sel = (id, lbl, opts) => `<div class="fr"><label for="${id}">${UI.esc(lbl)}</label>
@@ -279,8 +287,16 @@
           <div class="cz-col">
             ${f('c-nombre', 'Cliente', this.cli.nombre, 'Nombre y apellido')}
             ${f('c-dom', 'Domicilio de entrega', this.cli.domicilio, 'Calle 1234, piso/depto')}
-            ${sel('c-locd', 'Localidad', `<option value="">Elegí…</option>` +
-              locds.map(l => `<option value="${l.k}" ${this.cli.localidad === l.k ? 'selected' : ''}>${UI.esc(l.label)}</option>`).join(''))}
+            <div class="fr"><label for="c-locd">Localidad</label>
+              <div class="fx locw">
+                <input id="c-locd" value="${UI.esc(locActual ? locActual.label : '')}"
+                  placeholder="Escribí la localidad…" autocomplete="off">
+                ${locActual ? `<button class="cx" id="c-locx" title="Quitar la localidad" aria-label="Quitar la localidad">✕</button>` : ''}
+                <div id="c-locdrop"></div>
+              </div></div>
+            ${locActual ? `<div class="fr"><label></label><span class="hint">
+              ${UI.esc(locActual.zona)} · envío ${locActual.flete ? UI.pesos(locActual.flete) : 'a cotizar'}
+              ${locActual.manual ? '<b>· cargada a mano</b>' : ''}</span></div>` : ''}
           </div>
           <div class="cz-col">
             ${f('c-tel', 'Teléfono', this.cli.telefono, '11 5555-2020')}
@@ -309,23 +325,102 @@
         this.pintarCliente(); this.pintarCabecera(); this.refrescarResumen(); this.pintarSide();
       });
       document.getElementById('c-canal').onchange = e => { this.cli.canal = e.target.value; };
-      // Elegir localidad trae el costo de envío por default (editable en Adicionales).
-      document.getElementById('c-locd').onchange = e => {
-        this.cli.localidad = e.target.value;
-        if (!this.ad.envioTocado) {
-          this.ad.envio = global.DB.fleteDe(this.cli.localidad);
-          this.log('Sistema', `Cargó el envío por localidad: ${UI.pesos(this.ad.envio)}`);
-        }
-        this.pintarTodo();
-      };
-      document.getElementById('c-sig').onclick = () => { this.etapa = 'productos'; this.pintarMain(); };
+      this.bindLocalidad();
+      document.getElementById('c-sig').onclick = () => this.irAProductos();
       this.avisoCliente();
     },
 
-    avisoCliente() {
+    // Buscador de localidad: se escribe y aparecen las del mapa. La que no esté
+    // se carga a mano y queda guardada para las próximas cotizaciones.
+    bindLocalidad() {
+      const inp = document.getElementById('c-locd'); if (!inp) return;
+      const drop = document.getElementById('c-locdrop');
+      const cerrar = () => { if (drop) drop.innerHTML = ''; };
+
+      const elegir = l => {
+        this.cli.localidad = l.k;
+        if (!this.ad.envioTocado) {
+          this.ad.envio = global.DB.fleteDe(l.k);
+          this.log('Sistema', `Cargó el envío por localidad (${l.label}): ${this.ad.envio ? UI.pesos(this.ad.envio) : 'a cotizar'}`);
+        }
+        cerrar(); this.pintarTodo();
+      };
+
+      const buscar = () => {
+        const q = sinTilde(inp.value);
+        const todas = global.DB.localidades();
+        const hits = q ? todas.filter(l => sinTilde(l.label).includes(q)).slice(0, 12) : todas.slice(0, 12);
+        const exacta = todas.some(l => sinTilde(l.label) === q);
+        if (!hits.length && !q) return cerrar();
+        drop.innerHTML = `<div class="drop">
+          ${hits.map(l => `<div class="it" data-l="${l.k}"><span>${UI.esc(l.label)}</span>
+            <span class="sp" style="flex:1"></span>
+            <span class="cnt">${UI.esc(l.zona)}${l.flete ? ' · ' + UI.pesos(l.flete) : ''}</span></div>`).join('')}
+          ${q && !exacta ? `<div class="it nueva" data-nueva="1">+ Cargar “${UI.esc(inp.value.trim())}” a mano</div>` : ''}
+          ${!hits.length && !q ? '<div class="it muted">Escribí para buscar.</div>' : ''}
+        </div>`;
+        drop.querySelectorAll('[data-l]').forEach(it => it.onmousedown = e => {
+          e.preventDefault(); elegir(global.DB.localidad(it.dataset.l));
+        });
+        const nueva = drop.querySelector('[data-nueva]');
+        if (nueva) nueva.onmousedown = e => { e.preventDefault(); cerrar(); this.modalLocalidad(inp.value.trim(), elegir); };
+      };
+
+      let t;
+      inp.oninput = () => { clearTimeout(t); t = setTimeout(buscar, 160); };
+      inp.onfocus = buscar;
+      inp.onblur = () => setTimeout(cerrar, 180);
+      const x = document.getElementById('c-locx');
+      if (x) x.onclick = () => {
+        this.cli.localidad = '';
+        if (!this.ad.envioTocado) this.ad.envio = 0;
+        this.pintarTodo();
+      };
+    },
+
+    // Alta de una localidad que todavía no está en el mapa.
+    modalLocalidad(nombre, onlisto) {
+      this.modal(`<h3 style="color:var(--navy)">Cargar localidad</h3>
+        <p class="muted" style="font-size:13px;margin:8px 0 12px">
+          No está en el mapa todavía. Cargala acá y queda guardada para las próximas cotizaciones.</p>
+        <div class="fr"><label for="nl-nom">Localidad</label>
+          <input id="nl-nom" value="${UI.esc(nombre)}" placeholder="Nombre de la localidad"></div>
+        <div class="fr" style="margin-top:9px"><label for="nl-flete">Costo de envío</label>
+          <input id="nl-flete" type="number" min="0" value="0"></div>
+        <div class="fr"><label></label><span class="hint">Dejalo en 0 si hay que cotizarlo aparte.</span></div>
+        <div class="row" style="margin-top:16px;justify-content:flex-end;gap:10px">
+          <button class="btn" id="nl-cancel">Cancelar</button>
+          <button class="btn primary" id="nl-ok">Cargar</button></div>`, m => {
+        document.getElementById('nl-cancel').onclick = () => m.remove();
+        document.getElementById('nl-ok').onclick = () => {
+          const nom = document.getElementById('nl-nom').value.trim();
+          if (!nom) return UI.aviso('Poné el nombre de la localidad', 'warn');
+          const l = global.DB.agregarLocalidad(nom, Number(document.getElementById('nl-flete').value) || 0);
+          this.log(this.vendedor, `Cargó la localidad ${nom}`);
+          m.remove();
+          UI.aviso(`${nom} cargada`, 'ok');
+          onlisto(global.DB.localidad(l.k) || l);
+        };
+      });
+    },
+
+    // No se pasa a cotizar sin saber a quién: hace falta el nombre y al menos
+    // un contacto (teléfono, Instagram o mail).
+    irAProductos() {
+      if (!this.clienteCompleto()) { this.avisoCliente(true); return; }
+      this.etapa = 'productos'; this.pintarMain();
+    },
+    clienteCompleto() { return !!String(this.cli.nombre).trim() && this.clienteValido(); },
+
+    // El aviso NO vive permanente en la pantalla: sale cuando se quiere avanzar.
+    avisoCliente(mostrar) {
       const a = document.getElementById('c-aviso'); if (!a) return;
-      a.innerHTML = this.clienteValido() ? '' :
-        `<div class="banner warn" style="margin:12px 0 0">Cargá al menos <b>teléfono, Instagram o mail</b> — es lo que arma al cliente. El nombre puede quedar para después.</div>`;
+      if (mostrar != null) this._avisoOn = !!mostrar;
+      if (!this._avisoOn || this.clienteCompleto()) { a.innerHTML = ''; this._avisoOn = false; return; }
+      const falta = [];
+      if (!String(this.cli.nombre).trim()) falta.push('el <b>nombre</b>');
+      if (!this.clienteValido()) falta.push('al menos un contacto: <b>teléfono, Instagram o mail</b>');
+      a.innerHTML = `<div class="banner warn" style="margin:12px 0 0">Para pasar a Productos cargá ${falta.join(' y ')}.</div>`;
     },
     // Nota interna: el % es de uso nuestro, el cliente sólo ve el nombre.
     notaTermino() {
@@ -1178,6 +1273,9 @@
         .tag.ext{background:var(--brand-soft);color:var(--brand)}
         .tag.int{background:var(--line-soft);color:var(--ink-soft)}
         .lnk.mod{flex:none;font-size:12px}
+        .locw{position:relative}
+        .locw .drop{width:100%;min-width:250px}
+        .drop .it.nueva{color:var(--brand);font-weight:600}
         .cz-tyc textarea,.cz-foot textarea{width:100%;padding:8px 10px;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);resize:vertical}
         .cz-tots .tr{display:flex;justify-content:space-between;gap:12px;padding:4px 0;font-size:13px;color:var(--ink-soft)}
         .cz-tots .tr b{color:var(--navy)}
@@ -1234,6 +1332,9 @@
       if (calza && v[eje] && !out.includes(v[eje])) out.push(v[eje]);
     });
     return out;
+  }
+  function sinTilde(s) {
+    return String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   }
   function inic(nombre) {
     return String(nombre || '?').trim().split(/\s+/).slice(0, 2).map(p => p[0] || '').join('').toUpperCase() || '?';
