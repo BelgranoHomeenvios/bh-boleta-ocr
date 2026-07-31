@@ -144,6 +144,15 @@
   siempre editable), y queda aplicada al elegir el producto. En las líneas ya
   cargadas se mantiene el texto que se toca para editar.
 
+- ✅ 107. En el armador, **después de los tres ejes se elige Estándar o A medida**.
+  Estándar toma el precio del catálogo; **A medida queda "A definir"** y la línea
+  se abre sola para completarlo.
+- ✅ 108. El precio de los a medida se carga con **dos campos enlazados**:
+  **Precio de lista** ⇄ **Precio en efectivo**. Se completa cualquiera de los dos
+  y el otro sale solo (lista −35% = efectivo · efectivo ÷ 0,65 ≈ ×1,54). El
+  porcentaje sale de **Configuración → Reglas de precio**, así que si cambia la
+  regla cambia la conversión.
+
 > Pendientes:
 > - La lista de localidades es **demo del AMBA**; se reemplaza por la real del mapa.
 > - La foto del diseño hoy se carga por **URL**; falta la subida real del archivo.

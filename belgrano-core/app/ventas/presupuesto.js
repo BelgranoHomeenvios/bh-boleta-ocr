@@ -60,6 +60,22 @@
     _mount: 'view',
 
     // ---- Cálculo ---------------------------------------------------------
+    // El vendedor cotiza a medida con UNO de los dos precios y el otro sale solo:
+    // lista −35% = efectivo · efectivo ÷ 0,65 (≈ ×1,54) = lista.
+    factorEfectivo() { return 1 - (global.DB.descuentoDe('efectivo') / 100); },
+    aEfectivo(lista) { return Math.round((Number(lista) || 0) * this.factorEfectivo()); },
+    aLista(efectivo) {
+      const f = this.factorEfectivo();
+      return f > 0 ? Math.round((Number(efectivo) || 0) / f) : 0;
+    },
+    descEfectivoPct() { return global.DB.descuentoDe('efectivo'); },
+    multLista() {
+      const f = this.factorEfectivo();
+      return f > 0 ? (1 / f).toFixed(2).replace('.', ',') : '—';
+    },
+    // Un mueble a medida puede estar todavía sin precio: se define después.
+    sinPrecio(l) { return l.tipo === 'medida' && l.precioManual == null; },
+
     // Descuento de la condición de pago, en % (se configura en Configuración).
     descPct() { return this.termino === 'mixto' ? 0 : global.DB.descuentoDe(this.termino); },
     factor() { return 1 - this.descPct() / 100; },
@@ -525,7 +541,7 @@
       // Una vez cargado, el renglón queda QUIETO: se lee, no se edita. Con el
       // lápiz se vuelve a abrir esa línea y ahí sí se toca todo.
       cont.innerHTML = this.lineas.map(l => {
-        const sub = this.unit(l) * l.cantidad, ed = this.editable(l);
+        const sub = this.unit(l) * l.cantidad;
         const dto = (this.lista(l) - this.unit(l)) * l.cantidad;
         const medida = l.tipo === 'medida', abierta = !!l.editando;
         const nombre = abierta && medida
@@ -535,8 +551,10 @@
         // La columna muestra siempre el precio de LISTA: el descuento de la
         // condición de pago se ve aparte y ya viene aplicado en el subtotal.
         // Estándar → bloqueado (sale del catálogo). A medida → lo carga el vendedor.
-        const precioCel = abierta && ed
-          ? `<input type="number" min="0" class="pnum" value="${l.precioManual != null ? l.precioManual : Math.round(this.lista(l))}" data-precio="${l.key}" aria-label="Precio unitario de lista">`
+        // A medida sin precio todavía → "A definir". El precio de los a medida se
+        // carga abajo, con sus dos campos (lista ⇄ efectivo).
+        const precioCel = this.sinPrecio(l)
+          ? `<div class="adef">A definir</div>`
           : `<div class="lock tnum">${UI.pesos(this.lista(l))}</div>`;
         const cantCel = abierta
           ? this.cantHTML(l.cantidad, l.key)
@@ -548,6 +566,12 @@
         // vendedor explica lo que pidió el cliente, con la foto del diseño.
         const obs = !medida ? '' : abierta
           ? `<div class="lobs">
+              <div class="lprec">
+                <label>Precio de lista <input type="number" min="0" data-plista="${l.key}" value="${l.precioManual != null ? l.precioManual : ''}" placeholder="0"></label>
+                <span class="oo">o</span>
+                <label>Precio en efectivo <input type="number" min="0" data-pefec="${l.key}" value="${l.precioManual != null ? this.aEfectivo(l.precioManual) : ''}" placeholder="0"></label>
+                <span class="hint">Cargá uno y el otro sale solo (−${this.descEfectivoPct()}% / ×${this.multLista()}).</span>
+              </div>
               <textarea data-obs="${l.key}" rows="2" placeholder="Observaciones del mueble a medida — medidas, materiales, lo que pidió el cliente…">${UI.esc(l.obs)}</textarea>
               <div class="lobs-f">
                 <button class="cam" data-img="${l.key}" title="${l.img ? 'Cambiar la foto del diseño' : 'Adjuntar foto del diseño'}">📷 ${l.img ? 'Cambiar foto' : 'Adjuntar foto'}</button>
@@ -565,7 +589,7 @@
             <div>${tipoCel}</div>
             ${precioCel}
             <div class="dto tnum">${dto ? '−' + UI.pesos(dto) : '—'}</div>
-            <div class="sub tnum">${UI.pesos(sub)}</div>
+            <div class="sub tnum">${this.sinPrecio(l) ? '<span class="adef">—</span>' : UI.pesos(sub)}</div>
             <div class="lacc">
               <button class="lx" data-ed="${l.key}" title="${abierta ? 'Listo' : 'Editar el renglón'}">${abierta ? '✓' : '✏️'}</button>
               <button class="lx" data-del="${l.key}" title="Quitar">✕</button>
@@ -590,7 +614,17 @@
       this.bindCant(cont);
       cont.querySelectorAll('[data-obs]').forEach(i => i.oninput = () => { const l = this.get(i.dataset.obs); if (l) l.obs = i.value; });
       cont.querySelectorAll('[data-nom]').forEach(i => i.oninput = () => { const l = this.get(i.dataset.nom); if (l) l.prodNombre = i.value; });
-      cont.querySelectorAll('[data-precio]').forEach(i => i.onchange = () => { const l = this.get(i.dataset.precio); if (l) { l.precioManual = Math.max(0, Number(i.value) || 0); this.pintar(); } });
+      // Se carga el de lista o el de efectivo; el otro se completa solo.
+      cont.querySelectorAll('[data-plista]').forEach(i => i.onchange = () => {
+        const l = this.get(i.dataset.plista); if (!l) return;
+        l.precioManual = i.value === '' ? null : Math.max(0, Number(i.value) || 0);
+        this.repintar();
+      });
+      cont.querySelectorAll('[data-pefec]').forEach(i => i.onchange = () => {
+        const l = this.get(i.dataset.pefec); if (!l) return;
+        l.precioManual = i.value === '' ? null : this.aLista(Math.max(0, Number(i.value) || 0));
+        this.repintar();
+      });
       // "A medida" es una opción DENTRO del producto, no un ítem suelto:
       // se pasa la línea a medida y ahí se libera el precio.
       cont.querySelectorAll('[data-tipo]').forEach(b => b.onclick = () => this.alternarTipo(this.get(b.dataset.tipo)));
@@ -612,8 +646,8 @@
         const guardar = () => {
           if (listo) return; listo = true;
           const n = Math.max(1, Math.floor(Number(i.value)) || 1);
-          if (key === 'nueva') { this.cantNueva = n; this.pintarProductos(); }
-          else { const l = this.get(key); if (l) l.cantidad = n; this.pintar(); }
+          if (key === 'nueva') { this.cantNueva = n; setTimeout(() => this.pintarProductos(), 0); }
+          else { const l = this.get(key); if (l) l.cantidad = n; this.repintar(); }
         };
         i.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); i.blur(); } };
         i.onblur = guardar;
@@ -628,12 +662,15 @@
       if (s) s.textContent = UI.pesos(this.total());
     },
     get(key) { return this.lineas.find(x => x.key === Number(key)); },
+    // Repinta después de que termine el evento en curso: hacerlo dentro de un
+    // blur/change deja el navegador quitando un nodo que ya no está.
+    repintar() { try { setTimeout(() => this.pintar(), 0); } catch (e) { this.pintar(); } },
 
     alternarTipo(l) {
       if (!l) return;
       if (l.tipo === 'estandar') {
         l.tipo = 'medida';
-        l.precioManual = Math.round(l.base);
+        if (l.precioManual == null) l.precioManual = Math.round(l.base);
         l.ejes = l.ejes ? l.ejes + ' · adaptado' : 'a medida';
         l.editando = true;   // queda abierta para cargar el detalle y la foto
         this.log(this.vendedor, `Pasó ${l.prodNombre} a medida`);
@@ -694,15 +731,19 @@
       this.modalVariante(prod, vars);
     },
 
-    agregarEstandar(prodNombre, variante, img = '', cantidad = 1) {
+    agregarEstandar(prodNombre, variante, img = '', cantidad = 1, tipo = 'estandar') {
       const partes = EJES.filter(e => variante[e.k]).map(e => ({ lbl: e.label, val: variante[e.k] }));
+      const medida = tipo === 'medida';
       this.lineas.push({
-        key: ++this._uid, tipo: 'estandar', prodNombre, varId: variante.id,
-        partes, ejes: textoEjes(partes), base: Number(variante.precio) || 0,
+        key: ++this._uid, tipo, prodNombre, varId: variante.id,
+        partes, ejes: textoEjes(partes) + (medida ? ' · adaptado' : ''),
+        base: Number(variante.precio) || 0,
         cantidad: Math.max(1, Math.floor(cantidad) || 1),
-        obs: '', precioManual: null, img: img || variante.img || '',
+        // A medida arranca SIN precio ("a definir"): se completa después.
+        obs: '', precioManual: medida ? null : null, img: img || variante.img || '',
+        editando: medida,   // se abre para cargar precio, detalle y foto
       });
-      this.log(this.vendedor, `Agregó ${cantidad > 1 ? cantidad + ' × ' : ''}${prodNombre}`);
+      this.log(this.vendedor, `Agregó ${cantidad > 1 ? cantidad + ' × ' : ''}${prodNombre}${medida ? ' (a medida)' : ''}`);
       this.cantNueva = 1;   // el renglón de carga vuelve a 1 para el próximo
       this.pintarProductos(); this.pintarCabecera(); this.pintarSide();
       UI.aviso('Producto agregado', 'ok');
@@ -1119,6 +1160,7 @@
       const m = this.modal('', null, 560);
       const caja = m.firstChild;
       const cant = Math.max(1, this.cantNueva || 1);   // copiada del renglón de carga
+      let tipo = 'estandar';   // estándar toma el precio del catálogo; a medida queda a definir
 
       const calzan = () => vars.filter(v => ejes.every(e => sel[e.k] == null || v[e.k] === sel[e.k]));
       const elegida = () => { const c = calzan(); return c.length === 1 || ejes.every(e => sel[e.k] != null) ? c[0] : null; };
@@ -1136,15 +1178,24 @@
               <div class="vopts">${opts.map(o =>
                 `<button class="vopt ${sel[e.k] === o ? 'on' : ''}" data-e="${e.k}" data-o="${UI.esc(o)}">${UI.esc(o)}</button>`).join('')}</div></div>`;
           }).join('')}
+          <div class="vgrp"><div class="vlbl">Tipo</div>
+            <div class="vopts">
+              <button class="vopt ${tipo === 'estandar' ? 'on' : ''}" data-t="estandar">Estándar</button>
+              <button class="vopt ${tipo === 'medida' ? 'on med' : ''}" data-t="medida">A medida</button>
+            </div></div>
           <div class="vpre">
             <div>
               <div class="muted" style="font-size:12px">${partes.length ? UI.esc(textoEjes(partes)) : 'Elegí las opciones'}</div>
-              <b class="tnum" style="font-size:21px;color:var(--navy)">${v ? UI.pesos(v.precio * cant) : '—'}</b>
-              <span class="muted" style="font-size:12px">precio de lista${cant > 1 && v ? ` · ${cant} × ${UI.pesos(v.precio)}` : ''}</span>
+              ${tipo === 'medida'
+                ? `<b style="font-size:19px;color:var(--warn)">A definir</b>
+                   <span class="muted" style="font-size:12px">el precio se carga en el renglón</span>`
+                : `<b class="tnum" style="font-size:21px;color:var(--navy)">${v ? UI.pesos(v.precio * cant) : '—'}</b>
+                   <span class="muted" style="font-size:12px">precio de lista${cant > 1 && v ? ` · ${cant} × ${UI.pesos(v.precio)}` : ''}</span>`}
             </div>
             <div class="sp" style="flex:1"></div>
             <button class="btn primary" id="mv-ok" ${v ? '' : 'disabled'}>Agregar${cant > 1 ? ` ${cant}` : ''}</button>
           </div>`;
+        caja.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { tipo = b.dataset.t; pintar(); });
 
         document.getElementById('mv-x').onclick = () => m.remove();
         caja.querySelectorAll('[data-e]').forEach(b => b.onclick = () => {
@@ -1155,7 +1206,7 @@
           pintar();
         });
         const ok = document.getElementById('mv-ok');
-        if (ok && v) ok.onclick = () => { this.agregarEstandar(prod.nombre, v, prod.img, cant); m.remove(); };
+        if (ok && v) ok.onclick = () => { this.agregarEstandar(prod.nombre, v, prod.img, cant, tipo); m.remove(); };
       };
       pintar();
     },
@@ -1335,6 +1386,12 @@
         /* Observaciones: sólo en los a medida y ABAJO del renglón, con lugar
            para escribir y para adjuntar la foto del diseño que pidió el cliente. */
         .lobs{padding:0 0 11px 70px;display:flex;flex-direction:column;gap:7px}
+        .adef{text-align:right;font-size:12.5px;font-weight:700;color:var(--warn)}
+        .lprec{display:flex;align-items:flex-end;gap:11px;flex-wrap:wrap}
+        .lprec label{display:flex;flex-direction:column;gap:4px;font-size:11.5px;color:var(--ink-soft)}
+        .lprec input{width:132px;padding:6px 9px;font-size:13px}
+        .lprec .oo{font-size:12px;color:var(--muted);padding-bottom:8px}
+        .lprec .hint{padding-bottom:7px}
         .lobs textarea{width:100%;padding:7px 9px;font:inherit;font-size:12.5px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);resize:vertical}
         .lobs-f{display:flex;align-items:center;gap:10px}
         .cam{border:1px dashed var(--line);background:var(--panel);color:var(--ink-soft);border-radius:8px;padding:5px 11px;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
@@ -1411,6 +1468,7 @@
         .vcant input{width:58px;text-align:center;padding:4px 6px;font-size:13px}
         .vopt:hover{border-color:var(--brand);color:var(--brand)}
         .vopt.on{border-color:var(--brand);background:var(--brand);color:#fff}
+        .vopt.on.med{border-color:var(--warn);background:var(--warn)}
         .vpre{display:flex;align-items:center;gap:12px;border-top:1px solid var(--line);padding-top:12px;margin-top:6px}
 
         .mdlbg{position:fixed;inset:0;background:rgba(20,26,38,.4);z-index:50;display:grid;place-items:center;padding:20px}
