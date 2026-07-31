@@ -1469,6 +1469,7 @@ tr:hover td{background:var(--panel-2)}
     lado: 'actividad',   // actividad | notas
     vendedor: '', local: '', fecha: '', termino: 'efectivo',
     nro: null, guardada: false,   // el número se toma al abrir; si no se usa, vuelve
+    cantNueva: 1,                 // cantidad del renglón de carga (cantidad + producto)
     obsExt: '', obsInt: '', terminos: '',
     ad: null,            // adicionales
     actividad: [],       // historial de la cotización (se arma sola)
@@ -1864,15 +1865,15 @@ tr:hover td{background:var(--panel-2)}
           <div class="muted" id="op-nota" style="font-size:12px"></div>
         </div>
         <div class="lhead" id="pr-head"></div>
+        <div id="pr-lineas"></div>
         <div class="srow">
-          <span></span>
+          <div class="lcant">${this.cantHTML(this.cantNueva, 'nueva')}</div>
           <div class="bwrap">
             <input id="pr-buscar" class="busca" placeholder="Buscar un producto…" autocomplete="off">
             <div id="pr-drop"></div>
           </div>
           <button class="lnk" id="pr-catalogo">Catálogo</button>
         </div>
-        <div id="pr-lineas"></div>
         <div class="pr-pie">
           <div class="pr-sum">Total de los muebles <b class="tnum">${UI.pesos(this.total())}</b></div>
         </div>
@@ -1886,6 +1887,7 @@ tr:hover td{background:var(--panel-2)}
       };
       document.getElementById('pr-catalogo').onclick = () => this.modalCatalogo();
       document.getElementById('p-sig').onclick = () => { this.etapa = 'adicionales'; this.pintarMain(); };
+      this.bindCant(cont);
       const inp = document.getElementById('pr-buscar');
       let t; inp.oninput = () => { clearTimeout(t); t = setTimeout(() => this.buscarInline(inp.value.trim()), 220); };
       inp.onblur = () => setTimeout(() => { const d = document.getElementById('pr-drop'); if (d) d.innerHTML = ''; }, 180);
@@ -1901,63 +1903,80 @@ tr:hover td{background:var(--panel-2)}
       // monto descontado; el descuento total de la orden queda abajo de todo.
       const head = document.getElementById('pr-head');
       if (head) head.innerHTML = `<span>Cant.</span><span>Producto</span><span>Tipo</span>
-        <span style="text-align:right">${pct ? `Dto. ${pct}%` : 'Dto.'}</span>
         <span style="text-align:right">Precio unit.</span>
+        <span style="text-align:right">${pct ? `Dto. ${pct}%` : 'Dto.'}</span>
         <span style="text-align:right">Subtotal</span><span></span>`;
 
       if (!this.lineas.length) {
-        cont.innerHTML = UI.vacio('Buscá un mueble arriba para empezar la cotización.');
+        cont.innerHTML = UI.vacio('Buscá un mueble abajo para empezar la cotización.');
         this.refrescarProductos(); return;
       }
+      // Una vez cargado, el renglón queda QUIETO: se lee, no se edita. Con el
+      // lápiz se vuelve a abrir esa línea y ahí sí se toca todo.
       cont.innerHTML = this.lineas.map(l => {
         const sub = this.unit(l) * l.cantidad, ed = this.editable(l);
         const dto = (this.lista(l) - this.unit(l)) * l.cantidad;
-        const medida = l.tipo === 'medida';
-        const nombre = medida && !l.prodNombre
-          ? `<input value="" data-nom="${l.key}" placeholder="Mueble a medida" style="font-weight:650">`
+        const medida = l.tipo === 'medida', abierta = !!l.editando;
+        const nombre = abierta && medida
+          ? `<input value="${UI.esc(l.prodNombre)}" data-nom="${l.key}" placeholder="Mueble a medida" style="font-weight:650">`
           : `<div class="n">${UI.esc(l.prodNombre || 'Mueble a medida')}</div>
              <div class="v">${UI.esc(l.ejes)}</div>`;
         // La columna muestra siempre el precio de LISTA: el descuento de la
         // condición de pago se ve aparte y ya viene aplicado en el subtotal.
         // Estándar → bloqueado (sale del catálogo). A medida → lo carga el vendedor.
-        const precioCel = ed
+        const precioCel = abierta && ed
           ? `<input type="number" min="0" class="pnum" value="${l.precioManual != null ? l.precioManual : Math.round(this.lista(l))}" data-precio="${l.key}" aria-label="Precio unitario de lista">`
           : `<div class="lock tnum">${UI.pesos(this.lista(l))}</div>`;
+        const cantCel = abierta
+          ? this.cantHTML(l.cantidad, l.key)
+          : `<span class="cantf">${l.cantidad}</span>`;
+        const tipoCel = abierta
+          ? `<button class="tipo ${medida ? 'med' : ''}" data-tipo="${l.key}">${medida ? 'A medida' : 'Estándar'}</button>`
+          : `<span class="tipo fijo ${medida ? 'med' : ''}">${medida ? 'A medida' : 'Estándar'}</span>`;
         // Observaciones sólo en los a medida, y abajo del renglón: es donde el
         // vendedor explica lo que pidió el cliente, con la foto del diseño.
-        const obs = medida ? `<div class="lobs">
-            <textarea data-obs="${l.key}" rows="2" placeholder="Observaciones del mueble a medida — medidas, materiales, lo que pidió el cliente…">${UI.esc(l.obs)}</textarea>
-            <div class="lobs-f">
-              <button class="cam" data-img="${l.key}" title="${l.img ? 'Cambiar la foto del diseño' : 'Adjuntar foto del diseño'}">📷 ${l.img ? 'Cambiar foto' : 'Adjuntar foto'}</button>
+        const obs = !medida ? '' : abierta
+          ? `<div class="lobs">
+              <textarea data-obs="${l.key}" rows="2" placeholder="Observaciones del mueble a medida — medidas, materiales, lo que pidió el cliente…">${UI.esc(l.obs)}</textarea>
+              <div class="lobs-f">
+                <button class="cam" data-img="${l.key}" title="${l.img ? 'Cambiar la foto del diseño' : 'Adjuntar foto del diseño'}">📷 ${l.img ? 'Cambiar foto' : 'Adjuntar foto'}</button>
+                ${l.img ? `<img class="lobs-img" src="${UI.esc(l.img)}" alt="Foto del diseño">` : ''}
+              </div>
+            </div>`
+          : (l.obs || l.img) ? `<div class="lobs leido">
+              ${l.obs ? `<div class="obst">${UI.esc(l.obs)}</div>` : ''}
               ${l.img ? `<img class="lobs-img" src="${UI.esc(l.img)}" alt="Foto del diseño">` : ''}
-            </div>
-          </div>` : '';
-        return `<div class="litem ${medida ? 'med' : ''}">
+            </div>` : '';
+        return `<div class="litem ${medida ? 'med' : ''} ${abierta ? 'abierta' : ''}">
           <div class="lrow" data-l="${l.key}">
-            <div class="lcant">
-              <button class="vpm" data-menos="${l.key}" ${l.cantidad <= 1 ? 'disabled' : ''} aria-label="Quitar uno">−</button>
-              <input type="number" min="1" value="${l.cantidad}" data-cant="${l.key}" aria-label="Cantidad">
-              <button class="vpm" data-mas="${l.key}" aria-label="Sumar uno">+</button>
-            </div>
+            <div class="lcant">${cantCel}</div>
             <div>${nombre}</div>
-            <div><button class="tipo ${medida ? 'med' : ''}" data-tipo="${l.key}">${medida ? 'A medida' : 'Estándar'}</button></div>
-            <div class="dto tnum">${dto ? '−' + UI.pesos(dto) : '—'}</div>
+            <div>${tipoCel}</div>
             ${precioCel}
+            <div class="dto tnum">${dto ? '−' + UI.pesos(dto) : '—'}</div>
             <div class="sub tnum">${UI.pesos(sub)}</div>
-            <button class="lx" data-del="${l.key}" title="Quitar">✕</button>
+            <div class="lacc">
+              <button class="lx" data-ed="${l.key}" title="${abierta ? 'Listo' : 'Editar el renglón'}">${abierta ? '✓' : '✏️'}</button>
+              <button class="lx" data-del="${l.key}" title="Quitar">✕</button>
+            </div>
           </div>${obs}</div>`;
       }).join('');
 
+      cont.querySelectorAll('[data-ed]').forEach(b => b.onclick = () => {
+        const l = this.get(b.dataset.ed); if (!l) return;
+        // Se abre de a una: cerrar las otras evita dejar renglones sueltos editables.
+        const abrir = !l.editando;
+        this.lineas.forEach(x => { x.editando = false; });
+        l.editando = abrir;
+        this.pintar();
+      });
       cont.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
         const l = this.get(b.dataset.del);
         this.lineas = this.lineas.filter(x => x.key !== Number(b.dataset.del));
         if (l) this.log(this.vendedor, `Quitó ${l.prodNombre || 'un producto'}`);
         this.pintar();
       });
-      const setCant = (l, n) => { if (l) { l.cantidad = Math.max(1, Math.floor(n) || 1); this.pintar(); } };
-      cont.querySelectorAll('[data-cant]').forEach(i => i.onchange = () => setCant(this.get(i.dataset.cant), Number(i.value)));
-      cont.querySelectorAll('[data-menos]').forEach(b => b.onclick = () => { const l = this.get(b.dataset.menos); setCant(l, l.cantidad - 1); });
-      cont.querySelectorAll('[data-mas]').forEach(b => b.onclick = () => { const l = this.get(b.dataset.mas); setCant(l, l.cantidad + 1); });
+      this.bindCant(cont);
       cont.querySelectorAll('[data-obs]').forEach(i => i.oninput = () => { const l = this.get(i.dataset.obs); if (l) l.obs = i.value; });
       cont.querySelectorAll('[data-nom]').forEach(i => i.oninput = () => { const l = this.get(i.dataset.nom); if (l) l.prodNombre = i.value; });
       cont.querySelectorAll('[data-precio]').forEach(i => i.onchange = () => { const l = this.get(i.dataset.precio); if (l) { l.precioManual = Math.max(0, Number(i.value) || 0); this.pintar(); } });
@@ -1967,6 +1986,30 @@ tr:hover td{background:var(--panel-2)}
       cont.querySelectorAll('[data-img]').forEach(b => b.onclick = () => this.cargarImagen(this.get(b.dataset.img)));
       this.refrescarProductos();
     },
+    // La cantidad se ve como texto, igual que el nombre del producto. Se toca,
+    // se escribe el número y con Enter (o al salir del campo) queda guardado.
+    cantHTML(valor, key) {
+      return `<button class="cantv" data-cv="${key}" title="Tocá para cambiar la cantidad">${valor}</button>`;
+    },
+    bindCant(cont) {
+      cont.querySelectorAll('[data-cv]').forEach(b => b.onclick = () => {
+        const key = b.dataset.cv;
+        const actual = key === 'nueva' ? this.cantNueva : (this.get(key) || {}).cantidad || 1;
+        b.outerHTML = `<input class="cante" type="number" min="1" value="${actual}" data-ce="${key}" aria-label="Cantidad">`;
+        const i = cont.querySelector(`[data-ce="${key}"]`); if (!i) return;
+        let listo = false;
+        const guardar = () => {
+          if (listo) return; listo = true;
+          const n = Math.max(1, Math.floor(Number(i.value)) || 1);
+          if (key === 'nueva') { this.cantNueva = n; this.pintarProductos(); }
+          else { const l = this.get(key); if (l) l.cantidad = n; this.pintar(); }
+        };
+        i.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); i.blur(); } };
+        i.onblur = guardar;
+        i.focus(); i.select && i.select();
+      });
+    },
+
     // Refresca lo que depende de las líneas sin volver a dibujar la tabla.
     refrescarProductos() {
       this.pintarTotales(); this.refrescarResumen();
@@ -1981,6 +2024,7 @@ tr:hover td{background:var(--panel-2)}
         l.tipo = 'medida';
         l.precioManual = Math.round(l.base);
         l.ejes = l.ejes ? l.ejes + ' · adaptado' : 'a medida';
+        l.editando = true;   // queda abierta para cargar el detalle y la foto
         this.log(this.vendedor, `Pasó ${l.prodNombre} a medida`);
       } else {
         l.tipo = 'estandar';
@@ -2035,7 +2079,7 @@ tr:hover td{background:var(--panel-2)}
       let vars;
       try { vars = await global.DB.variantes(prodId); } catch (e) { UI.aviso(String(e.message || e), 'crit'); return; }
       if (!vars.length) { UI.aviso('Ese producto no tiene variantes', 'warn'); return; }
-      if (vars.length === 1) return this.agregarEstandar(prod.nombre, vars[0], prod.img);
+      if (vars.length === 1) return this.agregarEstandar(prod.nombre, vars[0], prod.img, this.cantNueva);
       this.modalVariante(prod, vars);
     },
 
@@ -2047,8 +2091,9 @@ tr:hover td{background:var(--panel-2)}
         cantidad: Math.max(1, Math.floor(cantidad) || 1),
         obs: '', precioManual: null, img: img || variante.img || '',
       });
-      this.log(this.vendedor, `Agregó producto ${prodNombre}`);
-      this.pintar(); this.pintarCabecera(); this.pintarSide();
+      this.log(this.vendedor, `Agregó ${cantidad > 1 ? cantidad + ' × ' : ''}${prodNombre}`);
+      this.cantNueva = 1;   // el renglón de carga vuelve a 1 para el próximo
+      this.pintarProductos(); this.pintarCabecera(); this.pintarSide();
       UI.aviso('Producto agregado', 'ok');
     },
 
@@ -2344,7 +2389,7 @@ tr:hover td{background:var(--panel-2)}
       if (this.nro != null && !this.guardada) global.DB.liberarNumeroCotizacion(this.nro);
       this.nro = global.DB.tomarNumeroCotizacion(); this.guardada = false;
       this.cli = { nombre: '', telefono: '', email: '', instagram: '', dni: '', tel2: '', canal: '', domicilio: '', localidad: '' };
-      this.abiertos = {}; this.etapa = 'cliente'; this.lado = 'actividad';
+      this.abiertos = {}; this.etapa = 'cliente'; this.lado = 'actividad'; this.cantNueva = 1;
       // Vendedor y local salen del usuario de la sesión; igual se pueden editar.
       this.vendedor = s.vendedor; this.local = s.local; this.fecha = hoy(); this.termino = 'efectivo';
       this.obsExt = ''; this.obsInt = ''; this.terminos = global.DB.TYC_DEFAULT;
@@ -2456,7 +2501,7 @@ tr:hover td{background:var(--panel-2)}
 
       const m = this.modal('', null, 560);
       const caja = m.firstChild;
-      let cant = 1;   // la cantidad se elige acá mismo, antes de los ejes
+      const cant = Math.max(1, this.cantNueva || 1);   // copiada del renglón de carga
 
       const calzan = () => vars.filter(v => ejes.every(e => sel[e.k] == null || v[e.k] === sel[e.k]));
       const elegida = () => { const c = calzan(); return c.length === 1 || ejes.every(e => sel[e.k] != null) ? c[0] : null; };
@@ -2468,12 +2513,6 @@ tr:hover td{background:var(--panel-2)}
           <div class="row" style="margin-bottom:4px"><h3 style="color:var(--navy);margin:0">${UI.esc(prod.nombre)}</h3>
             <div class="sp" style="flex:1"></div><button class="lx" id="mv-x" style="font-size:20px">✕</button></div>
           <p class="muted" style="margin:0 0 12px;font-size:13px">Armá el mueble: elegí ${ejes.map(e => e.label.toLowerCase()).join(', ')}.</p>
-          <div class="vgrp"><div class="vlbl">Cantidad</div>
-            <div class="vcant">
-              <button class="vpm" id="mv-menos" ${cant <= 1 ? 'disabled' : ''} aria-label="Quitar uno">−</button>
-              <input id="mv-cant" type="number" min="1" value="${cant}" aria-label="Cantidad">
-              <button class="vpm" id="mv-mas" aria-label="Sumar uno">+</button>
-            </div></div>
           ${ejes.map(e => {
             const opts = opciones(vars, e.k, sel);
             return `<div class="vgrp"><div class="vlbl">${UI.esc(e.label)}</div>
@@ -2487,14 +2526,10 @@ tr:hover td{background:var(--panel-2)}
               <span class="muted" style="font-size:12px">precio de lista${cant > 1 && v ? ` · ${cant} × ${UI.pesos(v.precio)}` : ''}</span>
             </div>
             <div class="sp" style="flex:1"></div>
-            <button class="btn primary" id="mv-ok" ${v ? '' : 'disabled'}>Agregar</button>
+            <button class="btn primary" id="mv-ok" ${v ? '' : 'disabled'}>Agregar${cant > 1 ? ` ${cant}` : ''}</button>
           </div>`;
 
         document.getElementById('mv-x').onclick = () => m.remove();
-        const setCant = n => { cant = Math.max(1, Math.floor(n) || 1); pintar(); };
-        document.getElementById('mv-menos').onclick = () => setCant(cant - 1);
-        document.getElementById('mv-mas').onclick = () => setCant(cant + 1);
-        document.getElementById('mv-cant').onchange = e => setCant(Number(e.target.value));
         caja.querySelectorAll('[data-e]').forEach(b => b.onclick = () => {
           const e = b.dataset.e, o = b.dataset.o;
           if (sel[e] === o) delete sel[e]; else sel[e] = o;
@@ -2651,7 +2686,7 @@ tr:hover td{background:var(--panel-2)}
         
         /* El buscador va alineado con la columna Producto, arriba de las líneas:
            lo que se elige completa directamente ese renglón. */
-        .srow{display:grid;grid-template-columns:104px minmax(0,1.6fr) auto;gap:8px;align-items:center;padding:10px 0}
+        .srow{display:grid;grid-template-columns:62px minmax(0,1.6fr) auto;gap:8px;align-items:center;padding:11px 0 4px}
         .bwrap{position:relative}
         .srow .busca{width:100%;padding:7px 10px;font-size:13px}
         .lnk{border:0;background:none;color:var(--brand);font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:0;justify-self:start}
@@ -2662,16 +2697,24 @@ tr:hover td{background:var(--panel-2)}
         .drop .it:last-child{border-bottom:0} .drop .it:hover{background:var(--brand-soft)} .drop .it .cnt{color:var(--muted);font-size:12px}
 
         /* Cantidad adelante · los dos precios juntos al final. */
-        .lhead,.lrow{display:grid;grid-template-columns:104px minmax(0,1.6fr) 92px 100px 108px 108px 24px;gap:8px;align-items:center;padding:0}
-        .lcant{display:flex;align-items:center;gap:3px}
-        .lcant input{width:38px;text-align:center;padding:5px 2px}
-        .lcant .vpm{width:24px;height:24px;font-size:13px}
+        .lhead,.lrow{display:grid;grid-template-columns:62px minmax(0,1.6fr) 92px 108px 100px 108px 52px;gap:8px;align-items:center;padding:0}
+        .lcant{display:flex;align-items:center}
+        .cantv{border:1px solid transparent;background:none;font:inherit;font-size:14px;font-weight:650;color:var(--navy);
+          cursor:pointer;padding:4px 10px;border-radius:7px;min-width:42px;text-align:center}
+        .cantv:hover{border-color:var(--line);background:var(--panel)}
+        .cante{width:56px;text-align:center;padding:4px 6px;font-size:14px;font-weight:650}
         .lrow .dto{text-align:right;font-size:12.5px;color:var(--ok)}
         .litem{border-bottom:1px solid var(--line-soft)}
-        .litem.med{background:var(--panel-2);border-radius:8px;padding:0 8px;margin:2px -8px}
+        .litem.abierta{background:var(--panel-2);border-radius:8px;padding:0 8px;margin:2px -8px;border:1px solid var(--brand)}
+        .lacc{display:flex;align-items:center;gap:2px;justify-content:flex-end}
+        .cantf{font-size:14px;font-weight:650;color:var(--navy);padding:4px 10px;min-width:42px;text-align:center;display:inline-block}
+        .tipo.fijo{display:inline-block;cursor:default;background:none;border-color:transparent;color:var(--muted);text-align:center}
+        .tipo.fijo.med{color:var(--warn);border-color:var(--warn);background:var(--warn-bg)}
+        .lobs.leido{gap:9px;flex-direction:row;align-items:flex-start;padding-bottom:9px}
+        .lobs.leido .obst{font-size:12.5px;color:var(--ink-soft);line-height:1.45;flex:1}
         /* Observaciones: sólo en los a medida y ABAJO del renglón, con lugar
            para escribir y para adjuntar la foto del diseño que pidió el cliente. */
-        .lobs{padding:0 0 11px 112px;display:flex;flex-direction:column;gap:7px}
+        .lobs{padding:0 0 11px 70px;display:flex;flex-direction:column;gap:7px}
         .lobs textarea{width:100%;padding:7px 9px;font:inherit;font-size:12.5px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);resize:vertical}
         .lobs-f{display:flex;align-items:center;gap:10px}
         .cam{border:1px dashed var(--line);background:var(--panel);color:var(--ink-soft);border-radius:8px;padding:5px 11px;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
@@ -2692,7 +2735,7 @@ tr:hover td{background:var(--panel-2)}
         .tipo:hover{border-color:var(--brand);color:var(--brand)}
         .tipo.med{border-color:var(--warn);color:var(--warn);background:var(--warn-bg)}
         .lx{color:var(--muted);cursor:pointer;font-size:15px;border:0;background:transparent;padding:3px}
-        @media(max-width:1000px){.lhead{display:none}.lrow{grid-template-columns:104px 1fr 1fr;gap:8px}.lrow .sub,.lrow .lock,.lrow .pnum{text-align:left}}
+        @media(max-width:1000px){.lhead{display:none}.lrow{grid-template-columns:62px 1fr 1fr;gap:8px}.lrow .sub,.lrow .lock,.lrow .pnum{text-align:left}}
 
         .cz-foot{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:26px;padding:16px}
         @media(max-width:820px){.cz-foot{grid-template-columns:1fr}}
@@ -2704,6 +2747,7 @@ tr:hover td{background:var(--panel-2)}
         .lnk.mod{flex:none;font-size:12px}
         .locw{position:relative}
         .locw .drop{width:100%;min-width:250px}
+        .bwrap .drop{margin-top:4px}
         .drop .it.nueva{color:var(--brand);font-weight:600}
         .cz-tyc textarea,.cz-foot textarea{width:100%;padding:8px 10px;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);resize:vertical}
         .cz-tots .tr{display:flex;justify-content:space-between;gap:12px;padding:4px 0;font-size:13px;color:var(--ink-soft)}

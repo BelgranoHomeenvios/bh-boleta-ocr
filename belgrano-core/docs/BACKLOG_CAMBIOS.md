@@ -111,8 +111,18 @@
   La que **no está se carga a mano** (nombre + costo) y **queda guardada** para
   las próximas cotizaciones, marcada como "cargada a mano".
 
-- ✅ 94. La **cantidad en la línea** también es un contador: **− 1 +**, con el −
-  deshabilitado en 1, y el número se puede escribir a mano (2, 3, 7…).
+- ✅ 94. La **cantidad se completa en el renglón de carga**, junto al buscador:
+  quedan **dos campos para completar** (cuántos y cuál). El armador ya no la
+  pide, sólo la copia. Después de agregar, el renglón vuelve a 1.
+- ✅ 95. **Sin botones − / +**: se escribe el número y con **Enter** queda
+  guardado. Se muestra como texto plano, igual que el nombre del producto.
+- ✅ 96. **Precio unit. antes que Dto.** en el orden de columnas.
+- ✅ 97. El **renglón de carga baja**: arriba lo ya cargado, abajo para sumar más.
+- ✅ 98. El renglón cargado queda **sin edición** — se lee, no se toca. Con el
+  **✏️ al final** se abre esa línea (cantidad, tipo, precio, observaciones y
+  foto) y con el **✓** se cierra. Se abre de a una. Al pasar una línea a
+  **A medida** se abre sola para cargar el detalle; cerrada, la observación y la
+  foto quedan a la vista pero sin poder editarse.
 
 > Pendientes:
 > - La lista de localidades es **demo del AMBA**; se reemplaza por la real del mapa.
