@@ -75,6 +75,29 @@
     // Los números de costo sólo se ven en su solapa, y sólo si el rol puede.
     muestraCostos() { return this.verCostos() && this._tab === 'costos'; },
 
+    _tab: 'producto',
+    // Qué módulos están abiertos. Adicionales arranca cerrado: es lo que menos
+    // se toca.
+    _abre: { mueble: true, catprop: true, variantes: true, adicionales: false },
+
+    solapas() { return this.SOLAPAS.filter(t => !t.costos || this.verCostos()); },
+    muestraCostos() { return this.verCostos() && this._tab === 'costos'; },
+
+    // Un módulo desplegable, igual que las etapas de la cotización: número,
+    // título, un resumen de lo que hay adentro y la flecha.
+    modulo(k, n, titulo, resumen, cuerpo, ok) {
+      const on = this._abre[k] !== false;
+      return `<section class="pd-m ${on ? 'on' : ''} ${ok ? 'ok' : ''}">
+        <button class="pd-mh" data-mod="${k}" aria-expanded="${on}">
+          <span class="pd-mn">${n}</span>
+          <span class="pd-mt">${UI.esc(titulo)}</span>
+          <span class="pd-mr">${on ? '' : UI.esc(resumen || '')}</span>
+          <span class="pd-mg">${on ? '▴' : '▾'}</span>
+        </button>
+        ${on ? `<div class="pd-mb">${cuerpo}</div>` : ''}
+      </section>`;
+    },
+
     pintar() {
       const v = document.getElementById(this._mount); if (!v) return;
       const p = this.p, ed = this.puedeEditar();
@@ -88,7 +111,6 @@
             <span class="pill ${p.publicado ? 'ok' : 'warn'}" id="pd-pub-pill">${
               p.publicado ? 'Visible para los vendedores' : 'Oculto — no se puede vender'}</span>
           </div>
-          ${this.bloqueNombre()}
           <div class="pd-tabs">${this.solapas().map(t =>
             `<button class="pd-tab ${this._tab === t.k ? 'on' : ''}" data-tab="${t.k}"
               aria-current="${this._tab === t.k}">${UI.esc(t.label)}</button>`).join('')}</div>
@@ -101,15 +123,30 @@
       document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {
         this._tab = b.dataset.tab; this.pintar();
       });
+      document.querySelectorAll('[data-mod]').forEach(b => b.onclick = () => {
+        const k = b.dataset.mod; this._abre[k] = this._abre[k] === false; this.pintar();
+      });
       this.enganchar();
     },
 
-    // La solapa principal, en cuatro módulos y en este orden:
-    //  1 · qué es el mueble  2 · dónde va y de qué depende
-    //  3 · qué variantes salen de eso  4 · el resto.
+    // Los cuatro módulos, en orden: qué es · dónde entra y de qué depende ·
+    // qué variantes salen de eso · el resto.
     tabProducto() {
-      return this.bloqueFotos() + this.bloqueCatProp()
-        + this.bloqueVariantes() + this.bloqueAdicionales();
+      const cs = this.cats(), ps = this.props().filter(x => x.usados.length);
+      const r = this.p.rutas || {};
+      return this.modulo('mueble', 1, 'El mueble',
+          `${this.p.nombre} · ${(this.p.fotos || []).length} ${(this.p.fotos || []).length === 1 ? 'foto' : 'fotos'}`,
+          this.bloqueNombre() + this.bloqueFotos(), !!this.p.nombre)
+        + this.modulo('catprop', 2, 'Categorías y propiedades',
+          `${cs.map(c => c.nombre).join(' · ') || 'sin categoría'} — ${ps.length} ${ps.length === 1 ? 'propiedad' : 'propiedades'}`,
+          this.bloqueCategorias(true) + '<div class="pd-sepl"></div>' + this.bloquePropiedades(true),
+          cs.length > 0)
+        + this.modulo('variantes', 3, 'Variantes',
+          `${this.vars.length} ${this.vars.length === 1 ? 'variante' : 'variantes'} · ${this.activas().length} activas`,
+          this.bloqueVariantes(true), this.vars.length > 0)
+        + this.modulo('adicionales', 4, 'Adicionales',
+          `${this.p.publicado ? 'Visible' : 'Oculto'} · ${global.DB.RUTAS.filter(x => r[x.k]).map(x => x.label).join(', ') || 'sin definir'}`,
+          this.bloqueAdicionales(true), true);
     },
     tabCostos() {
       return this.bloqueVariantes() + this.bloqueSimulador() + this.bloqueProveedores();
@@ -122,7 +159,7 @@
     // lleva. Todo eso no puede ser una propiedad porque no multiplica nada.
     bloqueNombre() {
       const p = this.p, ed = this.puedeEditar();
-      return `<section class="pd-b">
+      return `<div>
         <label class="lbl-t" for="pd-nombre">Nombre</label>
         <input id="pd-nombre" class="pd-nom" value="${UI.esc(p.nombre)}"
           placeholder="Nombre del mueble" ${ed ? '' : 'readonly'}>
@@ -136,13 +173,13 @@
         <div class="pd-nsub">
           <span class="muted">Código</span> <b class="tnum">${UI.esc(p.sku || '—')}</b>
         </div>
-      </section>`;
+      </div>`;
     },
 
     // 2 · Fotos ------------------------------------------------------------
     bloqueFotos() {
       const fotos = this.p.fotos || [];
-      return `<section class="pd-b">
+      return `<div class="pd-sepl"></div><div>
         <div class="pd-h">Fotos y videos</div>
         ${this.puedeEditar() ? `<div class="dropz" id="pd-drop">
           <div class="dz-mas">＋</div>
@@ -161,7 +198,7 @@
         </div>
         <div class="hint" style="margin-top:8px">Los archivos se guardan en el Storage del sistema, no en la
           cotización: acá queda sólo el enlace. Mínimo recomendado 1280px.</div>
-      </section>`;
+      </div>`;
     },
 
     // 3 · Categorías -------------------------------------------------------
@@ -186,17 +223,6 @@
       });
       this.cats().forEach(c => out.delete(c.id));
       return [...out.values()];
-    },
-
-    // Módulo 2 · dónde entra el mueble y de qué depende. Las dos cosas van
-    // juntas y en este orden: primero en qué familia está, después qué
-    // propiedades tiene — que es de donde salen las variantes de abajo.
-    bloqueCatProp() {
-      return `<section class="pd-b">
-        ${this.bloqueCategorias(true)}
-        <div class="pd-sepl"></div>
-        ${this.bloquePropiedades(true)}
-      </section>`;
     },
 
     bloqueCategorias(dentro) {
@@ -225,15 +251,17 @@
       return `<${dentro ? 'div' : 'section class="pd-b"'}>
         <div class="pd-h">Propiedades</div>
         <div class="props">${ps.map(p => `
-          <button class="prow" data-prop="${UI.esc(p.k)}">
-            <span class="prow-i">
-              <span class="prow-n">${UI.esc(p.nombre)}</span>
-              <span class="chips">${p.usados.map(v =>
+          <div class="prow">
+            <div class="prow-i">
+              <div class="prow-n">${UI.esc(p.nombre)}</div>
+              <div class="chips">${p.usados.map(v =>
                 `<span class="chip">${UI.esc(v)}</span>`).join('')
-                || '<span class="hint">Sin valores todavía — entrá para cargarlos.</span>'}</span>
-            </span>
-            <span class="prow-go">›</span>
-          </button>`).join('') || '<div class="hint">Este mueble todavía no tiene propiedades.</div>'}
+                || '<span class="hint">Sin valores todavía.</span>'}
+                ${ed ? `<button class="chip-add" data-addv="${UI.esc(p.k)}">＋ Agregar</button>` : ''}</div>
+            </div>
+            <button class="prow-go" data-prop="${UI.esc(p.k)}"
+              title="Editar ${UI.esc(p.nombre)}">›</button>
+          </div>`).join('') || '<div class="hint">Este mueble todavía no tiene propiedades.</div>'}
         </div>
         ${ed ? `<div class="prow-add">
           <button class="lnk" id="pd-addprop">⊕ Agregar propiedad</button>
@@ -245,29 +273,29 @@
     },
 
     // 5 · Listado de variantes ---------------------------------------------
-    bloqueVariantes() {
+    bloqueVariantes(dentro) {
       const f = this._fVar.trim().toLowerCase();
       const lista = this.vars.filter(v => !f || this.nombreVar(v).toLowerCase().includes(f));
       const cost = this.muestraCostos();
-      return `<section class="pd-b">
-        <div class="pd-h">${cost ? 'Costo y precio por variante' : 'Variantes'}
+      return `<${dentro ? 'div' : 'section class="pd-b"'}>
+        ${dentro ? '' : `<div class="pd-h">${cost ? 'Costo y precio por variante' : 'Variantes'}
           <span class="muted">(${this.vars.length})</span>
-          ${cost ? `<span class="pill ${this.estado().pill}" style="float:right">${UI.esc(this.estado().label)}</span>` : ''}</div>
+          ${cost ? `<span class="pill ${this.estado().pill}" style="float:right">${UI.esc(this.estado().label)}</span>` : ''}</div>`}
         <div class="vr-tools">
           <input id="pd-fvar" class="busca" placeholder="Filtrar por medida, estructura, frente…" value="${UI.esc(this._fVar)}">
           <div class="sp"></div>
           <span class="hint">${this.activas().length} activas · ${this.vars.length - this.activas().length} desactivadas</span>
         </div>
         <div class="vr-head ${cost ? '' : 'sincosto'}">
-          <span>Imágenes</span><span>Variante</span><span>Stock</span>
+          <span>Imagen venta</span><span>Imagen producción</span><span>Variante</span><span>Stock</span>
           ${cost ? '<span style="text-align:right">Costo</span>' : ''}
           <span style="text-align:right">Precio</span>
           <span style="text-align:right">${cost ? 'Markup' : 'Peso'}</span>
-          <span></span>
+          <span>Acciones</span>
         </div>
         <div id="pd-vars">${lista.map(v => this.filaVar(v, cost)).join('')
           || UI.vacio('Ninguna variante coincide con el filtro.')}</div>
-      </section>`;
+      </${dentro ? 'div' : 'section'}>`;
     },
 
     nombreVar(v) {
@@ -277,11 +305,13 @@
     filaVar(v, cost) {
       const mk = this.markupDe(v), banda = global.DB.bandaDe(mk);
       const off = v.activa === false;
+      // 2 × 2 cm en pantalla: se ve de qué mueble se trata sin abrir nada.
       const img = (url, k, tit) => `<button class="vimg ${url ? 'hay' : ''}" data-img="${v.id}|${k}" title="${tit}">
-        ${url ? `<img src="${UI.esc(url)}" alt="">` : (k === 'imgProd' ? '📐' : '📷')}</button>`;
+        ${url ? `<img src="${UI.esc(url)}" alt="">` : `<span class="vimg-v">${k === 'imgProd' ? '📐' : '📷'}</span>`}
+        <span class="vimg-e">✎</span></button>`;
       return `<div class="vr ${off ? 'off' : ''} ${cost ? '' : 'sincosto'}" data-v="${v.id}">
-        <div class="vimgs">${img(v.imgVenta, 'imgVenta', 'Imagen de venta — sale impresa')}
-          ${img(v.imgProd, 'imgProd', 'Imagen de producción — la que va a fábrica')}</div>
+        ${img(v.imgVenta, 'imgVenta', 'Imagen de venta — sale impresa en la cotización')}
+        ${img(v.imgProd, 'imgProd', 'Imagen de producción — el plano que va a fábrica')}
         <div class="vr-n">
           <button class="vr-nom" data-abrir="${v.id}">${UI.esc(this.nombreVar(v))}</button>
           <div class="vr-sku tnum">${UI.esc(v.sku || global.DB.skuDe(this.p, v))}${
@@ -380,11 +410,10 @@
 
     // Módulo 4 · Adicionales — todo lo que no es ni qué es el mueble ni cuánto
     // sale: quién lo ve, cómo se consigue y cómo se entrega.
-    bloqueAdicionales() {
+    bloqueAdicionales(dentro) {
       const p = this.p, r = p.rutas || {}, ed = this.puedeEditar();
-      return `<section class="pd-b">
-        <div class="pd-h">Adicionales</div>
-
+      return `<${dentro ? 'div' : 'section class="pd-b"'}>
+        ${dentro ? '' : '<div class="pd-h">Adicionales</div>'}
         <div class="ad-t">Visibilidad</div>
         <label class="chk"><input type="checkbox" id="pd-pub" ${p.publicado ? 'checked' : ''}
           ${ed ? '' : 'disabled'}> Mostrar a los vendedores</label>
@@ -409,7 +438,7 @@
             placeholder="1" ${ed ? '' : 'readonly'}></div>
         <div class="fr"><label></label><span class="hint">Con cuántos bultos viaja. Es lo que usa
           la subida por escalera, que se cobra por piso y por bulto.</span></div>
-      </section>`;
+      </${dentro ? 'div' : 'section'}>`;
     },
 
     // 9 · Contabilidad -------------------------------------------------------
@@ -467,6 +496,8 @@
       if (g('pd-edcat')) g('pd-edcat').onclick = () => this.modalCategorias();
       document.querySelectorAll('[data-prop]').forEach(b =>
         b.onclick = () => this.abrirPropiedad(b.dataset.prop));
+      document.querySelectorAll('[data-addv]').forEach(b =>
+        b.onclick = () => this.agregarValores(b.dataset.addv));
       if (g('pd-addprop')) g('pd-addprop').onclick = () => this.desplegarPropiedades();
       document.querySelectorAll('[data-quitarcat]').forEach(b => b.onclick = () => {
         const id = Number(b.dataset.quitarcat);
@@ -736,17 +767,120 @@
         if (!v) return;
         if (v === '__nueva') return this.modalPropiedadNueva();
         this.agregarPropiedad(v);
+        sel.hidden = true; btn.hidden = false;
       };
       // Si se va sin elegir nada, vuelve el botón.
       sel.onblur = () => { if (!sel.value) { sel.hidden = true; btn.hidden = false; } };
     },
 
+    // Una propiedad sin valores no sirve para nada: no multiplica, no aparece
+    // en la variante y ensucia la pantalla. Así que se piden los valores
+    // PRIMERO, y recién si se elige alguno la propiedad entra al mueble.
     agregarPropiedad(k) {
-      this.p.propiedades = [...(this.p.propiedades || []), k];
-      this.guardar();
-      this.pintar();
-      // Se entra derecho: una propiedad sin valores no sirve para nada.
-      this.abrirPropiedad(k);
+      this.agregarValores(k, { alta: true });
+    },
+
+    // Elegir valores. Es la pantalla que más se usa del catálogo, así que los
+    // valores se ven todos juntos y se marcan de a uno, en vez de escribirlos.
+    //  · opts.alta = true → viene de agregar una propiedad nueva al mueble, y
+    //    si no se elige ningún valor la propiedad NO se agrega.
+    agregarValores(k, opts = {}) {
+      const prop = global.DB.propiedad(k); if (!prop) return;
+      const usados = (this.props().find(x => x.k === k) || { usados: [] }).usados;
+      const libres = prop.valores.filter(v => !usados.includes(v));
+      const sel = new Set();
+
+      const chip = v => `<button class="vsel" data-v="${UI.esc(v)}">
+        <span class="vsel-c">✓</span><span>${UI.esc(v)}</span></button>`;
+
+      const cerrar = this.modal(`
+        <h3 class="h-title" style="font-size:17px">${UI.esc(prop.nombre)}</h3>
+        <p class="h-sub">Marcá los valores que puede tener <b>${UI.esc(this.p.nombre)}</b>.
+          ${opts.alta ? 'Con al menos uno la propiedad se agrega al mueble.' : ''}</p>
+
+        ${usados.length ? `<div class="vya">Ya tiene:
+          ${usados.map(v => `<span class="chip">${UI.esc(v)}</span>`).join('')}</div>` : ''}
+
+        <input id="av-q" class="busca" placeholder="Buscar valor" style="margin:12px 0 10px">
+        <div class="vsels" id="av-lista">${libres.map(chip).join('')
+          || '<div class="hint">No queda ninguno sin usar. Creá uno nuevo abajo.</div>'}</div>
+
+        <div class="pd-sepl"></div>
+        <div class="ad-t">Crear un valor que no está</div>
+        <div class="fx">
+          <input id="av-nuevo" placeholder="Ej: ESTRUCTURA ROBLE">
+          <button class="btn" id="av-crear">＋ Crear</button>
+        </div>
+        <div class="hint" style="margin-top:5px">Queda disponible para todos los muebles del catálogo.</div>
+
+        <div class="row" style="margin-top:18px;gap:10px">
+          <span class="hint" id="av-n">ninguno marcado</span><div class="sp"></div>
+          <button class="btn" id="av-x">Cancelar</button>
+          <button class="btn primary" id="av-ok">Agregar</button>
+        </div>`, 560);
+
+      const lista = document.getElementById('av-lista');
+      const contar = () => {
+        document.getElementById('av-n').textContent = sel.size
+          ? `${sel.size} ${sel.size === 1 ? 'marcado' : 'marcados'}` : 'ninguno marcado';
+      };
+      const enganchar = () => lista.querySelectorAll('.vsel').forEach(b => b.onclick = () => {
+        const v = b.dataset.v;
+        if (sel.has(v)) { sel.delete(v); b.classList.remove('on'); }
+        else { sel.add(v); b.classList.add('on'); }
+        contar();
+      });
+      enganchar();
+
+      const q = document.getElementById('av-q');
+      q.oninput = () => {
+        const t = q.value.trim().toLowerCase();
+        lista.querySelectorAll('.vsel').forEach(b =>
+          b.style.display = !t || b.dataset.v.toLowerCase().includes(t) ? '' : 'none');
+      };
+
+      const crear = (forzar) => {
+        const inp = document.getElementById('av-nuevo');
+        const n = inp.value.trim();
+        if (!n) return UI.aviso('Escribí el valor', 'warn');
+        // Antes de crearlo se revisa que no sea un error de tipeo de otro.
+        const parecido = forzar ? null : global.DB.parecidoA(k, n);
+        if (parecido) return this.confirmarValor(k, n, parecido, (usar, esOtro) => {
+          if (!esOtro) {
+            // Ya existe: se marca el que está en vez de crear uno igual.
+            const b = lista.querySelector(`.vsel[data-v="${usar.replace(/"/g, '&quot;')}"]`);
+            if (b && !sel.has(usar)) { sel.add(usar); b.classList.add('on'); contar(); }
+            else if (!b) { sel.add(usar); contar(); }
+            inp.value = '';
+          } else { inp.value = usar; crear(true); }
+        });
+        const guardado = global.DB.agregarValor(k, n);
+        lista.insertAdjacentHTML('afterbegin', chip(guardado));
+        enganchar();
+        sel.add(guardado);
+        lista.firstElementChild.classList.add('on');
+        inp.value = ''; contar();
+      };
+      document.getElementById('av-crear').onclick = () => crear(false);
+      document.getElementById('av-nuevo').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); crear(false); } };
+
+      document.getElementById('av-x').onclick = cerrar;
+      document.getElementById('av-ok').onclick = () => {
+        if (!sel.size) {
+          return UI.aviso(opts.alta
+            ? 'Elegí al menos un valor — una propiedad sin valores no sirve'
+            : 'No marcaste ninguno', 'warn');
+        }
+        if (opts.alta && !(this.p.propiedades || []).includes(k)) {
+          this.p.propiedades = [...(this.p.propiedades || []), k];
+          this.guardar();
+        }
+        let n = 0;
+        sel.forEach(v => { n += this.sumarValor(k, v) || 0; });
+        cerrar();
+        UI.aviso(n ? `${n} ${n === 1 ? 'variante nueva' : 'variantes nuevas'}` : 'Listo', 'ok');
+        this.pintar();
+      };
     },
 
     modalPropiedadNueva() {
@@ -961,7 +1095,7 @@
           <button class="btn" id="cp-nuevo">Es otro — crearlo igual</button>
           <button class="btn primary" id="cp-usar">Usar ${UI.esc(parecido)}</button>
         </div>`, 480);
-      document.getElementById('cp-usar').onclick = () => { cerrar(); usar(parecido); };
+      document.getElementById('cp-usar').onclick = () => { cerrar(); usar(parecido, false); };
       document.getElementById('cp-nuevo').onclick = () => { cerrar(); usar(escrito, true); };
     },
 
@@ -977,16 +1111,19 @@
       const filas = arbol.map(c => ({ c, r: ruta(c) }));
       const cerrar = this.modal(`
         <h3 class="h-title" style="font-size:17px">Categorías</h3>
-        <input id="mc-q" class="busca" placeholder="Buscar categoría" style="margin:12px 0">
-        <button class="lnk" id="mc-crear">⊕ Crear categoría</button>
+        <p class="h-sub">Dónde entra este mueble. Se pueden marcar varias.</p>
+        <div class="fx" style="margin:12px 0 10px">
+          <input id="mc-q" class="busca" placeholder="Buscar categoría">
+          <button class="btn" id="mc-crear">＋ Crear</button>
+        </div>
         <div class="lstc" id="mc-lista">${filas.map(({ c, r }) => `
           <label class="lc" data-txt="${UI.esc(r.join('/').toLowerCase())}">
             <span class="lc-r">${r.slice(0, -1).map(x => `<span class="muted">${UI.esc(x)}/</span>`).join('')}<b>${UI.esc(c.nombre)}</b></span>
             <input type="checkbox" data-cat="${c.id}" ${(this.p.categorias || []).includes(c.id) ? 'checked' : ''}>
           </label>`).join('')}
         </div>
-        <div class="hint" style="margin-top:10px">Se pueden marcar varias. Con la familia alcanza: el
-          ambiente del que cuelga se hereda solo.</div>
+        <div class="hint" style="margin-top:10px">Con la familia alcanza: el ambiente del que cuelga
+          se hereda solo.</div>
         <div class="row" style="margin-top:16px;gap:10px">
           <span class="hint" id="mc-n"></span><div class="sp"></div>
           <button class="btn" id="mc-x">Cancelar</button>
@@ -1006,7 +1143,35 @@
       };
       document.querySelectorAll('[data-cat]').forEach(c => c.onchange = cuenta);
       cuenta();
-      document.getElementById('mc-crear').onclick = () => UI.aviso('El alta de categorías va en Catálogo → Familias', 'warn');
+      // Crear una categoría desde acá: se elige de qué ambiente cuelga y queda
+      // marcada, sin tener que ir hasta Catálogo → Familias y volver.
+      document.getElementById('mc-crear').onclick = () => {
+        const raices = arbol.filter(c => !c.padre_id);
+        const cerrar2 = this.modal(`
+          <h3 class="h-title" style="font-size:17px">Nueva categoría</h3>
+          <p class="h-sub">Queda en el árbol del catálogo, para todos los muebles.</p>
+          <label class="fld" style="margin-top:12px"><span class="lbl">Nombre</span>
+            <input id="nc-n" placeholder="Ej: ESCRITORIOS"></label>
+          <label class="fld" style="margin-top:10px"><span class="lbl">Cuelga de</span>
+            <select id="nc-p"><option value="">— Es un ambiente, no cuelga de nada —</option>
+              ${raices.map(c => `<option value="${c.id}">${UI.esc(c.nombre)}</option>`).join('')}</select></label>
+          <div class="row" style="margin-top:16px;justify-content:flex-end;gap:10px">
+            <button class="btn" id="nc-x">Cancelar</button>
+            <button class="btn primary" id="nc-ok">Crear y marcar</button>
+          </div>`, 460);
+        document.getElementById('nc-x').onclick = cerrar2;
+        document.getElementById('nc-ok').onclick = () => {
+          const n = document.getElementById('nc-n').value.trim();
+          if (!n) return UI.aviso('Poné el nombre', 'warn');
+          const padre = Number(document.getElementById('nc-p').value) || null;
+          const nueva = global.DB.crearCategoria(n, padre);
+          cerrar2(); cerrar();
+          this.p.categorias = [...(this.p.categorias || []), nueva.id];
+          this.p.categoria_id = this.p.categorias[0];
+          this.guardar();
+          this.render(this._mount, this.p.id);
+        };
+      };
       document.getElementById('mc-x').onclick = cerrar;
       document.getElementById('mc-ok').onclick = async () => {
         this.p.categorias = [...document.querySelectorAll('[data-cat]')]
@@ -1064,7 +1229,23 @@
 
         /* La pantalla no ocupa todo el ancho: se lee mucho mejor una columna
            angosta y centrada, con aire a los dos costados. */
-        .pd-wrap{max-width:1000px;margin:0 auto}
+        .pd-wrap{max-width:920px;margin:0 auto}
+        /* Módulos desplegables, iguales a las etapas de la cotización. */
+        .pd-m{background:var(--panel);border:1px solid var(--line);border-radius:11px;
+          box-shadow:var(--shadow);margin-bottom:9px;overflow:hidden}
+        .pd-m.on{border-color:var(--brand)}
+        .pd-mh{width:100%;display:flex;align-items:center;gap:10px;padding:10px 14px;
+          background:none;border:0;cursor:pointer;text-align:left;font:inherit}
+        .pd-mh:hover{background:var(--panel-2)}
+        .pd-mn{width:21px;height:21px;flex:none;border-radius:50%;background:var(--line-soft);
+          color:var(--ink-soft);display:grid;place-items:center;font-size:11.5px;font-weight:800}
+        .pd-m.on .pd-mn{background:var(--brand);color:#fff}
+        .pd-m.ok:not(.on) .pd-mn{background:var(--ok);color:#fff}
+        .pd-mt{font-weight:700;color:var(--navy);font-size:13.5px;flex:none}
+        .pd-mr{flex:1;min-width:0;color:var(--muted);font-size:12px;overflow:hidden;
+          text-overflow:ellipsis;white-space:nowrap}
+        .pd-mg{color:var(--muted);font-size:11px}
+        .pd-mb{padding:12px 14px 14px;border-top:1px solid var(--line-soft)}
         .pd-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px}
         /* Solapas: adelante lo que se mira siempre, atrás lo que se consulta. */
         .pd-tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0 0 12px}
@@ -1123,7 +1304,9 @@
         .prow:hover .prow-go{color:var(--brand);transform:translateX(2px)}
         .prow-i{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
         .prow-n{font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--navy)}
-        .prow-go{color:var(--muted);font-size:19px;line-height:1;transition:.15s}
+        .prow-go{color:var(--muted);font-size:19px;line-height:1;transition:.15s;border:0;
+          background:none;cursor:pointer;padding:2px 6px;font:inherit;font-size:19px}
+        .prow-go:hover{color:var(--brand);transform:translateX(2px)}
         .prow-add{margin-top:10px;padding-top:9px;border-top:1px solid var(--line)}
         .selprop{max-width:280px;padding:6px 9px;font-size:12.5px}
         /* Los valores adentro de la propiedad: tildar, renombrar y ordenar. */
@@ -1133,6 +1316,17 @@
         .vrow:last-child{border-bottom:0}
         .vrow.drag{opacity:.4}
         .vr-drag{color:var(--muted);cursor:grab;font-size:13px;line-height:1;letter-spacing:-2px}
+        /* Elegir valores: se marcan de a uno, no se escriben. */
+        .vya{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+        .vsels{display:flex;gap:7px;flex-wrap:wrap;max-height:230px;overflow:auto;padding:2px}
+        .vsel{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);
+          background:var(--panel);border-radius:8px;padding:6px 11px;font:inherit;font-size:12.5px;
+          color:var(--navy);cursor:pointer;transition:.12s}
+        .vsel:hover{border-color:var(--brand)}
+        .vsel-c{width:15px;height:15px;border:1px solid var(--line);border-radius:4px;font-size:10px;
+          display:grid;place-items:center;color:transparent;flex:none}
+        .vsel.on{border-color:var(--brand);background:var(--brand-soft);font-weight:650}
+        .vsel.on .vsel-c{background:var(--brand);border-color:var(--brand);color:#fff}
         .vrow input[type=checkbox]{width:15px;height:15px;accent-color:var(--brand);flex:none}
         .vr-txt{flex:1;min-width:0;padding:5px 8px;font-size:12.5px}
         .btn.ghost{background:none;border-color:transparent;color:var(--crit)}
@@ -1143,23 +1337,31 @@
 
         .vr-tools{display:flex;align-items:center;gap:10px;margin-bottom:8px}
         .vr-tools .busca{max-width:320px;padding:7px 10px;font-size:13px}
-        .vr-head,.vr{display:grid;grid-template-columns:74px minmax(0,1fr) 82px 104px 104px 66px 82px;
-          gap:8px;align-items:center}
-        .vr-head.sincosto,.vr.sincosto{grid-template-columns:74px minmax(0,1fr) 82px 104px 106px 82px}
+        .vr-head,.vr{display:grid;grid-template-columns:78px 78px minmax(0,1fr) 72px 92px 92px 60px 82px;
+          gap:9px;align-items:center}
+        .vr-head.sincosto,.vr.sincosto{grid-template-columns:78px 78px minmax(0,1fr) 76px 96px 96px 82px}
         .vr-p,.vr-pe{display:flex;align-items:center;gap:4px}
+        /* El input no puede comerse la unidad: si no, "kg" queda cortado. */
+        .vr-p .pn,.vr-pe .pn{flex:1;min-width:0;width:auto}
         .uni{font-size:11px;color:var(--muted);flex:none}
         .inf{font-size:12px;color:var(--brand)}
         .vr-a{display:flex;gap:1px;justify-content:flex-end}
-        .vr-head{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
+        .vr-head{font-size:10px;letter-spacing:.03em;line-height:1.3;text-transform:uppercase;color:var(--muted);
           font-weight:700;padding-bottom:8px;border-bottom:1px solid var(--line)}
         .vr{padding:6px 0;border-bottom:1px solid var(--line-soft)}
         .vr.off{opacity:.5}
-        .vimgs{display:flex;gap:4px}
-        .vimg{width:34px;height:34px;border:1px dashed var(--line);border-radius:6px;background:var(--panel-2);
-          cursor:pointer;font-size:14px;line-height:1;padding:0;overflow:hidden;color:var(--muted)}
+        /* 2 × 2 cm ≈ 76 px. Entra la foto de venta y el plano de producción. */
+        .vimg{position:relative;width:76px;height:76px;border:1px dashed var(--line);border-radius:9px;
+          background:var(--panel-2);cursor:pointer;font-size:20px;line-height:1;padding:0;
+          overflow:hidden;color:var(--muted);display:grid;place-items:center}
         .vimg.hay{border-style:solid;border-color:var(--line)}
         .vimg img{width:100%;height:100%;object-fit:cover}
         .vimg:hover{border-color:var(--brand)}
+        .vimg-e{position:absolute;right:3px;top:3px;width:19px;height:19px;border-radius:50%;
+          background:rgba(255,255,255,.94);color:var(--brand);font-size:10px;display:grid;
+          place-items:center;box-shadow:var(--shadow)}
+        .vimg:not(:hover) .vimg-e{opacity:0}
+        .vimg.hay:not(:hover) .vimg-e{opacity:.85}
         .vr-nom{border:0;background:none;font:inherit;font-size:13px;font-weight:650;color:var(--navy);
           cursor:pointer;padding:0;text-align:left}
         .vr-nom:hover{color:var(--brand);text-decoration:underline}

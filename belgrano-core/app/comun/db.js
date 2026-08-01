@@ -543,6 +543,18 @@
       return (data || []).map(p => ({ ...p, variantes: p.variante?.[0]?.count ?? 0 }));
     },
 
+    // Alta de categoría desde la ficha del mueble, sin ir hasta Familias.
+    crearCategoria(nombre, padreId) {
+      const n = String(nombre || '').trim(); if (!n) return null;
+      const ya = DEMO.categorias.find(c => sinTilde(c.nombre) === sinTilde(n)
+        && (c.padre_id ?? null) === (padreId ?? null));
+      if (ya) return ya;
+      const nueva = { id: Math.max(0, ...DEMO.categorias.map(c => c.id)) + 1,
+        nombre: n.toUpperCase(), padre_id: padreId ?? null };
+      DEMO.categorias.push(nueva);
+      return nueva;
+    },
+
     // Rutas de abastecimiento: un mueble puede tener más de una.
     RUTAS: [
       { k: 'fabricar', label: 'Lo fabricamos' },
