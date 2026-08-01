@@ -415,6 +415,46 @@ Todo en **una sola columna**, un bloque abajo del otro, y en modo edición.
   muebles publicados desde Inventario). **Producción ve todo menos costo,
   markup, margen y ganancia**, y sólo lee.
 
+### Lote 12 — APLICADO (Cierre de Información general · Documentos · Compra y venta)
+
+**Propiedades**
+- ✅ 237. **Agregar propiedad** abre un pop-up con las que ya existen y, abajo,
+  la opción de crear una nueva.
+- ✅ 238. Los valores se eligen de una **lista compacta con tildes** — varios de
+  una, sin llenar la pantalla de botones.
+- ✅ 239. Las **propiedades y los valores se arrastran** para ordenarlos.
+
+**Orden de las variantes**
+- ✅ 240. Salen por **propiedad 1, después 2, después 3**, respetando el orden
+  de los valores: todas las de 1,40 juntas y adentro por frente. Cambiar el
+  orden de arriba reordena las de abajo.
+- ✅ 241. El diccionario escribe `1,60` y la variante `1.60`: se comparan
+  normalizados, si no el orden no se encontraba nunca.
+- ✅ 242. El nombre pasa a **MEDIDAS 1.60 · ESTRUCTURA PARAÍSO · FRENTE BLANCO**,
+  sin repetir el nombre de la propiedad cuando el valor ya lo trae.
+
+**Información general**
+- ✅ 243. **Sin precios ni costos**: la usa Producción. Queda stock, **Largo,
+  Alto, Profundidad y Peso**. Fuera el lápiz y fuera el módulo Visibilidad.
+
+**Solapa Documentos**
+- ✅ 244. Las fotos salen del módulo 1 y van a **su propia solapa**, separadas
+  en Venta · Producción · Otro. Van a ser muchos archivos.
+- ✅ 245. Cada archivo dice **en cuántas variantes está usado** y no se puede
+  borrar uno en uso.
+- ✅ 246. La variante **elige** su imagen de la biblioteca y guarda el **id del
+  archivo**, no la imagen entera.
+
+**Solapa Compra y venta** (era Costos y márgenes)
+- ✅ 247. Una **columna por propiedad** (en el orden de arriba) y después
+  Costo · P. efectivo · P. de lista · Margen · Markup · Medida de costeo.
+  Sin imágenes, sin simulador y sin lápiz.
+- ✅ 248. Se carga el **precio de efectivo**, que es lo que realmente entra, y
+  el de lista sale solo (efectivo ÷ 65%). El **margen y el markup se miden
+  contra el efectivo**, no contra la lista.
+- ✅ 249. Se le sumaron proveedores, cómo se pide, cómo se factura y
+  visibilidad: es la misma conversación que el costo y el precio.
+
 ### Lote 11 — APLICADO (Seis solapas y propuestas para decidir)
 
 **Respuestas de Brian anotadas**

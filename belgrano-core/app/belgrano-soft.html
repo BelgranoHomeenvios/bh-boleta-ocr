@@ -2013,13 +2013,46 @@ tr:hover td{background:var(--panel-2)}
 
     // ---- Cálculo -------------------------------------------------------
     // Las propiedades que usa este mueble, con los valores que tiene activos.
+    // El orden importa: es el que después ordena las variantes de abajo.
     props() {
       const dicc = global.DB.propiedades();
       return (this.p.propiedades || []).map(k => {
         const d = dicc.find(x => x.k === k) || { k, nombre: k.toUpperCase(), valores: [] };
-        // Los valores en uso salen de las variantes que ya existen.
-        const usados = [...new Set(this.vars.map(v => v[k]).filter(Boolean))];
+        // Los valores en uso, en el orden del diccionario — no en el orden en
+        // que se fueron cargando. El diccionario escribe "1,60" y la variante
+        // "1.60": se comparan normalizados o no se encontrarían nunca.
+        const norm = x => String(x || '').replace(',', '.').toLowerCase().trim();
+        const pos = new Map(d.valores.map((v, i) => [norm(v), i]));
+        const hay = [...new Set(this.vars.map(v => v[k]).filter(Boolean))];
+        const usados = hay.sort((a, b) => {
+          const ia = pos.has(norm(a)) ? pos.get(norm(a)) : Infinity;
+          const ib = pos.has(norm(b)) ? pos.get(norm(b)) : Infinity;
+          if (ia !== ib) return ia - ib;
+          // Los que no están en el diccionario, en orden natural: 1.40 antes
+          // que 1.60 y no "1.40" antes que "1.4" como texto.
+          return String(a).localeCompare(String(b), 'es', { numeric: true });
+        });
         return { ...d, usados };
+      });
+    },
+
+    // Las variantes salen ordenadas por la propiedad 1, después la 2 y después
+    // la 3 — respetando el orden de los valores de cada una. Así quedan todas
+    // las de 0,40 blanca juntas, y adentro por frente.
+    ordenadas(lista) {
+      const ejes = this.p.propiedades || [];
+      const pos = {};
+      this.props().forEach(pr => {
+        pos[pr.k] = {};
+        pr.usados.forEach((v, i) => { pos[pr.k][v] = i; });
+      });
+      return [...(lista || this.vars)].sort((a, b) => {
+        for (const k of ejes) {
+          const ia = pos[k] && pos[k][a[k]] !== undefined ? pos[k][a[k]] : 999;
+          const ib = pos[k] && pos[k][b[k]] !== undefined ? pos[k][b[k]] : 999;
+          if (ia !== ib) return ia - ib;
+        }
+        return 0;
       });
     },
     // 3 estructuras × 3 frentes × 3 medidas = 27. Sale solo.
@@ -2043,10 +2076,10 @@ tr:hover td{background:var(--panel-2)}
     // falta para saber qué es y cuánto sale — vive en las otras.
     SOLAPAS: [
       { k: 'producto', label: 'Información general' },
-      { k: 'costos', label: 'Costos y márgenes', costos: true },
+      { k: 'costos', label: 'Compra y venta', costos: true },
       { k: 'inventario', label: 'Inventario' },
-      { k: 'compraventa', label: 'Compra y venta' },
       { k: 'produccion', label: 'Producción' },
+      { k: 'documentos', label: 'Documentos' },
       { k: 'contabilidad', label: 'Contabilidad' },
     ],
     _tab: 'producto',
@@ -2114,8 +2147,7 @@ tr:hover td{background:var(--panel-2)}
       const cs = this.cats(), ps = this.props().filter(x => x.usados.length);
       const r = this.p.rutas || {};
       return this.modulo('mueble', 1, 'El mueble',
-          `${this.p.nombre} · ${(this.p.fotos || []).length} ${(this.p.fotos || []).length === 1 ? 'foto' : 'fotos'}`,
-          this.bloqueNombre() + this.bloqueFotos(), !!this.p.nombre)
+          this.p.nombre, this.bloqueNombre(), !!this.p.nombre)
         + this.modulo('catprop', 2, 'Categorías y propiedades',
           `${cs.map(c => c.nombre).join(' · ') || 'sin categoría'} — ${ps.length} ${ps.length === 1 ? 'propiedad' : 'propiedades'}`,
           this.bloqueCategorias(true) + '<div class="pd-sepl"></div>' + this.bloquePropiedades(true),
@@ -2123,12 +2155,106 @@ tr:hover td{background:var(--panel-2)}
         + this.modulo('variantes', 3, 'Variantes',
           `${this.vars.length} ${this.vars.length === 1 ? 'variante' : 'variantes'} · ${this.activas().length} activas`,
           this.bloqueVariantes(true), this.vars.length > 0)
-        + this.modulo('visibilidad', 4, 'Visibilidad',
-          this.p.publicado ? 'Visible para los vendedores' : 'Oculto',
-          this.bloqueVisibilidad(), true);
+;
     },
+    // El precio de EFECTIVO es el que se carga: es lo que realmente entra. El
+    // de lista sale solo aplicándole el descuento al revés, y el margen y el
+    // markup se miden contra el efectivo, no contra la lista.
+    descEfectivo() { return global.DB.descuentoDe('efectivo') / 100; },
+    listaDe(efectivo) {
+      const d = this.descEfectivo();
+      return d < 1 ? Math.round((Number(efectivo) || 0) / (1 - d)) : 0;
+    },
+    efectivoDe(v) {
+      // Lo que hay guardado es el precio de lista; el efectivo se deriva.
+      return v.efectivo != null ? v.efectivo : Math.round((Number(v.precio) || 0) * (1 - this.descEfectivo()));
+    },
+
     tabCostos() {
-      return this.bloqueVariantes() + this.bloqueSimulador();
+      const ed = this.puedeEditar();
+      const ejes = this.props();
+      const f = this._fVar.trim().toLowerCase();
+      const lista = this.ordenadas(this.vars.filter(v => !f || this.nombreVar(v).toLowerCase().includes(f)));
+      const medidas = (global.DB.propiedad('medida') || { valores: [] }).valores;
+
+      const fila = v => {
+        const ef = this.efectivoDe(v);
+        const mk = global.DB.markupDe(v.costo, ef);
+        const mg = global.DB.margenDe(v.costo, ef);
+        const banda = global.DB.bandaDe(mk);
+        const norm = x => String(x || '').replace(',', '.');
+        const act = norm(v.medidaCosteo || v.medida);
+        const opts = medidas.some(m => norm(m) === act) ? medidas : [v.medidaCosteo || v.medida, ...medidas];
+        return `<div class="cv-r ${v.activa === false ? 'off' : ''}" data-v="${v.id}">
+          ${ejes.map(pr => `<div class="cv-p">${UI.esc(v[pr.k] || '—')}</div>`).join('')}
+          <div class="cv-n"><input class="pn" inputmode="numeric" data-costo="${v.id}"
+            value="${v.costo || ''}" placeholder="—" ${ed ? '' : 'readonly'}></div>
+          <div class="cv-n"><input class="pn" inputmode="numeric" data-efec="${v.id}"
+            value="${ef || ''}" placeholder="—" ${ed ? '' : 'readonly'}></div>
+          <div class="cv-n"><span class="cv-lista tnum" data-lista="${v.id}">${UI.pesos(this.listaDe(ef))}</span></div>
+          <div class="cv-n"><span class="tnum" data-marg="${v.id}">${mg ? mg.toFixed(1).replace('.', ',') + ' %' : '—'}</span></div>
+          <div class="cv-n"><span class="mk ${banda.pill}" data-mk="${v.id}">${
+            mk ? mk.toFixed(2).replace('.', ',') + 'x' : '—'}</span></div>
+          <div><select data-medc="${v.id}" ${ed ? '' : 'disabled'}>${opts.map(m =>
+            `<option ${norm(m) === act ? 'selected' : ''}>${UI.esc(m)}</option>`).join('')}</select></div>
+        </div>`;
+      };
+
+      return `<section class="pd-b">
+        <div class="pd-h">Costo y precio por variante
+          <span class="muted">(${this.vars.length})</span>
+          <span class="pill ${this.estado().pill}" style="float:right">${UI.esc(this.estado().label)}</span></div>
+        <div class="vr-tools">
+          <input id="pd-fvar" class="busca" placeholder="Filtrar…" value="${UI.esc(this._fVar)}">
+          <div class="sp"></div>
+          <span class="hint">El de lista sale solo: efectivo ÷ ${(100 - global.DB.descuentoDe('efectivo'))}%</span>
+        </div>
+        <div class="cv-tabla" style="--ejes:${ejes.length}">
+          <div class="cv-h">
+            ${ejes.map(pr => `<span>${UI.esc(pr.nombre)}</span>`).join('')}
+            <span class="num">Costo</span><span class="num">P. efectivo</span>
+            <span class="num">P. de lista</span><span class="num">Margen</span>
+            <span class="num">Markup</span><span>Medida de costeo</span>
+          </div>
+          <div id="pd-vars">${lista.map(fila).join('') || UI.vacio('Ninguna variante coincide.')}</div>
+        </div>
+      </section>` + this.bloqueProveedores() + this.bloqueVentaCompra();
+    },
+
+    // Con quién se compra y cómo se factura. Estaba en su propia solapa; va
+    // acá porque es la misma conversación que el costo y el precio.
+    bloqueVentaCompra() {
+      const p = this.p, r = p.rutas || {}, ed = this.puedeEditar();
+      return `<section class="pd-b">
+        <div class="pd-h">Cómo se pide</div>
+        <div class="rutas">${global.DB.RUTAS.map(x =>
+          `<label class="chk"><input type="checkbox" data-ruta="${x.k}" ${r[x.k] ? 'checked' : ''}
+            ${ed ? '' : 'disabled'}> ${UI.esc(x.label)}</label>`).join('')}</div>
+      </section>
+
+      <section class="pd-b">
+        <div class="pd-h">Cómo se factura</div>
+        <div class="fr"><label for="pd-iva">IVA</label>
+          <select id="pd-iva" ${ed ? '' : 'disabled'}>
+            <option value="21" ${String(p.iva ?? 21) === '21' ? 'selected' : ''}>21 %</option>
+            <option value="10.5" ${String(p.iva) === '10.5' ? 'selected' : ''}>10,5 %</option>
+            <option value="0" ${String(p.iva) === '0' ? 'selected' : ''}>Exento</option>
+          </select></div>
+        <div class="fr"><label for="pd-cfact">Concepto en la factura</label>
+          <input id="pd-cfact" value="${UI.esc(p.conceptoFactura || '')}"
+            placeholder="El nombre del mueble" ${ed ? '' : 'readonly'}></div>
+      </section>
+
+      <section class="pd-b">
+        <div class="pd-h">Visibilidad y entrega</div>
+        <label class="chk"><input type="checkbox" id="pd-pub" ${p.publicado ? 'checked' : ''}
+          ${ed ? '' : 'disabled'}> Mostrar a los vendedores</label>
+        <label class="chk"><input type="checkbox" id="pd-inst" ${p.instalacion ? 'checked' : ''}
+          ${ed ? '' : 'disabled'}> Requiere instalación</label>
+        <div class="fr" style="margin-top:9px"><label for="pd-bultos">Bultos por unidad</label>
+          <input id="pd-bultos" inputmode="numeric" value="${UI.esc(p.bultos || '')}"
+            placeholder="1" ${ed ? '' : 'readonly'}></div>
+      </section>`;
     },
 
     // Cómo se rastrea el stock de este mueble y cuánto hay que tener.
@@ -2174,46 +2300,6 @@ tr:hover td{background:var(--panel-2)}
       </section>`;
     },
 
-    // De quién se compra y cómo se vende.
-    tabCompraventa() {
-      const p = this.p, r = p.rutas || {}, ed = this.puedeEditar();
-      return this.bloqueProveedores() + `
-      <section class="pd-b">
-        <div class="pd-h">Cómo se pide</div>
-        <div class="rutas">${global.DB.RUTAS.map(x =>
-          `<label class="chk"><input type="checkbox" data-ruta="${x.k}" ${r[x.k] ? 'checked' : ''}
-            ${ed ? '' : 'disabled'}> ${UI.esc(x.label)}</label>`).join('')}</div>
-      </section>
-
-      <section class="pd-b">
-        <div class="pd-h">Cómo se factura</div>
-        <div class="fr"><label for="pd-iva">IVA</label>
-          <select id="pd-iva" ${ed ? '' : 'disabled'}>
-            <option value="21" ${String(p.iva ?? 21) === '21' ? 'selected' : ''}>21 %</option>
-            <option value="10.5" ${String(p.iva) === '10.5' ? 'selected' : ''}>10,5 %</option>
-            <option value="0" ${String(p.iva) === '0' ? 'selected' : ''}>Exento</option>
-          </select></div>
-        <div class="fr"><label for="pd-cfact">Concepto en la factura</label>
-          <input id="pd-cfact" value="${UI.esc(p.conceptoFactura || '')}"
-            placeholder="El nombre del mueble" ${ed ? '' : 'readonly'}></div>
-        <div class="fr"><label></label><span class="hint">En blanco sale el nombre del mueble.</span></div>
-      </section>
-
-      <section class="pd-b">
-        <div class="pd-h">Entrega</div>
-        <label class="chk"><input type="checkbox" id="pd-inst" ${p.instalacion ? 'checked' : ''}
-          ${ed ? '' : 'disabled'}> Requiere instalación</label>
-        <div class="hint">${p.instalacion
-          ? 'En la orden va a saltar solo, con <b>a convenir</b>; el costo se define en Instalaciones.'
-          : 'En la orden sale <b>no requiere instalación</b>, y el vendedor puede editarlo.'}</div>
-        <div class="fr" style="margin-top:9px"><label for="pd-bultos">Bultos por unidad</label>
-          <input id="pd-bultos" inputmode="numeric" value="${UI.esc(p.bultos || '')}"
-            placeholder="1" ${ed ? '' : 'readonly'}></div>
-        <div class="fr"><label></label><span class="hint">Lo usa la subida por escalera, que se cobra
-          por piso y por bulto.</span></div>
-      </section>`;
-    },
-
     // Lo que necesita fábrica: el plano de cada variante y cómo se hace.
     tabProduccion() {
       const ed = this.puedeEditar();
@@ -2224,7 +2310,7 @@ tr:hover td{background:var(--panel-2)}
         <div class="planos">${this.vars.map(v => `<div class="plano">
           <button class="vimg ${v.imgProd ? 'hay' : ''}" data-img="${v.id}|imgProd"
             title="Subir el plano de esta variante">
-            ${v.imgProd ? `<img src="${UI.esc(v.imgProd)}" alt="">` : '<span class="vimg-v">📐</span>'}
+            ${v.imgProd ? `<img src="${UI.esc(this.urlDe(v.imgProd) || v.imgProd)}" alt="">` : '<span class="vimg-v">📐</span>'}
             <span class="vimg-e">✎</span></button>
           <div class="plano-n">${UI.esc(this.nombreVar(v))}</div>
           <div class="vr-sku tnum">${UI.esc(v.sku || global.DB.skuDe(this.p, v))}</div>
@@ -2270,28 +2356,73 @@ tr:hover td{background:var(--panel-2)}
     },
 
     // 2 · Fotos ------------------------------------------------------------
-    bloqueFotos() {
-      const fotos = this.p.fotos || [];
-      return `<div class="pd-sepl"></div><div>
-        <div class="pd-h">Fotos y videos</div>
-        ${this.puedeEditar() ? `<div class="dropz" id="pd-drop">
-          <div class="dz-mas">＋</div>
-          <div class="dz-t">Arrastrá y soltá, o subí fotos y video del mueble</div>
-          <input type="file" id="pd-file" accept="image/*,video/*" multiple hidden>
-        </div>` : ''}
-        <div class="fotos">${fotos.length ? fotos.map((f, i) => `
-          <div class="fo ${i === 0 ? 'ppal' : ''}">
-            <img src="${UI.esc(f.url)}" alt="${UI.esc(f.nombre || '')}">
-            ${i === 0 ? '<span class="fo-ppal">★ Principal</span>' : ''}
-            ${this.puedeEditar() ? `<div class="fo-acc">
-              ${i ? `<button class="fo-b" data-ppal="${i}" title="Marcar como principal">★</button>` : ''}
-              <button class="fo-b" data-quitarf="${i}" title="Quitar">🗑</button>
+    // Todos los archivos del mueble en un solo lugar: fotos de venta, planos de
+    // producción, folletos. Van a ser muchos, así que tienen su propia solapa y
+    // no se mezclan con la información del mueble. Desde acá se elige cuál usa
+    // cada variante.
+    TIPOS: [
+      { k: 'venta', label: 'Venta', icono: '📷' },
+      { k: 'produccion', label: 'Producción', icono: '📐' },
+      { k: 'otro', label: 'Otro', icono: '📄' },
+    ],
+    archivos(tipo) {
+      const a = this.p.archivos || [];
+      return tipo ? a.filter(x => x.tipo === tipo) : a;
+    },
+    // Dónde está usado un archivo, para no borrar algo que está en uso.
+    usoDe(id) {
+      return this.vars.filter(v => v.imgVenta === id || v.imgProd === id).length;
+    },
+    urlDe(id) {
+      const a = (this.p.archivos || []).find(x => x.id === id);
+      return a ? a.url : '';
+    },
+
+    tabDocumentos() {
+      const ed = this.puedeEditar();
+      const grupo = t => {
+        const fs = this.archivos(t.k);
+        return `<section class="pd-b">
+          <div class="pd-h">${t.icono} ${UI.esc(t.label)} <span class="muted">(${fs.length})</span></div>
+          ${ed ? `<div class="dropz chico" data-drop="${t.k}">
+            <div class="dz-t">＋ Arrastrá acá, o hacé clic para subir</div>
+            <input type="file" data-file="${t.k}" accept="image/*,application/pdf,video/*" multiple hidden>
+          </div>` : ''}
+          <div class="docs">${fs.map(f => `<div class="doc">
+            <div class="doc-im">${/^data:image|\.(png|jpe?g|webp|svg)$/i.test(f.url)
+              ? `<img src="${UI.esc(f.url)}" alt="${UI.esc(f.nombre)}">` : t.icono}</div>
+            <div class="doc-n" title="${UI.esc(f.nombre)}">${UI.esc(f.nombre)}</div>
+            <div class="doc-u">${this.usoDe(f.id)
+              ? `<span class="pill info">en ${this.usoDe(f.id)} ${this.usoDe(f.id) === 1 ? 'variante' : 'variantes'}</span>`
+              : '<span class="pill soft">sin usar</span>'}</div>
+            ${ed ? `<div class="doc-a">
+              <select data-tipo="${f.id}">${this.TIPOS.map(x =>
+                `<option value="${x.k}" ${f.tipo === x.k ? 'selected' : ''}>${UI.esc(x.label)}</option>`).join('')}</select>
+              <button class="lx" data-borrar="${f.id}" title="Borrar">🗑</button>
             </div>` : ''}
-          </div>`).join('') : '<div class="hint">Todavía no hay fotos cargadas.</div>'}
-        </div>
-        <div class="hint" style="margin-top:8px">Los archivos se guardan en el Storage del sistema, no en la
-          cotización: acá queda sólo el enlace. Mínimo recomendado 1280px.</div>
-      </div>`;
+          </div>`).join('') || '<div class="hint">Todavía no hay archivos de este tipo.</div>'}</div>
+        </section>`;
+      };
+      return `<div class="banner info">Los archivos se guardan en el <b>Storage del sistema</b>, no adentro
+        de la cotización. Desde la solapa Información general, cada variante elige cuál de estos usa
+        como imagen de venta, y desde Producción cuál usa como plano.</div>`
+        + this.TIPOS.map(grupo).join('');
+    },
+
+    // Sube archivos a la biblioteca del mueble.
+    subir(files, tipo) {
+      [...(files || [])].forEach(f => {
+        const r = new FileReader();
+        r.onload = () => {
+          this.p.archivos = this.p.archivos || [];
+          this.p.archivos.push({
+            id: 'a' + (Math.max(0, ...this.p.archivos.map(x => Number(String(x.id).slice(1)) || 0)) + 1),
+            nombre: f.name, url: r.result, tipo: tipo || 'otro',
+          });
+          this.guardar(); this.pintar();
+        };
+        r.readAsDataURL(f);
+      });
     },
 
     // 3 · Categorías -------------------------------------------------------
@@ -2344,7 +2475,8 @@ tr:hover td{background:var(--panel-2)}
       return `<${dentro ? 'div' : 'section class="pd-b"'}>
         <div class="pd-h">Propiedades</div>
         <div class="props">${ps.map(p => `
-          <div class="prow">
+          <div class="prow" draggable="${ed}" data-orden="${UI.esc(p.k)}">
+            ${ed ? '<span class="prow-drag" title="Arrastrar para cambiar el orden">⠿</span>' : ''}
             <div class="prow-i">
               <div class="prow-n">${UI.esc(p.nombre)}</div>
               <div class="chips">${p.usados.map(v =>
@@ -2356,9 +2488,10 @@ tr:hover td{background:var(--panel-2)}
               title="Editar ${UI.esc(p.nombre)}">›</button>
           </div>`).join('') || '<div class="hint">Este mueble todavía no tiene propiedades.</div>'}
         </div>
+        ${ed && ps.length > 1 ? '<div class="hint" style="margin-top:7px">Arrastrá una propiedad para '
+          + 'cambiar el orden: es el que ordena las variantes de abajo.</div>' : ''}
         ${ed ? `<div class="prow-add">
-          <button class="lnk" id="pd-addprop">⊕ Agregar propiedad</button>
-          <select id="pd-selprop" class="selprop" hidden></select>
+          <button class="btn" id="pd-addprop">⊕ Agregar propiedad</button>
         </div>` : ''}
         ${n ? `<div class="prop-pie"><div class="combo"><b class="tnum">${n}</b> combinaciones posibles
           ${this.vars.length !== n ? `<span class="muted">· ${this.vars.length} creadas</span>` : ''}</div></div>` : ''}
@@ -2368,7 +2501,7 @@ tr:hover td{background:var(--panel-2)}
     // 5 · Listado de variantes ---------------------------------------------
     bloqueVariantes(dentro) {
       const f = this._fVar.trim().toLowerCase();
-      const lista = this.vars.filter(v => !f || this.nombreVar(v).toLowerCase().includes(f));
+      const lista = this.ordenadas(this.vars.filter(v => !f || this.nombreVar(v).toLowerCase().includes(f)));
       const cost = this.muestraCostos();
       return `<${dentro ? 'div' : 'section class="pd-b"'}>
         ${dentro ? '' : `<div class="pd-h">${cost ? 'Costo y precio por variante' : 'Variantes'}
@@ -2379,30 +2512,44 @@ tr:hover td{background:var(--panel-2)}
           <div class="sp"></div>
           <span class="hint">${this.activas().length} activas · ${this.vars.length - this.activas().length} desactivadas</span>
         </div>
-        <div class="vr-head ${cost ? '' : 'sincosto'}">
-          <span>Imagen venta</span><span>Imagen producción</span><span>Variante</span><span>Stock</span>
-          ${cost ? '<span style="text-align:right">Costo</span>' : ''}
-          <span style="text-align:right">Precio</span>
-          <span style="text-align:right">${cost ? 'Markup' : 'Peso'}</span>
+        <div class="vr-tabla">
+        <div class="vr-head ${cost ? 'concosto' : ''}">
+          <span>Imagen<br>venta</span><span>Imagen<br>producción</span><span>Variante</span><span>Stock</span>
+          ${cost ? `<span class="num">Costo</span><span class="num">Precio</span><span class="num">Markup</span>`
+            : `<span class="num">Largo</span><span class="num">Alto</span><span class="num">Prof.</span><span class="num">Peso</span>`}
           <span>Acciones</span>
         </div>
         <div id="pd-vars">${lista.map(v => this.filaVar(v, cost)).join('')
           || UI.vacio('Ninguna variante coincide con el filtro.')}</div>
+        </div>
       </${dentro ? 'div' : 'section'}>`;
     },
 
+    // "MEDIDAS 1.60 · ESTRUCTURA PARAÍSO · FRENTE BLANCO". Si el valor ya
+    // arranca con el nombre de la propiedad no se repite: "ESTRUCTURA BLANCA"
+    // queda así y no "ESTRUCTURA ESTRUCTURA BLANCA".
     nombreVar(v) {
-      return (this.p.propiedades || []).map(k => v[k]).filter(Boolean).join(' · ');
+      const ps = this.props();
+      return (this.p.propiedades || []).map(k => {
+        const val = v[k]; if (!val) return null;
+        const pr = ps.find(x => x.k === k) || { nombre: k.toUpperCase() };
+        const corto = String(pr.nombre).split(' ')[0];
+        return String(val).toUpperCase().startsWith(corto) ? val : `${corto} ${val}`;
+      }).filter(Boolean).join(' · ');
     },
 
     filaVar(v, cost) {
       const mk = this.markupDe(v), banda = global.DB.bandaDe(mk);
       const off = v.activa === false;
       // 2 × 2 cm en pantalla: se ve de qué mueble se trata sin abrir nada.
-      const img = (url, k, tit) => `<button class="vimg ${url ? 'hay' : ''}" data-img="${v.id}|${k}" title="${tit}">
+      const img = (ref, k, tit) => { const url = this.urlDe(ref) || ref;
+        return `<button class="vimg ${url ? 'hay' : ''}" data-img="${v.id}|${k}" title="${tit}">
         ${url ? `<img src="${UI.esc(url)}" alt="">` : `<span class="vimg-v">${k === 'imgProd' ? '📐' : '📷'}</span>`}
-        <span class="vimg-e">✎</span></button>`;
-      return `<div class="vr ${off ? 'off' : ''} ${cost ? '' : 'sincosto'}" data-v="${v.id}">
+        <span class="vimg-e">✎</span></button>`; };
+      const campo = (attr, val, uni) => `<div class="vr-x"><input inputmode="decimal" class="pn"
+        data-${attr}="${v.id}" value="${val || ''}" placeholder="—" ${this.puedeEditar() ? '' : 'readonly'}
+        >${uni ? `<span class="uni">${uni}</span>` : ''}</div>`;
+      return `<div class="vr ${off ? 'off' : ''} ${cost ? 'concosto' : ''}" data-v="${v.id}">
         ${img(v.imgVenta, 'imgVenta', 'Imagen de venta — sale impresa en la cotización')}
         ${img(v.imgProd, 'imgProd', 'Imagen de producción — el plano que va a fábrica')}
         <div class="vr-n">
@@ -2414,19 +2561,14 @@ tr:hover td{background:var(--panel-2)}
           ? `<b class="tnum ok-t">${v.stock}</b>`
           : (v.reponer === 'minimo'
             ? '<span class="muted">reponer</span>'
-            // Se fabrica cuando se vende: no hay tope de stock.
             : '<span class="inf">∞ a pedido</span>')}</div>
-        ${cost ? `<div class="vr-c"><input inputmode="numeric" class="pn" data-costo="${v.id}"
-          value="${v.costo || ''}" ${this.puedeEditar() ? '' : 'readonly'}></div>` : ''}
-        <div class="vr-p"><span class="uni">$</span><input inputmode="numeric" class="pn" data-precio="${v.id}"
-          value="${v.precio || ''}" ${this.puedeEditar() ? '' : 'readonly'}></div>
-        ${cost ? `<div class="vr-m"><span class="mk ${banda.pill}">${mk ? mk.toFixed(2).replace('.', ',') + 'x' : '—'}</span></div>`
-          : `<div class="vr-pe"><input inputmode="decimal" class="pn" data-peso="${v.id}"
-              value="${v.peso || ''}" ${this.puedeEditar() ? '' : 'readonly'}><span class="uni">kg</span></div>`}
+        ${cost ? `${campo('costo', v.costo)}${campo('precio', v.precio)}
+          <div class="vr-m"><span class="mk ${banda.pill}">${mk ? mk.toFixed(2).replace('.', ',') + 'x' : '—'}</span></div>`
+          : `${campo('largo', v.frenteCm, 'cm')}${campo('alto', v.alto, 'cm')}
+             ${campo('prof', v.prof, 'cm')}${campo('peso', v.peso, 'kg')}`}
         <div class="vr-a">
-          <button class="lx" data-abrir="${v.id}" title="Editar la variante">✏️</button>
           <button class="lx" data-dup="${v.id}" title="Duplicar">⧉</button>
-          <button class="lx" data-hist="${v.id}" title="Historial de precio">↺</button>
+          <button class="lx" data-hist="${v.id}" title="Historial">↺</button>
         </div>
       </div>`;
     },
@@ -2501,16 +2643,6 @@ tr:hover td{background:var(--panel-2)}
       </section>`;
     },
 
-    // Quién ve este mueble. Lo demás que estaba acá se fue a las solapas de
-    // Inventario, Compra y venta y Producción.
-    bloqueVisibilidad() {
-      const p = this.p, ed = this.puedeEditar();
-      return `<label class="chk"><input type="checkbox" id="pd-pub" ${p.publicado ? 'checked' : ''}
-          ${ed ? '' : 'disabled'}> Mostrar a los vendedores</label>
-        <div class="hint">Oculto no aparece para cotizar. Cada variante además se puede mostrar o
-          esconder por separado, desde su panel.</div>`;
-    },
-
     // 9 · Contabilidad -------------------------------------------------------
     // El plan de cuentas todavía no existe: cuando esté, estos dos campos pasan
     // a ser desplegables y en blanco heredan la cuenta de la categoría.
@@ -2550,21 +2682,24 @@ tr:hover td{background:var(--panel-2)}
       };
 
       // Fotos: se leen del disco y quedan como enlace del Storage.
-      const dz = g('pd-drop'), file = g('pd-file');
-      if (dz) {
+      document.querySelectorAll('[data-drop]').forEach(dz => {
+        const tipo = dz.dataset.drop;
+        const file = document.querySelector(`[data-file="${tipo}"]`);
         dz.onclick = () => file.click();
         dz.ondragover = e => { e.preventDefault(); dz.classList.add('on'); };
         dz.ondragleave = () => dz.classList.remove('on');
-        dz.ondrop = e => { e.preventDefault(); dz.classList.remove('on'); this.subir(e.dataTransfer.files); };
-        file.onchange = () => this.subir(file.files);
-      }
-      document.querySelectorAll('[data-ppal]').forEach(b => b.onclick = () => {
-        const i = Number(b.dataset.ppal);
-        const f = p.fotos.splice(i, 1)[0]; p.fotos.unshift(f);
-        this.guardar(); this.pintar();
+        dz.ondrop = e => { e.preventDefault(); dz.classList.remove('on'); this.subir(e.dataTransfer.files, tipo); };
+        file.onchange = () => this.subir(file.files, tipo);
       });
-      document.querySelectorAll('[data-quitarf]').forEach(b => b.onclick = () => {
-        p.fotos.splice(Number(b.dataset.quitarf), 1); this.guardar(); this.pintar();
+      document.querySelectorAll('[data-tipo]').forEach(sl => sl.onchange = () => {
+        const a = (p.archivos || []).find(x => x.id === sl.dataset.tipo);
+        if (a) { a.tipo = sl.value; this.guardar(); this.pintar(); }
+      });
+      document.querySelectorAll('[data-borrar]').forEach(b => b.onclick = () => {
+        const id = b.dataset.borrar, uso = this.usoDe(id);
+        if (uso) return UI.aviso(`No se puede: está en ${uso} ${uso === 1 ? 'variante' : 'variantes'}`, 'warn');
+        p.archivos = (p.archivos || []).filter(x => x.id !== id);
+        this.guardar(); this.pintar();
       });
 
       if (g('pd-edcat')) g('pd-edcat').onclick = () => this.modalCategorias();
@@ -2572,6 +2707,7 @@ tr:hover td{background:var(--panel-2)}
         b.onclick = () => this.abrirPropiedad(b.dataset.prop));
       document.querySelectorAll('[data-addv]').forEach(b =>
         b.onclick = () => this.agregarValores(b.dataset.addv));
+      this.arrastrarPropiedades();
       if (g('pd-addprop')) g('pd-addprop').onclick = () => this.desplegarPropiedades();
       document.querySelectorAll('[data-quitarcat]').forEach(b => b.onclick = () => {
         const id = Number(b.dataset.quitarcat);
@@ -2645,7 +2781,7 @@ tr:hover td{background:var(--panel-2)}
         b.onclick = () => this.abrirVariante(Number(b.dataset.abrir)));
       document.querySelectorAll('[data-img]').forEach(b => b.onclick = () => {
         const [id, campo] = b.dataset.img.split('|');
-        this.subirImagenVar(Number(id), campo);
+        this.elegirImagenVar(Number(id), campo);
       });
       const num = (attr, campo) => document.querySelectorAll(`[data-${attr}]`).forEach(i => {
         i.onchange = () => {
@@ -2656,6 +2792,34 @@ tr:hover td{background:var(--panel-2)}
         };
       });
       num('costo', 'costo'); num('precio', 'precio'); num('peso', 'peso');
+      // El efectivo es lo que se carga; la lista, el margen y el markup se
+      // recalculan en la misma fila sin repintar toda la tabla.
+      const refrescarCV = v => {
+        const ef = this.efectivoDe(v);
+        const mk = global.DB.markupDe(v.costo, ef), mg = global.DB.margenDe(v.costo, ef);
+        const q = (a) => document.querySelector(`[data-${a}="${v.id}"]`);
+        if (q('lista')) q('lista').textContent = UI.pesos(this.listaDe(ef));
+        if (q('marg')) q('marg').textContent = mg ? mg.toFixed(1).replace('.', ',') + ' %' : '—';
+        const el = q('mk');
+        if (el) { el.textContent = mk ? mk.toFixed(2).replace('.', ',') + 'x' : '—';
+          el.className = 'mk ' + global.DB.bandaDe(mk).pill; }
+      };
+      document.querySelectorAll('[data-efec]').forEach(i => i.onchange = () => {
+        const v = this.vars.find(x => x.id === Number(i.dataset.efec)); if (!v) return;
+        v.efectivo = Math.max(0, Number(String(i.value).replace(/[^\d]/g, '')) || 0);
+        v.precio = this.listaDe(v.efectivo);   // el de lista se guarda derivado
+        global.DB.guardarVariante(v); refrescarCV(v);
+      });
+      document.querySelectorAll('[data-costo]').forEach(i => {
+        const antes = i.onchange;
+        i.onchange = () => { if (antes) antes();
+          const v = this.vars.find(x => x.id === Number(i.dataset.costo)); if (v) refrescarCV(v); };
+      });
+      document.querySelectorAll('[data-medc]').forEach(sl => sl.onchange = () => {
+        const v = this.vars.find(x => x.id === Number(sl.dataset.medc)); if (!v) return;
+        v.medidaCosteo = sl.value; global.DB.guardarVariante(v);
+      });
+      num('largo', 'frenteCm'); num('alto', 'alto'); num('prof', 'prof');
       document.querySelectorAll('[data-dup]').forEach(b =>
         b.onclick = () => this.duplicar(Number(b.dataset.dup)));
       document.querySelectorAll('[data-hist]').forEach(b =>
@@ -2685,19 +2849,63 @@ tr:hover td{background:var(--panel-2)}
       });
     },
 
-    subirImagenVar(id, campo) {
+    // La imagen de una variante se ELIGE de la biblioteca. Si el archivo
+    // todavía no está, se sube desde el mismo pop-up y queda en Documentos.
+    elegirImagenVar(id, campo) {
       const v = this.vars.find(x => x.id === id); if (!v || !this.puedeEditar()) return;
-      const inp = document.createElement('input');
-      inp.type = 'file';
-      // La de producción suele ser un plano en PDF.
-      inp.accept = campo === 'imgProd' ? 'image/*,application/pdf' : 'image/*';
-      inp.onchange = () => {
-        const f = inp.files[0]; if (!f) return;
+      const esVenta = campo === 'imgVenta';
+      const tipo = esVenta ? 'venta' : 'produccion';
+      const fs = this.archivos(tipo);
+      const actual = v[campo];
+
+      const cerrar = this.modal(`
+        <h3 class="h-title" style="font-size:17px">${esVenta ? 'Imagen de venta' : 'Plano de producción'}</h3>
+        <p class="h-sub">${UI.esc(this.nombreVar(v))}</p>
+        <div class="docs elegir" id="ei-lista" style="margin-top:14px">
+          ${fs.map(f => `<button class="doc ${actual === f.id ? 'on' : ''}" data-usar="${f.id}">
+            <div class="doc-im">${/^data:image/.test(f.url)
+              ? `<img src="${UI.esc(f.url)}" alt="">` : (esVenta ? '📷' : '📐')}</div>
+            <div class="doc-n">${UI.esc(f.nombre)}</div>
+          </button>`).join('')
+          || `<div class="hint">No hay archivos de ${esVenta ? 'venta' : 'producción'} cargados todavía.</div>`}
+        </div>
+        <div class="pd-sepl"></div>
+        <div class="row">
+          <button class="btn" id="ei-subir">＋ Subir uno nuevo</button>
+          ${actual ? '<button class="btn" id="ei-quitar">Quitar la imagen</button>' : ''}
+          <div class="sp"></div>
+          <button class="btn" id="ei-x">Cerrar</button>
+        </div>
+        <input type="file" id="ei-file" hidden
+          accept="${esVenta ? 'image/*' : 'image/*,application/pdf'}">`, 560);
+
+      document.getElementById('ei-x').onclick = cerrar;
+      document.querySelectorAll('[data-usar]').forEach(b => b.onclick = () => {
+        v[campo] = b.dataset.usar;
+        global.DB.guardarVariante(v); cerrar(); this.pintar();
+      });
+      const quitar = document.getElementById('ei-quitar');
+      if (quitar) quitar.onclick = () => {
+        v[campo] = ''; global.DB.guardarVariante(v); cerrar(); this.pintar();
+      };
+      const file = document.getElementById('ei-file');
+      document.getElementById('ei-subir').onclick = () => file.click();
+      file.onchange = () => {
+        const f = file.files[0]; if (!f) return;
         const r = new FileReader();
-        r.onload = () => { v[campo] = r.result; global.DB.guardarVariante(v); this.refrescarFila(v); };
+        r.onload = () => {
+          this.p.archivos = this.p.archivos || [];
+          const nuevo = {
+            id: 'a' + (Math.max(0, ...this.p.archivos.map(x => Number(String(x.id).slice(1)) || 0)) + 1),
+            nombre: f.name, url: r.result, tipo,
+          };
+          this.p.archivos.push(nuevo);
+          v[campo] = nuevo.id;
+          this.guardar(); global.DB.guardarVariante(v);
+          cerrar(); this.pintar();
+        };
         r.readAsDataURL(f);
       };
-      inp.click();
     },
 
     // ---- Panel de la variante ----------------------------------------------
@@ -2847,25 +3055,56 @@ tr:hover td{background:var(--panel-2)}
     // Agregar una propiedad A ESTE MUEBLE. No se inventa una nueva: se elige
     // entre las que ya existen en el sistema, y recién al final está la opción
     // de crear una que no exista.
+    // El orden de las propiedades es el que ordena las variantes: si primero
+    // va la medida, quedan juntas todas las de 0,40 y adentro por estructura.
+    arrastrarPropiedades() {
+      const caja = document.querySelector('.props'); if (!caja) return;
+      let origen = null;
+      caja.querySelectorAll('.prow[data-orden]').forEach(r => {
+        r.ondragstart = () => { origen = r; r.classList.add('drag'); };
+        r.ondragend = () => {
+          r.classList.remove('drag'); origen = null;
+          this.p.propiedades = [...caja.querySelectorAll('.prow[data-orden]')].map(x => x.dataset.orden);
+          this.guardar(); this.pintar();
+        };
+        r.ondragover = e => {
+          e.preventDefault();
+          if (!origen || origen === r) return;
+          const c = r.getBoundingClientRect();
+          caja.insertBefore(origen, e.clientY < c.top + c.height / 2 ? r : r.nextSibling);
+        };
+      });
+    },
+
+    // Un pop-up con las propiedades que ya existen y, abajo, la opción de
+    // crear una que no esté. No se inventa nada desde cero por descuido.
     desplegarPropiedades() {
-      const btn = document.getElementById('pd-addprop');
-      const sel = document.getElementById('pd-selprop');
       const usa = this.p.propiedades || [];
       const libres = global.DB.propiedades().filter(p => !usa.includes(p.k));
-      sel.innerHTML = `<option value="">Seleccionar…</option>`
-        + libres.map(p => `<option value="${UI.esc(p.k)}">${UI.esc(p.nombre)}`
-          + `${p.valores.length ? ` (${p.valores.length} valores)` : ''}</option>`).join('')
-        + `<option value="__nueva">+ Nueva propiedad</option>`;
-      btn.hidden = true; sel.hidden = false; sel.focus();
-      sel.onchange = () => {
-        const v = sel.value;
-        if (!v) return;
-        if (v === '__nueva') return this.modalPropiedadNueva();
-        this.agregarPropiedad(v);
-        sel.hidden = true; btn.hidden = false;
+      const cerrar = this.modal(`
+        <h3 class="h-title" style="font-size:17px">Agregar una propiedad</h3>
+        <p class="h-sub">De qué más depende este mueble. Cada propiedad que sumes multiplica
+          las variantes.</p>
+        <label class="fld" style="margin-top:14px"><span class="lbl">Propiedad</span>
+          <select id="ap-sel">
+            <option value="">Seleccionar…</option>
+            ${libres.map(p => `<option value="${UI.esc(p.k)}">${UI.esc(p.nombre)}`
+              + `${p.valores.length ? ` (${p.valores.length} valores)` : ''}</option>`).join('')}
+          </select></label>
+        <div class="pd-sepl"></div>
+        <div class="hint">¿No está en la lista?</div>
+        <button class="btn" id="ap-nueva" style="margin-top:7px">＋ Crear una propiedad nueva</button>
+        <div class="row" style="margin-top:18px;justify-content:flex-end;gap:10px">
+          <button class="btn" id="ap-x">Cancelar</button>
+          <button class="btn primary" id="ap-ok">Continuar</button>
+        </div>`, 460);
+      document.getElementById('ap-x').onclick = cerrar;
+      document.getElementById('ap-nueva').onclick = () => { cerrar(); this.modalPropiedadNueva(); };
+      document.getElementById('ap-ok').onclick = () => {
+        const k = document.getElementById('ap-sel').value;
+        if (!k) return UI.aviso('Elegí una propiedad', 'warn');
+        cerrar(); this.agregarPropiedad(k);
       };
-      // Si se va sin elegir nada, vuelve el botón.
-      sel.onblur = () => { if (!sel.value) { sel.hidden = true; btn.hidden = false; } };
     },
 
     // Una propiedad sin valores no sirve para nada: no multiplica, no aparece
@@ -2885,8 +3124,10 @@ tr:hover td{background:var(--panel-2)}
       const libres = prop.valores.filter(v => !usados.includes(v));
       const sel = new Set();
 
-      const chip = v => `<button class="vsel" data-v="${UI.esc(v)}">
-        <span class="vsel-c">✓</span><span>${UI.esc(v)}</span></button>`;
+      // Una lista compacta con tildes: se marcan varios de una, sin llenar la
+      // pantalla de botones grandes.
+      const chip = v => `<label class="vsel" data-v="${UI.esc(v)}">
+        <input type="checkbox"><span>${UI.esc(v)}</span></label>`;
 
       const cerrar = this.modal(`
         <h3 class="h-title" style="font-size:17px">${UI.esc(prop.nombre)}</h3>
@@ -2919,11 +3160,14 @@ tr:hover td{background:var(--panel-2)}
         document.getElementById('av-n').textContent = sel.size
           ? `${sel.size} ${sel.size === 1 ? 'marcado' : 'marcados'}` : 'ninguno marcado';
       };
-      const enganchar = () => lista.querySelectorAll('.vsel').forEach(b => b.onclick = () => {
-        const v = b.dataset.v;
-        if (sel.has(v)) { sel.delete(v); b.classList.remove('on'); }
-        else { sel.add(v); b.classList.add('on'); }
-        contar();
+      const enganchar = () => lista.querySelectorAll('.vsel').forEach(b => {
+        const chk = b.querySelector('input');
+        chk.onchange = () => {
+          const v = b.dataset.v;
+          if (chk.checked) { sel.add(v); b.classList.add('on'); }
+          else { sel.delete(v); b.classList.remove('on'); }
+          contar();
+        };
       });
       enganchar();
 
@@ -2944,7 +3188,9 @@ tr:hover td{background:var(--panel-2)}
           if (!esOtro) {
             // Ya existe: se marca el que está en vez de crear uno igual.
             const b = lista.querySelector(`.vsel[data-v="${usar.replace(/"/g, '&quot;')}"]`);
-            if (b && !sel.has(usar)) { sel.add(usar); b.classList.add('on'); contar(); }
+            if (b && !sel.has(usar)) {
+              sel.add(usar); b.classList.add('on'); b.querySelector('input').checked = true; contar();
+            }
             else if (!b) { sel.add(usar); contar(); }
             inp.value = '';
           } else { inp.value = usar; crear(true); }
@@ -2954,6 +3200,7 @@ tr:hover td{background:var(--panel-2)}
         enganchar();
         sel.add(guardado);
         lista.firstElementChild.classList.add('on');
+        lista.firstElementChild.querySelector('input').checked = true;
         inp.value = ''; contar();
       };
       document.getElementById('av-crear').onclick = () => crear(false);
@@ -3343,9 +3590,14 @@ tr:hover td{background:var(--panel-2)}
         .pd-mb{padding:12px 14px 14px;border-top:1px solid var(--line-soft)}
         .pd-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px}
         /* Solapas: adelante lo que se mira siempre, atrás lo que se consulta. */
-        .pd-tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0 0 12px}
-        .pd-tab{border:0;background:none;font:inherit;font-size:13px;font-weight:650;color:var(--muted);
-          cursor:pointer;padding:9px 13px;border-bottom:2px solid transparent;margin-bottom:-1px}
+        /* Con siete solapas no entran a lo ancho: antes que partirse en dos
+           renglones, la barra scrollea. */
+        .pd-tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0 0 12px;
+          overflow-x:auto;scrollbar-width:none}
+        .pd-tabs::-webkit-scrollbar{display:none}
+        .pd-tab{flex:none;white-space:nowrap;border:0;background:none;font:inherit;font-size:13px;
+          font-weight:650;color:var(--muted);cursor:pointer;padding:9px 12px;
+          border-bottom:2px solid transparent;margin-bottom:-1px}
         .pd-tab:hover{color:var(--navy)}
         .pd-tab.on{color:var(--navy);border-bottom-color:var(--brand)}
         /* Los bloques cortos van de a dos: uno abajo del otro la pantalla
@@ -3372,6 +3624,21 @@ tr:hover td{background:var(--panel-2)}
         .dropz{border:2px dashed var(--brand);border-radius:10px;background:var(--brand-soft);
           padding:11px;text-align:center;cursor:pointer;margin-bottom:9px}
         .dropz.on{background:var(--panel-2);border-color:var(--navy)}
+        .dropz.chico{padding:9px}
+        .docs{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px}
+        .doc{border:1px solid var(--line);border-radius:9px;padding:8px;background:var(--panel-2);
+          font:inherit;text-align:left}
+        .doc-im{height:90px;border-radius:7px;background:var(--panel);display:grid;place-items:center;
+          font-size:24px;overflow:hidden;border:1px solid var(--line-soft)}
+        .doc-im img{width:100%;height:100%;object-fit:cover}
+        .doc-n{font-size:11.5px;color:var(--navy);margin-top:6px;overflow:hidden;
+          text-overflow:ellipsis;white-space:nowrap}
+        .doc-u{margin-top:4px}
+        .doc-a{display:flex;gap:4px;align-items:center;margin-top:6px}
+        .doc-a select{font-size:11.5px;padding:3px 6px}
+        .docs.elegir .doc{cursor:pointer;transition:.12s}
+        .docs.elegir .doc:hover{border-color:var(--brand)}
+        .docs.elegir .doc.on{border-color:var(--brand);background:var(--brand-soft)}
         .dz-mas{font-size:16px;color:var(--brand);line-height:1}
         .dz-t{font-size:12.5px;font-weight:650;color:var(--brand);margin-top:2px}
         .fotos{display:flex;gap:9px;flex-wrap:wrap}
@@ -3403,6 +3670,9 @@ tr:hover td{background:var(--panel-2)}
           background:none;cursor:pointer;padding:2px 6px;font:inherit;font-size:19px}
         .prow-go:hover{color:var(--brand);transform:translateX(2px)}
         .prow-add{margin-top:10px;padding-top:9px;border-top:1px solid var(--line)}
+        .prow-drag{color:var(--muted);cursor:grab;font-size:13px;line-height:1;letter-spacing:-2px;
+          flex:none;align-self:flex-start;margin-top:2px}
+        .prow.drag{opacity:.4}
         .selprop{max-width:280px;padding:6px 9px;font-size:12.5px}
         /* Los valores adentro de la propiedad: tildar, renombrar y ordenar. */
         .vrows{border:1px solid var(--line);border-radius:9px;max-height:290px;overflow:auto}
@@ -3413,15 +3683,13 @@ tr:hover td{background:var(--panel-2)}
         .vr-drag{color:var(--muted);cursor:grab;font-size:13px;line-height:1;letter-spacing:-2px}
         /* Elegir valores: se marcan de a uno, no se escriben. */
         .vya{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-        .vsels{display:flex;gap:7px;flex-wrap:wrap;max-height:230px;overflow:auto;padding:2px}
-        .vsel{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);
-          background:var(--panel);border-radius:8px;padding:6px 11px;font:inherit;font-size:12.5px;
-          color:var(--navy);cursor:pointer;transition:.12s}
-        .vsel:hover{border-color:var(--brand)}
-        .vsel-c{width:15px;height:15px;border:1px solid var(--line);border-radius:4px;font-size:10px;
-          display:grid;place-items:center;color:transparent;flex:none}
-        .vsel.on{border-color:var(--brand);background:var(--brand-soft);font-weight:650}
-        .vsel.on .vsel-c{background:var(--brand);border-color:var(--brand);color:#fff}
+        .vsels{border:1px solid var(--line);border-radius:9px;max-height:230px;overflow:auto}
+        .vsel{display:flex;align-items:center;gap:9px;padding:7px 11px;font-size:12.5px;color:var(--navy);
+          cursor:pointer;border-bottom:1px solid var(--line-soft)}
+        .vsel:last-child{border-bottom:0}
+        .vsel:hover{background:var(--panel-2)}
+        .vsel.on{background:var(--brand-soft);font-weight:650}
+        .vsel input{width:15px;height:15px;accent-color:var(--brand);flex:none}
         .vrow input[type=checkbox]{width:15px;height:15px;accent-color:var(--brand);flex:none}
         .vr-txt{flex:1;min-width:0;padding:5px 8px;font-size:12.5px}
         .btn.ghost{background:none;border-color:transparent;color:var(--crit)}
@@ -3432,9 +3700,33 @@ tr:hover td{background:var(--panel-2)}
 
         .vr-tools{display:flex;align-items:center;gap:10px;margin-bottom:8px}
         .vr-tools .busca{max-width:320px;padding:7px 10px;font-size:13px}
-        .vr-head,.vr{display:grid;grid-template-columns:78px 78px minmax(0,1fr) 72px 92px 92px 60px 82px;
-          gap:9px;align-items:center}
-        .vr-head.sincosto,.vr.sincosto{grid-template-columns:78px 78px minmax(0,1fr) 76px 96px 96px 82px}
+        /* Información general: sin precios — largo, alto, profundidad y peso.
+           Costos y márgenes: costo, precio y markup. Son nueve columnas y no
+           entran en 920 px, así que la tabla scrollea sola sin ensanchar la
+           pantalla. */
+        .vr-tabla{overflow-x:auto;margin:0 -14px;padding:0 14px}
+        .vr-head,.vr{display:grid;min-width:860px;
+          grid-template-columns:76px 76px minmax(150px,1fr) 68px 72px 72px 72px 72px 58px;
+          gap:7px;align-items:center}
+        .vr-head.concosto,.vr.concosto{min-width:760px;
+          grid-template-columns:76px 76px minmax(150px,1fr) 72px 96px 96px 64px 58px}
+        .num{text-align:right}
+        .vr-x{display:flex;align-items:center;gap:3px}
+        .vr-x .pn{flex:1;min-width:0;width:auto;padding:5px 6px}
+        /* Compra y venta: una columna por propiedad y después los números. */
+        .cv-tabla{overflow-x:auto;margin:0 -14px;padding:0 14px}
+        .cv-h,.cv-r{display:grid;min-width:940px;gap:8px;align-items:center;
+          grid-template-columns:repeat(var(--ejes),minmax(140px,1fr)) 90px 90px 94px 68px 62px 96px}
+        .cv-h{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);
+          font-weight:700;padding-bottom:8px;border-bottom:1px solid var(--line)}
+        .cv-r{padding:5px 0;border-bottom:1px solid var(--line-soft)}
+        .cv-r.off{opacity:.5}
+        .cv-p{font-size:12.5px;color:var(--brand);font-weight:600;overflow:hidden;
+          text-overflow:ellipsis;white-space:nowrap}
+        .cv-n{text-align:right;font-size:12.5px}
+        .cv-n .pn{width:100%;text-align:right;padding:5px 8px}
+        .cv-lista{color:var(--navy);font-weight:650}
+        .cv-r select{font-size:12px;padding:4px 7px}
         .vr-p,.vr-pe{display:flex;align-items:center;gap:4px}
         /* El input no puede comerse la unidad: si no, "kg" queda cortado. */
         .vr-p .pn,.vr-pe .pn{flex:1;min-width:0;width:auto}
