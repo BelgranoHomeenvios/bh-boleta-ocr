@@ -415,6 +415,36 @@ Todo en **una sola columna**, un bloque abajo del otro, y en modo edición.
   muebles publicados desde Inventario). **Producción ve todo menos costo,
   markup, margen y ganancia**, y sólo lee.
 
+### Lote 11 — APLICADO (Seis solapas y propuestas para decidir)
+
+**Respuestas de Brian anotadas**
+- Le gusta que haya **movimientos e histórico** de cada producto.
+- **Storage real de Supabase**: por ahora queda adentro del HTML; se hace
+  cuando armemos las bases de datos.
+- **Plan de cuentas**: por ahora vacío, se completa después.
+
+**Solapas del mueble**
+- ✅ 230. Ahora son seis: `Información general` · `Costos y márgenes` ·
+  `Inventario` · `Compra y venta` · `Producción` · `Contabilidad`.
+- ✅ 231. **Inventario**: cómo se rastrea el stock (por variante o no se lleva),
+  y stock, mínimo y reposición de cada variante en una sola tabla.
+- ✅ 232. **Compra y venta**: proveedores, cómo se pide, **cómo se factura**
+  (IVA y concepto) y entrega con bultos por unidad.
+- ✅ 233. **Producción**: los planos de todas las variantes en una grilla para
+  ir cargándolos, más materiales y notas para fábrica. Producción trabaja
+  desde acá.
+- ✅ 234. **Contabilidad** avisa que el plan de cuentas todavía no está y que
+  esos campos van a ser una lista para elegir.
+
+**Propuestas para decidir juntos** — `docs/propuestas/`
+- ✅ 235. `mueble.html`: tres formas de cargar un mueble y sus variantes —
+  **matriz** (los ejes cruzados, se edita como planilla), **en pasos** (alta
+  guiada, muestra cuántas variantes van a salir antes de crearlas) y
+  **lista y detalle** (una variante por vez, con sus movimientos).
+- ✅ 236. `catalogo.html`: tres formas de ver el catálogo — **con foto** (para
+  el vendedor frente al cliente), **tabla para trabajar** (Dirección, edición
+  de a muchos) y **explorador por familia** (para saber qué hay).
+
 ### Lote 10 — APLICADO (El mueble: cuatro módulos, solapas y columna angosta)
 
 La pantalla abría con todo junto. Ahora adelante está lo que se mira siempre y

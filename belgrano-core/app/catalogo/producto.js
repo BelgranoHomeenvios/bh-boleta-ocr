@@ -66,8 +66,11 @@
     // atributos, sus variantes y el precio. Todo lo demás — lo que no hace
     // falta para saber qué es y cuánto sale — vive en las otras.
     SOLAPAS: [
-      { k: 'producto', label: 'Producto' },
+      { k: 'producto', label: 'Información general' },
       { k: 'costos', label: 'Costos y márgenes', costos: true },
+      { k: 'inventario', label: 'Inventario' },
+      { k: 'compraventa', label: 'Compra y venta' },
+      { k: 'produccion', label: 'Producción' },
       { k: 'contabilidad', label: 'Contabilidad' },
     ],
     _tab: 'producto',
@@ -144,13 +147,127 @@
         + this.modulo('variantes', 3, 'Variantes',
           `${this.vars.length} ${this.vars.length === 1 ? 'variante' : 'variantes'} · ${this.activas().length} activas`,
           this.bloqueVariantes(true), this.vars.length > 0)
-        + this.modulo('adicionales', 4, 'Adicionales',
-          `${this.p.publicado ? 'Visible' : 'Oculto'} · ${global.DB.RUTAS.filter(x => r[x.k]).map(x => x.label).join(', ') || 'sin definir'}`,
-          this.bloqueAdicionales(true), true);
+        + this.modulo('visibilidad', 4, 'Visibilidad',
+          this.p.publicado ? 'Visible para los vendedores' : 'Oculto',
+          this.bloqueVisibilidad(), true);
     },
     tabCostos() {
-      return this.bloqueVariantes() + this.bloqueSimulador() + this.bloqueProveedores();
+      return this.bloqueVariantes() + this.bloqueSimulador();
     },
+
+    // Cómo se rastrea el stock de este mueble y cuánto hay que tener.
+    tabInventario() {
+      const p = this.p, ed = this.puedeEditar();
+      const conMin = this.vars.filter(v => v.reponer === 'minimo');
+      return `<section class="pd-b">
+        <div class="pd-h">Cómo se rastrea el stock</div>
+        <div class="rutas">
+          <label class="chk"><input type="radio" name="pd-track" value="variante"
+            ${(p.rastreo || 'variante') === 'variante' ? 'checked' : ''} ${ed ? '' : 'disabled'}>
+            Por variante</label>
+          <label class="chk"><input type="radio" name="pd-track" value="no"
+            ${p.rastreo === 'no' ? 'checked' : ''} ${ed ? '' : 'disabled'}>
+            No se lleva stock</label>
+        </div>
+        <div class="hint" style="margin-top:6px">Los que se fabrican contra pedido no llevan stock:
+          en la cotización salen como <b>a pedido</b> y nunca frenan una venta.</div>
+      </section>
+
+      <section class="pd-b">
+        <div class="pd-h">Stock y mínimos por variante</div>
+        <div class="inv-head">
+          <span>Variante</span><span style="text-align:right">Stock</span>
+          <span style="text-align:right">Mínimo</span><span>Reposición</span>
+        </div>
+        ${this.vars.map(v => `<div class="inv-r">
+          <div><b>${UI.esc(this.nombreVar(v))}</b>
+            <div class="vr-sku tnum">${UI.esc(v.sku || global.DB.skuDe(this.p, v))}</div></div>
+          <div><input class="pn" inputmode="numeric" data-stock="${v.id}" value="${v.stock || 0}"
+            ${ed ? '' : 'readonly'}></div>
+          <div><input class="pn" inputmode="numeric" data-min="${v.id}" value="${v.minStock || ''}"
+            placeholder="—" ${ed ? '' : 'readonly'}></div>
+          <div><select data-rep="${v.id}" ${ed ? '' : 'disabled'}>
+            <option value="pedido" ${v.reponer !== 'minimo' ? 'selected' : ''}>Se pide cuando se vende</option>
+            <option value="minimo" ${v.reponer === 'minimo' ? 'selected' : ''}>Mantener un mínimo</option>
+          </select></div>
+        </div>`).join('')}
+        <div class="hint" style="margin-top:9px">${conMin.length
+          ? `<b>${conMin.length}</b> ${conMin.length === 1 ? 'variante mantiene' : 'variantes mantienen'} un mínimo.
+             Cuando el stock baje de ahí va a saltar el pedido de reposición.`
+          : 'Ninguna variante mantiene mínimo: todas se piden cuando se venden.'}</div>
+      </section>`;
+    },
+
+    // De quién se compra y cómo se vende.
+    tabCompraventa() {
+      const p = this.p, r = p.rutas || {}, ed = this.puedeEditar();
+      return this.bloqueProveedores() + `
+      <section class="pd-b">
+        <div class="pd-h">Cómo se pide</div>
+        <div class="rutas">${global.DB.RUTAS.map(x =>
+          `<label class="chk"><input type="checkbox" data-ruta="${x.k}" ${r[x.k] ? 'checked' : ''}
+            ${ed ? '' : 'disabled'}> ${UI.esc(x.label)}</label>`).join('')}</div>
+      </section>
+
+      <section class="pd-b">
+        <div class="pd-h">Cómo se factura</div>
+        <div class="fr"><label for="pd-iva">IVA</label>
+          <select id="pd-iva" ${ed ? '' : 'disabled'}>
+            <option value="21" ${String(p.iva ?? 21) === '21' ? 'selected' : ''}>21 %</option>
+            <option value="10.5" ${String(p.iva) === '10.5' ? 'selected' : ''}>10,5 %</option>
+            <option value="0" ${String(p.iva) === '0' ? 'selected' : ''}>Exento</option>
+          </select></div>
+        <div class="fr"><label for="pd-cfact">Concepto en la factura</label>
+          <input id="pd-cfact" value="${UI.esc(p.conceptoFactura || '')}"
+            placeholder="El nombre del mueble" ${ed ? '' : 'readonly'}></div>
+        <div class="fr"><label></label><span class="hint">En blanco sale el nombre del mueble.</span></div>
+      </section>
+
+      <section class="pd-b">
+        <div class="pd-h">Entrega</div>
+        <label class="chk"><input type="checkbox" id="pd-inst" ${p.instalacion ? 'checked' : ''}
+          ${ed ? '' : 'disabled'}> Requiere instalación</label>
+        <div class="hint">${p.instalacion
+          ? 'En la orden va a saltar solo, con <b>a convenir</b>; el costo se define en Instalaciones.'
+          : 'En la orden sale <b>no requiere instalación</b>, y el vendedor puede editarlo.'}</div>
+        <div class="fr" style="margin-top:9px"><label for="pd-bultos">Bultos por unidad</label>
+          <input id="pd-bultos" inputmode="numeric" value="${UI.esc(p.bultos || '')}"
+            placeholder="1" ${ed ? '' : 'readonly'}></div>
+        <div class="fr"><label></label><span class="hint">Lo usa la subida por escalera, que se cobra
+          por piso y por bulto.</span></div>
+      </section>`;
+    },
+
+    // Lo que necesita fábrica: el plano de cada variante y cómo se hace.
+    tabProduccion() {
+      const ed = this.puedeEditar();
+      const conPlano = this.vars.filter(v => v.imgProd).length;
+      return `<section class="pd-b">
+        <div class="pd-h">Planos de producción
+          <span class="muted">· ${conPlano} de ${this.vars.length} cargados</span></div>
+        <div class="planos">${this.vars.map(v => `<div class="plano">
+          <button class="vimg ${v.imgProd ? 'hay' : ''}" data-img="${v.id}|imgProd"
+            title="Subir el plano de esta variante">
+            ${v.imgProd ? `<img src="${UI.esc(v.imgProd)}" alt="">` : '<span class="vimg-v">📐</span>'}
+            <span class="vimg-e">✎</span></button>
+          <div class="plano-n">${UI.esc(this.nombreVar(v))}</div>
+          <div class="vr-sku tnum">${UI.esc(v.sku || global.DB.skuDe(this.p, v))}</div>
+        </div>`).join('')}</div>
+        <div class="hint" style="margin-top:9px">Es la hoja que se le manda a fábrica. Acepta imagen o PDF.
+          No sale nunca en la cotización del cliente.</div>
+      </section>
+
+      <section class="pd-b">
+        <div class="pd-h">Cómo se hace</div>
+        <label class="lbl-t" for="pd-mat">Materiales y herrajes</label>
+        <textarea id="pd-mat" class="pd-des" rows="2" ${ed ? '' : 'readonly'}
+          placeholder="MDF 18 mm · guías telescópicas · bisagras con freno">${UI.esc(this.p.materiales || '')}</textarea>
+        <label class="lbl-t" for="pd-notaprod" style="margin-top:11px">Notas para fábrica</label>
+        <textarea id="pd-notaprod" class="pd-des" rows="2" ${ed ? '' : 'readonly'}
+          placeholder="Lo que hay que tener en cuenta al fabricarlo.">${UI.esc(this.p.notaProd || '')}</textarea>
+      </section>`;
+    },
+
     tabContabilidad() { return this.bloqueContabilidad(); },
 
     // 1 · Nombre y descripción ---------------------------------------------
@@ -408,53 +525,34 @@
       </section>`;
     },
 
-    // Módulo 4 · Adicionales — todo lo que no es ni qué es el mueble ni cuánto
-    // sale: quién lo ve, cómo se consigue y cómo se entrega.
-    bloqueAdicionales(dentro) {
-      const p = this.p, r = p.rutas || {}, ed = this.puedeEditar();
-      return `<${dentro ? 'div' : 'section class="pd-b"'}>
-        ${dentro ? '' : '<div class="pd-h">Adicionales</div>'}
-        <div class="ad-t">Visibilidad</div>
-        <label class="chk"><input type="checkbox" id="pd-pub" ${p.publicado ? 'checked' : ''}
+    // Quién ve este mueble. Lo demás que estaba acá se fue a las solapas de
+    // Inventario, Compra y venta y Producción.
+    bloqueVisibilidad() {
+      const p = this.p, ed = this.puedeEditar();
+      return `<label class="chk"><input type="checkbox" id="pd-pub" ${p.publicado ? 'checked' : ''}
           ${ed ? '' : 'disabled'}> Mostrar a los vendedores</label>
-        <div class="hint">Oculto no aparece para cotizar. Cada variante además se puede
-          mostrar o esconder por separado.</div>
-
-        <div class="pd-sepl"></div>
-        <div class="ad-t">Cómo se pide</div>
-        <div class="rutas">${global.DB.RUTAS.map(x =>
-          `<label class="chk"><input type="checkbox" data-ruta="${x.k}" ${r[x.k] ? 'checked' : ''}
-            ${ed ? '' : 'disabled'}> ${UI.esc(x.label)}</label>`).join('')}</div>
-
-        <div class="pd-sepl"></div>
-        <div class="ad-t">Entrega</div>
-        <label class="chk"><input type="checkbox" id="pd-inst" ${p.instalacion ? 'checked' : ''}
-          ${ed ? '' : 'disabled'}> Requiere instalación</label>
-        <div class="hint">${p.instalacion
-          ? 'En la orden va a saltar solo, con <b>a convenir</b>; el costo se define en Instalaciones, no acá.'
-          : 'En la orden sale <b>no requiere instalación</b> por default, y el vendedor puede editarlo.'}</div>
-        <div class="fr" style="margin-top:9px"><label for="pd-bultos">Bultos por unidad</label>
-          <input id="pd-bultos" inputmode="numeric" value="${UI.esc(p.bultos || '')}"
-            placeholder="1" ${ed ? '' : 'readonly'}></div>
-        <div class="fr"><label></label><span class="hint">Con cuántos bultos viaja. Es lo que usa
-          la subida por escalera, que se cobra por piso y por bulto.</span></div>
-      </${dentro ? 'div' : 'section'}>`;
+        <div class="hint">Oculto no aparece para cotizar. Cada variante además se puede mostrar o
+          esconder por separado, desde su panel.</div>`;
     },
 
     // 9 · Contabilidad -------------------------------------------------------
+    // El plan de cuentas todavía no existe: cuando esté, estos dos campos pasan
+    // a ser desplegables y en blanco heredan la cuenta de la categoría.
     bloqueContabilidad() {
-      const c = this.p.contabilidad || {};
+      const c = this.p.contabilidad || {}, ed = this.puedeEditar();
       const f = (id, lbl, val) => `<div class="fr"><label for="${id}">${lbl}</label>
         <input id="${id}" value="${UI.esc(val || '')}" placeholder="De la categoría"
-          ${this.puedeEditar() ? '' : 'readonly'}></div>`;
+          ${ed ? '' : 'readonly'}></div>`;
       return `<section class="pd-b">
-        <div class="pd-h">Contabilidad</div>
-        <div class="cz-cols">
-          <div class="cz-col">${f('pd-cta-v', 'Cuando se vende', c.ingresos)}</div>
-          <div class="cz-col">${f('pd-cta-c', 'Cuando se compra', c.gastos)}</div>
-        </div>
-        <div class="hint" style="margin-top:8px">En blanco hereda la cuenta de la categoría. Se termina de
-          enganchar cuando armemos Contabilidad.</div>
+        <div class="pd-h">Imputación contable</div>
+        <div class="banner info">El <b>plan de cuentas</b> todavía no está cargado. Cuando esté, estos
+          dos campos van a ser una lista para elegir, y en blanco heredan la cuenta de la categoría.</div>
+        ${f('pd-cta-v', 'Cuenta de ingreso', c.ingresos)}
+        <div class="fr"><label></label><span class="hint">A dónde va la plata cuando se vende
+          este mueble.</span></div>
+        ${f('pd-cta-c', 'Cuenta de gasto', c.gastos)}
+        <div class="fr"><label></label><span class="hint">Contra qué cuenta se imputa cuando se
+          compra o se fabrica.</span></div>
       </section>`;
     },
 
@@ -526,6 +624,27 @@
       if (g('pd-inst') && ed) g('pd-inst').onchange = e => {
         p.instalacion = e.target.checked; this.guardar(); this.pintar();
       };
+      document.querySelectorAll('[name="pd-track"]').forEach(radio => radio.onchange = () => {
+        if (radio.checked) { p.rastreo = radio.value; this.guardar(); this.pintar(); }
+      });
+      const numv = (attr, campo) => document.querySelectorAll(`[data-${attr}]`).forEach(i => {
+        i.onchange = () => {
+          const v = this.vars.find(x => x.id === Number(i.dataset[attr])); if (!v) return;
+          v[campo] = Math.max(0, Number(String(i.value).replace(/[^\d]/g, '')) || 0);
+          global.DB.guardarVariante(v);
+        };
+      });
+      numv('stock', 'stock'); numv('min', 'minStock');
+      document.querySelectorAll('[data-rep]').forEach(sl => sl.onchange = () => {
+        const v = this.vars.find(x => x.id === Number(sl.dataset.rep)); if (!v) return;
+        v.reponer = sl.value; global.DB.guardarVariante(v); this.pintar();
+      });
+      ['pd-iva', 'pd-cfact', 'pd-mat', 'pd-notaprod'].forEach(id => {
+        const el = g(id); if (!el || !ed) return;
+        const campo = { 'pd-iva': 'iva', 'pd-cfact': 'conceptoFactura',
+          'pd-mat': 'materiales', 'pd-notaprod': 'notaProd' }[id];
+        el.onchange = () => { p[campo] = el.value.trim(); this.guardar(); };
+      });
       const bul = g('pd-bultos');
       if (bul && ed) bul.onchange = () => {
         p.bultos = Math.max(0, Number(String(bul.value).replace(/[^\d]/g, '')) || 0); this.guardar();
@@ -1394,6 +1513,16 @@
         .sim-kv b{font-size:15px;color:var(--navy)}
         .rutas{display:flex;gap:18px;flex-wrap:wrap}
         .ad-t{font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px}
+        .inv-head,.inv-r{display:grid;grid-template-columns:minmax(0,1fr) 88px 88px 210px;
+          gap:9px;align-items:center}
+        .inv-head{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);
+          font-weight:700;padding-bottom:7px;border-bottom:1px solid var(--line)}
+        .inv-r{padding:7px 0;border-bottom:1px solid var(--line-soft);font-size:12.5px}
+        .inv-r b{color:var(--navy)}
+        .inv-r select{font-size:12px;padding:5px 8px}
+        .planos{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+        .plano-n{font-size:12px;font-weight:650;color:var(--navy);margin-top:6px}
+        .planos .vimg{width:100%;height:118px}
         #pd-bultos{max-width:96px}
 
         .pv-back{position:fixed;inset:0;background:rgba(12,22,44,.35);z-index:40}
