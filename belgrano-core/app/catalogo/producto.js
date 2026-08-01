@@ -102,9 +102,9 @@
       { k: 'producto', label: 'Información general' },
       { k: 'costos', label: 'Compra y venta', costos: true },
       { k: 'inventario', label: 'Inventario' },
+      { k: 'otros', label: 'Otros' },
       { k: 'produccion', label: 'Producción' },
       { k: 'documentos', label: 'Documentos' },
-      { k: 'contabilidad', label: 'Contabilidad' },
     ],
     _tab: 'producto',
     solapas() { return this.SOLAPAS.filter(t => !t.costos || this.verCostos()); },
@@ -242,81 +242,140 @@
           </div>
           <div id="pd-vars">${lista.map(fila).join('') || UI.vacio('Ninguna variante coincide.')}</div>
         </div>
-      </section>` + this.bloqueProveedores() + this.bloqueVentaCompra();
+      </section>`;
     },
 
-    // Con quién se compra y cómo se factura. Estaba en su propia solapa; va
-    // acá porque es la misma conversación que el costo y el precio.
-    bloqueVentaCompra() {
-      const p = this.p, r = p.rutas || {}, ed = this.puedeEditar();
-      return `<section class="pd-b">
-        <div class="pd-h">Cómo se pide</div>
-        <div class="rutas">${global.DB.RUTAS.map(x =>
-          `<label class="chk"><input type="checkbox" data-ruta="${x.k}" ${r[x.k] ? 'checked' : ''}
-            ${ed ? '' : 'disabled'}> ${UI.esc(x.label)}</label>`).join('')}</div>
+    // Todo lo que no entra en las otras solapas pero hay que definir igual:
+    // con quién se fabrica, cómo se entrega, cómo se factura y contra qué
+    // cuenta se imputa.
+    tabOtros() {
+      const p = this.p, c = p.contabilidad || {}, ed = this.puedeEditar();
+      return this.bloqueProveedores() + `
+
+      <section class="pd-b">
+        <div class="pd-h">Entrega</div>
+        <label class="chk"><input type="checkbox" id="pd-inst" ${p.instalacion ? 'checked' : ''}
+          ${ed ? '' : 'disabled'}> Requiere instalación</label>
+        <div class="hint">${p.instalacion
+          ? 'En la orden va a saltar solo, con <b>a convenir</b>; el costo se define en Instalaciones, no acá.'
+          : 'En la orden sale <b>no requiere instalación</b> por default, y el vendedor puede editarlo.'}</div>
+        <div class="fr" style="margin-top:11px"><label for="pd-bultos">Bultos para el embalaje</label>
+          <input id="pd-bultos" inputmode="numeric" value="${UI.esc(p.bultos || '')}"
+            placeholder="1" ${ed ? '' : 'readonly'}></div>
+        <div class="fr"><label></label><span class="hint">En cuántos bultos viaja una unidad. Es lo que
+          usa la subida por escalera, que se cobra por piso y por bulto.</span></div>
       </section>
 
       <section class="pd-b">
-        <div class="pd-h">Cómo se factura</div>
-        <div class="fr"><label for="pd-iva">IVA</label>
+        <div class="pd-h">Facturación</div>
+        <div class="fr"><label for="pd-cfact">Concepto en la factura</label>
+          <input id="pd-cfact" value="${UI.esc(p.conceptoFactura || '')}"
+            placeholder="El nombre del mueble" ${ed ? '' : 'readonly'}></div>
+        <div class="fr"><label></label><span class="hint">En blanco sale el nombre del mueble.</span></div>
+        <div class="fr" style="margin-top:9px"><label for="pd-iva">IVA</label>
           <select id="pd-iva" ${ed ? '' : 'disabled'}>
             <option value="21" ${String(p.iva ?? 21) === '21' ? 'selected' : ''}>21 %</option>
             <option value="10.5" ${String(p.iva) === '10.5' ? 'selected' : ''}>10,5 %</option>
             <option value="0" ${String(p.iva) === '0' ? 'selected' : ''}>Exento</option>
           </select></div>
-        <div class="fr"><label for="pd-cfact">Concepto en la factura</label>
-          <input id="pd-cfact" value="${UI.esc(p.conceptoFactura || '')}"
-            placeholder="El nombre del mueble" ${ed ? '' : 'readonly'}></div>
       </section>
 
       <section class="pd-b">
-        <div class="pd-h">Visibilidad y entrega</div>
+        <div class="pd-h">Imputación contable</div>
+        <div class="banner info">El <b>plan de cuentas</b> todavía no está cargado. Cuando esté, estos
+          dos campos van a ser una lista para elegir, y en blanco heredan la cuenta de la categoría.</div>
+        <div class="fr"><label for="pd-cta-v">Cuenta de ingreso</label>
+          <input id="pd-cta-v" value="${UI.esc(c.ingresos || '')}" placeholder="De la categoría"
+            ${ed ? '' : 'readonly'}></div>
+        <div class="fr"><label></label><span class="hint">A dónde va la plata cuando se vende
+          este mueble.</span></div>
+        <div class="fr" style="margin-top:9px"><label for="pd-cta-c">Cuenta de gasto</label>
+          <input id="pd-cta-c" value="${UI.esc(c.gastos || '')}" placeholder="De la categoría"
+            ${ed ? '' : 'readonly'}></div>
+        <div class="fr"><label></label><span class="hint">Contra qué cuenta se imputa cuando se compra
+          o se fabrica.</span></div>
+      </section>
+
+      <section class="pd-b">
+        <div class="pd-h">Visibilidad</div>
         <label class="chk"><input type="checkbox" id="pd-pub" ${p.publicado ? 'checked' : ''}
           ${ed ? '' : 'disabled'}> Mostrar a los vendedores</label>
-        <label class="chk"><input type="checkbox" id="pd-inst" ${p.instalacion ? 'checked' : ''}
-          ${ed ? '' : 'disabled'}> Requiere instalación</label>
-        <div class="fr" style="margin-top:9px"><label for="pd-bultos">Bultos por unidad</label>
-          <input id="pd-bultos" inputmode="numeric" value="${UI.esc(p.bultos || '')}"
-            placeholder="1" ${ed ? '' : 'readonly'}></div>
+        <div class="hint">Oculto no aparece para cotizar. Cada variante además se puede mostrar o
+          esconder por separado.</div>
       </section>`;
     },
 
     // Cómo se rastrea el stock de este mueble y cuánto hay que tener.
+    RASTREO: [
+      { k: 'serie', label: 'Por número de serie único',
+        pie: 'Cada unidad es distinta y lleva su código. Si hay 12 mesas de luz Miami blancas, son 12 unidades distintas y se sabe cuál salió en cada orden.' },
+      { k: 'lote', label: 'Por lotes',
+        pie: 'Las unidades de una misma tanda comparten identificación. Sirve cuando lo que importa es de qué producción salió, no cuál pieza.' },
+      { k: 'cantidad', label: 'Por cantidad',
+        pie: 'Sólo se cuenta cuántas hay. No se puede saber cuál se entregó ni de qué tanda salió.' },
+    ],
+    // Los que se reponen contra pedido no llevan mínimo: el mínimo y la
+    // reposición van de la mano y no tienen sentido por separado.
+    REPO: [
+      { k: 'pedido', label: 'Se pide cuando se vende' },
+      { k: 'minimo', label: 'Mantener un mínimo' },
+    ],
+
     tabInventario() {
       const p = this.p, ed = this.puedeEditar();
+      const modo = p.rastreo || 'serie';
       const conMin = this.vars.filter(v => v.reponer === 'minimo');
+      const lista = this.ordenadas();
+
+      const fila = v => {
+        const min = v.reponer === 'minimo';
+        return `<div class="inv-r ${v.activa === false ? 'off' : ''}">
+          <div><b>${UI.esc(this.nombreVar(v))}</b>
+            <div class="vr-sku tnum">${UI.esc(v.sku || global.DB.skuDe(this.p, v))}</div></div>
+          <div class="num"><input class="pn" inputmode="numeric" data-stock="${v.id}"
+            value="${v.stock || 0}" ${ed ? '' : 'readonly'}></div>
+          <div><select data-rep="${v.id}" ${ed ? '' : 'disabled'}>${this.REPO.map(r =>
+            `<option value="${r.k}" ${(v.reponer === 'minimo' ? 'minimo' : 'pedido') === r.k ? 'selected' : ''}
+              >${UI.esc(r.label)}</option>`).join('')}</select></div>
+          <div class="num"><input class="pn ${min ? '' : 'bloq'}" inputmode="numeric" data-min="${v.id}"
+            value="${min ? (v.minStock || '') : ''}" placeholder="${min ? '0' : '—'}"
+            ${min && ed ? '' : 'readonly'}
+            title="${min ? 'Cuando el stock baje de acá, se repone'
+              : 'Se habilita al poner Mantener un mínimo — o escribí acá y cambia solo'}"></div>
+        </div>`;
+      };
+
+      const r = p.rutas || {};
       return `<section class="pd-b">
-        <div class="pd-h">Cómo se rastrea el stock</div>
-        <div class="rutas">
-          <label class="chk"><input type="radio" name="pd-track" value="variante"
-            ${(p.rastreo || 'variante') === 'variante' ? 'checked' : ''} ${ed ? '' : 'disabled'}>
-            Por variante</label>
-          <label class="chk"><input type="radio" name="pd-track" value="no"
-            ${p.rastreo === 'no' ? 'checked' : ''} ${ed ? '' : 'disabled'}>
-            No se lleva stock</label>
-        </div>
-        <div class="hint" style="margin-top:6px">Los que se fabrican contra pedido no llevan stock:
-          en la cotización salen como <b>a pedido</b> y nunca frenan una venta.</div>
+        <div class="pd-h">Cómo se pide el mueble</div>
+        <div class="rutas">${global.DB.RUTAS.map(x =>
+          `<label class="chk"><input type="checkbox" data-ruta="${x.k}" ${r[x.k] ? 'checked' : ''}
+            ${ed ? '' : 'disabled'}> ${UI.esc(x.label)}</label>`).join('')}</div>
+        <div class="hint" style="margin-top:7px">Puede ser más de una: hay muebles que fabricamos y
+          además compramos terminados cuando no llegamos.</div>
       </section>
 
       <section class="pd-b">
-        <div class="pd-h">Stock y mínimos por variante</div>
-        <div class="inv-head">
-          <span>Variante</span><span style="text-align:right">Stock</span>
-          <span style="text-align:right">Mínimo</span><span>Reposición</span>
+        <div class="pd-h">Cómo se rastrea el stock</div>
+        <div class="rast">${this.RASTREO.map(r => `
+          <label class="rast-o ${modo === r.k ? 'on' : ''}">
+            <input type="radio" name="pd-track" value="${r.k}" ${modo === r.k ? 'checked' : ''}
+              ${ed ? '' : 'disabled'}>
+            <span><b>${UI.esc(r.label)}</b><small>${UI.esc(r.pie)}</small></span>
+          </label>`).join('')}</div>
+        ${modo === 'serie' ? `<div class="hint" style="margin-top:9px">Cada unidad va a necesitar su
+          <b>código de barras</b> para identificarla al entregar. Falta definir cómo se numeran.</div>` : ''}
+      </section>
+
+      <section class="pd-b">
+        <div class="pd-h">Stock y reposición por variante</div>
+        <div class="inv-tabla">
+          <div class="inv-head">
+            <span>Variante</span><span class="num">Stock</span>
+            <span>Cómo se repone</span><span class="num">Mínimo</span>
+          </div>
+          ${lista.map(fila).join('')}
         </div>
-        ${this.vars.map(v => `<div class="inv-r">
-          <div><b>${UI.esc(this.nombreVar(v))}</b>
-            <div class="vr-sku tnum">${UI.esc(v.sku || global.DB.skuDe(this.p, v))}</div></div>
-          <div><input class="pn" inputmode="numeric" data-stock="${v.id}" value="${v.stock || 0}"
-            ${ed ? '' : 'readonly'}></div>
-          <div><input class="pn" inputmode="numeric" data-min="${v.id}" value="${v.minStock || ''}"
-            placeholder="—" ${ed ? '' : 'readonly'}></div>
-          <div><select data-rep="${v.id}" ${ed ? '' : 'disabled'}>
-            <option value="pedido" ${v.reponer !== 'minimo' ? 'selected' : ''}>Se pide cuando se vende</option>
-            <option value="minimo" ${v.reponer === 'minimo' ? 'selected' : ''}>Mantener un mínimo</option>
-          </select></div>
-        </div>`).join('')}
         <div class="hint" style="margin-top:9px">${conMin.length
           ? `<b>${conMin.length}</b> ${conMin.length === 1 ? 'variante mantiene' : 'variantes mantienen'} un mínimo.
              Cuando el stock baje de ahí va a saltar el pedido de reposición.`
@@ -667,27 +726,6 @@
       </section>`;
     },
 
-    // 9 · Contabilidad -------------------------------------------------------
-    // El plan de cuentas todavía no existe: cuando esté, estos dos campos pasan
-    // a ser desplegables y en blanco heredan la cuenta de la categoría.
-    bloqueContabilidad() {
-      const c = this.p.contabilidad || {}, ed = this.puedeEditar();
-      const f = (id, lbl, val) => `<div class="fr"><label for="${id}">${lbl}</label>
-        <input id="${id}" value="${UI.esc(val || '')}" placeholder="De la categoría"
-          ${ed ? '' : 'readonly'}></div>`;
-      return `<section class="pd-b">
-        <div class="pd-h">Imputación contable</div>
-        <div class="banner info">El <b>plan de cuentas</b> todavía no está cargado. Cuando esté, estos
-          dos campos van a ser una lista para elegir, y en blanco heredan la cuenta de la categoría.</div>
-        ${f('pd-cta-v', 'Cuenta de ingreso', c.ingresos)}
-        <div class="fr"><label></label><span class="hint">A dónde va la plata cuando se vende
-          este mueble.</span></div>
-        ${f('pd-cta-c', 'Cuenta de gasto', c.gastos)}
-        <div class="fr"><label></label><span class="hint">Contra qué cuenta se imputa cuando se
-          compra o se fabrica.</span></div>
-      </section>`;
-    },
-
     // ---- Interacción -------------------------------------------------------
     enganchar() {
       const g = id => document.getElementById(id);
@@ -773,7 +811,27 @@
       numv('stock', 'stock'); numv('min', 'minStock');
       document.querySelectorAll('[data-rep]').forEach(sl => sl.onchange = () => {
         const v = this.vars.find(x => x.id === Number(sl.dataset.rep)); if (!v) return;
-        v.reponer = sl.value; global.DB.guardarVariante(v); this.pintar();
+        v.reponer = sl.value;
+        // Si deja de mantener mínimo, el número que hubiera quedado no sirve.
+        if (v.reponer !== 'minimo') v.minStock = 0;
+        global.DB.guardarVariante(v); this.pintar();
+      });
+      // Escribir un mínimo en una variante que se pide cuando se vende no
+      // puede ser un error silencioso: cambia sola la reposición, porque son
+      // la misma decisión.
+      document.querySelectorAll('[data-min]').forEach(i => {
+        if (!ed) return;
+        const abrir = () => {
+          const v = this.vars.find(x => x.id === Number(i.dataset.min));
+          if (!v || v.reponer === 'minimo') return;
+          v.reponer = 'minimo'; global.DB.guardarVariante(v);
+          UI.aviso('Pasó a mantener un mínimo', 'ok');
+          this.pintar();
+          const otro = document.querySelector(`[data-min="${v.id}"]`);
+          if (otro) otro.focus();
+        };
+        i.onfocus = abrir;
+        i.onclick = abrir;
       });
       ['pd-iva', 'pd-cfact', 'pd-mat', 'pd-notaprod'].forEach(id => {
         const el = g(id); if (!el || !ed) return;
@@ -1805,8 +1863,21 @@
         .sim-kv b{font-size:15px;color:var(--navy)}
         .rutas{display:flex;gap:18px;flex-wrap:wrap}
         .ad-t{font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px}
-        .inv-head,.inv-r{display:grid;grid-template-columns:minmax(0,1fr) 88px 88px 210px;
-          gap:9px;align-items:center}
+        .inv-tabla{overflow-x:auto;margin:0 -14px;padding:0 14px}
+        .inv-head,.inv-r{display:grid;min-width:720px;
+          grid-template-columns:minmax(200px,1fr) 88px 216px 96px;gap:10px;align-items:center}
+        .inv-r.off{opacity:.5}
+        /* El mínimo bloqueado se ve apagado, pero se puede tocar: al escribir
+           ahí la reposición cambia sola. */
+        .pn.bloq{background:var(--panel-2);color:var(--muted);border-style:dashed}
+        .rast{display:flex;flex-direction:column;gap:7px}
+        .rast-o{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);
+          border-radius:9px;padding:9px 11px;cursor:pointer;transition:.12s}
+        .rast-o:hover{border-color:var(--brand)}
+        .rast-o.on{border-color:var(--brand);background:var(--brand-soft)}
+        .rast-o input{width:15px;height:15px;accent-color:var(--brand);flex:none;margin-top:2px}
+        .rast-o b{display:block;font-size:12.5px;color:var(--navy)}
+        .rast-o small{font-size:11.5px;color:var(--muted);line-height:1.4}
         .inv-head{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);
           font-weight:700;padding-bottom:7px;border-bottom:1px solid var(--line)}
         .inv-r{padding:7px 0;border-bottom:1px solid var(--line-soft);font-size:12.5px}

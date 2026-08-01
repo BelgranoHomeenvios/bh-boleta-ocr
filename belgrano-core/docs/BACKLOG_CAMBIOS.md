@@ -415,6 +415,35 @@ Todo en **una sola columna**, un bloque abajo del otro, y en modo edición.
   muebles publicados desde Inventario). **Producción ve todo menos costo,
   markup, margen y ganancia**, y sólo lee.
 
+### Lote 13 — APLICADO (Inventario y solapa Otros)
+
+Las solapas quedan en: **Información general · Compra y venta · Inventario ·
+Otros · Producción · Documentos**.
+
+**Inventario**
+- ✅ 250. Arranca con **cómo se pide el mueble** (lo fabricamos · lo compramos
+  terminado · se repone contra pedido), que es lo que define si el stock tiene
+  sentido siquiera. Puede ser más de una.
+- ✅ 251. **Cómo se rastrea el stock**: por **número de serie único** (default),
+  por **lotes** o por **cantidad**. Cada mueble nuestro es distinto — si hay 12
+  mesas de luz Miami blancas son 12 unidades distintas y hay que saber cuál
+  salió en cada orden.
+- ✅ 252. Con serie único avisa que **cada unidad va a necesitar su código de
+  barras**, y que falta definir cómo se numeran.
+- ✅ 253. La tabla va **Variante · Stock · Cómo se repone · Mínimo**, en ese
+  orden: primero la decisión, después el número.
+- ✅ 254. El **mínimo queda bloqueado** si la variante se pide cuando se vende.
+  Si igual se escribe ahí, **la reposición cambia sola** a "mantener un
+  mínimo": son la misma decisión. Y al volver a "se pide cuando se vende" el
+  número se limpia, para no dejar un mínimo huérfano.
+
+**Solapa Otros**
+- ✅ 255. Junta lo que hay que definir pero no entra en las otras: proveedores
+  que lo fabrican, si requiere instalación, **bultos para el embalaje**,
+  concepto e **IVA de la factura**, **cuenta de ingreso y de gasto**, y
+  visibilidad. La solapa Contabilidad desaparece: sus dos campos viven acá.
+- ✅ 256. **Compra y venta** queda sólo con la tabla de costo y precio.
+
 ### Lote 12 — APLICADO (Cierre de Información general · Documentos · Compra y venta)
 
 **Propiedades**

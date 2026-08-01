@@ -565,6 +565,9 @@
     _defProd(p) {
       return {
         proveedores: [], rutas: { fabricar: true }, instalacion: false,
+        // Cada mueble es distinto: 12 mesas de luz iguales son 12 unidades
+        // distintas, y hay que saber cuál salió en cada orden.
+        rastreo: 'serie',
         publicado: true, markupObj: this.MARKUP_OBJETIVO,
         contabilidad: { ingresos: '', gastos: '' },   // vacío = hereda de la categoría
         propiedades: ['medida', 'estructura', 'frente'],
