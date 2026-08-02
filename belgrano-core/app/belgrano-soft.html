@@ -409,7 +409,7 @@ tr:hover td{background:var(--panel-2)}
         desc: 'Cómoda de 4 cajones con guías de extracción total y tiradores embutidos. El clásico de la línea Amberes.',
         alto: 0.85, prof: 0.45, materiales: 'MDF 18 mm laqueado · guías telescópicas · tiradores de aluminio', dias: 32,
         proveedores: [{ nombre: 'Tony' }, { nombre: 'Andrés' }, { nombre: 'Luciano' }],
-        rutas: { fabricar: true }, instalacion: false },
+        obtencion: 'dibujo', instalacion: false },
       { id: 4, categoria_id: 2, nombre: 'CÓMODA OLIVER 60', publicado_tn: true, sku: 'CO-OLI-60',
         desc: 'Seis cajones sobre patas de madera maciza. Frente ranurado, sin tiradores a la vista.',
         alto: 0.90, prof: 0.45, materiales: 'MDF 18 mm · patas de paraíso macizo · guías telescópicas', dias: 35 },
@@ -419,7 +419,7 @@ tr:hover td{background:var(--panel-2)}
       { id: 2, categoria_id: 3, nombre: 'PLACARD OLIVER', publicado_tn: true, sku: 'PL-OLI',
         desc: 'Placard de dos y tres puertas con interior armado: barral, estantes y cajonera.',
         alto: 2.10, prof: 0.55, materiales: 'MDF 18 mm · barral cromado · bisagras con freno', dias: 40,
-        proveedores: [{ nombre: 'Tony' }], rutas: { fabricar: true, pedido: true }, instalacion: true },
+        proveedores: [{ nombre: 'Tony' }], obtencion: 'dibujo', instalacion: true },
       { id: 6, categoria_id: 3, nombre: 'PLACARD AMBERES 2 PUERTAS', publicado_tn: true, sku: 'PL-AMB-2P',
         desc: 'Dos puertas batientes con cajonera interna de tres cajones y estante alto.',
         alto: 2.00, prof: 0.55, materiales: 'MDF 18 mm laqueado · bisagras con freno', dias: 40 },
@@ -442,7 +442,7 @@ tr:hover td{background:var(--panel-2)}
         desc: 'Mueble de TV de 1,60 con cuatro cajones y frente ranurado. La base se retira en los cuatro lados y el corte de la tapa es a 45°.',
         alto: 0.55, prof: 0.40, materiales: 'MDF 18 mm · frente ranurado · corte 45° · guías telescópicas', dias: 32,
         proveedores: [{ nombre: 'Tony' }, { nombre: 'Andrés' }],
-        rutas: { fabricar: true }, instalacion: false },
+        obtencion: 'dibujo', instalacion: false },
       { id: 11, categoria_id: 7, nombre: 'RACK OSLO 1.80', publicado_tn: true, sku: 'RK-OSL-180',
         desc: 'Dos cajones y un módulo abierto, sobre patas de madera. La versión larga del living Oslo.',
         alto: 0.48, prof: 0.40, materiales: 'MDF 18 mm · patas de paraíso macizo · guías telescópicas', dias: 32 },
@@ -768,16 +768,20 @@ tr:hover td{background:var(--panel-2)}
       return nueva;
     },
 
-    // Rutas de abastecimiento: un mueble puede tener más de una.
-    RUTAS: [
-      { k: 'fabricar', label: 'Lo fabricamos' },
-      { k: 'comprar', label: 'Lo compramos terminado' },
-      { k: 'pedido', label: 'Se repone contra pedido' },
+    // Con qué se le pide al proveedor. No es de dónde sale el mueble —eso es
+    // siempre contra pedido— sino qué papel hay que mandarle para que lo haga.
+    OBTENCION: [
+      { k: 'dibujo', label: 'Se pide por dibujo',
+        pie: 'Se le manda el plano de producción de la variante. Sin el plano cargado, el pedido no se puede armar.' },
+      { k: 'planilla', label: 'Se pide por planilla',
+        pie: 'Se le manda la planilla de pedido con las medidas y los materiales, sin plano.' },
+      { k: 'ambos', label: 'Se pide por dibujo y planilla',
+        pie: 'Necesita las dos cosas: el plano y la planilla.' },
     ],
     // Lo que todo mueble tiene aunque no se haya cargado todavía.
     _defProd(p) {
       return {
-        proveedores: [], rutas: { fabricar: true }, instalacion: false,
+        proveedores: [], obtencion: 'dibujo', dosProveedores: false, instalacion: false,
         // Cada mueble es distinto: 12 mesas de luz iguales son 12 unidades
         // distintas, y hay que saber cuál salió en cada orden.
         rastreo: 'serie',
@@ -2152,7 +2156,6 @@ tr:hover td{background:var(--panel-2)}
     // qué variantes salen de eso · el resto.
     tabProducto() {
       const cs = this.cats(), ps = this.props().filter(x => x.usados.length);
-      const r = this.p.rutas || {};
       return this.modulo('mueble', 1, 'El mueble',
           this.p.nombre, this.bloqueNombre(), !!this.p.nombre)
         + this.modulo('catprop', 2, 'Categorías y propiedades',
@@ -2185,49 +2188,65 @@ tr:hover td{background:var(--panel-2)}
       const ejes = this.props();
       const f = this._fVar.trim().toLowerCase();
       const lista = this.ordenadas(this.vars.filter(v => !f || this.nombreVar(v).toLowerCase().includes(f)));
-      const medidas = (global.DB.propiedad('medida') || { valores: [] }).valores;
+      this._abiertos = this._abiertos || new Set();
 
       const fila = v => {
         const ef = this.efectivoDe(v);
         const mk = global.DB.markupDe(v.costo, ef);
         const mg = global.DB.margenDe(v.costo, ef);
         const banda = global.DB.bandaDe(mk);
-        const norm = x => String(x || '').replace(',', '.');
-        const act = norm(v.medidaCosteo || v.medida);
-        const opts = medidas.some(m => norm(m) === act) ? medidas : [v.medidaCosteo || v.medida, ...medidas];
+        // Los números bajan de la plantilla de precios. Se muestran, no se
+        // escriben: recién con el lápiz se pisan para esta variante.
+        const abierto = this._abiertos.has(v.id);
+        const celda = (attr, val) => abierto
+          ? `<div class="cv-n"><input class="pn" inputmode="numeric" data-${attr}="${v.id}"
+              value="${val || ''}" placeholder="—" ${ed ? '' : 'readonly'}></div>`
+          : `<div class="cv-n"><span class="cv-fijo ${v.pisado ? 'pisado' : ''}"
+              title="${v.pisado ? 'Pisado a mano en este mueble' : 'Viene de la plantilla de precios'}"
+              >${val ? UI.pesos(val) : '—'}</span></div>`;
         return `<div class="cv-r ${v.activa === false ? 'off' : ''}" data-v="${v.id}">
           ${ejes.map(pr => `<div class="cv-p">${UI.esc(v[pr.k] || '—')}</div>`).join('')}
-          <div class="cv-n"><input class="pn" inputmode="numeric" data-costo="${v.id}"
-            value="${v.costo || ''}" placeholder="—" ${ed ? '' : 'readonly'}></div>
-          <div class="cv-n"><input class="pn" inputmode="numeric" data-efec="${v.id}"
-            value="${ef || ''}" placeholder="—" ${ed ? '' : 'readonly'}></div>
-          <div class="cv-n"><span class="cv-lista tnum" data-lista="${v.id}">${UI.pesos(this.listaDe(ef))}</span></div>
-          <div class="cv-n"><span class="tnum" data-marg="${v.id}">${mg ? mg.toFixed(1).replace('.', ',') + ' %' : '—'}</span></div>
+          ${celda('costo', v.costo)}
+          ${celda('efec', ef)}
+          <div class="cv-n"><span class="tnum" data-marg="${v.id}">${
+            mg ? mg.toFixed(1).replace('.', ',') + ' %' : '—'}</span></div>
           <div class="cv-n"><span class="mk ${banda.pill}" data-mk="${v.id}">${
             mk ? mk.toFixed(2).replace('.', ',') + 'x' : '—'}</span></div>
-          <div><select data-medc="${v.id}" ${ed ? '' : 'disabled'}>${opts.map(m =>
-            `<option ${norm(m) === act ? 'selected' : ''}>${UI.esc(m)}</option>`).join('')}</select></div>
+          <div class="cv-a">
+            ${ed ? `<button class="lx ${abierto ? 'on' : ''}" data-editar="${v.id}"
+              title="${abierto ? 'Listo' : 'Pisar el precio de esta variante'}">${abierto ? '✓' : '✏️'}</button>` : ''}
+            <button class="lx" data-abrir="${v.id}" title="Ver todo">⋯</button>
+          </div>
         </div>`;
       };
 
+      const pisados = this.vars.filter(v => v.pisado).length;
       return `<section class="pd-b">
-        <div class="pd-h">Costo y precio por variante
+        <div class="banner info">El costo y el precio salen de la <b>plantilla de precios</b>, para no
+          cargarlos mueble por mueble y poder compararlos entre productos parecidos. Acá se ven, y con
+          el lápiz se pisan sólo para este mueble.
+          <b>El módulo Precios todavía no está hecho</b> — se arma cuando cerremos esta parte.</div>
+
+        <div class="pd-h" style="margin-top:12px">Costo y precio por variante
           <span class="muted">(${this.vars.length})</span>
           <span class="pill ${this.estado().pill}" style="float:right">${UI.esc(this.estado().label)}</span></div>
         <div class="vr-tools">
           <input id="pd-fvar" class="busca" placeholder="Filtrar…" value="${UI.esc(this._fVar)}">
           <div class="sp"></div>
-          <span class="hint">El de lista sale solo: efectivo ÷ ${(100 - global.DB.descuentoDe('efectivo'))}%</span>
+          <span class="hint">${pisados
+            ? `<b>${pisados}</b> ${pisados === 1 ? 'pisada' : 'pisadas'} a mano`
+            : 'Todas vienen de la plantilla'}</span>
         </div>
         <div class="cv-tabla" style="--ejes:${ejes.length}">
           <div class="cv-h">
             ${ejes.map(pr => `<span>${UI.esc(pr.nombre)}</span>`).join('')}
             <span class="num">Costo</span><span class="num">P. efectivo</span>
-            <span class="num">P. de lista</span><span class="num">Margen</span>
-            <span class="num">Markup</span><span>Medida de costeo</span>
+            <span class="num">Margen</span><span class="num">Markup</span><span></span>
           </div>
           <div id="pd-vars">${lista.map(fila).join('') || UI.vacio('Ninguna variante coincide.')}</div>
         </div>
+        <div class="hint" style="margin-top:9px">El <b>precio de lista</b> y la <b>medida de costeo</b>
+          están en el panel de cada variante: se abre con los tres puntitos.</div>
       </section>`;
     },
 
@@ -2312,64 +2331,134 @@ tr:hover td{background:var(--panel-2)}
     tabInventario() {
       const p = this.p, ed = this.puedeEditar();
       const modo = p.rastreo || 'serie';
-      const conMin = this.vars.filter(v => v.reponer === 'minimo');
+      const obt = p.obtencion || 'dibujo';
+      const cual = global.DB.OBTENCION.find(x => x.k === obt) || global.DB.OBTENCION[0];
+      const elegido = this.RASTREO.find(x => x.k === modo) || this.RASTREO[0];
+      const conMin = this.vars.filter(v => (v.minStock || 0) > 0);
+      const faltan = conMin.filter(v => (v.stock || 0) < v.minStock);
       const lista = this.ordenadas();
 
-      const fila = v => {
-        const min = v.reponer === 'minimo';
-        return `<div class="inv-r ${v.activa === false ? 'off' : ''}">
-          <div><b>${UI.esc(this.nombreVar(v))}</b>
-            <div class="vr-sku tnum">${UI.esc(v.sku || global.DB.skuDe(this.p, v))}</div></div>
-          <div class="num"><input class="pn" inputmode="numeric" data-stock="${v.id}"
-            value="${v.stock || 0}" ${ed ? '' : 'readonly'}></div>
-          <div><select data-rep="${v.id}" ${ed ? '' : 'disabled'}>${this.REPO.map(r =>
-            `<option value="${r.k}" ${(v.reponer === 'minimo' ? 'minimo' : 'pedido') === r.k ? 'selected' : ''}
-              >${UI.esc(r.label)}</option>`).join('')}</select></div>
-          <div class="num"><input class="pn ${min ? '' : 'bloq'}" inputmode="numeric" data-min="${v.id}"
-            value="${min ? (v.minStock || '') : ''}" placeholder="${min ? '0' : '—'}"
-            ${min && ed ? '' : 'readonly'}
-            title="${min ? 'Cuando el stock baje de acá, se repone'
-              : 'Se habilita al poner Mantener un mínimo — o escribí acá y cambia solo'}"></div>
-        </div>`;
-      };
-
-      const r = p.rutas || {};
       return `<section class="pd-b">
-        <div class="pd-h">Cómo se pide el mueble</div>
-        <div class="rutas">${global.DB.RUTAS.map(x =>
-          `<label class="chk"><input type="checkbox" data-ruta="${x.k}" ${r[x.k] ? 'checked' : ''}
-            ${ed ? '' : 'disabled'}> ${UI.esc(x.label)}</label>`).join('')}</div>
-        <div class="hint" style="margin-top:7px">Puede ser más de una: hay muebles que fabricamos y
-          además compramos terminados cuando no llegamos.</div>
+        <div class="pd-h">Cómo se le pide al proveedor</div>
+        <div class="fr"><label for="pd-obt">Se pide</label>
+          <select id="pd-obt" ${ed ? '' : 'disabled'}>${global.DB.OBTENCION.map(x =>
+            `<option value="${x.k}" ${obt === x.k ? 'selected' : ''}>${UI.esc(x.label)}</option>`).join('')}</select></div>
+        <div class="fr"><label></label><span class="hint">${UI.esc(cual.pie)}</span></div>
+        ${obt !== 'planilla' && !this.vars.every(v => v.imgProd)
+          ? `<div class="banner warn" style="margin-top:9px">Se pide por dibujo y
+             <b>${this.vars.filter(v => !v.imgProd).length}</b> de ${this.vars.length} variantes no tienen
+             el plano cargado. Se suben en <b>Producción</b>.</div>` : ''}
+        <label class="chk" style="margin-top:11px"><input type="checkbox" id="pd-dos"
+          ${p.dosProveedores ? 'checked' : ''} ${ed ? '' : 'disabled'}>
+          Se necesitan <b>dos proveedores</b> para hacerlo</label>
+        <div class="hint">${p.dosProveedores
+          ? 'Uno solo no lo termina. Cargá los dos en <b>Otros → Proveedores</b>; cuando armemos Producción vamos a ver cómo se anota cuál hace qué parte.'
+          : 'Marcalo si un proveedor solo no lo termina: Producción no puede dar por listo un mueble al que le falta la mitad.'}</div>
+        <div class="pd-sepl"></div>
+        <div class="fr"><label for="pd-track">Cómo se rastrea el stock</label>
+          <select id="pd-track" ${ed ? '' : 'disabled'}>${this.RASTREO.map(x =>
+            `<option value="${x.k}" ${modo === x.k ? 'selected' : ''}>${UI.esc(x.label)}</option>`).join('')}</select></div>
+        <div class="fr"><label></label><span class="hint">${UI.esc(elegido.pie)}${modo === 'serie'
+          ? ' Cada unidad va a necesitar su <b>código de barras</b>; falta definir cómo se numeran.' : ''}</span></div>
       </section>
 
       <section class="pd-b">
-        <div class="pd-h">Cómo se rastrea el stock</div>
-        <div class="rast">${this.RASTREO.map(r => `
-          <label class="rast-o ${modo === r.k ? 'on' : ''}">
-            <input type="radio" name="pd-track" value="${r.k}" ${modo === r.k ? 'checked' : ''}
-              ${ed ? '' : 'disabled'}>
-            <span><b>${UI.esc(r.label)}</b><small>${UI.esc(r.pie)}</small></span>
-          </label>`).join('')}</div>
-        ${modo === 'serie' ? `<div class="hint" style="margin-top:9px">Cada unidad va a necesitar su
-          <b>código de barras</b> para identificarla al entregar. Falta definir cómo se numeran.</div>` : ''}
-      </section>
-
-      <section class="pd-b">
-        <div class="pd-h">Stock y reposición por variante</div>
+        <div class="pd-h">Stock por variante</div>
         <div class="inv-tabla">
           <div class="inv-head">
             <span>Variante</span><span class="num">Stock</span>
-            <span>Cómo se repone</span><span class="num">Mínimo</span>
+            <span class="num">Stock mínimo deseado</span><span></span>
           </div>
-          ${lista.map(fila).join('')}
+          ${lista.map(v => {
+            const min = Number(v.minStock) || 0;
+            const falta = min > 0 && (v.stock || 0) < min;
+            return `<div class="inv-r ${v.activa === false ? 'off' : ''}">
+              <div><b>${UI.esc(this.nombreVar(v))}</b>
+                <div class="vr-sku tnum">${UI.esc(v.sku || global.DB.skuDe(this.p, v))}</div></div>
+              <div class="num"><input class="pn" inputmode="numeric" data-stock="${v.id}"
+                value="${v.stock || 0}" ${ed ? '' : 'readonly'}></div>
+              <div class="num"><input class="pn" inputmode="numeric" data-min="${v.id}"
+                value="${min || ''}" placeholder="—" ${ed ? '' : 'readonly'}></div>
+              <div>${falta
+                ? `<span class="pill warn">faltan ${min - (v.stock || 0)}</span>`
+                : (min ? '<span class="pill ok">cubierto</span>' : '')}</div>
+            </div>`;
+          }).join('')}
         </div>
-        <div class="hint" style="margin-top:9px">${conMin.length
-          ? `<b>${conMin.length}</b> ${conMin.length === 1 ? 'variante mantiene' : 'variantes mantienen'} un mínimo.
-             Cuando el stock baje de ahí va a saltar el pedido de reposición.`
-          : 'Ninguna variante mantiene mínimo: todas se piden cuando se venden.'}</div>
+        <div class="hint" style="margin-top:9px">Todo se repone cuando se vende. El <b>mínimo deseado</b>
+          es aparte: lo que querés tener siempre en el depósito, aunque nadie lo haya pedido.</div>
+        ${conMin.length ? `<div class="banner ${faltan.length ? 'warn' : 'info'}" style="margin-top:10px">
+          ${faltan.length
+            ? `<b>${faltan.length}</b> ${faltan.length === 1 ? 'variante está' : 'variantes están'} por debajo del mínimo.
+               Cuando enganchemos <b>Producción</b>, esto va a generar el pedido solo.`
+            : `<b>${conMin.length}</b> ${conMin.length === 1 ? 'variante tiene' : 'variantes tienen'} mínimo y
+               ${conMin.length === 1 ? 'está cubierta' : 'están cubiertas'}.`}
+        </div>` : ''}
       </section>`;
     },
+
+    // Todo lo que no entra en las otras solapas pero hay que definir igual:
+    // con quién se fabrica, cómo se entrega, cómo se factura y contra qué
+    // cuenta se imputa.
+    tabOtros() {
+      const p = this.p, c = p.contabilidad || {}, ed = this.puedeEditar();
+      return this.bloqueProveedores() + `
+
+      <section class="pd-b">
+        <div class="pd-h">Facturación</div>
+        <div class="fr"><label for="pd-cfact">Concepto en la factura</label>
+          <input id="pd-cfact" value="${UI.esc(p.conceptoFactura || '')}"
+            placeholder="El nombre del mueble" ${ed ? '' : 'readonly'}></div>
+        <div class="fr"><label></label><span class="hint">En blanco sale el nombre del mueble.</span></div>
+        <div class="fr" style="margin-top:9px"><label for="pd-iva">IVA</label>
+          <select id="pd-iva" ${ed ? '' : 'disabled'}>
+            <option value="21" ${String(p.iva ?? 21) === '21' ? 'selected' : ''}>21 %</option>
+            <option value="10.5" ${String(p.iva) === '10.5' ? 'selected' : ''}>10,5 %</option>
+            <option value="0" ${String(p.iva) === '0' ? 'selected' : ''}>Exento</option>
+          </select></div>
+      </section>
+
+      <section class="pd-b">
+        <div class="pd-h">Imputación contable</div>
+        <div class="banner info">El <b>plan de cuentas</b> todavía no está cargado. Cuando esté, estos
+          dos campos van a ser una lista para elegir, y en blanco heredan la cuenta de la categoría.</div>
+        <div class="fr"><label for="pd-cta-v">Cuenta de ingreso</label>
+          <input id="pd-cta-v" value="${UI.esc(c.ingresos || '')}" placeholder="De la categoría"
+            ${ed ? '' : 'readonly'}></div>
+        <div class="fr"><label></label><span class="hint">A dónde va la plata cuando se vende
+          este mueble.</span></div>
+        <div class="fr" style="margin-top:9px"><label for="pd-cta-c">Cuenta de gasto</label>
+          <input id="pd-cta-c" value="${UI.esc(c.gastos || '')}" placeholder="De la categoría"
+            ${ed ? '' : 'readonly'}></div>
+        <div class="fr"><label></label><span class="hint">Contra qué cuenta se imputa cuando se compra
+          o se fabrica.</span></div>
+      </section>
+
+      <section class="pd-b">
+        <div class="pd-h">Visibilidad</div>
+        <label class="chk"><input type="checkbox" id="pd-pub" ${p.publicado ? 'checked' : ''}
+          ${ed ? '' : 'disabled'}> Mostrar a los vendedores</label>
+        <div class="hint">Oculto no aparece para cotizar. Cada variante además se puede mostrar o
+          esconder por separado.</div>
+      </section>`;
+    },
+
+    // Cómo se rastrea el stock de este mueble y cuánto hay que tener.
+    RASTREO: [
+      { k: 'serie', label: 'Por número de serie único',
+        pie: 'Cada unidad es distinta y lleva su código. Si hay 12 mesas de luz Miami blancas, son 12 unidades distintas y se sabe cuál salió en cada orden.' },
+      { k: 'lote', label: 'Por lotes',
+        pie: 'Las unidades de una misma tanda comparten identificación. Sirve cuando lo que importa es de qué producción salió, no cuál pieza.' },
+      { k: 'cantidad', label: 'Por cantidad',
+        pie: 'Sólo se cuenta cuántas hay. No se puede saber cuál se entregó ni de qué tanda salió.' },
+    ],
+    // Los que se reponen contra pedido no llevan mínimo: el mínimo y la
+    // reposición van de la mano y no tienen sentido por separado.
+    REPO: [
+      { k: 'pedido', label: 'Se pide cuando se vende' },
+      { k: 'minimo', label: 'Mantener un mínimo' },
+    ],
+
 
     // Lo que necesita fábrica: el plano de cada variante y cómo se hace.
     tabProduccion() {
@@ -2770,15 +2859,15 @@ tr:hover td{background:var(--panel-2)}
       }
       this.engancharVars();
 
-      document.querySelectorAll('[data-ruta]').forEach(c => c.onchange = () => {
-        p.rutas = p.rutas || {}; p.rutas[c.dataset.ruta] = c.checked; this.guardar();
-      });
+      const obt = g('pd-obt');
+      if (obt && ed) obt.onchange = () => { p.obtencion = obt.value; this.guardar(); this.pintar(); };
+      const dos = g('pd-dos');
+      if (dos && ed) dos.onchange = () => { p.dosProveedores = dos.checked; this.guardar(); this.pintar(); };
       if (g('pd-inst') && ed) g('pd-inst').onchange = e => {
         p.instalacion = e.target.checked; this.guardar(); this.pintar();
       };
-      document.querySelectorAll('[name="pd-track"]').forEach(radio => radio.onchange = () => {
-        if (radio.checked) { p.rastreo = radio.value; this.guardar(); this.pintar(); }
-      });
+      const track = g('pd-track');
+      if (track && ed) track.onchange = () => { p.rastreo = track.value; this.guardar(); this.pintar(); };
       const numv = (attr, campo) => document.querySelectorAll(`[data-${attr}]`).forEach(i => {
         i.onchange = () => {
           const v = this.vars.find(x => x.id === Number(i.dataset[attr])); if (!v) return;
@@ -2794,22 +2883,17 @@ tr:hover td{background:var(--panel-2)}
         if (v.reponer !== 'minimo') v.minStock = 0;
         global.DB.guardarVariante(v); this.pintar();
       });
-      // Escribir un mínimo en una variante que se pide cuando se vende no
-      // puede ser un error silencioso: cambia sola la reposición, porque son
-      // la misma decisión.
+      // El mínimo es sólo un número. La reposición se deriva de él, porque el
+      // resto del sistema ya la mira: con mínimo cargado la variante se
+      // repone sola, sin mínimo se pide cuando se vende.
       document.querySelectorAll('[data-min]').forEach(i => {
         if (!ed) return;
-        const abrir = () => {
-          const v = this.vars.find(x => x.id === Number(i.dataset.min));
-          if (!v || v.reponer === 'minimo') return;
-          v.reponer = 'minimo'; global.DB.guardarVariante(v);
-          UI.aviso('Pasó a mantener un mínimo', 'ok');
-          this.pintar();
-          const otro = document.querySelector(`[data-min="${v.id}"]`);
-          if (otro) otro.focus();
+        i.onchange = () => {
+          const v = this.vars.find(x => x.id === Number(i.dataset.min)); if (!v) return;
+          v.minStock = Math.max(0, Number(String(i.value).replace(/[^\d]/g, '')) || 0);
+          v.reponer = v.minStock > 0 ? 'minimo' : 'pedido';
+          global.DB.guardarVariante(v); this.pintar();
         };
-        i.onfocus = abrir;
-        i.onclick = abrir;
       });
       ['pd-iva', 'pd-cfact', 'pd-mat', 'pd-notaprod'].forEach(id => {
         const el = g(id); if (!el || !ed) return;
@@ -2868,12 +2952,19 @@ tr:hover td{background:var(--panel-2)}
         const v = this.vars.find(x => x.id === Number(i.dataset.efec)); if (!v) return;
         v.efectivo = Math.max(0, Number(String(i.value).replace(/[^\d]/g, '')) || 0);
         v.precio = this.listaDe(v.efectivo);   // el de lista se guarda derivado
+        v.pisado = true;                        // se apartó de la plantilla
         global.DB.guardarVariante(v); refrescarCV(v);
       });
       document.querySelectorAll('[data-costo]').forEach(i => {
         const antes = i.onchange;
         i.onchange = () => { if (antes) antes();
           const v = this.vars.find(x => x.id === Number(i.dataset.costo)); if (v) refrescarCV(v); };
+      });
+      document.querySelectorAll('[data-editar]').forEach(b => b.onclick = () => {
+        const id = Number(b.dataset.editar);
+        this._abiertos = this._abiertos || new Set();
+        if (this._abiertos.has(id)) this._abiertos.delete(id); else this._abiertos.add(id);
+        this.pintar();
       });
       document.querySelectorAll('[data-medc]').forEach(sl => sl.onchange = () => {
         const v = this.vars.find(x => x.id === Number(sl.dataset.medc)); if (!v) return;
@@ -2990,73 +3081,95 @@ tr:hover td{background:var(--panel-2)}
     },
 
     // ---- Panel de la variante ----------------------------------------------
+    // El panel de una variante: todo lo suyo en un solo lado, sin salir de la
+    // tabla. Se pasa de una a otra con las flechas.
     abrirVariante(id) {
       const v = this.vars.find(x => x.id === id); if (!v) return;
       this._abierta = id;
-      const ed = this.puedeEditar(), cost = this.muestraCostos();
-      const mk = this.markupDe(v), banda = global.DB.bandaDe(mk);
-      const f = (id2, lbl, val, extra = '') => `<div class="fr"><label for="${id2}">${lbl}</label>
-        <input id="${id2}" value="${UI.esc(val ?? '')}" ${extra} ${ed ? '' : 'readonly'}></div>`;
+      const orden = this.ordenadas();
+      const i = orden.findIndex(x => x.id === id);
+      const ed = this.puedeEditar(), cost = this.verCostos();
+      const ef = this.efectivoDe(v);
+      const mk = global.DB.markupDe(v.costo, ef), mg = global.DB.margenDe(v.costo, ef);
+      const banda = global.DB.bandaDe(mk);
+      const medidas = (global.DB.propiedad('medida') || { valores: [] }).valores;
+      const norm = x => String(x || '').replace(',', '.');
+      const act = norm(v.medidaCosteo || v.medida);
+      const opts = medidas.some(m => norm(m) === act) ? medidas : [v.medidaCosteo || v.medida, ...medidas];
+
+      const f = (id2, lbl, val, extra = '', uni = '') => `<label class="fld">
+        <span class="lbl">${lbl}</span>
+        <div class="fx">${uni === '$' ? '<span class="uni">$</span>' : ''}
+          <input id="${id2}" value="${UI.esc(val ?? '')}" ${extra} ${ed ? '' : 'readonly'}>
+          ${uni && uni !== '$' ? `<span class="uni">${uni}</span>` : ''}</div></label>`;
 
       document.getElementById('pd-panel').innerHTML = `
         <div class="pv-back" id="pv-back"></div>
         <aside class="pv-drawer">
           <div class="pv-top">
-            <button class="lx" id="pv-cerrar" title="Cerrar">✕</button>
-            <div>
+            <button class="lx" id="pv-cerrar" title="Cerrar">‹</button>
+            <div style="flex:1;min-width:0">
               <div class="kick">${UI.esc(this.p.nombre)}</div>
               <h3>${UI.esc(this.nombreVar(v))}</h3>
             </div>
+            <button class="lx" id="pv-ant" ${i <= 0 ? 'disabled' : ''} title="Anterior">‹</button>
+            <button class="lx" id="pv-sig" ${i >= orden.length - 1 ? 'disabled' : ''} title="Siguiente">›</button>
           </div>
           <div class="pv-body">
-            <div class="pv-h">Precio</div>
-            ${f('pv-precio', 'Precio de lista', v.precio, 'inputmode="numeric"')}
-            ${cost ? f('pv-costo', 'Costo', v.costo, 'inputmode="numeric"') : ''}
-            ${cost ? `<div class="fr"><label for="pv-mkobj">Markup objetivo</label>
-              <div class="fx"><input id="pv-mkobj" inputmode="decimal" value="${v.markupObj || ''}"
-                placeholder="${this.p.markupObj || 2}" ${ed ? '' : 'readonly'}>
-                <span class="mk ${banda.pill}">${mk ? mk.toFixed(2).replace('.', ',') + 'x' : '—'}</span></div></div>
-              <div class="fr"><label></label><span class="hint">En blanco usa el del mueble
-                (<b>${String(this.p.markupObj || 2).replace('.', ',')}x</b>). Se puede subir en las medidas
-                grandes, que el cliente paga.</span></div>` : ''}
-            ${f('pv-desc', 'Precio promocional', v.promo, 'inputmode="numeric" placeholder="sin descuento"')}
+            ${cost ? `<div class="pv-h">Precios</div>
+            <div class="pv-2">
+              ${f('pv-efec', 'Precio de efectivo', ef, 'inputmode="numeric"', '$')}
+              ${f('pv-promo', 'Precio promocional', v.promo, 'inputmode="numeric" placeholder="sin descuento"', '$')}
+            </div>
+            <div class="pv-calc">
+              <div><span>Precio de lista</span><b id="pv-lista">${UI.pesos(this.listaDe(ef))}</b></div>
+              <div><span>Margen</span><b id="pv-marg">${mg ? mg.toFixed(1).replace('.', ',') + ' %' : '—'}</b></div>
+              <div><span>Markup</span><b class="mk ${banda.pill}" id="pv-mk">${
+                mk ? mk.toFixed(2).replace('.', ',') + 'x' : '—'}</b></div>
+            </div>
+            <div class="hint">El de lista sale del efectivo, y el margen y el markup se miden contra
+              el efectivo — que es lo que realmente entra.</div>
+
+            <div class="pv-h">Costo</div>
+            <div class="pv-2">
+              ${f('pv-costo', 'Costo', v.costo, 'inputmode="numeric"', '$')}
+              <label class="fld"><span class="lbl">Medida de costeo</span>
+                <select id="pv-medc" ${ed ? '' : 'disabled'}>${opts.map(m =>
+                  `<option ${norm(m) === act ? 'selected' : ''}>${UI.esc(m)}</option>`).join('')}</select></label>
+            </div>
+            <div class="hint">La medida que usa el proveedor cuando no cotiza la nuestra: el de 0,90 se
+              costea con el de 1,00. ${v.pisado
+                ? '<b class="warn-t">Este precio está pisado a mano</b>, no baja de la plantilla.'
+                : 'Baja de la plantilla de precios.'}</div>` : ''}
 
             <div class="pv-h">Códigos</div>
-            <div class="fr"><label for="pv-sku">SKU</label>
-              <div class="fx"><input id="pv-sku" value="${UI.esc(v.sku || global.DB.skuDe(this.p, v))}" ${ed ? '' : 'readonly'}>
-                <button class="lapiz" id="pv-sku-auto" title="Volver al automático">↺</button></div></div>
-            <div class="fr"><label></label><span class="hint">Se arma solo con el código del mueble y los
-              valores de la variante; se puede pisar a mano.</span></div>
+            <div class="pv-2">
+              <label class="fld"><span class="lbl">SKU</span>
+                <div class="fx"><input id="pv-sku" value="${UI.esc(v.sku || global.DB.skuDe(this.p, v))}"
+                  ${ed ? '' : 'readonly'}>
+                  <button class="lapiz" id="pv-sku-auto" title="Volver al automático">↺</button></div></label>
+              ${f('pv-barras', 'Código de barras', v.barras, 'inputmode="numeric" placeholder="13 números"')}
+            </div>
+            <div class="hint">El SKU se arma solo con el código del mueble y los valores de la variante.
+              El código de barras identifica la unidad al entregar.</div>
 
-            <div class="pv-h">Medidas y peso</div>
-            <div class="cz-cols">
-              <div class="cz-col">${f('pv-frente', 'Frente (cm)', v.frenteCm, 'inputmode="decimal"')}
-                ${f('pv-alto', 'Alto (cm)', v.alto, 'inputmode="decimal"')}</div>
-              <div class="cz-col">${f('pv-prof', 'Profundidad (cm)', v.prof, 'inputmode="decimal"')}
-                ${f('pv-peso', 'Peso (kg)', v.peso, 'inputmode="decimal"')}</div>
+            <div class="pv-h">Peso y dimensiones</div>
+            <div class="pv-2">
+              ${f('pv-largo', 'Largo', v.frenteCm, 'inputmode="decimal"', 'cm')}
+              ${f('pv-alto', 'Alto', v.alto, 'inputmode="decimal"', 'cm')}
+              ${f('pv-prof', 'Profundidad', v.prof, 'inputmode="decimal"', 'cm')}
+              ${f('pv-peso', 'Peso', v.peso, 'inputmode="decimal"', 'kg')}
             </div>
 
-            <div class="pv-h">Costeo</div>
-            <div class="fr"><label for="pv-medc">Medida de costeo</label>
-              <select id="pv-medc" ${ed ? '' : 'disabled'}>${(() => {
-                // El diccionario escribe "1,60" y la variante "1.60": se
-                // comparan igual para que no quede seleccionada otra medida.
-                const norm = x => String(x || '').replace(',', '.');
-                const act = norm(v.medidaCosteo || v.medida);
-                const vals = (global.DB.propiedad('medida') || { valores: [] }).valores;
-                const todas = vals.some(m => norm(m) === act) ? vals : [v.medidaCosteo || v.medida, ...vals];
-                return todas.map(m => `<option ${norm(m) === act ? 'selected' : ''}>${UI.esc(m)}</option>`).join('');
-              })()}</select></div>
-            <div class="fr"><label></label><span class="hint">La que usa el proveedor cuando no cotiza la
-              nuestra: el de 0,90 se costea con el de 1,00.</span></div>
-
             <div class="pv-h">Stock</div>
-            ${f('pv-stock', 'Stock real', v.stock, 'inputmode="numeric"')}
-            <div class="fr"><label for="pv-rep">Reposición</label>
-              <select id="pv-rep" ${ed ? '' : 'disabled'}>
-                <option value="pedido" ${v.reponer !== 'minimo' ? 'selected' : ''}>Se pide cuando se vende</option>
-                <option value="minimo" ${v.reponer === 'minimo' ? 'selected' : ''}>Mantener un mínimo</option>
-              </select></div>
+            <div class="pv-2">
+              ${f('pv-stock', 'Stock real', v.stock, 'inputmode="numeric"')}
+              <label class="fld"><span class="lbl">Reposición</span>
+                <select id="pv-rep" ${ed ? '' : 'disabled'}>
+                  <option value="pedido" ${v.reponer !== 'minimo' ? 'selected' : ''}>Se pide cuando se vende</option>
+                  <option value="minimo" ${v.reponer === 'minimo' ? 'selected' : ''}>Mantener un mínimo</option>
+                </select></label>
+            </div>
             ${v.reponer === 'minimo' ? f('pv-min', 'Mínimo', v.minStock, 'inputmode="numeric"') : ''}
 
             <div class="pv-h">Publicación</div>
@@ -3071,23 +3184,41 @@ tr:hover td{background:var(--panel-2)}
       const cerrar = () => { document.getElementById('pd-panel').innerHTML = ''; this._abierta = null; };
       document.getElementById('pv-cerrar').onclick = cerrar;
       document.getElementById('pv-back').onclick = cerrar;
+      const ant = document.getElementById('pv-ant'), sig = document.getElementById('pv-sig');
+      if (i > 0) ant.onclick = () => this.abrirVariante(orden[i - 1].id);
+      if (i < orden.length - 1) sig.onclick = () => this.abrirVariante(orden[i + 1].id);
 
-      const bind = (id, fn) => { const el = document.getElementById(id); if (el && ed) el.onchange = () => fn(el); };
-      const numf = (id, campo) => bind(id, el => {
+      const bind = (id2, fn) => { const el = document.getElementById(id2); if (el && ed) el.onchange = () => fn(el); };
+      const numf = (id2, campo) => bind(id2, el => {
         v[campo] = Number(String(el.value).replace(',', '.').replace(/[^\d.]/g, '')) || 0;
-        global.DB.guardarVariante(v); this.refrescarFila(v);
+        global.DB.guardarVariante(v); this.pintar(); this.abrirVariante(id);
       });
-      numf('pv-precio', 'precio'); numf('pv-costo', 'costo'); numf('pv-desc', 'promo');
-      numf('pv-frente', 'frenteCm'); numf('pv-alto', 'alto'); numf('pv-prof', 'prof');
+      bind('pv-efec', el => {
+        v.efectivo = Number(String(el.value).replace(/[^\d]/g, '')) || 0;
+        v.precio = this.listaDe(v.efectivo);
+        v.pisado = true;
+        global.DB.guardarVariante(v); this.pintar(); this.abrirVariante(id);
+      });
+      bind('pv-costo', el => {
+        v.costo = Number(String(el.value).replace(/[^\d]/g, '')) || 0;
+        v.pisado = true;
+        global.DB.guardarVariante(v); this.pintar(); this.abrirVariante(id);
+      });
+      numf('pv-promo', 'promo');
+      numf('pv-largo', 'frenteCm'); numf('pv-alto', 'alto'); numf('pv-prof', 'prof');
       numf('pv-peso', 'peso'); numf('pv-stock', 'stock'); numf('pv-min', 'minStock');
-      numf('pv-mkobj', 'markupObj');
-      bind('pv-sku', el => { v.sku = el.value.trim(); global.DB.guardarVariante(v); this.refrescarFila(v); });
+      bind('pv-sku', el => { v.sku = el.value.trim(); global.DB.guardarVariante(v); this.pintar(); });
+      bind('pv-barras', el => { v.barras = el.value.trim(); global.DB.guardarVariante(v); });
       bind('pv-medc', el => { v.medidaCosteo = el.value; global.DB.guardarVariante(v); });
-      bind('pv-rep', el => { v.reponer = el.value; global.DB.guardarVariante(v); this.abrirVariante(id); this.refrescarFila(v); });
-      bind('pv-mostrar', el => { v.mostrar = el.checked; global.DB.guardarVariante(v); this.refrescarFila(v); });
-      bind('pv-activa', el => { v.activa = el.checked; global.DB.guardarVariante(v); this.pintar(); });
+      bind('pv-rep', el => {
+        v.reponer = el.value;
+        if (v.reponer !== 'minimo') v.minStock = 0;
+        global.DB.guardarVariante(v); this.abrirVariante(id);
+      });
+      bind('pv-mostrar', el => { v.mostrar = el.checked; global.DB.guardarVariante(v); });
+      bind('pv-activa', el => { v.activa = el.checked; global.DB.guardarVariante(v); this.pintar(); this.abrirVariante(id); });
       const auto = document.getElementById('pv-sku-auto');
-      if (auto) auto.onclick = () => { v.sku = ''; global.DB.guardarVariante(v); this.abrirVariante(id); this.refrescarFila(v); };
+      if (auto && ed) auto.onclick = () => { v.sku = ''; global.DB.guardarVariante(v); this.pintar(); this.abrirVariante(id); };
     },
 
     // ---- Simulador -----------------------------------------------------------
@@ -3853,8 +3984,13 @@ tr:hover td{background:var(--panel-2)}
         .aplic:hover{background:var(--brand-soft)}
         /* Compra y venta: una columna por propiedad y después los números. */
         .cv-tabla{overflow-x:auto;margin:0 -14px;padding:0 14px}
-        .cv-h,.cv-r{display:grid;min-width:940px;gap:8px;align-items:center;
-          grid-template-columns:repeat(var(--ejes),minmax(140px,1fr)) 90px 90px 94px 68px 62px 96px}
+        .cv-h,.cv-r{display:grid;min-width:820px;gap:8px;align-items:center;
+          grid-template-columns:repeat(var(--ejes),minmax(140px,1fr)) 104px 104px 72px 66px 64px}
+        .cv-a{display:flex;gap:1px;justify-content:flex-end}
+        .lx.on{color:var(--ok)}
+        /* El número que baja de la plantilla se lee; el pisado a mano se marca. */
+        .cv-fijo{font-weight:650;color:var(--navy)}
+        .cv-fijo.pisado{color:var(--warn);border-bottom:1px dashed var(--warn)}
         .cv-h{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);
           font-weight:700;padding-bottom:8px;border-bottom:1px solid var(--line)}
         .cv-r{padding:5px 0;border-bottom:1px solid var(--line-soft)}
@@ -3920,8 +4056,8 @@ tr:hover td{background:var(--panel-2)}
         .rutas{display:flex;gap:18px;flex-wrap:wrap}
         .ad-t{font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px}
         .inv-tabla{overflow-x:auto;margin:0 -14px;padding:0 14px}
-        .inv-head,.inv-r{display:grid;min-width:720px;
-          grid-template-columns:minmax(200px,1fr) 88px 216px 96px;gap:10px;align-items:center}
+        .inv-head,.inv-r{display:grid;min-width:640px;
+          grid-template-columns:minmax(220px,1fr) 92px 150px 96px;gap:10px;align-items:center}
         .inv-r.off{opacity:.5}
         /* El mínimo bloqueado se ve apagado, pero se puede tocar: al escribir
            ahí la reposición cambia sola. */
@@ -3953,6 +4089,16 @@ tr:hover td{background:var(--panel-2)}
         .pv-h{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
           margin:13px 0 8px;padding-top:10px;border-top:1px solid var(--line-soft)}
         .pv-h:first-child{margin-top:0;padding-top:0;border-top:0}
+        .pv-drawer{width:min(520px,100%)}
+        .pv-2{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+        @media(max-width:560px){.pv-2{grid-template-columns:1fr}}
+        .pv-2 .fld{margin-bottom:0}
+        .pv-calc{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:11px 0 7px;
+          background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:10px 12px}
+        .pv-calc span{display:block;font-size:11px;color:var(--muted)}
+        .pv-calc b{font-size:15px;color:var(--navy)}
+        .pv-calc .mk{display:inline-block;width:auto;padding:2px 8px}
+        .pv-top .lx[disabled]{opacity:.3;cursor:default}
 
         .mdlz{position:fixed;inset:0;background:rgba(12,22,44,.4);z-index:50;display:grid;
           place-items:center;padding:20px}

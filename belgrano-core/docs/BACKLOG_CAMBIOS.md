@@ -442,6 +442,36 @@ Todo en **una sola columna**, un bloque abajo del otro, y en modo edición.
 - ✅ 264. **Entrega** vuelve como módulo 4: requiere instalación y bultos para
   el embalaje. Es una característica del mueble, no un "otro".
 
+### Lote 15 — APLICADO (Precios desde plantilla, panel de variante, inventario simple)
+
+**Compra y venta**
+- ✅ 265. El costo y el precio **bajan de una plantilla de precios** y acá sólo
+  se ven. Con el **lápiz** se pisan para esa variante, y lo pisado queda
+  marcado en ámbar, para distinguir lo que se apartó de la plantilla.
+- ✅ 266. Columnas: propiedades · Costo · P. efectivo · Margen · Markup · **⋯**.
+  El precio de lista y la medida de costeo salieron de la tabla y viven en el
+  panel.
+- ✅ 267. Los **tres puntitos** abren un **panel lateral** con todo lo de la
+  variante: precios (con lista, margen y markup calculados), costo y medida de
+  costeo, SKU y **código de barras**, peso y dimensiones, stock y publicación.
+  Se pasa de una variante a otra con las flechas, sin cerrar.
+
+**Inventario**
+- ✅ 268. **Cómo se le pide al proveedor**: por **dibujo**, por **planilla** o
+  por las dos. Si se pide por dibujo y hay variantes sin plano, avisa cuántas
+  faltan.
+- ✅ 269. Tilde aparte para **se necesitan dos proveedores**: Producción no
+  puede dar por listo un mueble al que le falta la mitad.
+- ✅ 270. El rastreo del stock pasó a **desplegable** — ocupa mucho menos.
+- ✅ 271. **Fuera la columna "cómo se repone"**: todo se repone cuando se vende.
+  Queda el **stock mínimo deseado**, que es otra cosa: lo que se quiere tener
+  siempre aunque nadie lo haya pedido. La variante por debajo del mínimo se
+  marca, y de ahí va a salir el pedido a Producción.
+
+> Pendiente que abre este lote: el **módulo Precios** — márgenes, costos,
+> precios de venta y markup en un solo lado, para no cargarlos mueble por
+> mueble y poder comparar productos parecidos.
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·
