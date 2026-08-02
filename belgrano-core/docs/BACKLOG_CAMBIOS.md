@@ -472,6 +472,24 @@ Todo en **una sola columna**, un bloque abajo del otro, y en modo edición.
 > precios de venta y markup en un solo lado, para no cargarlos mueble por
 > mueble y poder comparar productos parecidos.
 
+### Lote 16 — APLICADO (Quién lo fabrica)
+
+- ✅ 272. **Producción arranca con "Quién lo fabrica"**: primero una botonera de
+  **1 · 2 · 3 proveedores**, y según lo que se elija aparecen ese tanto de
+  campos para completar. Un rack con el módulo laqueado y las patas de hierro
+  necesita dos —carpintería y herrería— y Producción tiene que saberlo para no
+  dar por listo un pedido al que le falta una parte.
+- ✅ 273. Si baja la cantidad, los proveedores que sobran se descartan; si
+  falta cargar alguno, avisa que el pedido no se va a poder armar completo.
+- ✅ 274. Los proveedores son **una sola lista para todo el sistema**
+  (`DB.proveedores()`): el que se carga desde un mueble queda disponible en
+  todos los demás, y no se duplica por tildes ni mayúsculas. Cuando exista la
+  pantalla de Proveedores va a leer de acá mismo.
+- ✅ 275. El bloque de Proveedores sale de **Otros** y el tilde de "dos
+  proveedores" sale de **Inventario**: los dos apuntaban a lo mismo y ahora
+  vive en un solo lado.
+- ✅ 276. La tercera opción de "cómo se pide" pasa a llamarse **Mixta**.
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·

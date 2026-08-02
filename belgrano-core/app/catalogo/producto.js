@@ -283,13 +283,52 @@
           usa la subida por escalera, que se cobra por piso y por bulto.</span></div>`;
     },
 
+    // Quién fabrica el mueble. Primero cuántos hacen falta y después quiénes
+    // son: un rack con el módulo laqueado y las patas de hierro necesita dos
+    // —carpintería y herrería— y Producción tiene que saberlo para no dar por
+    // listo un pedido al que le falta una parte.
+    bloqueQuienFabrica() {
+      const p = this.p, ed = this.puedeEditar();
+      const n = Math.min(3, Math.max(1, Number(p.nProveedores) || 1));
+      const provs = p.proveedores || [];
+      const lista = global.DB.proveedores();
+      const faltan = Array.from({ length: n }, (_, i) => provs[i]).filter(x => !x).length;
+
+      const campo = i => `<div class="fr">
+        <label for="pv-prov-${i}">${n === 1 ? 'Proveedor' : `Proveedor ${i + 1}`}</label>
+        <div class="fx">
+          <select id="pv-prov-${i}" data-prov="${i}" ${ed ? '' : 'disabled'}>
+            <option value="">Elegir…</option>
+            ${lista.map(x => `<option ${provs[i] === x ? 'selected' : ''}>${UI.esc(x)}</option>`).join('')}
+          </select>
+          ${ed ? `<button class="btn" data-nuevoprov="${i}">＋</button>` : ''}
+        </div></div>`;
+
+      return `<section class="pd-b">
+        <div class="pd-h">Quién lo fabrica</div>
+        <div class="segm">${[1, 2, 3].map(x => `
+          <button class="seg ${n === x ? 'on' : ''}" data-nprov="${x}" ${ed ? '' : 'disabled'}>
+            ${x} ${x === 1 ? 'proveedor' : 'proveedores'}</button>`).join('')}</div>
+        <div class="hint" style="margin:7px 0 11px">${n === 1
+          ? 'Un solo proveedor lo entrega terminado.'
+          : `Hacen falta <b>${n}</b> para terminarlo. Ej: el módulo laqueado lo hace carpintería y las patas, herrería.`}</div>
+
+        ${Array.from({ length: n }, (_, i) => campo(i)).join('')}
+
+        ${faltan ? `<div class="banner warn" style="margin-top:9px">Falta${faltan === 1 ? '' : 'n'}
+          cargar <b>${faltan}</b> ${faltan === 1 ? 'proveedor' : 'proveedores'}. Producción no va a poder
+          armar el pedido completo.</div>` : ''}
+        <div class="hint" style="margin-top:8px">Los proveedores son los mismos para todo el sistema:
+          el que se carga acá queda disponible en cualquier otro mueble.</div>
+      </section>`;
+    },
+
     // Todo lo que no entra en las otras solapas pero hay que definir igual:
     // con quién se fabrica, cómo se entrega, cómo se factura y contra qué
     // cuenta se imputa.
     tabOtros() {
       const p = this.p, c = p.contabilidad || {}, ed = this.puedeEditar();
-      return this.bloqueProveedores() + `
-
+      return `
       <section class="pd-b">
         <div class="pd-h">Facturación</div>
         <div class="fr"><label for="pd-cfact">Concepto en la factura</label>
@@ -365,12 +404,8 @@
           ? `<div class="banner warn" style="margin-top:9px">Se pide por dibujo y
              <b>${this.vars.filter(v => !v.imgProd).length}</b> de ${this.vars.length} variantes no tienen
              el plano cargado. Se suben en <b>Producción</b>.</div>` : ''}
-        <label class="chk" style="margin-top:11px"><input type="checkbox" id="pd-dos"
-          ${p.dosProveedores ? 'checked' : ''} ${ed ? '' : 'disabled'}>
-          Se necesitan <b>dos proveedores</b> para hacerlo</label>
-        <div class="hint">${p.dosProveedores
-          ? 'Uno solo no lo termina. Cargá los dos en <b>Otros → Proveedores</b>; cuando armemos Producción vamos a ver cómo se anota cuál hace qué parte.'
-          : 'Marcalo si un proveedor solo no lo termina: Producción no puede dar por listo un mueble al que le falta la mitad.'}</div>
+        <div class="hint" style="margin-top:9px">Cuántos proveedores hacen falta y quiénes son se
+          define en <b>Producción → Quién lo fabrica</b>.</div>
         <div class="pd-sepl"></div>
         <div class="fr"><label for="pd-track">Cómo se rastrea el stock</label>
           <select id="pd-track" ${ed ? '' : 'disabled'}>${this.RASTREO.map(x =>
@@ -414,13 +449,52 @@
       </section>`;
     },
 
+    // Quién fabrica el mueble. Primero cuántos hacen falta y después quiénes
+    // son: un rack con el módulo laqueado y las patas de hierro necesita dos
+    // —carpintería y herrería— y Producción tiene que saberlo para no dar por
+    // listo un pedido al que le falta una parte.
+    bloqueQuienFabrica() {
+      const p = this.p, ed = this.puedeEditar();
+      const n = Math.min(3, Math.max(1, Number(p.nProveedores) || 1));
+      const provs = p.proveedores || [];
+      const lista = global.DB.proveedores();
+      const faltan = Array.from({ length: n }, (_, i) => provs[i]).filter(x => !x).length;
+
+      const campo = i => `<div class="fr">
+        <label for="pv-prov-${i}">${n === 1 ? 'Proveedor' : `Proveedor ${i + 1}`}</label>
+        <div class="fx">
+          <select id="pv-prov-${i}" data-prov="${i}" ${ed ? '' : 'disabled'}>
+            <option value="">Elegir…</option>
+            ${lista.map(x => `<option ${provs[i] === x ? 'selected' : ''}>${UI.esc(x)}</option>`).join('')}
+          </select>
+          ${ed ? `<button class="btn" data-nuevoprov="${i}">＋</button>` : ''}
+        </div></div>`;
+
+      return `<section class="pd-b">
+        <div class="pd-h">Quién lo fabrica</div>
+        <div class="segm">${[1, 2, 3].map(x => `
+          <button class="seg ${n === x ? 'on' : ''}" data-nprov="${x}" ${ed ? '' : 'disabled'}>
+            ${x} ${x === 1 ? 'proveedor' : 'proveedores'}</button>`).join('')}</div>
+        <div class="hint" style="margin:7px 0 11px">${n === 1
+          ? 'Un solo proveedor lo entrega terminado.'
+          : `Hacen falta <b>${n}</b> para terminarlo. Ej: el módulo laqueado lo hace carpintería y las patas, herrería.`}</div>
+
+        ${Array.from({ length: n }, (_, i) => campo(i)).join('')}
+
+        ${faltan ? `<div class="banner warn" style="margin-top:9px">Falta${faltan === 1 ? '' : 'n'}
+          cargar <b>${faltan}</b> ${faltan === 1 ? 'proveedor' : 'proveedores'}. Producción no va a poder
+          armar el pedido completo.</div>` : ''}
+        <div class="hint" style="margin-top:8px">Los proveedores son los mismos para todo el sistema:
+          el que se carga acá queda disponible en cualquier otro mueble.</div>
+      </section>`;
+    },
+
     // Todo lo que no entra en las otras solapas pero hay que definir igual:
     // con quién se fabrica, cómo se entrega, cómo se factura y contra qué
     // cuenta se imputa.
     tabOtros() {
       const p = this.p, c = p.contabilidad || {}, ed = this.puedeEditar();
-      return this.bloqueProveedores() + `
-
+      return `
       <section class="pd-b">
         <div class="pd-h">Facturación</div>
         <div class="fr"><label for="pd-cfact">Concepto en la factura</label>
@@ -481,7 +555,607 @@
     tabProduccion() {
       const ed = this.puedeEditar();
       const conPlano = this.vars.filter(v => v.imgProd).length;
+      return this.bloqueQuienFabrica() + `<section class="pd-b">
+        <div class="pd-h">Planos de producción
+          <span class="muted">· ${conPlano} de ${this.vars.length} cargados</span></div>
+        <div class="planos">${this.vars.map(v => `<div class="plano">
+          <button class="vimg ${v.imgProd ? 'hay' : ''}" data-img="${v.id}|imgProd"
+            title="Subir el plano de esta variante">
+            ${v.imgProd ? `<img src="${UI.esc(this.urlDe(v.imgProd) || v.imgProd)}" alt="">` : '<span class="vimg-v">📐</span>'}
+            <span class="vimg-e">✎</span></button>
+          <div class="plano-n">${UI.esc(this.nombreVar(v))}</div>
+          <div class="vr-sku tnum">${UI.esc(v.sku || global.DB.skuDe(this.p, v))}</div>
+        </div>`).join('')}</div>
+        <div class="hint" style="margin-top:9px">Es la hoja que se le manda a fábrica. Acepta imagen o PDF.
+          No sale nunca en la cotización del cliente.</div>
+      </section>
+
+      <section class="pd-b">
+        <div class="pd-h">Cómo se hace</div>
+        <label class="lbl-t" for="pd-mat">Materiales y herrajes</label>
+        <textarea id="pd-mat" class="pd-des" rows="2" ${ed ? '' : 'readonly'}
+          placeholder="MDF 18 mm · guías telescópicas · bisagras con freno">${UI.esc(this.p.materiales || '')}</textarea>
+        <label class="lbl-t" for="pd-notaprod" style="margin-top:11px">Notas para fábrica</label>
+        <textarea id="pd-notaprod" class="pd-des" rows="2" ${ed ? '' : 'readonly'}
+          placeholder="Lo que hay que tener en cuenta al fabricarlo.">${UI.esc(this.p.notaProd || '')}</textarea>
+      </section>`;
+    },
+
+    tabContabilidad() { return this.bloqueContabilidad(); },
+
+    // 1 · Nombre y descripción ---------------------------------------------
+    // La descripción es para lo que NO es una variante: el alto y la
+    // profundidad cuando son siempre los mismos, cómo se arma, qué herrajes
+    // lleva. Todo eso no puede ser una propiedad porque no multiplica nada.
+    bloqueNombre() {
+      const p = this.p, ed = this.puedeEditar();
+      return `<div>
+        <label class="lbl-t" for="pd-nombre">Nombre</label>
+        <input id="pd-nombre" class="pd-nom" value="${UI.esc(p.nombre)}"
+          placeholder="Nombre del mueble" ${ed ? '' : 'readonly'}>
+
+        <label class="lbl-t" for="pd-desc" style="margin-top:11px">Descripción</label>
+        <textarea id="pd-desc" class="pd-des" rows="2" ${ed ? '' : 'readonly'}
+          placeholder="Las medidas y los detalles que no cambian entre variantes. Ej: alto 0,55 · profundidad 0,40 · la base se retira en los cuatro lados · corte de tapa a 45°."
+          >${UI.esc(p.desc || '')}</textarea>
+        <div class="hint">Lo que es igual en todas las variantes. Lo que cambia va como propiedad.</div>
+
+        <div class="pd-nsub">
+          <span class="muted">Código</span> <b class="tnum">${UI.esc(p.sku || '—')}</b>
+        </div>
+      </div>`;
+    },
+
+    // 2 · Fotos ------------------------------------------------------------
+    // Todos los archivos del mueble en un solo lugar: fotos de venta, planos de
+    // producción, folletos. Van a ser muchos, así que tienen su propia solapa y
+    // no se mezclan con la información del mueble. Desde acá se elige cuál usa
+    // cada variante.
+    TIPOS: [
+      { k: 'venta', label: 'Venta', icono: '📷' },
+      { k: 'produccion', label: 'Producción', icono: '📐' },
+      { k: 'otro', label: 'Otro', icono: '📄' },
+    ],
+    archivos(tipo) {
+      const a = this.p.archivos || [];
+      return tipo ? a.filter(x => x.tipo === tipo) : a;
+    },
+    // Dónde está usado un archivo, para no borrar algo que está en uso.
+    usoDe(id) {
+      return this.vars.filter(v => v.imgVenta === id || v.imgProd === id).length;
+    },
+    urlDe(id) {
+      const a = (this.p.archivos || []).find(x => x.id === id);
+      return a ? a.url : '';
+    },
+
+    tabDocumentos() {
+      const ed = this.puedeEditar();
+      const grupo = t => {
+        const fs = this.archivos(t.k);
+        return `<section class="pd-b">
+          <div class="pd-h">${t.icono} ${UI.esc(t.label)} <span class="muted">(${fs.length})</span></div>
+          ${ed ? `<div class="dropz chico" data-drop="${t.k}">
+            <div class="dz-t">＋ Arrastrá acá, o hacé clic para subir</div>
+            <input type="file" data-file="${t.k}" accept="image/*,application/pdf,video/*" multiple hidden>
+          </div>` : ''}
+          <div class="docs">${fs.map(f => `<div class="doc">
+            <div class="doc-im">${/^data:image|\.(png|jpe?g|webp|svg)$/i.test(f.url)
+              ? `<img src="${UI.esc(f.url)}" alt="${UI.esc(f.nombre)}">` : t.icono}</div>
+            <div class="doc-n" title="${UI.esc(f.nombre)}">${UI.esc(f.nombre)}</div>
+            <div class="doc-u">${this.usoDe(f.id)
+              ? `<span class="pill info">en ${this.usoDe(f.id)} ${this.usoDe(f.id) === 1 ? 'variante' : 'variantes'}</span>`
+              : '<span class="pill soft">sin usar</span>'}</div>
+            ${ed ? `<div class="doc-a">
+              <select data-tipo="${f.id}">${this.TIPOS.map(x =>
+                `<option value="${x.k}" ${f.tipo === x.k ? 'selected' : ''}>${UI.esc(x.label)}</option>`).join('')}</select>
+              <button class="lx" data-borrar="${f.id}" title="Borrar">🗑</button>
+            </div>` : ''}
+          </div>`).join('') || '<div class="hint">Todavía no hay archivos de este tipo.</div>'}</div>
+        </section>`;
+      };
+      return `<div class="banner info">Los archivos se guardan en el <b>Storage del sistema</b>, no adentro
+        de la cotización. Desde la solapa Información general, cada variante elige cuál de estos usa
+        como imagen de venta, y desde Producción cuál usa como plano.</div>`
+        + this.TIPOS.map(grupo).join('');
+    },
+
+    // Sube archivos a la biblioteca del mueble.
+    subir(files, tipo) {
+      [...(files || [])].forEach(f => {
+        const r = new FileReader();
+        r.onload = () => {
+          this.p.archivos = this.p.archivos || [];
+          this.p.archivos.push({
+            id: 'a' + (Math.max(0, ...this.p.archivos.map(x => Number(String(x.id).slice(1)) || 0)) + 1),
+            nombre: f.name, url: r.result, tipo: tipo || 'otro',
+          });
+          this.guardar(); this.pintar();
+        };
+        r.readAsDataURL(f);
+      });
+    },
+
+    // 3 · Categorías -------------------------------------------------------
+    // Un mueble puede estar en más de una: una mesa ratona que también entra
+    // en Living y en Escritorios se carga una sola vez y aparece en las dos.
+    cats() {
+      // Se guardan en `categorias`; si el mueble es viejo y sólo tiene la de
+      // siempre, esa es la lista.
+      const ids = this.p.categorias || (this.p.categoria_id ? [this.p.categoria_id] : []);
+      return ids.map(id => (this._arbol || []).find(c => c.id === id)
+        || (this.p.categoria && this.p.categoria.id === id ? this.p.categoria : null)).filter(Boolean);
+    },
+    // El ambiente del que cuelga cada una: no hace falta cargarlo a mano.
+    heredadas() {
+      const out = new Map();
+      this.cats().forEach(c => {
+        let x = c;
+        while (x && x.padre_id) {
+          x = (this._arbol || []).find(y => y.id === x.padre_id);
+          if (x) out.set(x.id, x);
+        }
+      });
+      this.cats().forEach(c => out.delete(c.id));
+      return [...out.values()];
+    },
+
+    bloqueCategorias(dentro) {
+      const cs = this.cats(), her = this.heredadas();
+      return `<${dentro ? 'div' : 'section class="pd-b"'}>
+        <div class="pd-h">Categorías</div>
+        <div class="chips">
+          ${cs.map(c => `<span class="chip">${UI.esc(c.nombre)}${this.puedeEditar()
+            ? `<button class="chip-x" data-quitarcat="${c.id}" aria-label="Quitar">✕</button>` : ''}</span>`).join('')
+            || '<span class="hint">Sin categoría.</span>'}
+          ${her.map(c => `<span class="chip her" title="Se hereda: ${UI.esc(c.nombre)} es el ambiente del que cuelga">${UI.esc(c.nombre)}</span>`).join('')}
+          ${this.puedeEditar() ? '<button class="chip-add" id="pd-edcat">✎ editar</button>' : ''}
+        </div>
+        ${her.length ? `<div class="hint" style="margin-top:6px">
+          <b>${UI.esc(her.map(c => c.nombre).join(' · '))}</b> ${her.length === 1 ? 'se hereda' : 'se heredan'} —
+          con marcar la familia alcanza.</div>` : ''}
+      </${dentro ? 'div' : 'section'}>`;
+    },
+
+    // 4 · Propiedades ------------------------------------------------------
+    // Se ve la lista de las que usa este mueble, cada una con sus valores, y
+    // se ENTRA a una para cargarle los que puede tener. Abajo de todo, agregar
+    // otra propiedad.
+    bloquePropiedades(dentro) {
+      const ps = this.props(), n = this.combinatorio(), ed = this.puedeEditar();
+      return `<${dentro ? 'div' : 'section class="pd-b"'}>
+        <div class="pd-h">Propiedades</div>
+        <div class="props">${ps.map(p => `
+          <div class="prow" draggable="${ed}" data-orden="${UI.esc(p.k)}">
+            ${ed ? '<span class="prow-drag" title="Arrastrar para cambiar el orden">⠿</span>' : ''}
+            <div class="prow-i">
+              <div class="prow-n">${UI.esc(p.nombre)}</div>
+              <div class="chips" data-vals="${UI.esc(p.k)}">${p.usados.map(v =>
+                `<span class="chip val" draggable="${ed}" data-val="${UI.esc(v)}"
+                  ${ed ? 'title="Arrastrá para cambiar el orden"' : ''}
+                  >${ed ? '<span class="chip-drag">⠿</span>' : ''}${UI.esc(v)}</span>`).join('')
+                || '<span class="hint">Sin valores todavía.</span>'}
+                ${ed ? `<button class="chip-add" data-addv="${UI.esc(p.k)}">＋ Agregar</button>` : ''}</div>
+            </div>
+            <button class="prow-go" data-prop="${UI.esc(p.k)}"
+              title="Editar ${UI.esc(p.nombre)}">›</button>
+          </div>`).join('') || '<div class="hint">Este mueble todavía no tiene propiedades.</div>'}
+        </div>
+        ${ed && ps.length ? '<div class="hint" style="margin-top:7px">Arrastrá una <b>propiedad</b> o un '
+          + '<b>valor</b> para cambiar el orden: es el que ordena las variantes de abajo.</div>' : ''}
+        ${ed ? `<div class="prow-add">
+          <button class="btn" id="pd-addprop">⊕ Agregar propiedad</button>
+        </div>` : ''}
+        ${n ? `<div class="prop-pie"><div class="combo"><b class="tnum">${n}</b> combinaciones posibles
+          ${this.vars.length !== n ? `<span class="muted">· ${this.vars.length} creadas</span>` : ''}</div></div>` : ''}
+      </${dentro ? 'div' : 'section'}>`;
+    },
+
+    // 5 · Listado de variantes ---------------------------------------------
+    bloqueVariantes(dentro) {
+      const f = this._fVar.trim().toLowerCase();
+      const lista = this.ordenadas(this.vars.filter(v => !f || this.nombreVar(v).toLowerCase().includes(f)));
+      const cost = this.muestraCostos();
+      return `<${dentro ? 'div' : 'section class="pd-b"'}>
+        ${dentro ? '' : `<div class="pd-h">${cost ? 'Costo y precio por variante' : 'Variantes'}
+          <span class="muted">(${this.vars.length})</span>
+          ${cost ? `<span class="pill ${this.estado().pill}" style="float:right">${UI.esc(this.estado().label)}</span>` : ''}</div>`}
+        <div class="vr-tools">
+          <input id="pd-fvar" class="busca" placeholder="Filtrar por medida, estructura, frente…" value="${UI.esc(this._fVar)}">
+          <div class="sp"></div>
+          <span class="hint">${this.activas().length} activas · ${this.vars.length - this.activas().length} desactivadas</span>
+        </div>
+        <div class="vr-tabla">
+        <div class="vr-head ${cost ? 'concosto' : ''}">
+          <span>Imagen</span><span>Variante</span>
+          <span class="num">Largo</span><span class="num">Alto</span>
+          <span class="num">Prof.</span><span class="num">Peso</span>
+          <span></span>
+        </div>
+        <div id="pd-vars">${lista.map(v => this.filaVar(v, cost)).join('')
+          || UI.vacio('Ninguna variante coincide con el filtro.')}</div>
+        </div>
+      </${dentro ? 'div' : 'section'}>`;
+    },
+
+    // "MEDIDAS 1.60 · ESTRUCTURA PARAÍSO · FRENTE BLANCO". Si el valor ya
+    // arranca con el nombre de la propiedad no se repite: "ESTRUCTURA BLANCA"
+    // queda así y no "ESTRUCTURA ESTRUCTURA BLANCA".
+    nombreVar(v) {
+      const ps = this.props();
+      return (this.p.propiedades || []).map(k => {
+        const val = v[k]; if (!val) return null;
+        const pr = ps.find(x => x.k === k) || { nombre: k.toUpperCase() };
+        const corto = String(pr.nombre).split(' ')[0];
+        return String(val).toUpperCase().startsWith(corto) ? val : `${corto} ${val}`;
+      }).filter(Boolean).join(' · ');
+    },
+
+    filaVar(v, cost) {
+      const off = v.activa === false;
+      // 2 × 2 cm en pantalla: se ve de qué mueble se trata sin abrir nada.
+      const img = (ref, k, tit) => { const url = this.urlDe(ref) || ref;
+        return `<button class="vimg ${url ? 'hay' : ''}" data-img="${v.id}|${k}" title="${tit}">
+        ${url ? `<img src="${UI.esc(url)}" alt="">` : `<span class="vimg-v">${k === 'imgProd' ? '📐' : '📷'}</span>`}
+        <span class="vimg-e">✎</span></button>`; };
+      // Debajo de cada medida aparece "Aplicar a todas" apenas se escribe algo:
+      // el alto y la profundidad casi siempre son iguales en todas las
+      // variantes, y cargarlos de a uno en 27 filas no tiene sentido.
+      const campo = (attr, val, uni) => `<div class="vr-x">
+        <div class="vr-xi"><input inputmode="decimal" class="pn"
+          data-${attr}="${v.id}" value="${val || ''}" placeholder="—" ${this.puedeEditar() ? '' : 'readonly'}
+          >${uni ? `<span class="uni">${uni}</span>` : ''}</div>
+        <button class="aplic" data-aplic="${attr}|${v.id}" hidden>⊞ Aplicar a todas</button>
+      </div>`;
+      // Acá van las características del mueble y nada más: el plano vive en
+      // Producción y el stock en Inventario.
+      return `<div class="vr ${off ? 'off' : ''}" data-v="${v.id}">
+        ${img(v.imgVenta, 'imgVenta', 'Imagen de venta — sale impresa en la cotización')}
+        <div class="vr-n">
+          <button class="vr-nom" data-abrir="${v.id}">${UI.esc(this.nombreVar(v))}</button>
+          <div class="vr-sku tnum">${UI.esc(v.sku || global.DB.skuDe(this.p, v))}${
+            off ? ' · <b class="warn-t">desactivada</b>' : ''}</div>
+        </div>
+        ${campo('largo', v.frenteCm, 'cm')}${campo('alto', v.alto, 'cm')}
+        ${campo('prof', v.prof, 'cm')}${campo('peso', v.peso, 'kg')}
+        <div class="vr-a">
+          <button class="lx" data-hist="${v.id}" title="Historial">↺</button>
+        </div>
+      </div>`;
+    },
+
+    // El historial de precio todavía no se guarda: hace falta la tabla.
+    historial(id) {
+      const v = this.vars.find(x => x.id === id); if (!v) return;
+      this.modal(`
+        <h3 class="h-title" style="font-size:17px">Historial de precio</h3>
+        <p class="h-sub">${UI.esc(this.nombreVar(v))}</p>
+        <div class="banner info" style="margin:14px 0 0">Todavía no se guardan los cambios de precio.
+          Cuando esté la tabla, acá va a estar cada cambio con la fecha y quién lo hizo.</div>
+        <div class="row" style="margin-top:16px;justify-content:flex-end">
+          <button class="btn" onclick="document.getElementById('mdlz').remove()">Cerrar</button>
+        </div>`, 460);
+    },
+
+    // 6 · Simulador --------------------------------------------------------
+    // Mover costo o precio y ver qué pasa, SIN tocar los datos reales.
+    bloqueSimulador() {
+      const v = this.vars.find(x => x.activa !== false) || this.vars[0];
+      if (!v) return '';
+      this._sim = this._sim || { id: v.id, costo: v.costo, precio: v.precio };
       return `<section class="pd-b">
+        <div class="pd-h">Simular <span class="muted">· no modifica los datos reales</span></div>
+        <div class="sim-sel">
+          <select id="sim-v">${this.vars.map(x =>
+            `<option value="${x.id}" ${this._sim.id === x.id ? 'selected' : ''}>${UI.esc(this.nombreVar(x))}</option>`).join('')}</select>
+        </div>
+        <div class="sim-g">
+          <label>Costo <b class="tnum" id="sim-cl">${UI.pesos(this._sim.costo)}</b>
+            <input type="range" id="sim-c" min="0" max="${Math.max(1, this._sim.costo * 3)}" value="${this._sim.costo}"></label>
+          <label>Precio de lista <b class="tnum" id="sim-pl">${UI.pesos(this._sim.precio)}</b>
+            <input type="range" id="sim-p" min="0" max="${Math.max(1, this._sim.precio * 2)}" value="${this._sim.precio}"></label>
+        </div>
+        <div class="banda"><div class="bz crit"></div><div class="bz warn"></div><div class="bz ok"></div>
+          <div class="b-obj" id="sim-obj"></div><div class="b-pin" id="sim-pin"></div></div>
+        <div class="banda-l"><span>1,00x</span><span>1,60x</span><span>1,90x</span><span>3,00x</span></div>
+        <div class="sim-kv">
+          <div><span>Markup</span><b id="sim-mk">—</b></div>
+          <div><span>Margen</span><b id="sim-mg">—</b></div>
+          <div><span>Ganancia por unidad</span><b id="sim-gan">—</b></div>
+          <div><span>Objetivo</span><b id="sim-ob">—</b></div>
+        </div>
+      </section>`;
+    },
+
+    // Cómo se entrega. Es una característica del mueble, así que va en
+    // Información general y no en Otros.
+    bloqueEntrega() {
+      const p = this.p, ed = this.puedeEditar();
+      return `<label class="chk"><input type="checkbox" id="pd-inst" ${p.instalacion ? 'checked' : ''}
+          ${ed ? '' : 'disabled'}> Requiere instalación</label>
+        <div class="hint">${p.instalacion
+          ? 'En la orden va a saltar solo, con <b>a convenir</b>; el costo se define en Instalaciones, no acá.'
+          : 'En la orden sale <b>no requiere instalación</b> por default, y el vendedor puede editarlo.'}</div>
+        <div class="fr" style="margin-top:11px"><label for="pd-bultos">Bultos para el embalaje</label>
+          <input id="pd-bultos" inputmode="numeric" value="${UI.esc(p.bultos || '')}"
+            placeholder="1" ${ed ? '' : 'readonly'}></div>
+        <div class="fr"><label></label><span class="hint">En cuántos bultos viaja una unidad. Es lo que
+          usa la subida por escalera, que se cobra por piso y por bulto.</span></div>`;
+    },
+
+    // Quién fabrica el mueble. Primero cuántos hacen falta y después quiénes
+    // son: un rack con el módulo laqueado y las patas de hierro necesita dos
+    // —carpintería y herrería— y Producción tiene que saberlo para no dar por
+    // listo un pedido al que le falta una parte.
+    bloqueQuienFabrica() {
+      const p = this.p, ed = this.puedeEditar();
+      const n = Math.min(3, Math.max(1, Number(p.nProveedores) || 1));
+      const provs = p.proveedores || [];
+      const lista = global.DB.proveedores();
+      const faltan = Array.from({ length: n }, (_, i) => provs[i]).filter(x => !x).length;
+
+      const campo = i => `<div class="fr">
+        <label for="pv-prov-${i}">${n === 1 ? 'Proveedor' : `Proveedor ${i + 1}`}</label>
+        <div class="fx">
+          <select id="pv-prov-${i}" data-prov="${i}" ${ed ? '' : 'disabled'}>
+            <option value="">Elegir…</option>
+            ${lista.map(x => `<option ${provs[i] === x ? 'selected' : ''}>${UI.esc(x)}</option>`).join('')}
+          </select>
+          ${ed ? `<button class="btn" data-nuevoprov="${i}">＋</button>` : ''}
+        </div></div>`;
+
+      return `<section class="pd-b">
+        <div class="pd-h">Quién lo fabrica</div>
+        <div class="segm">${[1, 2, 3].map(x => `
+          <button class="seg ${n === x ? 'on' : ''}" data-nprov="${x}" ${ed ? '' : 'disabled'}>
+            ${x} ${x === 1 ? 'proveedor' : 'proveedores'}</button>`).join('')}</div>
+        <div class="hint" style="margin:7px 0 11px">${n === 1
+          ? 'Un solo proveedor lo entrega terminado.'
+          : `Hacen falta <b>${n}</b> para terminarlo. Ej: el módulo laqueado lo hace carpintería y las patas, herrería.`}</div>
+
+        ${Array.from({ length: n }, (_, i) => campo(i)).join('')}
+
+        ${faltan ? `<div class="banner warn" style="margin-top:9px">Falta${faltan === 1 ? '' : 'n'}
+          cargar <b>${faltan}</b> ${faltan === 1 ? 'proveedor' : 'proveedores'}. Producción no va a poder
+          armar el pedido completo.</div>` : ''}
+        <div class="hint" style="margin-top:8px">Los proveedores son los mismos para todo el sistema:
+          el que se carga acá queda disponible en cualquier otro mueble.</div>
+      </section>`;
+    },
+
+    // Todo lo que no entra en las otras solapas pero hay que definir igual:
+    // con quién se fabrica, cómo se entrega, cómo se factura y contra qué
+    // cuenta se imputa.
+    tabOtros() {
+      const p = this.p, c = p.contabilidad || {}, ed = this.puedeEditar();
+      return `
+      <section class="pd-b">
+        <div class="pd-h">Facturación</div>
+        <div class="fr"><label for="pd-cfact">Concepto en la factura</label>
+          <input id="pd-cfact" value="${UI.esc(p.conceptoFactura || '')}"
+            placeholder="El nombre del mueble" ${ed ? '' : 'readonly'}></div>
+        <div class="fr"><label></label><span class="hint">En blanco sale el nombre del mueble.</span></div>
+        <div class="fr" style="margin-top:9px"><label for="pd-iva">IVA</label>
+          <select id="pd-iva" ${ed ? '' : 'disabled'}>
+            <option value="21" ${String(p.iva ?? 21) === '21' ? 'selected' : ''}>21 %</option>
+            <option value="10.5" ${String(p.iva) === '10.5' ? 'selected' : ''}>10,5 %</option>
+            <option value="0" ${String(p.iva) === '0' ? 'selected' : ''}>Exento</option>
+          </select></div>
+      </section>
+
+      <section class="pd-b">
+        <div class="pd-h">Imputación contable</div>
+        <div class="banner info">El <b>plan de cuentas</b> todavía no está cargado. Cuando esté, estos
+          dos campos van a ser una lista para elegir, y en blanco heredan la cuenta de la categoría.</div>
+        <div class="fr"><label for="pd-cta-v">Cuenta de ingreso</label>
+          <input id="pd-cta-v" value="${UI.esc(c.ingresos || '')}" placeholder="De la categoría"
+            ${ed ? '' : 'readonly'}></div>
+        <div class="fr"><label></label><span class="hint">A dónde va la plata cuando se vende
+          este mueble.</span></div>
+        <div class="fr" style="margin-top:9px"><label for="pd-cta-c">Cuenta de gasto</label>
+          <input id="pd-cta-c" value="${UI.esc(c.gastos || '')}" placeholder="De la categoría"
+            ${ed ? '' : 'readonly'}></div>
+        <div class="fr"><label></label><span class="hint">Contra qué cuenta se imputa cuando se compra
+          o se fabrica.</span></div>
+      </section>
+
+      <section class="pd-b">
+        <div class="pd-h">Visibilidad</div>
+        <label class="chk"><input type="checkbox" id="pd-pub" ${p.publicado ? 'checked' : ''}
+          ${ed ? '' : 'disabled'}> Mostrar a los vendedores</label>
+        <div class="hint">Oculto no aparece para cotizar. Cada variante además se puede mostrar o
+          esconder por separado.</div>
+      </section>`;
+    },
+
+    // Cómo se rastrea el stock de este mueble y cuánto hay que tener.
+    RASTREO: [
+      { k: 'serie', label: 'Por número de serie único',
+        pie: 'Cada unidad es distinta y lleva su código. Si hay 12 mesas de luz Miami blancas, son 12 unidades distintas y se sabe cuál salió en cada orden.' },
+      { k: 'lote', label: 'Por lotes',
+        pie: 'Las unidades de una misma tanda comparten identificación. Sirve cuando lo que importa es de qué producción salió, no cuál pieza.' },
+      { k: 'cantidad', label: 'Por cantidad',
+        pie: 'Sólo se cuenta cuántas hay. No se puede saber cuál se entregó ni de qué tanda salió.' },
+    ],
+    // Los que se reponen contra pedido no llevan mínimo: el mínimo y la
+    // reposición van de la mano y no tienen sentido por separado.
+    REPO: [
+      { k: 'pedido', label: 'Se pide cuando se vende' },
+      { k: 'minimo', label: 'Mantener un mínimo' },
+    ],
+
+    tabInventario() {
+      const p = this.p, ed = this.puedeEditar();
+      const modo = p.rastreo || 'serie';
+      const obt = p.obtencion || 'dibujo';
+      const cual = global.DB.OBTENCION.find(x => x.k === obt) || global.DB.OBTENCION[0];
+      const elegido = this.RASTREO.find(x => x.k === modo) || this.RASTREO[0];
+      const conMin = this.vars.filter(v => (v.minStock || 0) > 0);
+      const faltan = conMin.filter(v => (v.stock || 0) < v.minStock);
+      const lista = this.ordenadas();
+
+      return `<section class="pd-b">
+        <div class="pd-h">Cómo se le pide al proveedor</div>
+        <div class="fr"><label for="pd-obt">Se pide</label>
+          <select id="pd-obt" ${ed ? '' : 'disabled'}>${global.DB.OBTENCION.map(x =>
+            `<option value="${x.k}" ${obt === x.k ? 'selected' : ''}>${UI.esc(x.label)}</option>`).join('')}</select></div>
+        <div class="fr"><label></label><span class="hint">${UI.esc(cual.pie)}</span></div>
+        ${obt !== 'planilla' && !this.vars.every(v => v.imgProd)
+          ? `<div class="banner warn" style="margin-top:9px">Se pide por dibujo y
+             <b>${this.vars.filter(v => !v.imgProd).length}</b> de ${this.vars.length} variantes no tienen
+             el plano cargado. Se suben en <b>Producción</b>.</div>` : ''}
+        <div class="hint" style="margin-top:9px">Cuántos proveedores hacen falta y quiénes son se
+          define en <b>Producción → Quién lo fabrica</b>.</div>
+        <div class="pd-sepl"></div>
+        <div class="fr"><label for="pd-track">Cómo se rastrea el stock</label>
+          <select id="pd-track" ${ed ? '' : 'disabled'}>${this.RASTREO.map(x =>
+            `<option value="${x.k}" ${modo === x.k ? 'selected' : ''}>${UI.esc(x.label)}</option>`).join('')}</select></div>
+        <div class="fr"><label></label><span class="hint">${UI.esc(elegido.pie)}${modo === 'serie'
+          ? ' Cada unidad va a necesitar su <b>código de barras</b>; falta definir cómo se numeran.' : ''}</span></div>
+      </section>
+
+      <section class="pd-b">
+        <div class="pd-h">Stock por variante</div>
+        <div class="inv-tabla">
+          <div class="inv-head">
+            <span>Variante</span><span class="num">Stock</span>
+            <span class="num">Stock mínimo deseado</span><span></span>
+          </div>
+          ${lista.map(v => {
+            const min = Number(v.minStock) || 0;
+            const falta = min > 0 && (v.stock || 0) < min;
+            return `<div class="inv-r ${v.activa === false ? 'off' : ''}">
+              <div><b>${UI.esc(this.nombreVar(v))}</b>
+                <div class="vr-sku tnum">${UI.esc(v.sku || global.DB.skuDe(this.p, v))}</div></div>
+              <div class="num"><input class="pn" inputmode="numeric" data-stock="${v.id}"
+                value="${v.stock || 0}" ${ed ? '' : 'readonly'}></div>
+              <div class="num"><input class="pn" inputmode="numeric" data-min="${v.id}"
+                value="${min || ''}" placeholder="—" ${ed ? '' : 'readonly'}></div>
+              <div>${falta
+                ? `<span class="pill warn">faltan ${min - (v.stock || 0)}</span>`
+                : (min ? '<span class="pill ok">cubierto</span>' : '')}</div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div class="hint" style="margin-top:9px">Todo se repone cuando se vende. El <b>mínimo deseado</b>
+          es aparte: lo que querés tener siempre en el depósito, aunque nadie lo haya pedido.</div>
+        ${conMin.length ? `<div class="banner ${faltan.length ? 'warn' : 'info'}" style="margin-top:10px">
+          ${faltan.length
+            ? `<b>${faltan.length}</b> ${faltan.length === 1 ? 'variante está' : 'variantes están'} por debajo del mínimo.
+               Cuando enganchemos <b>Producción</b>, esto va a generar el pedido solo.`
+            : `<b>${conMin.length}</b> ${conMin.length === 1 ? 'variante tiene' : 'variantes tienen'} mínimo y
+               ${conMin.length === 1 ? 'está cubierta' : 'están cubiertas'}.`}
+        </div>` : ''}
+      </section>`;
+    },
+
+    // Quién fabrica el mueble. Primero cuántos hacen falta y después quiénes
+    // son: un rack con el módulo laqueado y las patas de hierro necesita dos
+    // —carpintería y herrería— y Producción tiene que saberlo para no dar por
+    // listo un pedido al que le falta una parte.
+    bloqueQuienFabrica() {
+      const p = this.p, ed = this.puedeEditar();
+      const n = Math.min(3, Math.max(1, Number(p.nProveedores) || 1));
+      const provs = p.proveedores || [];
+      const lista = global.DB.proveedores();
+      const faltan = Array.from({ length: n }, (_, i) => provs[i]).filter(x => !x).length;
+
+      const campo = i => `<div class="fr">
+        <label for="pv-prov-${i}">${n === 1 ? 'Proveedor' : `Proveedor ${i + 1}`}</label>
+        <div class="fx">
+          <select id="pv-prov-${i}" data-prov="${i}" ${ed ? '' : 'disabled'}>
+            <option value="">Elegir…</option>
+            ${lista.map(x => `<option ${provs[i] === x ? 'selected' : ''}>${UI.esc(x)}</option>`).join('')}
+          </select>
+          ${ed ? `<button class="btn" data-nuevoprov="${i}">＋</button>` : ''}
+        </div></div>`;
+
+      return `<section class="pd-b">
+        <div class="pd-h">Quién lo fabrica</div>
+        <div class="segm">${[1, 2, 3].map(x => `
+          <button class="seg ${n === x ? 'on' : ''}" data-nprov="${x}" ${ed ? '' : 'disabled'}>
+            ${x} ${x === 1 ? 'proveedor' : 'proveedores'}</button>`).join('')}</div>
+        <div class="hint" style="margin:7px 0 11px">${n === 1
+          ? 'Un solo proveedor lo entrega terminado.'
+          : `Hacen falta <b>${n}</b> para terminarlo. Ej: el módulo laqueado lo hace carpintería y las patas, herrería.`}</div>
+
+        ${Array.from({ length: n }, (_, i) => campo(i)).join('')}
+
+        ${faltan ? `<div class="banner warn" style="margin-top:9px">Falta${faltan === 1 ? '' : 'n'}
+          cargar <b>${faltan}</b> ${faltan === 1 ? 'proveedor' : 'proveedores'}. Producción no va a poder
+          armar el pedido completo.</div>` : ''}
+        <div class="hint" style="margin-top:8px">Los proveedores son los mismos para todo el sistema:
+          el que se carga acá queda disponible en cualquier otro mueble.</div>
+      </section>`;
+    },
+
+    // Todo lo que no entra en las otras solapas pero hay que definir igual:
+    // con quién se fabrica, cómo se entrega, cómo se factura y contra qué
+    // cuenta se imputa.
+    tabOtros() {
+      const p = this.p, c = p.contabilidad || {}, ed = this.puedeEditar();
+      return `
+      <section class="pd-b">
+        <div class="pd-h">Facturación</div>
+        <div class="fr"><label for="pd-cfact">Concepto en la factura</label>
+          <input id="pd-cfact" value="${UI.esc(p.conceptoFactura || '')}"
+            placeholder="El nombre del mueble" ${ed ? '' : 'readonly'}></div>
+        <div class="fr"><label></label><span class="hint">En blanco sale el nombre del mueble.</span></div>
+        <div class="fr" style="margin-top:9px"><label for="pd-iva">IVA</label>
+          <select id="pd-iva" ${ed ? '' : 'disabled'}>
+            <option value="21" ${String(p.iva ?? 21) === '21' ? 'selected' : ''}>21 %</option>
+            <option value="10.5" ${String(p.iva) === '10.5' ? 'selected' : ''}>10,5 %</option>
+            <option value="0" ${String(p.iva) === '0' ? 'selected' : ''}>Exento</option>
+          </select></div>
+      </section>
+
+      <section class="pd-b">
+        <div class="pd-h">Imputación contable</div>
+        <div class="banner info">El <b>plan de cuentas</b> todavía no está cargado. Cuando esté, estos
+          dos campos van a ser una lista para elegir, y en blanco heredan la cuenta de la categoría.</div>
+        <div class="fr"><label for="pd-cta-v">Cuenta de ingreso</label>
+          <input id="pd-cta-v" value="${UI.esc(c.ingresos || '')}" placeholder="De la categoría"
+            ${ed ? '' : 'readonly'}></div>
+        <div class="fr"><label></label><span class="hint">A dónde va la plata cuando se vende
+          este mueble.</span></div>
+        <div class="fr" style="margin-top:9px"><label for="pd-cta-c">Cuenta de gasto</label>
+          <input id="pd-cta-c" value="${UI.esc(c.gastos || '')}" placeholder="De la categoría"
+            ${ed ? '' : 'readonly'}></div>
+        <div class="fr"><label></label><span class="hint">Contra qué cuenta se imputa cuando se compra
+          o se fabrica.</span></div>
+      </section>
+
+      <section class="pd-b">
+        <div class="pd-h">Visibilidad</div>
+        <label class="chk"><input type="checkbox" id="pd-pub" ${p.publicado ? 'checked' : ''}
+          ${ed ? '' : 'disabled'}> Mostrar a los vendedores</label>
+        <div class="hint">Oculto no aparece para cotizar. Cada variante además se puede mostrar o
+          esconder por separado.</div>
+      </section>`;
+    },
+
+    // Cómo se rastrea el stock de este mueble y cuánto hay que tener.
+    RASTREO: [
+      { k: 'serie', label: 'Por número de serie único',
+        pie: 'Cada unidad es distinta y lleva su código. Si hay 12 mesas de luz Miami blancas, son 12 unidades distintas y se sabe cuál salió en cada orden.' },
+      { k: 'lote', label: 'Por lotes',
+        pie: 'Las unidades de una misma tanda comparten identificación. Sirve cuando lo que importa es de qué producción salió, no cuál pieza.' },
+      { k: 'cantidad', label: 'Por cantidad',
+        pie: 'Sólo se cuenta cuántas hay. No se puede saber cuál se entregó ni de qué tanda salió.' },
+    ],
+    // Los que se reponen contra pedido no llevan mínimo: el mínimo y la
+    // reposición van de la mano y no tienen sentido por separado.
+    REPO: [
+      { k: 'pedido', label: 'Se pide cuando se vende' },
+      { k: 'minimo', label: 'Mantener un mínimo' },
+    ],
+
+
+    // Lo que necesita fábrica: el plano de cada variante y cómo se hace.
+    tabProduccion() {
+      const ed = this.puedeEditar();
+      const conPlano = this.vars.filter(v => v.imgProd).length;
+      return this.bloqueQuienFabrica() + `<section class="pd-b">
         <div class="pd-h">Planos de producción
           <span class="muted">· ${conPlano} de ${this.vars.length} cargados</span></div>
         <div class="planos">${this.vars.map(v => `<div class="plano">
@@ -878,8 +1552,19 @@
 
       const obt = g('pd-obt');
       if (obt && ed) obt.onchange = () => { p.obtencion = obt.value; this.guardar(); this.pintar(); };
-      const dos = g('pd-dos');
-      if (dos && ed) dos.onchange = () => { p.dosProveedores = dos.checked; this.guardar(); this.pintar(); };
+      document.querySelectorAll('[data-nprov]').forEach(b => b.onclick = () => {
+        p.nProveedores = Number(b.dataset.nprov);
+        // Si baja la cantidad, los que sobran se descartan.
+        p.proveedores = (p.proveedores || []).slice(0, p.nProveedores);
+        this.guardar(); this.pintar();
+      });
+      document.querySelectorAll('[data-prov]').forEach(sl => sl.onchange = () => {
+        p.proveedores = p.proveedores || [];
+        p.proveedores[Number(sl.dataset.prov)] = sl.value;
+        this.guardar(); this.pintar();
+      });
+      document.querySelectorAll('[data-nuevoprov]').forEach(b => b.onclick = () =>
+        this.modalProveedor(Number(b.dataset.nuevoprov)));
       if (g('pd-inst') && ed) g('pd-inst').onchange = e => {
         p.instalacion = e.target.checked; this.guardar(); this.pintar();
       };
@@ -1804,25 +2489,32 @@
       };
     },
 
-    modalProveedor() {
+    // Dar de alta un proveedor desde acá. Queda en la lista del sistema y
+    // seleccionado en el lugar desde el que se abrió.
+    modalProveedor(pos) {
       const cerrar = this.modal(`
-        <h3 class="h-title" style="font-size:17px">Agregar proveedor</h3>
-        <p class="h-sub">Quién puede fabricar o traer este mueble. El costo del mueble sale del
-          promedio de lo que pasa cada uno.</p>
+        <h3 class="h-title" style="font-size:17px">Nuevo proveedor</h3>
+        <p class="h-sub">Queda disponible para todos los muebles, no sólo para éste.</p>
         <label class="fld" style="margin-top:12px"><span class="lbl">Nombre</span>
-          <input id="mpr-n" placeholder="Tony, Andrés, Luciano…"></label>
+          <input id="mpr-n" placeholder="Tony, Herrería Sur, Laqueados Vera…"></label>
         <div class="row" style="margin-top:16px;justify-content:flex-end;gap:10px">
           <button class="btn" id="mpr-x">Cancelar</button>
-          <button class="btn primary" id="mpr-ok">Agregar</button>
+          <button class="btn primary" id="mpr-ok">Crear</button>
         </div>`, 440);
       document.getElementById('mpr-x').onclick = cerrar;
-      document.getElementById('mpr-ok').onclick = () => {
+      const crear = () => {
         const n = document.getElementById('mpr-n').value.trim();
         if (!n) return UI.aviso('Poné el nombre', 'warn');
+        const guardado = global.DB.crearProveedor(n);
+        if (guardado.toLowerCase() !== n.toLowerCase()) {
+          UI.aviso(`Ya existía como "${guardado}" — se usa ese`, 'ok');
+        }
         this.p.proveedores = this.p.proveedores || [];
-        this.p.proveedores.push({ nombre: n });
+        this.p.proveedores[pos || 0] = guardado;
         this.guardar(); cerrar(); this.pintar();
       };
+      document.getElementById('mpr-ok').onclick = crear;
+      document.getElementById('mpr-n').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); crear(); } };
     },
 
     estilos() {
@@ -2071,6 +2763,13 @@
         .sim-kv span{display:block;font-size:11px;color:var(--muted)}
         .sim-kv b{font-size:15px;color:var(--navy)}
         .rutas{display:flex;gap:18px;flex-wrap:wrap}
+        /* Botonera de una sola opción: cuántos proveedores hacen falta. */
+        .segm{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+        .seg{border:0;background:var(--panel);font:inherit;font-size:12.5px;font-weight:650;
+          color:var(--ink-soft);padding:7px 14px;cursor:pointer}
+        .seg+.seg{border-left:1px solid var(--line)}
+        .seg:hover{background:var(--panel-2);color:var(--navy)}
+        .seg.on{background:var(--brand);color:#fff}
         .ad-t{font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px}
         .inv-tabla{overflow-x:auto;margin:0 -14px;padding:0 14px}
         .inv-head,.inv-r{display:grid;min-width:640px;

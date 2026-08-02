@@ -195,7 +195,7 @@
       { id: 1, categoria_id: 2, nombre: 'CÓMODA AMBERES 55', publicado_tn: true, sku: 'CO-AMB-55',
         desc: 'Cómoda de 4 cajones con guías de extracción total y tiradores embutidos. El clásico de la línea Amberes.',
         alto: 0.85, prof: 0.45, materiales: 'MDF 18 mm laqueado · guías telescópicas · tiradores de aluminio', dias: 32,
-        proveedores: [{ nombre: 'Tony' }, { nombre: 'Andrés' }, { nombre: 'Luciano' }],
+        nProveedores: 1, proveedores: ['Tony'],
         obtencion: 'dibujo', instalacion: false },
       { id: 4, categoria_id: 2, nombre: 'CÓMODA OLIVER 60', publicado_tn: true, sku: 'CO-OLI-60',
         desc: 'Seis cajones sobre patas de madera maciza. Frente ranurado, sin tiradores a la vista.',
@@ -206,7 +206,7 @@
       { id: 2, categoria_id: 3, nombre: 'PLACARD OLIVER', publicado_tn: true, sku: 'PL-OLI',
         desc: 'Placard de dos y tres puertas con interior armado: barral, estantes y cajonera.',
         alto: 2.10, prof: 0.55, materiales: 'MDF 18 mm · barral cromado · bisagras con freno', dias: 40,
-        proveedores: [{ nombre: 'Tony' }], obtencion: 'dibujo', instalacion: true },
+        nProveedores: 1, proveedores: ['Tony'], obtencion: 'dibujo', instalacion: true },
       { id: 6, categoria_id: 3, nombre: 'PLACARD AMBERES 2 PUERTAS', publicado_tn: true, sku: 'PL-AMB-2P',
         desc: 'Dos puertas batientes con cajonera interna de tres cajones y estante alto.',
         alto: 2.00, prof: 0.55, materiales: 'MDF 18 mm laqueado · bisagras con freno', dias: 40 },
@@ -228,7 +228,7 @@
       { id: 12, categoria_id: 7, nombre: 'MUEBLE TV TASOS 55', publicado_tn: true, sku: 'S-MT-TA',
         desc: 'Mueble de TV de 1,60 con cuatro cajones y frente ranurado. La base se retira en los cuatro lados y el corte de la tapa es a 45°.',
         alto: 0.55, prof: 0.40, materiales: 'MDF 18 mm · frente ranurado · corte 45° · guías telescópicas', dias: 32,
-        proveedores: [{ nombre: 'Tony' }, { nombre: 'Andrés' }],
+        nProveedores: 2, proveedores: ['Tony', 'Herrería Sur'],
         obtencion: 'dibujo', instalacion: false },
       { id: 11, categoria_id: 7, nombre: 'RACK OSLO 1.80', publicado_tn: true, sku: 'RK-OSL-180',
         desc: 'Dos cajones y un módulo abierto, sobre patas de madera. La versión larga del living Oslo.',
@@ -543,6 +543,33 @@
       return (data || []).map(p => ({ ...p, variantes: p.variante?.[0]?.count ?? 0 }));
     },
 
+    // ---- Proveedores ------------------------------------------------------
+    // Una sola lista para todo el sistema: si se carga uno desde la ficha de
+    // un mueble, queda disponible en todos lados. Cuando exista la pantalla
+    // de Proveedores va a leer de acá mismo.
+    PROV_KEY: 'bh_proveedores',
+    PROV_BASE: ['Tony', 'Andrés', 'Luciano', 'Herrería Sur', 'Laqueados Vera'],
+    proveedores() {
+      let guardados = [];
+      try { guardados = JSON.parse(localStorage.getItem(this.PROV_KEY)) || []; } catch {}
+      const out = [...this.PROV_BASE];
+      guardados.forEach(n => { if (!out.some(x => sinTilde(x) === sinTilde(n))) out.push(n); });
+      return out.sort((a, b) => a.localeCompare(b, 'es'));
+    },
+    // Devuelve el proveedor tal como quedó: si ya existía uno igual sin
+    // importar tildes ni mayúsculas, devuelve ESE y no crea un duplicado.
+    crearProveedor(nombre) {
+      const n = String(nombre || '').trim();
+      if (!n) return null;
+      const ya = this.proveedores().find(x => sinTilde(x) === sinTilde(n));
+      if (ya) return ya;
+      let guardados = [];
+      try { guardados = JSON.parse(localStorage.getItem(this.PROV_KEY)) || []; } catch {}
+      guardados.push(n);
+      try { localStorage.setItem(this.PROV_KEY, JSON.stringify(guardados)); } catch {}
+      return n;
+    },
+
     // Alta de categoría desde la ficha del mueble, sin ir hasta Familias.
     crearCategoria(nombre, padreId) {
       const n = String(nombre || '').trim(); if (!n) return null;
@@ -562,13 +589,15 @@
         pie: 'Se le manda el plano de producción de la variante. Sin el plano cargado, el pedido no se puede armar.' },
       { k: 'planilla', label: 'Se pide por planilla',
         pie: 'Se le manda la planilla de pedido con las medidas y los materiales, sin plano.' },
-      { k: 'ambos', label: 'Se pide por dibujo y planilla',
-        pie: 'Necesita las dos cosas: el plano y la planilla.' },
+      { k: 'mixta', label: 'Mixta',
+        pie: 'Necesita las dos cosas: el plano y la planilla de pedido.' },
     ],
     // Lo que todo mueble tiene aunque no se haya cargado todavía.
     _defProd(p) {
       return {
-        proveedores: [], obtencion: 'dibujo', dosProveedores: false, instalacion: false,
+        // Cuántos proveedores hacen falta para terminarlo y quiénes son. Un
+        // rack con módulo laqueado y patas de hierro necesita dos.
+        nProveedores: 1, proveedores: [], obtencion: 'dibujo', instalacion: false,
         // Cada mueble es distinto: 12 mesas de luz iguales son 12 unidades
         // distintas, y hay que saber cuál salió en cada orden.
         rastreo: 'serie',
