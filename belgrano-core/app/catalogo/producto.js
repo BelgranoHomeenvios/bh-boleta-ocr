@@ -46,7 +46,11 @@
         // que se fueron cargando. El diccionario escribe "1,60" y la variante
         // "1.60": se comparan normalizados o no se encontrarían nunca.
         const norm = x => String(x || '').replace(',', '.').toLowerCase().trim();
-        const pos = new Map(d.valores.map((v, i) => [norm(v), i]));
+        // Si el mismo valor está dos veces escrito distinto ("1,60" y "1.60"),
+        // manda la primera aparición: si no, la copia del final pisa la
+        // posición real y el orden que se acaba de guardar no se ve.
+        const pos = new Map();
+        d.valores.forEach((v, i) => { if (!pos.has(norm(v))) pos.set(norm(v), i); });
         const hay = [...new Set(this.vars.map(v => v[k]).filter(Boolean))];
         const usados = hay.sort((a, b) => {
           const ia = pos.has(norm(a)) ? pos.get(norm(a)) : Infinity;
@@ -179,7 +183,10 @@
         + this.modulo('variantes', 3, 'Variantes',
           `${this.vars.length} ${this.vars.length === 1 ? 'variante' : 'variantes'} · ${this.activas().length} activas`,
           this.bloqueVariantes(true), this.vars.length > 0)
-;
+        + this.modulo('entrega', 4, 'Entrega',
+          `${this.p.instalacion ? 'Requiere instalación' : 'Sin instalación'} · `
+          + `${this.p.bultos || 1} ${(this.p.bultos || 1) === 1 ? 'bulto' : 'bultos'}`,
+          this.bloqueEntrega(), true);
     },
     // El precio de EFECTIVO es el que se carga: es lo que realmente entra. El
     // de lista sale solo aplicándole el descuento al revés, y el margen y el
@@ -245,16 +252,11 @@
       </section>`;
     },
 
-    // Todo lo que no entra en las otras solapas pero hay que definir igual:
-    // con quién se fabrica, cómo se entrega, cómo se factura y contra qué
-    // cuenta se imputa.
-    tabOtros() {
-      const p = this.p, c = p.contabilidad || {}, ed = this.puedeEditar();
-      return this.bloqueProveedores() + `
-
-      <section class="pd-b">
-        <div class="pd-h">Entrega</div>
-        <label class="chk"><input type="checkbox" id="pd-inst" ${p.instalacion ? 'checked' : ''}
+    // Cómo se entrega. Es una característica del mueble, así que va en
+    // Información general y no en Otros.
+    bloqueEntrega() {
+      const p = this.p, ed = this.puedeEditar();
+      return `<label class="chk"><input type="checkbox" id="pd-inst" ${p.instalacion ? 'checked' : ''}
           ${ed ? '' : 'disabled'}> Requiere instalación</label>
         <div class="hint">${p.instalacion
           ? 'En la orden va a saltar solo, con <b>a convenir</b>; el costo se define en Instalaciones, no acá.'
@@ -263,8 +265,15 @@
           <input id="pd-bultos" inputmode="numeric" value="${UI.esc(p.bultos || '')}"
             placeholder="1" ${ed ? '' : 'readonly'}></div>
         <div class="fr"><label></label><span class="hint">En cuántos bultos viaja una unidad. Es lo que
-          usa la subida por escalera, que se cobra por piso y por bulto.</span></div>
-      </section>
+          usa la subida por escalera, que se cobra por piso y por bulto.</span></div>`;
+    },
+
+    // Todo lo que no entra en las otras solapas pero hay que definir igual:
+    // con quién se fabrica, cómo se entrega, cómo se factura y contra qué
+    // cuenta se imputa.
+    tabOtros() {
+      const p = this.p, c = p.contabilidad || {}, ed = this.puedeEditar();
+      return this.bloqueProveedores() + `
 
       <section class="pd-b">
         <div class="pd-h">Facturación</div>
@@ -562,8 +571,10 @@
             ${ed ? '<span class="prow-drag" title="Arrastrar para cambiar el orden">⠿</span>' : ''}
             <div class="prow-i">
               <div class="prow-n">${UI.esc(p.nombre)}</div>
-              <div class="chips">${p.usados.map(v =>
-                `<span class="chip">${UI.esc(v)}</span>`).join('')
+              <div class="chips" data-vals="${UI.esc(p.k)}">${p.usados.map(v =>
+                `<span class="chip val" draggable="${ed}" data-val="${UI.esc(v)}"
+                  ${ed ? 'title="Arrastrá para cambiar el orden"' : ''}
+                  >${ed ? '<span class="chip-drag">⠿</span>' : ''}${UI.esc(v)}</span>`).join('')
                 || '<span class="hint">Sin valores todavía.</span>'}
                 ${ed ? `<button class="chip-add" data-addv="${UI.esc(p.k)}">＋ Agregar</button>` : ''}</div>
             </div>
@@ -571,8 +582,8 @@
               title="Editar ${UI.esc(p.nombre)}">›</button>
           </div>`).join('') || '<div class="hint">Este mueble todavía no tiene propiedades.</div>'}
         </div>
-        ${ed && ps.length > 1 ? '<div class="hint" style="margin-top:7px">Arrastrá una propiedad para '
-          + 'cambiar el orden: es el que ordena las variantes de abajo.</div>' : ''}
+        ${ed && ps.length ? '<div class="hint" style="margin-top:7px">Arrastrá una <b>propiedad</b> o un '
+          + '<b>valor</b> para cambiar el orden: es el que ordena las variantes de abajo.</div>' : ''}
         ${ed ? `<div class="prow-add">
           <button class="btn" id="pd-addprop">⊕ Agregar propiedad</button>
         </div>` : ''}
@@ -597,10 +608,10 @@
         </div>
         <div class="vr-tabla">
         <div class="vr-head ${cost ? 'concosto' : ''}">
-          <span>Imagen<br>venta</span><span>Imagen<br>producción</span><span>Variante</span><span>Stock</span>
-          ${cost ? `<span class="num">Costo</span><span class="num">Precio</span><span class="num">Markup</span>`
-            : `<span class="num">Largo</span><span class="num">Alto</span><span class="num">Prof.</span><span class="num">Peso</span>`}
-          <span>Acciones</span>
+          <span>Imagen</span><span>Variante</span>
+          <span class="num">Largo</span><span class="num">Alto</span>
+          <span class="num">Prof.</span><span class="num">Peso</span>
+          <span></span>
         </div>
         <div id="pd-vars">${lista.map(v => this.filaVar(v, cost)).join('')
           || UI.vacio('Ninguna variante coincide con el filtro.')}</div>
@@ -622,49 +633,36 @@
     },
 
     filaVar(v, cost) {
-      const mk = this.markupDe(v), banda = global.DB.bandaDe(mk);
       const off = v.activa === false;
       // 2 × 2 cm en pantalla: se ve de qué mueble se trata sin abrir nada.
       const img = (ref, k, tit) => { const url = this.urlDe(ref) || ref;
         return `<button class="vimg ${url ? 'hay' : ''}" data-img="${v.id}|${k}" title="${tit}">
         ${url ? `<img src="${UI.esc(url)}" alt="">` : `<span class="vimg-v">${k === 'imgProd' ? '📐' : '📷'}</span>`}
         <span class="vimg-e">✎</span></button>`; };
-      const campo = (attr, val, uni) => `<div class="vr-x"><input inputmode="decimal" class="pn"
-        data-${attr}="${v.id}" value="${val || ''}" placeholder="—" ${this.puedeEditar() ? '' : 'readonly'}
-        >${uni ? `<span class="uni">${uni}</span>` : ''}</div>`;
-      return `<div class="vr ${off ? 'off' : ''} ${cost ? 'concosto' : ''}" data-v="${v.id}">
+      // Debajo de cada medida aparece "Aplicar a todas" apenas se escribe algo:
+      // el alto y la profundidad casi siempre son iguales en todas las
+      // variantes, y cargarlos de a uno en 27 filas no tiene sentido.
+      const campo = (attr, val, uni) => `<div class="vr-x">
+        <div class="vr-xi"><input inputmode="decimal" class="pn"
+          data-${attr}="${v.id}" value="${val || ''}" placeholder="—" ${this.puedeEditar() ? '' : 'readonly'}
+          >${uni ? `<span class="uni">${uni}</span>` : ''}</div>
+        <button class="aplic" data-aplic="${attr}|${v.id}" hidden>⊞ Aplicar a todas</button>
+      </div>`;
+      // Acá van las características del mueble y nada más: el plano vive en
+      // Producción y el stock en Inventario.
+      return `<div class="vr ${off ? 'off' : ''}" data-v="${v.id}">
         ${img(v.imgVenta, 'imgVenta', 'Imagen de venta — sale impresa en la cotización')}
-        ${img(v.imgProd, 'imgProd', 'Imagen de producción — el plano que va a fábrica')}
         <div class="vr-n">
           <button class="vr-nom" data-abrir="${v.id}">${UI.esc(this.nombreVar(v))}</button>
           <div class="vr-sku tnum">${UI.esc(v.sku || global.DB.skuDe(this.p, v))}${
             off ? ' · <b class="warn-t">desactivada</b>' : ''}</div>
         </div>
-        <div class="vr-st">${v.stock > 0
-          ? `<b class="tnum ok-t">${v.stock}</b>`
-          : (v.reponer === 'minimo'
-            ? '<span class="muted">reponer</span>'
-            : '<span class="inf">∞ a pedido</span>')}</div>
-        ${cost ? `${campo('costo', v.costo)}${campo('precio', v.precio)}
-          <div class="vr-m"><span class="mk ${banda.pill}">${mk ? mk.toFixed(2).replace('.', ',') + 'x' : '—'}</span></div>`
-          : `${campo('largo', v.frenteCm, 'cm')}${campo('alto', v.alto, 'cm')}
-             ${campo('prof', v.prof, 'cm')}${campo('peso', v.peso, 'kg')}`}
+        ${campo('largo', v.frenteCm, 'cm')}${campo('alto', v.alto, 'cm')}
+        ${campo('prof', v.prof, 'cm')}${campo('peso', v.peso, 'kg')}
         <div class="vr-a">
-          <button class="lx" data-dup="${v.id}" title="Duplicar">⧉</button>
           <button class="lx" data-hist="${v.id}" title="Historial">↺</button>
         </div>
       </div>`;
-    },
-
-    // Duplicar sirve para la variante que es casi igual a otra: se copia
-    // entera y después se le cambia lo que sea distinto.
-    duplicar(id) {
-      const v = this.vars.find(x => x.id === id); if (!v) return;
-      const copia = { ...v, id: Math.max(0, ...this.vars.map(x => x.id)) + 1, sku: '', stock: 0 };
-      this.vars.splice(this.vars.indexOf(v) + 1, 0, copia);
-      UI.aviso('Variante duplicada — cambiale lo que sea distinto', 'ok');
-      this.pintar();
-      this.abrirVariante(copia.id);
     },
 
     // El historial de precio todavía no se guarda: hace falta la tabla.
@@ -770,6 +768,7 @@
       document.querySelectorAll('[data-addv]').forEach(b =>
         b.onclick = () => this.agregarValores(b.dataset.addv));
       this.arrastrarPropiedades();
+      this.arrastrarValores();
       if (g('pd-addprop')) g('pd-addprop').onclick = () => this.desplegarPropiedades();
       document.querySelectorAll('[data-quitarcat]').forEach(b => b.onclick = () => {
         const id = Number(b.dataset.quitarcat);
@@ -902,8 +901,29 @@
         v.medidaCosteo = sl.value; global.DB.guardarVariante(v);
       });
       num('largo', 'frenteCm'); num('alto', 'alto'); num('prof', 'prof');
-      document.querySelectorAll('[data-dup]').forEach(b =>
-        b.onclick = () => this.duplicar(Number(b.dataset.dup)));
+      // Al escribir una medida aparece el botón para bajarla a todas.
+      [['largo', 'frenteCm'], ['alto', 'alto'], ['prof', 'prof'], ['peso', 'peso']].forEach(([attr]) => {
+        document.querySelectorAll(`[data-${attr}]`).forEach(i => {
+          const bt = i.closest('.vr-x') && i.closest('.vr-x').querySelector('.aplic');
+          if (!bt) return;
+          i.oninput = () => {
+            document.querySelectorAll('.aplic').forEach(x => { x.hidden = true; });
+            bt.hidden = !String(i.value).trim();
+          };
+          i.onblur = () => setTimeout(() => { if (document.activeElement !== bt) bt.hidden = true; }, 150);
+        });
+      });
+      document.querySelectorAll('[data-aplic]').forEach(b => b.onmousedown = e => {
+        e.preventDefault();
+        const [attr, id] = b.dataset.aplic.split('|');
+        const campo = { largo: 'frenteCm', alto: 'alto', prof: 'prof', peso: 'peso' }[attr];
+        const v = this.vars.find(x => x.id === Number(id)); if (!v) return;
+        const valor = Number(String(document.querySelector(`[data-${attr}="${id}"]`).value)
+          .replace(',', '.').replace(/[^\d.]/g, '')) || 0;
+        this.vars.forEach(x => { x[campo] = valor; global.DB.guardarVariante(x); });
+        UI.aviso(`${this.vars.length} variantes con ${valor}`, 'ok');
+        this.pintar();
+      });
       document.querySelectorAll('[data-hist]').forEach(b =>
         b.onclick = () => this.historial(Number(b.dataset.hist)));
     },
@@ -1137,6 +1157,55 @@
     // Agregar una propiedad A ESTE MUEBLE. No se inventa una nueva: se elige
     // entre las que ya existen en el sistema, y recién al final está la opción
     // de crear una que no exista.
+    // Los valores también se ordenan a mano: el primero de la lista es el que
+    // encabeza las variantes de abajo. Se arrastran en horizontal porque van
+    // uno al lado del otro.
+    arrastrarValores() {
+      document.querySelectorAll('[data-vals]').forEach(caja => {
+        let origen = null;
+        caja.querySelectorAll('.chip.val').forEach(c => {
+          c.ondragstart = e => {
+            origen = c; c.classList.add('drag');
+            // Sin esto Firefox no arranca el arrastre.
+            if (e.dataTransfer) e.dataTransfer.setData('text/plain', c.dataset.val);
+          };
+          c.ondragend = () => {
+            c.classList.remove('drag'); origen = null;
+            this.guardarOrdenValores(caja.dataset.vals,
+              [...caja.querySelectorAll('.chip.val')].map(x => x.dataset.val));
+          };
+          c.ondragover = e => {
+            e.preventDefault();
+            if (!origen || origen === c) return;
+            const r = c.getBoundingClientRect();
+            caja.insertBefore(origen, e.clientX < r.left + r.width / 2 ? c : c.nextSibling);
+          };
+        });
+      });
+    },
+
+    // El orden se guarda en el diccionario, que es de donde sale. Los valores
+    // que este mueble NO usa se quedan en su lugar: reordenar acá no puede
+    // moverle los valores a los otros muebles.
+    guardarOrdenValores(k, nuevos) {
+      const props = global.DB.propiedades();
+      const pr = props.find(x => x.k === k); if (!pr) return;
+      // Normalizado, porque el diccionario escribe "1,60" y la variante "1.60":
+      // son el mismo valor y tienen que ordenarse como uno solo.
+      const norm = x => String(x || '').replace(',', '.').toLowerCase().trim();
+      const usados = new Set(nuevos.map(norm));
+      const otros = pr.valores.filter(v => !usados.has(norm(v)));
+      // Los que este mueble no usa se quedan como estaban; los que sí usa van
+      // todos juntos, en el orden nuevo, donde arrancaba el primero.
+      let corte = pr.valores.findIndex(v => usados.has(norm(v)));
+      if (corte < 0) corte = pr.valores.length;
+      const antes = otros.filter(v => pr.valores.indexOf(v) < corte);
+      const despues = otros.filter(v => pr.valores.indexOf(v) >= corte);
+      pr.valores = [...antes, ...nuevos, ...despues];
+      global.DB.guardarPropiedades(props);
+      this.pintar();
+    },
+
     // El orden de las propiedades es el que ordena las variantes: si primero
     // va la medida, quedan juntas todas las de 0,40 y adentro por estructura.
     arrastrarPropiedades() {
@@ -1755,6 +1824,10 @@
         .prow-drag{color:var(--muted);cursor:grab;font-size:13px;line-height:1;letter-spacing:-2px;
           flex:none;align-self:flex-start;margin-top:2px}
         .prow.drag{opacity:.4}
+        .chip.val{cursor:grab;padding-left:6px}
+        .chip.val:active{cursor:grabbing}
+        .chip.val.drag{opacity:.4}
+        .chip-drag{color:var(--muted);font-size:11px;line-height:1;letter-spacing:-2px;margin-right:2px}
         .selprop{max-width:280px;padding:6px 9px;font-size:12.5px}
         /* Los valores adentro de la propiedad: tildar, renombrar y ordenar. */
         .vrows{border:1px solid var(--line);border-radius:9px;max-height:290px;overflow:auto}
@@ -1787,14 +1860,18 @@
            entran en 920 px, así que la tabla scrollea sola sin ensanchar la
            pantalla. */
         .vr-tabla{overflow-x:auto;margin:0 -14px;padding:0 14px}
-        .vr-head,.vr{display:grid;min-width:860px;
-          grid-template-columns:76px 76px minmax(150px,1fr) 68px 72px 72px 72px 72px 58px;
-          gap:7px;align-items:center}
-        .vr-head.concosto,.vr.concosto{min-width:760px;
-          grid-template-columns:76px 76px minmax(150px,1fr) 72px 96px 96px 64px 58px}
+        .vr-head,.vr{display:grid;min-width:700px;
+          grid-template-columns:76px minmax(180px,1fr) 76px 76px 76px 76px 50px;
+          gap:8px;align-items:center}
         .num{text-align:right}
-        .vr-x{display:flex;align-items:center;gap:3px}
+        .vr-x{position:relative}
+        .vr-xi{display:flex;align-items:center;gap:3px}
         .vr-x .pn{flex:1;min-width:0;width:auto;padding:5px 6px}
+        .aplic{position:absolute;left:0;top:100%;margin-top:3px;z-index:5;white-space:nowrap;
+          border:1px solid var(--brand);background:var(--panel);color:var(--brand);border-radius:7px;
+          padding:3px 8px;font:inherit;font-size:11px;font-weight:650;cursor:pointer;
+          box-shadow:var(--shadow)}
+        .aplic:hover{background:var(--brand-soft)}
         /* Compra y venta: una columna por propiedad y después los números. */
         .cv-tabla{overflow-x:auto;margin:0 -14px;padding:0 14px}
         .cv-h,.cv-r{display:grid;min-width:940px;gap:8px;align-items:center;

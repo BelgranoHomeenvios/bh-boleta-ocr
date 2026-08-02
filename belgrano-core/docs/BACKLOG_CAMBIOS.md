@@ -415,6 +415,33 @@ Todo en **una sola columna**, un bloque abajo del otro, y en modo edición.
   muebles publicados desde Inventario). **Producción ve todo menos costo,
   markup, margen y ganancia**, y sólo lee.
 
+### Lote 14 — APLICADO (Orden de valores, aplicar a todas, Información general limpia)
+
+**Orden de los valores**
+- ✅ 257. Los **valores se arrastran** desde el mismo bloque, uno al lado del
+  otro: el primero encabeza las variantes de abajo.
+- ✅ 258. El orden se guarda en el diccionario y los valores que **este mueble
+  no usa se quedan donde estaban**: reordenar acá no le mueve nada a los otros
+  muebles.
+- ✅ 259. **Bug encontrado**: cuando el mismo valor estaba escrito de dos formas
+  (`1,60` y `1.60`), la copia del final pisaba la posición real y el orden
+  recién guardado no se veía. Ahora manda la primera aparición.
+
+**Variantes**
+- ✅ 260. **Fuera duplicar**: las variantes salen de las propiedades, no se
+  copian de a una.
+- ✅ 261. **Aplicar a todas**: al escribir un largo, alto, profundidad o peso
+  aparece debajo el botón para bajar ese valor a todas. El alto y la
+  profundidad casi siempre son iguales y cargarlos de a uno en 27 filas no
+  tiene sentido.
+
+**Información general**
+- ✅ 262. Queda sólo la **imagen de venta** — el plano vive en Producción.
+- ✅ 263. **Fuera la columna Stock**: acá van las características del mueble; el
+  stock está en Inventario.
+- ✅ 264. **Entrega** vuelve como módulo 4: requiere instalación y bultos para
+  el embalaje. Es una característica del mueble, no un "otro".
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·
