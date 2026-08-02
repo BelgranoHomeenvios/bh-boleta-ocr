@@ -195,7 +195,7 @@
       { id: 1, categoria_id: 2, nombre: 'CÓMODA AMBERES 55', publicado_tn: true, sku: 'CO-AMB-55',
         desc: 'Cómoda de 4 cajones con guías de extracción total y tiradores embutidos. El clásico de la línea Amberes.',
         alto: 0.85, prof: 0.45, materiales: 'MDF 18 mm laqueado · guías telescópicas · tiradores de aluminio', dias: 32,
-        nProveedores: 1, proveedores: ['Tony'],
+        nProveedores: 1, rubros: ['carpinteria'],
         obtencion: 'dibujo', instalacion: false },
       { id: 4, categoria_id: 2, nombre: 'CÓMODA OLIVER 60', publicado_tn: true, sku: 'CO-OLI-60',
         desc: 'Seis cajones sobre patas de madera maciza. Frente ranurado, sin tiradores a la vista.',
@@ -206,7 +206,7 @@
       { id: 2, categoria_id: 3, nombre: 'PLACARD OLIVER', publicado_tn: true, sku: 'PL-OLI',
         desc: 'Placard de dos y tres puertas con interior armado: barral, estantes y cajonera.',
         alto: 2.10, prof: 0.55, materiales: 'MDF 18 mm · barral cromado · bisagras con freno', dias: 40,
-        nProveedores: 1, proveedores: ['Tony'], obtencion: 'dibujo', instalacion: true },
+        nProveedores: 1, rubros: ['carpinteria'], obtencion: 'dibujo', instalacion: true },
       { id: 6, categoria_id: 3, nombre: 'PLACARD AMBERES 2 PUERTAS', publicado_tn: true, sku: 'PL-AMB-2P',
         desc: 'Dos puertas batientes con cajonera interna de tres cajones y estante alto.',
         alto: 2.00, prof: 0.55, materiales: 'MDF 18 mm laqueado · bisagras con freno', dias: 40 },
@@ -228,7 +228,7 @@
       { id: 12, categoria_id: 7, nombre: 'MUEBLE TV TASOS 55', publicado_tn: true, sku: 'S-MT-TA',
         desc: 'Mueble de TV de 1,60 con cuatro cajones y frente ranurado. La base se retira en los cuatro lados y el corte de la tapa es a 45°.',
         alto: 0.55, prof: 0.40, materiales: 'MDF 18 mm · frente ranurado · corte 45° · guías telescópicas', dias: 32,
-        nProveedores: 2, proveedores: ['Tony', 'Herrería Sur'],
+        nProveedores: 2, rubros: ['carpinteria', 'herreria'],
         obtencion: 'dibujo', instalacion: false },
       { id: 11, categoria_id: 7, nombre: 'RACK OSLO 1.80', publicado_tn: true, sku: 'RK-OSL-180',
         desc: 'Dos cajones y un módulo abierto, sobre patas de madera. La versión larga del living Oslo.',
@@ -543,32 +543,75 @@
       return (data || []).map(p => ({ ...p, variantes: p.variante?.[0]?.count ?? 0 }));
     },
 
-    // ---- Proveedores ------------------------------------------------------
-    // Una sola lista para todo el sistema: si se carga uno desde la ficha de
-    // un mueble, queda disponible en todos lados. Cuando exista la pantalla
-    // de Proveedores va a leer de acá mismo.
+    // ---- Rubros y proveedores ---------------------------------------------
+    // Un mueble no se le pide a "Tony": se le pide a CARPINTERÍA, y adentro de
+    // carpintería los cinco son pares — ninguno es mejor que otro, sólo
+    // cambia cuánto puede hacer por semana. Por eso el plano y la planilla van
+    // dirigidos al rubro, no a una persona.
+    RUBROS: [
+      { k: 'carpinteria', label: 'Carpintería' },
+      { k: 'herreria', label: 'Herrería' },
+      { k: 'tapiceria', label: 'Tapicería' },
+      { k: 'vidrieria', label: 'Vidriería' },
+      { k: 'marmoleria', label: 'Marmolería' },
+      { k: 'laqueado', label: 'Laqueado' },
+    ],
+    rubro(k) { return this.RUBROS.find(r => r.k === k) || null; },
+
     PROV_KEY: 'bh_proveedores',
-    PROV_BASE: ['Tony', 'Andrés', 'Luciano', 'Herrería Sur', 'Laqueados Vera'],
-    proveedores() {
+    // capacidad = cuántas unidades entrega por semana. No es prioridad: es
+    // cuánto le cabe.
+    PROV_BASE: [
+      { nombre: 'Tony', rubro: 'carpinteria', capacidad: 12 },
+      { nombre: 'Andrés', rubro: 'carpinteria', capacidad: 8 },
+      { nombre: 'Luciano', rubro: 'carpinteria', capacidad: 10 },
+      { nombre: 'Sergio', rubro: 'carpinteria', capacidad: 6 },
+      { nombre: 'Marcelo', rubro: 'carpinteria', capacidad: 9 },
+      { nombre: 'Herrería Sur', rubro: 'herreria', capacidad: 15 },
+      { nombre: 'Carla', rubro: 'herreria', capacidad: 10 },
+      { nombre: 'Laqueados Vera', rubro: 'laqueado', capacidad: 20 },
+    ],
+    proveedores(rubro) {
       let guardados = [];
       try { guardados = JSON.parse(localStorage.getItem(this.PROV_KEY)) || []; } catch {}
-      const out = [...this.PROV_BASE];
-      guardados.forEach(n => { if (!out.some(x => sinTilde(x) === sinTilde(n))) out.push(n); });
-      return out.sort((a, b) => a.localeCompare(b, 'es'));
+      const out = this.PROV_BASE.map(x => ({ ...x }));
+      guardados.forEach(g => {
+        if (!out.some(x => sinTilde(x.nombre) === sinTilde(g.nombre))) out.push({ ...g });
+      });
+      const lista = out.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+      return rubro ? lista.filter(x => x.rubro === rubro) : lista;
+    },
+    // Cuánto puede entregar por semana todo un rubro, sumando a sus pares.
+    capacidadRubro(k) {
+      return this.proveedores(k).reduce((a, b) => a + (Number(b.capacidad) || 0), 0);
     },
     // Devuelve el proveedor tal como quedó: si ya existía uno igual sin
     // importar tildes ni mayúsculas, devuelve ESE y no crea un duplicado.
-    crearProveedor(nombre) {
+    crearProveedor(nombre, rubro, capacidad) {
       const n = String(nombre || '').trim();
       if (!n) return null;
-      const ya = this.proveedores().find(x => sinTilde(x) === sinTilde(n));
+      const ya = this.proveedores().find(x => sinTilde(x.nombre) === sinTilde(n));
       if (ya) return ya;
       let guardados = [];
       try { guardados = JSON.parse(localStorage.getItem(this.PROV_KEY)) || []; } catch {}
-      guardados.push(n);
+      const nuevo = { nombre: n, rubro: rubro || 'carpinteria', capacidad: Number(capacidad) || 0 };
+      guardados.push(nuevo);
       try { localStorage.setItem(this.PROV_KEY, JSON.stringify(guardados)); } catch {}
-      return n;
+      return nuevo;
     },
+
+    // ---- Planilla de pedido -----------------------------------------------
+    // Cómo se le pide el mueble al rubro cuando no hay dibujo. Cada columna
+    // dice de dónde sale su valor, y por eso el renglón se puede llenar solo
+    // cuando se vende: la orden pone el número, el mueble pone el modelo y la
+    // variante pone sus propiedades.
+    ORIGENES: [
+      { k: 'orden', label: 'De la orden', pie: 'N° de venta, o STOCK si es para reponer.' },
+      { k: 'producto', label: 'Del mueble', pie: 'El nombre o el código del mueble.' },
+      { k: 'propiedad', label: 'De la variante', pie: 'Una de sus propiedades: medida, tela, color…' },
+      { k: 'cantidad', label: 'Cantidad', pie: 'Cuántas unidades de ese renglón.' },
+      { k: 'libre', label: 'A mano', pie: 'Lo escribe quien arma el pedido. Ej: observaciones.' },
+    ],
 
     // Alta de categoría desde la ficha del mueble, sin ir hasta Familias.
     crearCategoria(nombre, padreId) {
@@ -597,7 +640,10 @@
       return {
         // Cuántos proveedores hacen falta para terminarlo y quiénes son. Un
         // rack con módulo laqueado y patas de hierro necesita dos.
-        nProveedores: 1, proveedores: [], obtencion: 'dibujo', instalacion: false,
+        // A qué rubros se les pide, en orden: el primero recibe el primer
+        // plano, el segundo el segundo.
+        nProveedores: 1, rubros: ['carpinteria'], obtencion: 'dibujo', instalacion: false,
+        planilla: null,
         // Cada mueble es distinto: 12 mesas de luz iguales son 12 unidades
         // distintas, y hay que saber cuál salió en cada orden.
         rastreo: 'serie',

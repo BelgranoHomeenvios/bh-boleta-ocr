@@ -490,6 +490,44 @@ Todo en **una sola columna**, un bloque abajo del otro, y en modo edición.
   vive en un solo lado.
 - ✅ 276. La tercera opción de "cómo se pide" pasa a llamarse **Mixta**.
 
+### Lote 17 — APLICADO (Producción: rubros, planos y planilla)
+
+**Los proveedores son pares, el pedido va al rubro**
+- ✅ 277. Un mueble no se le pide a "Tony": se le pide a **CARPINTERÍA**, y
+  adentro los cinco son **pares** — ninguno es mejor que otro, sólo cambia
+  cuánto entrega por semana. Por eso el plano y la planilla van dirigidos al
+  **rubro**, no a una persona.
+- ✅ 278. Cada proveedor tiene **rubro y capacidad semanal**
+  (`DB.proveedores(rubro)`, `DB.capacidadRubro()`), y el bloque muestra los
+  pares del rubro con su capacidad y la suma.
+- ✅ 279. "Quién lo fabrica" pasa a ser **1 · 2 · 3 rubros**, y el orden importa:
+  el rubro 1 recibe el primer plano y la primera columna de la planilla.
+
+**Según cómo se pide**
+- ✅ 280. **Por dibujo** → la tabla de variantes con **un plano por rubro**: el
+  de carpintería no es el de herrería, y cada uno recibe el suyo. Avisa
+  cuántos faltan por rubro.
+- ✅ 281. **Por planilla** → el **diseñador de la planilla de pedido**: cada
+  columna dice **de dónde sale su valor** (de la orden, del mueble, de la
+  variante, cantidad, o a mano). Por eso el renglón se llena solo cuando se
+  vende. Se arrastran para ordenarlas y hay una **vista previa** con las
+  primeras variantes.
+- ✅ 282. **Mixta** → las dos cosas.
+
+**Contabilidad** (era Otros)
+- ✅ 283. El **concepto de facturación** sale solo: la **categoría** del mueble
+  más **"con medidas solicitadas"**. Se pisa sólo si ese mueble se factura
+  distinto.
+- ✅ 284. Debajo el **IVA**, después la imputación contable, y al final
+  visibilidad. El **vendedor ve sólo Información general y de lectura**.
+
+**Deuda técnica saldada**
+- ✅ 285. El archivo tenía **20 métodos definidos dos, tres y hasta cuatro
+  veces**. En un objeto literal gana el último, así que funcionaba — pero
+  varias ediciones estaban tocando código muerto y no se veían. Se limpiaron
+  (159 KB → 118 KB) y se agregó `test_sanidad.cjs`, que falla si vuelve a
+  aparecer un método repetido.
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·
