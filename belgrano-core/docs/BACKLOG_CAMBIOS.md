@@ -725,6 +725,17 @@ Compra y venta · Documentos · Contabilidad.
 - ✅ 334. El desplegable y **Guardar como planilla** entran parejos en un
   renglón.
 
+### Lote 25 — APLICADO (Sin emojis y rubros por letra)
+
+- ✅ 335. **Se van los emojis** de los botones: queda sólo el texto —
+  *Agregar*, *Agregar propiedad*, *Agregar secundaria*, *Agregar proveedor*,
+  *Guardar como planilla*, *Aplicar a todas*, *Crear*, *Subir uno nuevo*.
+- ✅ 336. En Producción los bloques se numeran **1 · A · B · C**: primero
+  *Quién lo fabrica*, y después un bloque por rubro identificado con su letra
+  (**Rubro A · Carpintería**, **Rubro B · Herrería**). La letra es la misma que
+  ordena los dibujos y las planillas: el **A** recibe el primer dibujo y la
+  primera planilla, el **B** los segundos.
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·

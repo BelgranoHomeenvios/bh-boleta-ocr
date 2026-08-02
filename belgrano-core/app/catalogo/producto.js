@@ -511,9 +511,10 @@
           <button class="seg ${n === x ? 'on' : ''}" data-nprov="${x}" ${ed ? '' : 'disabled'}>
             ${x} ${x === 1 ? 'rubro' : 'rubros'}</button>`).join('')}</div>
         <div class="hint" style="margin-top:9px">${n === 1
-          ? 'Un solo rubro lo entrega terminado.'
-          : `Hacen falta <b>${n}</b> para terminarlo: el módulo laqueado lo hace carpintería y las patas, herrería.`}
-          Cada uno se carga abajo, en su propio bloque.</div>`,
+          ? 'Un solo rubro lo entrega terminado. Se carga abajo, en el bloque <b>A</b>.'
+          : `Hacen falta <b>${n}</b> para terminarlo: el módulo laqueado lo hace carpintería y las patas,
+             herrería. Cada uno se carga abajo en su propio bloque: el <b>A</b> recibe el primer dibujo
+             y la primera planilla, el <b>B</b> los segundos.`}</div>`,
         rubros.every(x => x.k));
     },
 
@@ -615,13 +616,14 @@
     bloqueRubro(r, i) {
       const ed = this.puedeEditar();
       const pares = r.k ? global.DB.proveedores(r.k) : [];
-      const nom = r.k ? this.nombreRubro(r.k) : `Rubro ${i + 1}`;
+      const letra = String.fromCharCode(65 + i);
+      const nom = r.k ? this.nombreRubro(r.k) : `Rubro ${letra}`;
       const modo = (global.DB.OBTENCION.find(o => o.k === r.modo) || {}).label || '';
       const faltan = r.k && r.modo !== 'planilla'
         ? this.ordenadas().filter(v => !(v.planos || [])[i]).length : 0;
 
       const cuerpo = `
-        <div class="fr"><label for="pd-rubro-${i}">Rubro</label>
+        <div class="fr"><label for="pd-rubro-${i}">Rubro ${letra}</label>
           <select id="pd-rubro-${i}" data-rubro="${i}" ${ed ? '' : 'disabled'}>
             <option value="">Elegir…</option>
             ${global.DB.RUBROS.map(x => `<option value="${x.k}" ${r.k === x.k ? 'selected' : ''}
@@ -632,7 +634,7 @@
           <div class="rb-pares">
             ${pares.map(x => `<span class="chip">${UI.esc(x.nombre)}</span>`).join('')
               || '<span class="hint">Todavía no hay nadie cargado en este rubro.</span>'}
-            ${ed ? `<button class="chip-add" data-nuevoprov="${r.k}">➕</button>` : ''}
+            ${ed ? `<button class="chip-add" data-nuevoprov="${r.k}">Agregar</button>` : ''}
           </div></div>` : ''}
 
         <div class="fr fr-sep"><label for="pd-modo-${i}">Cómo se pide</label>
@@ -646,7 +648,7 @@
           ${this.bloqueNotasRubro(r, i)}`
         : '<div class="hint" style="margin-top:11px">Elegí el rubro para cargarle el dibujo o la planilla.</div>'}`;
 
-      return this.modulo(`rubro${i}`, i + 2, `Rubro ${i + 1}${r.k ? ` · ${nom}` : ''}`,
+      return this.modulo(`rubro${i}`, letra, `Rubro ${letra}${r.k ? ` · ${nom}` : ''}`,
         `${r.k ? modo : 'sin definir'}${faltan ? ` · faltan ${faltan} dibujos` : ''}`,
         cuerpo, !!r.k && !faltan);
     },
@@ -740,7 +742,7 @@
             ${global.DB.planillas().map(x => `<option value="${x.k}" ${r.plantilla === x.k ? 'selected' : ''}
               >${UI.esc(x.nombre)}</option>`).join('')}
           </select>
-          ${ed ? `<button class="btn sm" data-guardarpl="${i}">➕ Guardar como planilla</button>` : ''}
+          ${ed ? `<button class="btn sm" data-guardarpl="${i}">Guardar como planilla</button>` : ''}
         </div>
         ${t ? `<div class="banner info">Usa la planilla <b>${UI.esc(t.nombre)}</b>${usos > 1
             ? `, que comparten <b>${usos}</b> muebles` : ''}. Lo que cambies acá les llega a todos.</div>`
@@ -759,7 +761,7 @@
             </th>`;
           }).join('')}
           ${ed ? `<th class="tp-add"><button class="btn sm" data-addcol="${i}"
-            title="Agregar columna">＋</button></th>` : ''}</tr></thead>
+            title="Agregar columna">+</button></th>` : ''}</tr></thead>
           <tbody>${lista.map(v => `<tr>${cols.map(c => {
             const val = this.valorPlanilla(c, v);
             return `<td class="${val ? '' : 'muted'}">${UI.esc(val || '—')}</td>`;
@@ -946,7 +948,7 @@
         return `<section class="pd-b">
           <div class="pd-h">${t.icono} ${UI.esc(t.label)} <span class="muted">(${fs.length})</span></div>
           ${ed ? `<div class="dropz chico" data-drop="${t.k}">
-            <div class="dz-t">＋ Arrastrá acá, o hacé clic para subir</div>
+            <div class="dz-t">Arrastrá acá, o hacé clic para subir</div>
             <input type="file" data-file="${t.k}" accept="image/*,application/pdf,video/*" multiple hidden>
           </div>` : ''}
           <div class="docs">${fs.map(f => `<div class="doc">
@@ -1048,13 +1050,13 @@
                   ${ed ? 'title="Arrastrá para cambiar el orden"' : ''}
                   >${ed ? '<span class="chip-drag">⠿</span>' : ''}${UI.esc(v)}</span>`).join('')
                 || '<span class="hint">Sin valores todavía.</span>'}
-                ${ed ? `<button class="chip-add" data-addv="${UI.esc(p.k)}">➕ Agregar</button>` : ''}</div>
+                ${ed ? `<button class="chip-add" data-addv="${UI.esc(p.k)}">Agregar</button>` : ''}</div>
             </div>
           </div>`).join('') || '<div class="hint">Este mueble todavía no tiene propiedades.</div>'}
         </div>
         ${ed && ps.length ? '<div class="hint" style="margin-top:7px">Arrastrá una <b>propiedad</b> o un '
           + '<b>valor</b> para cambiar el orden: es el que ordena las variantes de abajo.</div>' : ''}
-        ${ed ? '<button class="btn sm mas" id="pd-addprop">➕ Agregar propiedad</button>' : ''}
+        ${ed ? '<button class="btn sm mas" id="pd-addprop">Agregar propiedad</button>' : ''}
         ${n ? `<div class="combo" style="margin-top:9px"><b class="tnum">${n}</b> combinaciones posibles
           ${this.vars.length !== n ? `<span class="muted">· ${this.vars.length} creadas</span>` : ''}</div>` : ''}
 
@@ -1074,7 +1076,7 @@
           </span>`).join('')
             || '<span class="hint">Ninguna. La variante sale con la imagen y el nombre nada más.</span>'}
         </div>
-        ${ed ? '<button class="btn sm mas" id="pd-addsec">➕ Agregar secundaria</button>' : ''}
+        ${ed ? '<button class="btn sm mas" id="pd-addsec">Agregar secundaria</button>' : ''}
       </${dentro ? 'div' : 'section'}>`;
     },
 
@@ -1150,7 +1152,7 @@
           <div class="vr-xi"><input inputmode="decimal" class="pn" data-sec="${v.id}|${x.k}"
             value="${UI.esc(global.DB.valorSec(v, x.k))}" placeholder="—" ${ed ? '' : 'readonly'}
             >${x.unidad ? `<span class="uni">${UI.esc(x.unidad)}</span>` : ''}</div>
-          <button class="aplic" data-aplic="${v.id}|${x.k}" hidden>⧉ Aplicar a todas</button>
+          <button class="aplic" data-aplic="${v.id}|${x.k}" hidden>Aplicar a todas</button>
         </div>`).join('')}
         <div class="vr-a">
           <button class="lx" data-hist="${v.id}" title="Historial">↺</button>
@@ -1210,7 +1212,7 @@
           ${ps.map((x, i) => `<span class="chip">${UI.esc(x.nombre)}${this.puedeEditar()
             ? `<button class="chip-x" data-quitarprov="${i}" aria-label="Quitar">✕</button>` : ''}</span>`).join('')
             || '<span class="hint">Todavía no se cargó ninguno.</span>'}
-          ${this.puedeEditar() ? '<button class="chip-add" id="pd-addprov">➕ proveedor</button>' : ''}
+          ${this.puedeEditar() ? '<button class="chip-add" id="pd-addprov">Agregar proveedor</button>' : ''}
         </div>
         <div class="hint" style="margin-top:8px">Van por mueble, no por variante: los mismos hacen todas las
           medidas. El costo sale del <b>promedio</b> de lo que pasa cada uno.</div>
@@ -1533,7 +1535,7 @@
         </div>
         <div class="pd-sepl"></div>
         <div class="row">
-          <button class="btn" id="ei-subir">➕ Subir uno nuevo</button>
+          <button class="btn" id="ei-subir">Subir uno nuevo</button>
           ${actual ? '<button class="btn" id="ei-quitar">Quitar la imagen</button>' : ''}
           <div class="sp"></div>
           <button class="btn" id="ei-x">Cerrar</button>
@@ -1644,7 +1646,7 @@
                 <div class="chips">${global.DB.RECARGOS.map(r => {
                   const on = (v.recargos || []).includes(r.k);
                   return `<button class="chip-add ${on ? 'on' : ''}" data-recargo="${v.id}|${r.k}"
-                    ${ed ? '' : 'disabled'}>${on ? '✓ ' : '➕ '}${UI.esc(r.label)}
+                    ${ed ? '' : 'disabled'}>${on ? '✓ ' : ''}${UI.esc(r.label)}
                     <small>${r.tipo === '%' ? r.valor + '%' : UI.pesos(r.valor)}</small></button>`;
                 }).join('')}</div>
                 ${comp.recargos.map(r => `<div class="cx-r">
@@ -1872,7 +1874,7 @@
           </select></label>
         <div class="pd-sepl"></div>
         <div class="hint">¿No está en la lista?</div>
-        <button class="btn" id="ap-nueva" style="margin-top:7px">➕ Crear una propiedad nueva</button>
+        <button class="btn" id="ap-nueva" style="margin-top:7px">Crear una propiedad nueva</button>
         <div class="row" style="margin-top:18px;justify-content:flex-end;gap:10px">
           <button class="btn" id="ap-x">Cancelar</button>
           <button class="btn primary" id="ap-ok">Continuar</button>
@@ -1924,7 +1926,7 @@
         <div class="ad-t">Crear un valor que no está</div>
         <div class="fx">
           <input id="av-nuevo" placeholder="Ej: ESTRUCTURA ROBLE">
-          <button class="btn" id="av-crear">➕ Crear</button>
+          <button class="btn" id="av-crear">Crear</button>
         </div>
         <div class="hint" style="margin-top:5px">Queda disponible para todos los muebles del catálogo.</div>
 
@@ -2052,7 +2054,7 @@
           <b>${UI.esc(this.p.nombre)}</b>.</p>
         <div class="lbl" style="margin:11px 0 7px">Valores seleccionados</div>
         <div class="vrows" id="mp-vals">${orden.map(fila).join('')}</div>
-        ${ed ? '<button class="lnk" id="mp-add" style="margin-top:10px">⊕ Agregar valor</button>' : ''}
+        ${ed ? '<button class="lnk" id="mp-add" style="margin-top:10px">Agregar valor</button>' : ''}
         <div class="row" style="margin-top:18px;gap:10px">
           ${ed ? '<button class="btn danger ghost" id="mp-del">Quitar del mueble</button>' : ''}
           <span class="hint" id="mp-n"></span><div class="sp"></div>
@@ -2235,7 +2237,7 @@
         <p class="h-sub">Dónde entra este mueble. Se pueden marcar varias.</p>
         <div class="fx" style="margin:12px 0 10px">
           <input id="mc-q" class="busca" placeholder="Buscar categoría">
-          <button class="btn" id="mc-crear">➕ Crear</button>
+          <button class="btn" id="mc-crear">Crear</button>
         </div>
         <div class="lstc" id="mc-lista">${filas.map(({ c, r }) => `
           <label class="lc" data-txt="${UI.esc(r.join('/').toLowerCase())}">
@@ -2364,7 +2366,7 @@
         </div>
         <div class="pd-sepl"></div>
         <div class="row">
-          <button class="btn" id="ep-subir">➕ Subir uno nuevo</button>
+          <button class="btn" id="ep-subir">Subir uno nuevo</button>
           ${actual ? '<button class="btn" id="ep-quitar">Quitar</button>' : ''}
           <div class="sp"></div>
           <button class="btn" id="ep-x">Cerrar</button>
@@ -2403,7 +2405,7 @@
       };
     },
 
-    // La planilla: tocar un título abre su configuración, y el ＋ agrega una
+    // La planilla: tocar un título abre su configuración, y Agregar suma una
     // columna al final.
     engancharPlanilla() {
       if (!document.querySelector('.tp')) return;
@@ -2474,7 +2476,7 @@
           <input id="ms-n" placeholder="Ej: Medida del hueco">
           <select id="ms-u" style="max-width:190px">${global.DB.UNIDADES.map(u =>
             `<option value="${UI.esc(u.k)}">${UI.esc(u.label)}</option>`).join('')}</select>
-          <button class="btn" id="ms-crear">➕ Crear</button>
+          <button class="btn" id="ms-crear">Crear</button>
         </div>
         <div class="hint" style="margin-top:5px">La unidad sale de una lista para que todos midan
           igual. Queda disponible para todos los muebles.</div>
