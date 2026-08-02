@@ -833,6 +833,68 @@ tr:hover td{background:var(--panel-2)}
       { k: 'vendido', label: 'Ya salió', pill: 'soft' },
     ],
 
+    // ---- Cómo una propiedad se convierte en costo -------------------------
+    // Acá está la bisagra con la lista de precios. Una propiedad no es sólo un
+    // texto: ESTRUCTURA se busca en la tabla de estructuras, FRENTE en la de
+    // frentes, y RANURAS no busca nada — suma un recargo. Sin este rol, el
+    // sistema no sabe dónde ir a buscar el número.
+    ROLES: [
+      { k: 'medida', label: 'Medida', pie: 'Define la fila de la tabla de precios. Ej: 1,60.' },
+      { k: 'estructura', label: 'Estructura', pie: 'Busca el costo en la tabla de estructuras.' },
+      { k: 'frente', label: 'Frente', pie: 'Busca el costo en la tabla de frentes.' },
+      { k: 'material', label: 'Material de otro rubro', pie: 'Busca en la tabla de ese rubro. Ej: hierro, vidrio, mármol.' },
+      { k: 'terminacion', label: 'Terminación', pie: 'Laqueado, melamina, enchapado. Puede tener su propio costo.' },
+      { k: 'recargo', label: 'Recargo', pie: 'No busca nada: suma un adicional. Ej: ranuras, corte 45°.' },
+      { k: 'ninguno', label: 'Sin costo', pie: 'Distingue la variante pero no cambia el precio.' },
+    ],
+    rol(k) { return this.ROLES.find(x => x.k === k) || null; },
+    // El rol de una propiedad. Las de siempre ya lo traen por su nombre.
+    ROL_POR_DEFECTO: { medida: 'medida', estructura: 'estructura', frente: 'frente',
+      terminacion: 'terminacion' },
+    rolDe(k) {
+      const p = this.propiedad(k);
+      return (p && p.rol) || this.ROL_POR_DEFECTO[k] || 'ninguno';
+    },
+
+    // Listas de precio: de dónde sale el costo base. Se elige por mueble para
+    // no equivocarse de tabla.
+    LISTAS: [
+      { k: 'carp-2026-01', label: 'Carpintería · enero 2026', rubro: 'carpinteria', vigencia: '01/2026' },
+      { k: 'carp-2025-10', label: 'Carpintería · octubre 2025', rubro: 'carpinteria', vigencia: '10/2025' },
+      { k: 'herr-2026-01', label: 'Herrería · enero 2026', rubro: 'herreria', vigencia: '01/2026' },
+      { k: 'tapi-2025-12', label: 'Tapicería · diciembre 2025', rubro: 'tapiceria', vigencia: '12/2025' },
+      { k: 'laq-2026-01', label: 'Laqueado · enero 2026', rubro: 'laqueado', vigencia: '01/2026' },
+    ],
+    lista(k) { return this.LISTAS.find(x => x.k === k) || null; },
+    // Las listas de un rubro, para no ofrecer la de herrería al carpintero.
+    listasDe(rubro) { return this.LISTAS.filter(x => x.rubro === rubro); },
+    // Recargos que se pueden marcar en una variante.
+    RECARGOS: [
+      { k: 'ranuras', label: 'Ranuras', tipo: '%', valor: 8 },
+      { k: 'corte45', label: 'Corte 45°', tipo: '%', valor: 5 },
+      { k: 'laqueado', label: 'Laqueado extra', tipo: 'fijo', valor: 18000 },
+      { k: 'herrajes', label: 'Herrajes premium', tipo: 'fijo', valor: 25000 },
+    ],
+    recargo(k) { return this.RECARGOS.find(x => x.k === k) || null; },
+
+    // La composición del costo de una variante: qué pone cada rubro y qué
+    // suman los recargos. Con dos rubros hay dos costos, no uno.
+    composicion(prod, v) {
+      const rubros = (prod.rubros || []).map(r => (typeof r === 'string' ? { k: r } : r)).filter(x => x && x.k);
+      const porRubro = rubros.map((r, i) => ({
+        rubro: r.k,
+        label: (this.rubro(r.k) || {}).label || r.k,
+        monto: Number((v.costos || [])[i]) || (i === 0 ? Number(v.costo) || 0 : 0),
+      }));
+      const base = porRubro.reduce((a, b) => a + b.monto, 0);
+      const recargos = (v.recargos || []).map(k => this.recargo(k)).filter(Boolean).map(r => ({
+        ...r, monto: r.tipo === '%' ? Math.round(base * r.valor / 100) : r.valor,
+      }));
+      const sumaRec = recargos.reduce((a, b) => a + b.monto, 0);
+      const ajuste = Number(v.ajuste) || 0;
+      return { porRubro, base, recargos, sumaRec, ajuste, total: base + sumaRec + ajuste };
+    },
+
     // ---- Propiedades secundarias ------------------------------------------
     UNIDADES,
     secundarias() {
@@ -2446,6 +2508,45 @@ tr:hover td{background:var(--panel-2)}
           + `${this.p.bultos || 1} ${(this.p.bultos || 1) === 1 ? 'bulto' : 'bultos'}`,
           this.bloqueEntrega(), true);
     },
+    // De dónde salen los costos: una lista por rubro. Si el mueble lleva
+    // carpintería y herrería, son dos listas distintas y cada una pone su
+    // parte. Es lo primero que hay que definir: sin eso, el costo se carga a
+    // mano y se pierde la comparación entre muebles parecidos.
+    listasDe() {
+      const rubros = this.rubrosDe().filter(r => r.k);
+      return rubros.map((r, i) => ({
+        rubro: r.k,
+        label: this.nombreRubro(r.k),
+        lista: (this.p.listas || [])[i] || (global.DB.listasDe(r.k)[0] || {}).k || '',
+      }));
+    },
+
+    bloqueListas() {
+      const ed = this.puedeEditar();
+      const ls = this.listasDe();
+      const sinLista = ls.filter(x => !x.lista).length;
+      return `<section class="pd-b">
+        <div class="pd-h">De dónde salen los costos</div>
+        <div class="hint" style="margin-bottom:11px">Una lista por rubro. El costo de cada variante
+          baja de ahí, para no cargarlo mueble por mueble y poder comparar productos parecidos.</div>
+        ${ls.map((x, i) => {
+          const opciones = global.DB.listasDe(x.rubro);
+          return `<div class="fr"><label for="pd-lista-${i}">${UI.esc(x.label)}</label>
+            <select id="pd-lista-${i}" data-lista="${i}" ${ed ? '' : 'disabled'}>
+              <option value="">Elegir lista…</option>
+              ${opciones.map(o => `<option value="${o.k}" ${x.lista === o.k ? 'selected' : ''}
+                >${UI.esc(o.label)}</option>`).join('')}
+            </select></div>`;
+        }).join('') || '<div class="hint">Definí primero los rubros en <b>Producción</b>.</div>'}
+        ${sinLista ? `<div class="banner warn" style="margin-top:9px">Falta${sinLista === 1 ? '' : 'n'}
+          elegir <b>${sinLista}</b> ${sinLista === 1 ? 'lista' : 'listas'}: sin eso el costo hay que
+          cargarlo a mano.</div>` : ''}
+        <div class="banner info" style="margin-top:9px">El <b>módulo Precios</b> todavía no está hecho.
+          Cuando esté, estas listas van a ser las tablas reales y el costo de cada variante va a salir
+          de cruzar sus propiedades contra ellas.</div>
+      </section>`;
+    },
+
     // El precio de EFECTIVO es el que se carga: es lo que realmente entra. El
     // de lista sale solo aplicándole el descuento al revés, y el margen y el
     // markup se miden contra el efectivo, no contra la lista.
@@ -2497,13 +2598,8 @@ tr:hover td{background:var(--panel-2)}
       };
 
       const pisados = this.vars.filter(v => v.pisado).length;
-      return `<section class="pd-b">
-        <div class="banner info">El costo y el precio salen de la <b>plantilla de precios</b>, para no
-          cargarlos mueble por mueble y poder compararlos entre productos parecidos. Acá se ven, y con
-          el lápiz se pisan sólo para este mueble.
-          <b>El módulo Precios todavía no está hecho</b> — se arma cuando cerremos esta parte.</div>
-
-        <div class="pd-h" style="margin-top:12px">Costo y precio por variante
+      return this.bloqueListas() + `<section class="pd-b">
+        <div class="pd-h">Costo y precio por variante
           <span class="muted">(${this.vars.length})</span>
           <span class="pill ${this.estado().pill}" style="float:right">${UI.esc(this.estado().label)}</span></div>
         <div class="vr-tools">
@@ -2949,13 +3045,13 @@ tr:hover td{background:var(--panel-2)}
       const mias = this.props().map(x => x.k);
 
       return `<div class="ad-t">Planilla para ${UI.esc(this.nombreRubro(r.k))}</div>
-        <div class="fx" style="margin-bottom:9px">
+        <div class="fx pl-sel">
           <select data-plantilla="${i}" ${ed ? '' : 'disabled'}>
             <option value="">Sólo para este mueble</option>
             ${global.DB.planillas().map(x => `<option value="${x.k}" ${r.plantilla === x.k ? 'selected' : ''}
               >${UI.esc(x.nombre)}</option>`).join('')}
           </select>
-          ${ed ? `<button class="btn" data-guardarpl="${i}">➕ Guardar como planilla</button>` : ''}
+          ${ed ? `<button class="btn sm" data-guardarpl="${i}">➕ Guardar como planilla</button>` : ''}
         </div>
         ${t ? `<div class="banner info">Usa la planilla <b>${UI.esc(t.nombre)}</b>${usos > 1
             ? `, que comparten <b>${usos}</b> muebles` : ''}. Lo que cambies acá les llega a todos.</div>`
@@ -2971,7 +3067,6 @@ tr:hover td{background:var(--panel-2)}
                 <span>${UI.esc(c.label)}</span>
                 ${ed ? '<i>▾</i>' : ''}
               </button>
-              <div class="tp-de">${UI.esc(this.origenCorto(c, huerfana))}</div>
             </th>`;
           }).join('')}
           ${ed ? `<th class="tp-add"><button class="btn sm" data-addcol="${i}"
@@ -3005,7 +3100,7 @@ tr:hover td{background:var(--panel-2)}
       const cols = this.planillaDe(r);
       const c = cols[j]; if (!c) return;
       const cerrar = this.modal(`
-        <h3 class="h-title" style="font-size:17px">Columna ${UI.esc(c.label)}</h3>
+        <h3 class="h-title" style="font-size:17px">${c.label ? 'Columna ' + UI.esc(c.label) : 'Columna nueva'}</h3>
         <p class="h-sub">Cómo se llama en el papel y de dónde sale su valor.</p>
         <label class="fld" style="margin-top:12px"><span class="lbl">Título</span>
           <input id="mc2-lbl" value="${UI.esc(c.label)}"></label>
@@ -3060,7 +3155,11 @@ tr:hover td{background:var(--panel-2)}
         this.persistirCols(i); cerrar(); this.pintar();
       };
       document.getElementById('mc2-ok').onclick = guardar;
-      document.getElementById('mc2-x').onclick = cerrar;
+      document.getElementById('mc2-x').onclick = () => {
+        // Si se acaba de crear y todavía no tiene nombre, se descarta.
+        if (!c.label) { this.colsEditables(i).splice(j, 1); this.persistirCols(i); cerrar(); this.pintar(); }
+        else cerrar();
+      };
       document.getElementById('mc2-izq').onclick = () => mover(-1);
       document.getElementById('mc2-der').onclick = () => mover(1);
       document.getElementById('mc2-del').onclick = () => {
@@ -3694,6 +3793,11 @@ tr:hover td{background:var(--panel-2)}
         i.onchange = () => { if (antes) antes();
           const v = this.vars.find(x => x.id === Number(i.dataset.costo)); if (v) refrescarCV(v); };
       });
+      document.querySelectorAll('[data-lista]').forEach(sl => sl.onchange = () => {
+        p.listas = this.listasDe().map(x => x.lista);
+        p.listas[Number(sl.dataset.lista)] = sl.value;
+        this.guardar(); this.pintar();
+      });
       document.querySelectorAll('[data-editar]').forEach(b => b.onclick = () => {
         const id = Number(b.dataset.editar);
         this._abiertos = this._abiertos || new Set();
@@ -3777,9 +3881,9 @@ tr:hover td{background:var(--panel-2)}
       };
     },
 
-    // ---- Panel de la variante ----------------------------------------------
-    // El panel de una variante: todo lo suyo en un solo lado, sin salir de la
-    // tabla. Se pasa de una a otra con las flechas.
+    // El panel de una variante. En Compra y venta muestra de dónde sale el
+    // costo: qué pone cada rubro y qué suman los recargos. Las medidas no van
+    // acá — están en Información general y repetirlas sólo confunde.
     abrirVariante(id) {
       const v = this.vars.find(x => x.id === id); if (!v) return;
       this._abierta = id;
@@ -3787,22 +3891,19 @@ tr:hover td{background:var(--panel-2)}
       const i = orden.findIndex(x => x.id === id);
       const ed = this.puedeEditar(), cost = this.verCostos();
       const ef = this.efectivoDe(v);
-      const mk = global.DB.markupDe(v.costo, ef), mg = global.DB.margenDe(v.costo, ef);
+      const comp = global.DB.composicion(this.p, v);
+      const mk = global.DB.markupDe(comp.total, ef), mg = global.DB.margenDe(comp.total, ef);
       const banda = global.DB.bandaDe(mk);
-      const medidas = (global.DB.propiedad('medida') || { valores: [] }).valores;
-      const norm = x => String(x || '').replace(',', '.');
-      const act = norm(v.medidaCosteo || v.medida);
-      const opts = medidas.some(m => norm(m) === act) ? medidas : [v.medidaCosteo || v.medida, ...medidas];
+      const obj = this.objetivoDe(v);
 
-      const f = (id2, lbl, val, extra = '', uni = '') => `<label class="fld">
-        <span class="lbl">${lbl}</span>
-        <div class="fx">${uni === '$' ? '<span class="uni">$</span>' : ''}
-          <input id="${id2}" value="${UI.esc(val ?? '')}" ${extra} ${ed ? '' : 'readonly'}>
-          ${uni && uni !== '$' ? `<span class="uni">${uni}</span>` : ''}</div></label>`;
+      const kpi = (icono, lbl, val, pie, clase) => `<div class="kp">
+        <div class="kp-t"><span class="kp-i">${icono}</span>${UI.esc(lbl)}</div>
+        <div class="kp-v ${clase || ''}">${val}</div>
+        ${pie ? `<div class="kp-p">${pie}</div>` : ''}</div>`;
 
       document.getElementById('pd-panel').innerHTML = `
         <div class="pv-back" id="pv-back"></div>
-        <aside class="pv-drawer">
+        <aside class="pv-drawer ancho">
           <div class="pv-top">
             <button class="lx" id="pv-cerrar" title="Cerrar">‹</button>
             <div style="flex:1;min-width:0">
@@ -3813,31 +3914,75 @@ tr:hover td{background:var(--panel-2)}
             <button class="lx" id="pv-sig" ${i >= orden.length - 1 ? 'disabled' : ''} title="Siguiente">›</button>
           </div>
           <div class="pv-body">
-            ${cost ? `<div class="pv-h">Precios</div>
-            <div class="pv-2">
-              ${f('pv-efec', 'Precio de efectivo', ef, 'inputmode="numeric"', '$')}
-              ${f('pv-promo', 'Precio promocional', v.promo, 'inputmode="numeric" placeholder="sin descuento"', '$')}
+            ${cost ? `<div class="kpis4">
+              ${kpi('📦', 'Costo final', UI.pesos(comp.total))}
+              ${kpi('🏷️', 'Precio efectivo', UI.pesos(ef), `lista ${UI.pesos(this.listaDe(ef))}`)}
+              ${kpi('📈', 'Margen', mg ? mg.toFixed(1).replace('.', ',') + ' %' : '—',
+                mg >= 40 ? 'sobre el mínimo' : 'bajo el mínimo', mg >= 40 ? 'ok-t' : 'warn-t')}
+              ${kpi('🎯', 'Markup', mk ? mk.toFixed(2).replace('.', ',') + 'x' : '—',
+                `objetivo ${String(obj).replace('.', ',')}`, banda.pill === 'ok' ? 'ok-t' : 'warn-t')}
             </div>
-            <div class="pv-calc">
-              <div><span>Precio de lista</span><b id="pv-lista">${UI.pesos(this.listaDe(ef))}</b></div>
-              <div><span>Margen</span><b id="pv-marg">${mg ? mg.toFixed(1).replace('.', ',') + ' %' : '—'}</b></div>
-              <div><span>Markup</span><b class="mk ${banda.pill}" id="pv-mk">${
-                mk ? mk.toFixed(2).replace('.', ',') + 'x' : '—'}</b></div>
-            </div>
-            <div class="hint">El de lista sale del efectivo, y el margen y el markup se miden contra
-              el efectivo — que es lo que realmente entra.</div>
 
-            <div class="pv-h">Costo</div>
-            <div class="pv-2">
-              ${f('pv-costo', 'Costo', v.costo, 'inputmode="numeric"', '$')}
-              <label class="fld"><span class="lbl">Medida de costeo</span>
-                <select id="pv-medc" ${ed ? '' : 'disabled'}>${opts.map(m =>
-                  `<option ${norm(m) === act ? 'selected' : ''}>${UI.esc(m)}</option>`).join('')}</select></label>
+            <div class="dos">
+              <section class="cx-b">
+                <div class="cx-h">Datos generales <span class="muted">de la variante</span></div>
+                ${this.props().map(pr => `<div class="fr sm2">
+                  <label>${UI.esc(pr.nombre)}</label>
+                  <div class="valf">${UI.esc(v[pr.k] || '—')}
+                    <small class="muted">${UI.esc((global.DB.rol(global.DB.rolDe(pr.k)) || {}).label || '')}</small></div>
+                </div>`).join('')}
+                <div class="fr sm2"><label>Medida de costeo</label>
+                  <div class="valf">${UI.esc(v.medidaCosteo || v.medida || '—')}</div></div>
+                <div class="hint">Cada propiedad dice en qué tabla buscarse — es lo que evita cargar
+                  el número a mano. Las listas se eligen arriba, en <b>De dónde salen los costos</b>.</div>
+              </section>
+
+              <section class="cx-b">
+                <div class="cx-h">Composición del costo</div>
+                ${comp.porRubro.map((r, j) => `<div class="cx-r">
+                  <span>${UI.esc(r.label)} <small class="muted">${UI.esc(
+                    ((global.DB.lista((this.listasDe()[j] || {}).lista) || {}).label || 'sin lista')
+                      .replace(/^[^·]+· /, ''))}</small></span>
+                  <input class="pn" inputmode="numeric" data-costorubro="${v.id}|${j}"
+                    value="${r.monto || ''}" placeholder="—" ${ed ? '' : 'readonly'}>
+                </div>`).join('')}
+                ${comp.porRubro.length > 1 ? `<div class="cx-r sub">
+                  <span>Subtotal de los ${comp.porRubro.length} rubros</span>
+                  <b class="tnum">${UI.pesos(comp.base)}</b></div>` : ''}
+
+                <div class="cx-sep"></div>
+                <div class="cx-h2">Recargos</div>
+                <div class="chips">${global.DB.RECARGOS.map(r => {
+                  const on = (v.recargos || []).includes(r.k);
+                  return `<button class="chip-add ${on ? 'on' : ''}" data-recargo="${v.id}|${r.k}"
+                    ${ed ? '' : 'disabled'}>${on ? '✓ ' : '➕ '}${UI.esc(r.label)}
+                    <small>${r.tipo === '%' ? r.valor + '%' : UI.pesos(r.valor)}</small></button>`;
+                }).join('')}</div>
+                ${comp.recargos.map(r => `<div class="cx-r">
+                  <span>${UI.esc(r.label)} <small class="muted">${
+                    r.tipo === '%' ? r.valor + '% sobre el costo' : 'fijo'}</small></span>
+                  <b class="tnum">${UI.pesos(r.monto)}</b></div>`).join('')}
+
+                <div class="cx-r"><span>Ajuste manual</span>
+                  <input class="pn" inputmode="numeric" data-ajuste="${v.id}"
+                    value="${v.ajuste || ''}" placeholder="0" ${ed ? '' : 'readonly'}></div>
+
+                <div class="cx-sep"></div>
+                <div class="cx-r total"><span>Costo final</span>
+                  <b class="tnum">${UI.pesos(comp.total)}</b></div>
+              </section>
             </div>
-            <div class="hint">La medida que usa el proveedor cuando no cotiza la nuestra: el de 0,90 se
-              costea con el de 1,00. ${v.pisado
-                ? '<b class="warn-t">Este precio está pisado a mano</b>, no baja de la plantilla.'
-                : 'Baja de la plantilla de precios.'}</div>` : ''}
+
+            <div class="pv-h">Precio</div>
+            <div class="pv-2">
+              <label class="fld"><span class="lbl">Precio de efectivo</span>
+                <div class="fx"><span class="uni">$</span>
+                  <input id="pv-efec" inputmode="numeric" value="${ef || ''}" ${ed ? '' : 'readonly'}></div></label>
+              <label class="fld"><span class="lbl">Precio promocional</span>
+                <div class="fx"><span class="uni">$</span>
+                  <input id="pv-promo" inputmode="numeric" value="${UI.esc(v.promo ?? '')}"
+                    placeholder="sin descuento" ${ed ? '' : 'readonly'}></div></label>
+            </div>` : ''}
 
             <div class="pv-h">Códigos</div>
             <div class="pv-2">
@@ -3845,36 +3990,17 @@ tr:hover td{background:var(--panel-2)}
                 <div class="fx"><input id="pv-sku" value="${UI.esc(v.sku || global.DB.skuDe(this.p, v))}"
                   ${ed ? '' : 'readonly'}>
                   <button class="lapiz" id="pv-sku-auto" title="Volver al automático">↺</button></div></label>
-              ${f('pv-barras', 'Código de barras', v.barras, 'inputmode="numeric" placeholder="13 números"')}
+              <label class="fld"><span class="lbl">Código de barras</span>
+                <input id="pv-barras" value="${UI.esc(v.barras || '')}" placeholder="13 números"
+                  ${ed ? '' : 'readonly'}></label>
             </div>
-            <div class="hint">El SKU se arma solo con el código del mueble y los valores de la variante.
-              El código de barras identifica la unidad al entregar.</div>
-
-            <div class="pv-h">Peso y dimensiones</div>
-            <div class="pv-2">
-              ${f('pv-largo', 'Largo', v.frenteCm, 'inputmode="decimal"', 'cm')}
-              ${f('pv-alto', 'Alto', v.alto, 'inputmode="decimal"', 'cm')}
-              ${f('pv-prof', 'Profundidad', v.prof, 'inputmode="decimal"', 'cm')}
-              ${f('pv-peso', 'Peso', v.peso, 'inputmode="decimal"', 'kg')}
-            </div>
-
-            <div class="pv-h">Stock</div>
-            <div class="pv-2">
-              ${f('pv-stock', 'Stock real', v.stock, 'inputmode="numeric"')}
-              <label class="fld"><span class="lbl">Reposición</span>
-                <select id="pv-rep" ${ed ? '' : 'disabled'}>
-                  <option value="pedido" ${v.reponer !== 'minimo' ? 'selected' : ''}>Se pide cuando se vende</option>
-                  <option value="minimo" ${v.reponer === 'minimo' ? 'selected' : ''}>Mantener un mínimo</option>
-                </select></label>
-            </div>
-            ${v.reponer === 'minimo' ? f('pv-min', 'Mínimo', v.minStock, 'inputmode="numeric"') : ''}
 
             <div class="pv-h">Publicación</div>
             <label class="chk"><input type="checkbox" id="pv-mostrar" ${v.mostrar !== false ? 'checked' : ''}
               ${ed ? '' : 'disabled'}> Mostrar esta variante a los vendedores</label>
             <label class="chk"><input type="checkbox" id="pv-activa" ${v.activa !== false ? 'checked' : ''}
               ${ed ? '' : 'disabled'}> Se fabrica</label>
-            <div class="hint">Si no se fabrica, queda a la vista pero no se puede cotizar.</div>
+            <div class="hint">El peso y las medidas están en <b>Información general</b>.</div>
           </div>
         </aside>`;
 
@@ -3886,36 +4012,42 @@ tr:hover td{background:var(--panel-2)}
       if (i < orden.length - 1) sig.onclick = () => this.abrirVariante(orden[i + 1].id);
 
       const bind = (id2, fn) => { const el = document.getElementById(id2); if (el && ed) el.onchange = () => fn(el); };
-      const numf = (id2, campo) => bind(id2, el => {
-        v[campo] = Number(String(el.value).replace(',', '.').replace(/[^\d.]/g, '')) || 0;
-        global.DB.guardarVariante(v); this.pintar(); this.abrirVariante(id);
-      });
+      const num = el => Number(String(el.value).replace(/[^\d]/g, '')) || 0;
       bind('pv-efec', el => {
-        v.efectivo = Number(String(el.value).replace(/[^\d]/g, '')) || 0;
-        v.precio = this.listaDe(v.efectivo);
-        v.pisado = true;
+        v.efectivo = num(el); v.precio = this.listaDe(v.efectivo); v.pisado = true;
         global.DB.guardarVariante(v); this.pintar(); this.abrirVariante(id);
       });
-      bind('pv-costo', el => {
-        v.costo = Number(String(el.value).replace(/[^\d]/g, '')) || 0;
-        v.pisado = true;
-        global.DB.guardarVariante(v); this.pintar(); this.abrirVariante(id);
-      });
-      numf('pv-promo', 'promo');
-      numf('pv-largo', 'frenteCm'); numf('pv-alto', 'alto'); numf('pv-prof', 'prof');
-      numf('pv-peso', 'peso'); numf('pv-stock', 'stock'); numf('pv-min', 'minStock');
+      bind('pv-promo', el => { v.promo = num(el); global.DB.guardarVariante(v); });
       bind('pv-sku', el => { v.sku = el.value.trim(); global.DB.guardarVariante(v); this.pintar(); });
       bind('pv-barras', el => { v.barras = el.value.trim(); global.DB.guardarVariante(v); });
-      bind('pv-medc', el => { v.medidaCosteo = el.value; global.DB.guardarVariante(v); });
-      bind('pv-rep', el => {
-        v.reponer = el.value;
-        if (v.reponer !== 'minimo') v.minStock = 0;
-        global.DB.guardarVariante(v); this.abrirVariante(id);
-      });
       bind('pv-mostrar', el => { v.mostrar = el.checked; global.DB.guardarVariante(v); });
       bind('pv-activa', el => { v.activa = el.checked; global.DB.guardarVariante(v); this.pintar(); this.abrirVariante(id); });
       const auto = document.getElementById('pv-sku-auto');
       if (auto && ed) auto.onclick = () => { v.sku = ''; global.DB.guardarVariante(v); this.pintar(); this.abrirVariante(id); };
+
+      // El costo de cada rubro por separado: con dos rubros hay dos costos.
+      document.querySelectorAll('[data-costorubro]').forEach(el => { if (!ed) return;
+        el.onchange = () => {
+          const [, j] = el.dataset.costorubro.split('|').map(Number);
+          v.costos = v.costos || [];
+          v.costos[j] = num(el);
+          v.costo = global.DB.composicion(this.p, v).base;
+          v.pisado = true;
+          global.DB.guardarVariante(v); this.pintar(); this.abrirVariante(id);
+        };
+      });
+      bind('pv-ajuste', () => {});
+      document.querySelectorAll('[data-ajuste]').forEach(el => { if (!ed) return;
+        el.onchange = () => { v.ajuste = num(el); global.DB.guardarVariante(v); this.pintar(); this.abrirVariante(id); };
+      });
+      document.querySelectorAll('[data-recargo]').forEach(b => { if (!ed) return;
+        b.onclick = () => {
+          const k = b.dataset.recargo.split('|')[1];
+          v.recargos = v.recargos || [];
+          v.recargos = v.recargos.includes(k) ? v.recargos.filter(x => x !== k) : [...v.recargos, k];
+          global.DB.guardarVariante(v); this.pintar(); this.abrirVariante(id);
+        };
+      });
     },
 
     // ---- Simulador -----------------------------------------------------------
@@ -4593,8 +4725,10 @@ tr:hover td{background:var(--panel-2)}
       });
       document.querySelectorAll('[data-addcol]').forEach(b => b.onclick = () => {
         const i = Number(b.dataset.addcol);
-        this.colsEditables(i).push({ label: 'NUEVA', origen: 'libre' });
+        const cs = this.colsEditables(i);
+        cs.push({ label: '', origen: 'libre' });
         this.persistirCols(i); this.pintar();
+        this.modalColumna(i, cs.length - 1);
       });
     },
 
@@ -5029,7 +5163,41 @@ tr:hover td{background:var(--panel-2)}
         .tp-th i{font-style:normal;font-size:9px;color:var(--muted)}
         .tp-th:hover i{color:var(--brand)}
         .tp-th[disabled]{cursor:default}
-        .tp-de{padding:0 9px 7px;font-size:10.5px;color:var(--muted);line-height:1.3}
+        .tp th{padding-bottom:7px}
+        .pl-sel{margin-bottom:9px;align-items:stretch}
+        .pl-sel select{flex:1;min-width:0}
+        .pl-sel .btn{flex:none;white-space:nowrap}
+
+        /* El panel de costo de una variante. */
+        .pv-drawer.ancho{width:min(760px,100%)}
+        .kpis4{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:13px}
+        @media(max-width:700px){.kpis4{grid-template-columns:1fr 1fr}}
+        .kp{border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:var(--panel-2)}
+        .kp-t{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);font-weight:600}
+        .kp-i{font-size:12px}
+        .kp-v{font-size:17px;font-weight:800;color:var(--navy);margin-top:3px}
+        .kp-p{font-size:10.5px;color:var(--muted);margin-top:1px}
+        .dos{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+        @media(max-width:700px){.dos{grid-template-columns:1fr}}
+        .cx-b{border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:var(--panel)}
+        .cx-h{font-size:12.5px;font-weight:700;color:var(--navy);margin-bottom:9px}
+        .cx-h2{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;
+          letter-spacing:.04em;margin-bottom:7px}
+        .cx-r{display:flex;align-items:center;gap:9px;justify-content:space-between;
+          padding:5px 0;font-size:12.5px}
+        .cx-r span{color:var(--ink-soft)} .cx-r small{font-size:10.5px}
+        .cx-r .pn{width:104px;text-align:right;padding:4px 7px}
+        .cx-r.sub{border-top:1px dashed var(--line);margin-top:3px;padding-top:7px}
+        .cx-r.total{font-size:14px} .cx-r.total b{font-size:16px;color:var(--navy)}
+        .cx-sep{height:1px;background:var(--line);margin:9px 0}
+        .fr.sm2{grid-template-columns:132px minmax(0,1fr);gap:8px;margin-bottom:6px}
+        .fr.sm2>label{font-size:11.5px}
+        .fr.sm2 .valf{font-size:12.5px;font-weight:650;color:var(--navy)}
+        .fr.sm2 .valf small{font-weight:400;margin-left:5px}
+        .fr.sm2 select{font-size:12px;padding:4px 7px}
+        .chip-add.on{border-style:solid;border-color:var(--brand);background:var(--brand-soft);
+          font-weight:700}
+        .chip-add small{margin-left:4px;opacity:.75;font-size:10.5px}
         .tp-add{min-width:44px;width:44px;text-align:center;vertical-align:middle}
         .tp td{padding:6px 8px;border-top:1px solid var(--line-soft);white-space:nowrap;
           border-right:1px solid var(--line-soft)}

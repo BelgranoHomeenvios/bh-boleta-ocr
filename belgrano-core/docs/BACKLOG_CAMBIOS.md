@@ -690,6 +690,41 @@ Compra y venta · Documentos · Contabilidad.
   secundaria. Aparecen al pasar el mouse, así la fila queda limpia.
 - ✅ 324. El contador de combinaciones se separa con una línea del resto.
 
+### Lote 24 — APLICADO (Costos: de dónde salen y cómo se componen)
+
+**Compra y venta arranca con "De dónde salen los costos"**
+- ✅ 325. **Una lista de precios por rubro**: si el mueble lleva carpintería y
+  herrería, son dos listas y cada una pone su parte. A cada rubro sólo se le
+  ofrecen las suyas — no se le muestra la de herrería al carpintero.
+- ✅ 326. Avisa si falta elegir alguna: sin lista, el costo hay que cargarlo a
+  mano y se pierde la comparación entre muebles parecidos.
+
+**El panel de la variante**
+- ✅ 327. Se fue **Peso y dimensiones**: ya está en Información general.
+- ✅ 328. Arriba, cuatro números: **Costo final · Precio efectivo · Margen ·
+  Markup**, cada uno con su referencia (lista, mínimo, objetivo).
+- ✅ 329. **Datos generales** muestra cada propiedad con **su rol de costeo** al
+  lado, así se ve de dónde va a salir el número.
+- ✅ 330. **Composición del costo**: un renglón **por rubro** con su lista, el
+  subtotal, los **recargos marcables** (ranuras 8%, corte 45° 5%, laqueado
+  extra, herrajes premium), el ajuste manual y el costo final.
+
+**El rol de costeo de una propiedad** — la bisagra con Precios
+- ✅ 331. Una propiedad ya no es sólo texto: tiene un **rol** que dice **en qué
+  tabla buscarse**. `medida` define la fila, `estructura` y `frente` buscan en
+  su tabla, `material` en la del rubro que sea (hierro, vidrio, mármol),
+  `terminacion` puede tener su costo, y **`recargo` no busca nada: suma un
+  adicional**. Las de siempre ya vienen con su rol; una propiedad nueva
+  arranca sin costo hasta que se le asigne.
+
+**Planilla**
+- ✅ 332. Se va el subtítulo gris de cada columna: queda **sólo el título**, y
+  el detalle se ve al entrar.
+- ✅ 333. El **➕ crea la columna y abre su configuración de una**. Si se
+  cancela sin ponerle nombre, la columna se descarta.
+- ✅ 334. El desplegable y **Guardar como planilla** entran parejos en un
+  renglón.
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·

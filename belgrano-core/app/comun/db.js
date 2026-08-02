@@ -620,6 +620,68 @@
       { k: 'vendido', label: 'Ya salió', pill: 'soft' },
     ],
 
+    // ---- Cómo una propiedad se convierte en costo -------------------------
+    // Acá está la bisagra con la lista de precios. Una propiedad no es sólo un
+    // texto: ESTRUCTURA se busca en la tabla de estructuras, FRENTE en la de
+    // frentes, y RANURAS no busca nada — suma un recargo. Sin este rol, el
+    // sistema no sabe dónde ir a buscar el número.
+    ROLES: [
+      { k: 'medida', label: 'Medida', pie: 'Define la fila de la tabla de precios. Ej: 1,60.' },
+      { k: 'estructura', label: 'Estructura', pie: 'Busca el costo en la tabla de estructuras.' },
+      { k: 'frente', label: 'Frente', pie: 'Busca el costo en la tabla de frentes.' },
+      { k: 'material', label: 'Material de otro rubro', pie: 'Busca en la tabla de ese rubro. Ej: hierro, vidrio, mármol.' },
+      { k: 'terminacion', label: 'Terminación', pie: 'Laqueado, melamina, enchapado. Puede tener su propio costo.' },
+      { k: 'recargo', label: 'Recargo', pie: 'No busca nada: suma un adicional. Ej: ranuras, corte 45°.' },
+      { k: 'ninguno', label: 'Sin costo', pie: 'Distingue la variante pero no cambia el precio.' },
+    ],
+    rol(k) { return this.ROLES.find(x => x.k === k) || null; },
+    // El rol de una propiedad. Las de siempre ya lo traen por su nombre.
+    ROL_POR_DEFECTO: { medida: 'medida', estructura: 'estructura', frente: 'frente',
+      terminacion: 'terminacion' },
+    rolDe(k) {
+      const p = this.propiedad(k);
+      return (p && p.rol) || this.ROL_POR_DEFECTO[k] || 'ninguno';
+    },
+
+    // Listas de precio: de dónde sale el costo base. Se elige por mueble para
+    // no equivocarse de tabla.
+    LISTAS: [
+      { k: 'carp-2026-01', label: 'Carpintería · enero 2026', rubro: 'carpinteria', vigencia: '01/2026' },
+      { k: 'carp-2025-10', label: 'Carpintería · octubre 2025', rubro: 'carpinteria', vigencia: '10/2025' },
+      { k: 'herr-2026-01', label: 'Herrería · enero 2026', rubro: 'herreria', vigencia: '01/2026' },
+      { k: 'tapi-2025-12', label: 'Tapicería · diciembre 2025', rubro: 'tapiceria', vigencia: '12/2025' },
+      { k: 'laq-2026-01', label: 'Laqueado · enero 2026', rubro: 'laqueado', vigencia: '01/2026' },
+    ],
+    lista(k) { return this.LISTAS.find(x => x.k === k) || null; },
+    // Las listas de un rubro, para no ofrecer la de herrería al carpintero.
+    listasDe(rubro) { return this.LISTAS.filter(x => x.rubro === rubro); },
+    // Recargos que se pueden marcar en una variante.
+    RECARGOS: [
+      { k: 'ranuras', label: 'Ranuras', tipo: '%', valor: 8 },
+      { k: 'corte45', label: 'Corte 45°', tipo: '%', valor: 5 },
+      { k: 'laqueado', label: 'Laqueado extra', tipo: 'fijo', valor: 18000 },
+      { k: 'herrajes', label: 'Herrajes premium', tipo: 'fijo', valor: 25000 },
+    ],
+    recargo(k) { return this.RECARGOS.find(x => x.k === k) || null; },
+
+    // La composición del costo de una variante: qué pone cada rubro y qué
+    // suman los recargos. Con dos rubros hay dos costos, no uno.
+    composicion(prod, v) {
+      const rubros = (prod.rubros || []).map(r => (typeof r === 'string' ? { k: r } : r)).filter(x => x && x.k);
+      const porRubro = rubros.map((r, i) => ({
+        rubro: r.k,
+        label: (this.rubro(r.k) || {}).label || r.k,
+        monto: Number((v.costos || [])[i]) || (i === 0 ? Number(v.costo) || 0 : 0),
+      }));
+      const base = porRubro.reduce((a, b) => a + b.monto, 0);
+      const recargos = (v.recargos || []).map(k => this.recargo(k)).filter(Boolean).map(r => ({
+        ...r, monto: r.tipo === '%' ? Math.round(base * r.valor / 100) : r.valor,
+      }));
+      const sumaRec = recargos.reduce((a, b) => a + b.monto, 0);
+      const ajuste = Number(v.ajuste) || 0;
+      return { porRubro, base, recargos, sumaRec, ajuste, total: base + sumaRec + ajuste };
+    },
+
     // ---- Propiedades secundarias ------------------------------------------
     UNIDADES,
     secundarias() {
