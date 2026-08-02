@@ -641,6 +641,44 @@ Compra y venta · Documentos · Contabilidad.
 - ✅ 310. Por default arranca con las **propiedades del mueble + ESTADO +
   CANT. + OBSERVACIONES**.
 
+### Lote 22 — APLICADO (Módulos, planilla repensada y filtro de inventario)
+
+**Encabezado y solapas**
+- ✅ 311. El **nombre del mueble y su código** siempre a la vista arriba: con
+  seis solapas es fácil perder de vista en cuál se está trabajando.
+- ✅ 312. Orden final: Información general · Inventario · Producción ·
+  Compra y venta · **Contabilidad · Documentos**.
+
+**Información general**
+- ✅ 313. **Categorías sube al módulo 1**, debajo de la descripción. El módulo 2
+  queda con **Propiedades** solas: **Principales** arriba y **Secundarias**
+  abajo, bien separadas.
+- ✅ 314. Cada grupo tiene **su propio botón** de agregar.
+- ✅ 315. Las secundarias arrancan por default en **Alto · Profundidad · Peso**,
+  se **borran**, se **editan** (✎) y se **arrastran** para ordenarlas.
+- ✅ 316. La **unidad sale de una lista** (cm · mm · m · kg · g · m³ · l · u ·
+  sin unidad): si uno escribe "cm" y otro "centímetros", después no se puede
+  comparar nada. Al renombrar, la **clave no cambia**, así lo ya cargado en las
+  variantes no se pierde.
+
+**Producción, un bloque por rubro**
+- ✅ 317. Arriba sólo **cuántos rubros**. Abajo, **un desplegable por rubro** con
+  todo lo suyo: rubro, proveedores, cómo se pide, y el dibujo o la planilla.
+  Se termina uno, se cierra, y se abre el siguiente.
+- ✅ 318. Más aire entre el rubro, sus proveedores y cómo se pide.
+
+**La planilla, repensada**
+- ✅ 319. Meter tres controles adentro de cada encabezado la hacía ilegible.
+  Ahora la tabla se ve como **lo que es** —títulos y renglones de ejemplo— y
+  **tocar un título abre su configuración**: nombre, de dónde sale, mover y
+  quitar. Debajo de cada título dice **de dónde sale su valor**.
+
+**Inventario**
+- ✅ 320. **Filtro por estado**: Todo · En depósito · **Por entrar** · Ya salió.
+  "Por entrar" es lo pedido al proveedor que todavía no llegó: ya está
+  comprometido pero no se puede entregar. Todavía no tiene serie ni código —
+  se le asignan cuando entra.
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·

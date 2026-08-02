@@ -184,6 +184,20 @@
   // definen el precio y el pedido. Las secundarias NO multiplican nada: son un
   // dato más de cada variante, y cada mueble elige cuáles le sirven. En una
   // cómoda importa el alto; en un placard, la medida del hueco.
+  // Las unidades salen de una lista, no se escriben: si uno pone "cm" y otro
+  // "CM." o "centímetros", después no hay forma de comparar nada.
+  const UNIDADES = [
+    { k: 'cm', label: 'cm · centímetros' },
+    { k: 'mm', label: 'mm · milímetros' },
+    { k: 'm', label: 'm · metros' },
+    { k: 'kg', label: 'kg · kilos' },
+    { k: 'g', label: 'g · gramos' },
+    { k: 'm³', label: 'm³ · metros cúbicos' },
+    { k: 'l', label: 'l · litros' },
+    { k: 'u', label: 'u · unidades' },
+    { k: '', label: 'Sin unidad' },
+  ];
+
   const SEC_KEY = 'bh_secundarias';
   const SEC_BASE = [
     { k: 'alto', nombre: 'Alto', unidad: 'cm' },
@@ -211,11 +225,8 @@
       { id: 1, categoria_id: 2, nombre: 'CÓMODA AMBERES 55', publicado_tn: true, sku: 'CO-AMB-55',
         desc: 'Cómoda de 4 cajones con guías de extracción total y tiradores embutidos. El clásico de la línea Amberes.',
         alto: 0.85, prof: 0.45, materiales: 'MDF 18 mm laqueado · guías telescópicas · tiradores de aluminio', dias: 32,
-        // Cuáles secundarias usa este mueble. Vacío = la tabla de variantes
-        // sale limpia, con la imagen y el nombre y nada más.
-        secundarias: [],
         nProveedores: 1, rubros: [{ k: 'carpinteria', modo: 'dibujo' }],
-        obtencion: 'dibujo', instalacion: false },
+        instalacion: false },
       { id: 4, categoria_id: 2, nombre: 'CÓMODA OLIVER 60', publicado_tn: true, sku: 'CO-OLI-60',
         desc: 'Seis cajones sobre patas de madera maciza. Frente ranurado, sin tiradores a la vista.',
         alto: 0.90, prof: 0.45, materiales: 'MDF 18 mm · patas de paraíso macizo · guías telescópicas', dias: 35 },
@@ -583,17 +594,34 @@
       });
       // Las que ya salieron quedan en el histórico: es lo que permite
       // contestar "¿cuál se le entregó a ese cliente?".
-      DEMO.variantes.filter(v => v.producto_id === Number(productoId)).slice(0, 2).forEach((v, i) => {
+      vs.slice(0, 2).forEach((v, i) => {
         out.push({
           serie: `${v.sku || 'SKU'}-${String(900 + i).padStart(3, '0')}`,
           barras: `779${String(v.id).padStart(4, '0')}${String(900 + i).padStart(6, '0')}`,
           varianteId: v.id, estado: 'vendido', orden: `#S000${19 + i}`, desde: '28/07',
         });
       });
+      // Y lo pedido al proveedor que todavía no llegó: es stock comprometido
+      // que no se puede entregar, pero hay que poder verlo.
+      vs.slice(0, 2).forEach((v, i) => {
+        out.push({
+          serie: '—', barras: '—',
+          varianteId: v.id, estado: 'entrando', orden: `#C0${41 + i}`, desde: '05/08',
+        });
+      });
       return out;
     },
 
+    // Los tres estados de una unidad. "Por entrar" es lo pedido al proveedor
+    // que todavía no llegó: ya está comprometido pero no se puede entregar.
+    ESTADOS_UNIDAD: [
+      { k: 'stock', label: 'En depósito', pill: 'ok' },
+      { k: 'entrando', label: 'Por entrar', pill: 'warn' },
+      { k: 'vendido', label: 'Ya salió', pill: 'soft' },
+    ],
+
     // ---- Propiedades secundarias ------------------------------------------
+    UNIDADES,
     secundarias() {
       let guardadas = [];
       try { guardadas = JSON.parse(localStorage.getItem(SEC_KEY)) || []; } catch {}
@@ -612,6 +640,19 @@
       guardadas.push(nueva);
       try { localStorage.setItem(SEC_KEY, JSON.stringify(guardadas)); } catch {}
       return nueva;
+    },
+    // Renombrar o cambiarle la unidad a una secundaria. La clave no cambia,
+    // así que los valores ya cargados en las variantes siguen enganchados.
+    editarSecundaria(k, nombre, unidad) {
+      const todas = this.secundarias();
+      const x = todas.find(y => y.k === k); if (!x) return null;
+      const reg = { k, nombre: String(nombre || x.nombre).trim(), unidad: String(unidad ?? x.unidad).trim() };
+      let guardadas = [];
+      try { guardadas = JSON.parse(localStorage.getItem(SEC_KEY)) || []; } catch {}
+      const i = guardadas.findIndex(y => y.k === k);
+      if (i >= 0) guardadas[i] = reg; else guardadas.push(reg);
+      try { localStorage.setItem(SEC_KEY, JSON.stringify(guardadas)); } catch {}
+      return reg;
     },
     // El valor de una secundaria en una variante. Los muebles viejos las
     // guardaban como campos sueltos, así que se leen de los dos lados.
@@ -788,6 +829,9 @@
         // rack con módulo laqueado y patas de hierro necesita dos.
         // A qué rubros se les pide, en orden. Cada uno con lo suyo: cómo se
         // le pide y, si es por planilla, qué columnas lleva la de ÉL.
+        // Alto, profundidad y peso las necesita casi todo mueble. Se borran o
+        // se cambian por las que sirvan: en un placard importa el hueco.
+        secundarias: ['alto', 'prof', 'peso'],
         nProveedores: 1,
         rubros: [{ k: 'carpinteria', modo: 'dibujo', plantilla: null, planilla: null }],
         instalacion: false,
