@@ -770,8 +770,16 @@ tr:hover td{background:var(--panel-2)}
           const vs = DEMO.variantes.filter(v => v.producto_id === p.id);
           const pr = vs.map(v => v.precio);
           // La grilla muestra "desde": el vendedor necesita el piso de precio
-          // antes de abrir el mueble.
-          return { ...p, variantes: vs.length, desde: pr.length ? Math.min(...pr) : 0, hasta: pr.length ? Math.max(...pr) : 0 };
+          // antes de abrir el mueble. Y con qué terminaciones viene, que es lo
+          // primero que pregunta el cliente.
+          return {
+            ...p,
+            variantes: vs.length,
+            desde: pr.length ? Math.min(...pr) : 0,
+            hasta: pr.length ? Math.max(...pr) : 0,
+            stock: vs.reduce((a, v) => a + (Number(v.stock) || 0), 0),
+            terminaciones: [...new Set(vs.map(v => v.estructura).filter(Boolean))],
+          };
         });
       }
       let q = cliente().from('producto')
@@ -1202,6 +1210,21 @@ tr:hover td{background:var(--panel-2)}
         .order('medida').order('estructura').order('frente');
       if (error) throw error;
       return data || [];
+    },
+
+    // El color con el que se pinta una terminación en el catálogo. No es la
+    // foto: es un redondelito para reconocerla de un vistazo.
+    COLORES: [
+      { busca: 'blanc', color: '#f4f2ee' }, { busca: 'negro', color: '#1b1b1b' },
+      { busca: 'paraiso', color: '#c49a6c' }, { busca: 'nogal', color: '#6b4a2f' },
+      { busca: 'natural', color: '#d9c3a2' }, { busca: 'roble', color: '#b08d5f' },
+      { busca: 'gris', color: '#9aa0a6' }, { busca: 'olmo', color: '#a8845c' },
+      { busca: 'petiribi', color: '#8a5a3b' }, { busca: 'laque', color: '#e8e6e1' },
+    ],
+    colorDe(valor) {
+      const t = sinTilde(valor || '');
+      const m = this.COLORES.find(c => t.includes(c.busca));
+      return m ? m.color : '#c9ccd1';
     },
 
     async totales() {
@@ -1981,17 +2004,64 @@ tr:hover td{background:var(--panel-2)}
             <input id="cat-q" placeholder="Amberes, oliver, mesa…" value="${UI.esc(this.texto)}">
           </label>
           <div class="vista-tog" role="group" aria-label="Formato de vista" style="align-self:flex-end">
-            <button id="v-bloques" title="Bloques" aria-label="Bloques">▦</button>
-            <button id="v-lista"   title="Listado" aria-label="Listado">☰</button>
+            <button id="v-bloques" title="Con foto">Fotos</button>
+            <button id="v-lista"   title="Listado">Listado</button>
           </div>
         </div>
-        <div id="cat-crumb"></div>
+        <div class="row" style="align-items:center;margin-bottom:4px">
+          <div id="cat-crumb" style="flex:1;min-width:0"></div>
+          <span class="hint" id="cat-cuenta"></span>
+        </div>
         <div id="cat-lista">${UI.spinner()}</div>
         <style>
           .vista-tog{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
-          .vista-tog button{border:0;background:transparent;padding:8px 12px;cursor:pointer;font-size:16px;color:var(--muted);line-height:1}
+          .vista-tog button{border:0;background:transparent;padding:8px 13px;cursor:pointer;font:inherit;
+            font-size:12.5px;font-weight:650;color:var(--muted);line-height:1.6}
           .vista-tog button+button{border-left:1px solid var(--line)}
           .vista-tog button.on{background:var(--brand-soft);color:var(--brand-ink)}
+
+          /* Filtros al costado y resultados al lado: el vendedor filtra sin
+             perder de vista lo que está mirando. */
+          .cat-amb{display:flex;gap:6px;flex-wrap:wrap}
+          .amb{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 13px;
+            font:inherit;font-size:12.5px;font-weight:650;color:var(--ink-soft);cursor:pointer;transition:.12s}
+          .amb:hover{border-color:var(--brand);color:var(--navy)}
+          .amb.on{background:var(--navy);border-color:var(--navy);color:#fff}
+          .cat-cols{display:grid;grid-template-columns:212px minmax(0,1fr);gap:18px;align-items:start}
+          @media(max-width:900px){.cat-cols{grid-template-columns:1fr}}
+          .cat-f{position:sticky;top:104px;display:flex;flex-direction:column;gap:14px}
+          .cat-f-h{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;
+            text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+          .cat-f-h .lnk{margin-left:auto;font-size:11.5px;text-transform:none;letter-spacing:0}
+          .cat-g-t{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+            color:var(--muted);margin-bottom:5px}
+          .cat-o{display:flex;align-items:center;gap:7px;padding:3px 0;cursor:pointer;font-size:12.5px;
+            color:var(--ink-soft)}
+          .cat-o:hover{color:var(--navy)}
+          .cat-o.on{color:var(--navy);font-weight:650}
+          .cat-o input{width:14px;height:14px;accent-color:var(--brand);flex:none;margin:0}
+          .cat-o-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+          .cat-o-c{font-size:11px;color:var(--muted);flex:none}
+          .pt{width:12px;height:12px;border-radius:50%;border:1px solid rgba(0,0,0,.18);flex:none;
+            display:inline-block}
+          .pts{display:inline-flex;align-items:center;gap:3px}
+
+          .grid-prod{display:grid;grid-template-columns:repeat(auto-fill,minmax(212px,1fr));gap:12px}
+          .prod-tile{display:flex;flex-direction:column;gap:3px;align-items:stretch;padding:0 0 11px;
+            border:1px solid var(--line);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);
+            cursor:pointer;text-align:left;transition:.15s;overflow:hidden}
+          .prod-tile:hover{border-color:var(--brand);transform:translateY(-1px)}
+          .prod-img{position:relative;display:grid;place-items:center;background:var(--panel-2);
+            padding:14px;color:var(--muted);min-height:132px;border-bottom:1px solid var(--line-soft);
+            margin-bottom:9px}
+          .prod-tile:hover .prod-img{color:var(--brand)}
+          .prod-est{position:absolute;top:9px;left:9px}
+          .sil{width:100%;max-width:150px;height:96px}
+          .prod-n{font-weight:700;color:var(--navy);font-size:13px;padding:0 11px;line-height:1.3}
+          .prod-c{font-size:11.5px;color:var(--muted);padding:0 11px}
+          .prod-p{font-size:13px;color:var(--navy);padding:2px 11px 0}
+          .prod-b{display:flex;align-items:center;gap:8px;padding:5px 11px 0}
+          .prod-v{font-size:11.5px;color:var(--brand);font-weight:650;flex:1}
         </style>`;
       this.pintarTog();
       document.getElementById('v-bloques').onclick = () => this.setVista('bloques');
@@ -2025,74 +2095,219 @@ tr:hover td{background:var(--panel-2)}
         .sort((a, b) => a.nombre.localeCompare(b.nombre));
     },
 
+    // ---- Filtros del costado ----------------------------------------------
+    // Se filtra por acá y se navega por el árbol de arriba: son dos cosas
+    // distintas. El árbol dice DÓNDE estoy mirando; los filtros, QUÉ de todo
+    // eso quiero ver. Marcar dos ambientes es normal —racks y aparadores para
+    // el mismo living— y eso el árbol solo no lo puede hacer.
+    _f: { ambiente: [], tipo: [], term: [], disp: [], pub: [] },
+
+    // Todos los productos del catálogo, sin filtrar: es contra esto que se
+    // cuentan las opciones de cada filtro.
+    async cargarTodo() {
+      if (this._todo) return this._todo;
+      this._todo = await global.DB.productos({ limite: 500 });
+      return this._todo;
+    },
+
+    normTerm(t) {
+      return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    },
+
+    ambienteDe(catId) {
+      let c = this.arbol.find(x => x.id === catId);
+      while (c && c.padre_id) c = this.arbol.find(x => x.id === c.padre_id);
+      return c || null;
+    },
+
+    // Un producto pasa el filtro si cumple con TODOS los grupos marcados, y
+    // adentro de un grupo alcanza con cualquiera: marcar Living y Dormitorio
+    // muestra los dos, no la intersección —que sería siempre vacía—.
+    pasa(p, salvo) {
+      const f = this._f;
+      const amb = this.ambienteDe(p.categoria_id);
+      if (salvo !== 'ambiente' && f.ambiente.length && !f.ambiente.includes(amb && amb.id)) return false;
+      if (salvo !== 'tipo' && f.tipo.length && !f.tipo.includes(p.categoria_id)) return false;
+      if (salvo !== 'term' && f.term.length
+        && !(p.terminaciones || []).some(t => f.term.includes(this.normTerm(t)))) return false;
+      if (salvo !== 'disp' && f.disp.length) {
+        const k = (p.stock || 0) > 0 ? 'stock' : 'pedido';
+        if (!f.disp.includes(k)) return false;
+      }
+      if (salvo !== 'pub' && f.pub.length) {
+        const k = p.publicado_tn ? 'tn' : 'interno';
+        if (!f.pub.includes(k)) return false;
+      }
+      return true;
+    },
+
+    // Cada opción muestra cuántos muebles quedarían si la marcaras. Se cuenta
+    // ignorando su propio grupo: si no, marcar una opción pondría el resto en
+    // cero y no se podría elegir una segunda.
+    grupos() {
+      const todo = this._todo || [];
+      const cuenta = (salvo, fn) => {
+        const m = new Map();
+        todo.filter(p => this.pasa(p, salvo)).forEach(p => {
+          [].concat(fn(p) || []).filter(x => x != null).forEach(k => m.set(k, (m.get(k) || 0) + 1));
+        });
+        return m;
+      };
+      const cAmb = cuenta('ambiente', p => (this.ambienteDe(p.categoria_id) || {}).id);
+      const cTipo = cuenta('tipo', p => p.categoria_id);
+      // Se cuenta por la clave normalizada, para que no salgan dos renglones
+      // por la misma terminación escrita distinto.
+      const cTerm = cuenta('term', p => [...new Set((p.terminaciones || []).map(t => this.normTerm(t)))]);
+      const nomTerm = new Map();
+      todo.forEach(p => (p.terminaciones || []).forEach(t => {
+        const k = this.normTerm(t);
+        if (!nomTerm.has(k)) nomTerm.set(k, t);
+      }));
+      const cDisp = cuenta('disp', p => ((p.stock || 0) > 0 ? 'stock' : 'pedido'));
+      const cPub = cuenta('pub', p => (p.publicado_tn ? 'tn' : 'interno'));
+      const nom = id => (this.arbol.find(c => c.id === id) || {}).nombre || '—';
+      const ord = (m, etiqueta) => [...m.entries()]
+        .map(([k, n]) => ({ k, n, label: etiqueta(k) }))
+        .sort((a, b) => b.n - a.n || String(a.label).localeCompare(String(b.label)));
+
+      return [
+        { k: 'tipo', titulo: 'Tipo de mueble', ops: ord(cTipo, nom) },
+        { k: 'term', titulo: 'Terminación', ops: ord(cTerm, k => nomTerm.get(k) || k), color: true },
+        { k: 'disp', titulo: 'Disponibilidad',
+          ops: ord(cDisp, k => (k === 'stock' ? 'Con stock' : 'A pedido')) },
+        { k: 'pub', titulo: 'Publicación',
+          ops: ord(cPub, k => (k === 'tn' ? 'En Tienda Nube' : 'Sólo interno')) },
+      ].filter(g => g.ops.length > 1 || this._f[g.k].length);
+    },
+
+    marcados() {
+      return Object.values(this._f).reduce((a, x) => a + x.length, 0);
+    },
+
+    htmlFiltros() {
+      const gs = this.grupos();
+      if (!gs.length) return '';
+      return `<aside class="cat-f">
+        <div class="cat-f-h">
+          <span>Filtros</span>
+          ${this.marcados() ? `<button class="lnk" id="cat-limpiar">limpiar ${this.marcados()}</button>` : ''}
+        </div>
+        ${gs.map(g => `<div class="cat-g">
+          <div class="cat-g-t">${UI.esc(g.titulo)}</div>
+          ${g.ops.map(o => `<label class="cat-o ${this._f[g.k].includes(o.k) ? 'on' : ''}">
+            <input type="checkbox" data-f="${g.k}" data-v="${UI.esc(String(o.k))}"
+              ${this._f[g.k].includes(o.k) ? 'checked' : ''}>
+            ${g.color ? `<span class="pt" style="background:${global.DB.colorDe(o.label)}"></span>` : ''}
+            <span class="cat-o-n">${UI.esc(o.label)}</span>
+            <span class="cat-o-c tnum">${o.n}</span>
+          </label>`).join('')}
+        </div>`).join('')}
+      </aside>`;
+    },
+
+    engancharFiltros() {
+      document.querySelectorAll('[data-f]').forEach(i => i.onchange = () => {
+        const g = i.dataset.f;
+        // Las claves numéricas del árbol vuelven del DOM como texto.
+        const v = /^\d+$/.test(i.dataset.v) ? Number(i.dataset.v) : i.dataset.v;
+        this._f[g] = i.checked ? [...this._f[g], v] : this._f[g].filter(x => x !== v);
+        this.pintar();
+      });
+      const l = document.getElementById('cat-limpiar');
+      if (l) l.onclick = () => {
+        Object.keys(this._f).forEach(k => { this._f[k] = []; });
+        this.pintar();
+      };
+    },
+
     crumb() {
       const c = document.getElementById('cat-crumb');
       if (!c) return;
-      const items = [{ id: null, nombre: 'Todo' }, ...this.ruta];
-      c.innerHTML = `<div class="wrap-row" style="margin-bottom:14px;align-items:center">` +
-        items.map((it, i) => {
-          const last = i === items.length - 1;
-          return `<span>${last
-            ? `<b style="color:var(--navy)">${UI.esc(it.nombre)}</b>`
-            : `<a href="#" data-crumb="${i}">${UI.esc(it.nombre)}</a>`}</span>` +
-            (last ? '' : '<span class="muted">›</span>');
-        }).join('') + `</div>`;
-      c.querySelectorAll('[data-crumb]').forEach(a =>
-        a.onclick = e => { e.preventDefault(); this.ruta = this.ruta.slice(0, Number(a.dataset.crumb)); this.pintar(); });
+      const ambientes = this.hijos(null);
+      const sel = this._f.ambiente;
+      c.innerHTML = `<div class="cat-amb">
+        <button class="amb ${sel.length ? '' : 'on'}" data-amb="">Todo</button>
+        ${ambientes.map(a => `<button class="amb ${sel.includes(a.id) ? 'on' : ''}"
+          data-amb="${a.id}">${UI.esc(a.nombre)}</button>`).join('')}
+      </div>`;
+      c.querySelectorAll('[data-amb]').forEach(b => b.onclick = () => {
+        const v = b.dataset.amb;
+        if (!v) { this._f.ambiente = []; this._f.tipo = []; }
+        else {
+          const id = Number(v);
+          // Cambiar de ambiente limpia los tipos: los de Living no existen
+          // en Dormitorio y quedarían filtrando en falso.
+          this._f.ambiente = sel.includes(id) ? sel.filter(x => x !== id) : [...sel, id];
+          this._f.tipo = this._f.tipo.filter(t => {
+            const amb = this.ambienteDe(t);
+            return !this._f.ambiente.length || (amb && this._f.ambiente.includes(amb.id));
+          });
+        }
+        this.pintar();
+      });
     },
 
     async pintar() {
       this.crumb();
       const cont = document.getElementById('cat-lista');
+      cont.innerHTML = UI.spinner();
       const actual = this.ruta.length ? this.ruta[this.ruta.length - 1].id : null;
-      const subcats = this.hijos(actual);
 
-      // Si la categoría actual tiene subcategorías, mostramos el árbol.
-      if (subcats.length) {
-        cont.innerHTML = `<div class="grid-cats">${subcats.map(c =>
-          `<button class="cat-tile" data-cat="${c.id}">
-             <span class="cat-n">${UI.esc(c.nombre)}</span>
-             <span class="cat-go">›</span>
-           </button>`).join('')}</div>
-          <style>
-            .grid-cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
-            .cat-tile{display:flex;align-items:center;gap:10px;padding:16px;border:1px solid var(--line);
-              border-radius:12px;background:var(--panel);box-shadow:var(--shadow);cursor:pointer;text-align:left;transition:.15s}
-            .cat-tile:hover{border-color:var(--brand);transform:translateY(-1px)}
-            .cat-n{font-weight:650;color:var(--navy);flex:1}
-            .cat-go{color:var(--muted);font-size:18px}
-          </style>`;
-        cont.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => {
-          const c = this.arbol.find(x => x.id === Number(b.dataset.cat));
-          this.ruta.push({ id: c.id, nombre: c.nombre }); this.pintar();
-        });
+      try {
+        await this.cargarTodo();
+      } catch (e) {
+        cont.innerHTML = `<div class="banner warn">No se pudo leer: ${UI.esc(e.message || e)}</div>`;
         return;
       }
 
-      // Es una hoja (tipo de mueble): mostramos sus productos.
-      cont.innerHTML = UI.spinner();
-      try {
-        this._prods = await global.DB.productos({ categoriaId: actual });
-        this.pintarProductos(cont,
-          actual ? 'Este tipo de mueble no tiene productos.' : 'Elegí un ambiente para empezar.');
-      } catch (e) {
-        this._prods = null;
-        cont.innerHTML = `<div class="banner warn">No se pudo leer: ${UI.esc(e.message || e)}</div>`;
-      }
+      // Lo que se ve es: lo que cuelga de donde estoy parado, filtrado, y si
+      // hay texto, lo que coincide en todo el catálogo.
+      const bajo = id => {
+        if (id == null) return () => true;
+        const dentro = new Set([id]);
+        let cambio = true;
+        while (cambio) {
+          cambio = false;
+          this.arbol.forEach(c => {
+            if (c.padre_id != null && dentro.has(c.padre_id) && !dentro.has(c.id)) {
+              dentro.add(c.id); cambio = true;
+            }
+          });
+        }
+        return p => dentro.has(p.categoria_id);
+      };
+      const t = global.DB.sinTilde ? global.DB.sinTilde(this.texto) : this.texto.toLowerCase();
+      const enTexto = p => !this.texto
+        || (p.nombre + ' ' + (p.sku || '')).toLowerCase().includes(this.texto.toLowerCase());
+
+      this._prods = (this._todo || [])
+        .filter(this.texto ? enTexto : bajo(actual))
+        .filter(p => this.pasa(p));
+
+      cont.innerHTML = `<div class="cat-cols">
+        ${this.htmlFiltros()}
+        <div class="cat-res" id="cat-res"></div>
+      </div>`;
+      this.pintarProductos(document.getElementById('cat-res') || cont, this.texto
+        ? 'No hay muebles para esa búsqueda.'
+        : (this.marcados() ? 'Ningún mueble cumple con esos filtros.' : 'No hay muebles acá.'));
+      this.engancharFiltros();
+      this.pintarSub();
+    },
+
+    // Cuántos se están viendo, arriba a la derecha.
+    pintarSub() {
+      const s = document.getElementById('cat-cuenta');
+      if (!s) return;
+      const n = (this._prods || []).length, tot = (this._todo || []).length;
+      s.textContent = n === tot
+        ? `${tot} ${tot === 1 ? 'mueble' : 'muebles'}`
+        : `${n} de ${tot} muebles`;
     },
 
     async buscar() {
       this.ruta = [];
-      document.getElementById('cat-crumb').innerHTML = '';
-      const cont = document.getElementById('cat-lista');
-      cont.innerHTML = UI.spinner();
-      try {
-        this._prods = await global.DB.productos({ texto: this.texto });
-        this.pintarProductos(cont, 'No hay productos para esa búsqueda.');
-      } catch (e) {
-        this._prods = null;
-        cont.innerHTML = `<div class="banner warn">${UI.esc(e.message || e)}</div>`;
-      }
+      this.pintar();
     },
 
     // Cambia entre bloques/listado y re-pinta lo que haya sin volver a la base.
@@ -2101,7 +2316,7 @@ tr:hover td{background:var(--panel-2)}
       this.vista = v;
       try { localStorage.setItem(VISTA_KEY, v); } catch {}
       this.pintarTog();
-      const cont = document.getElementById('cat-lista');
+      const cont = document.getElementById('cat-res') || document.getElementById('cat-lista');
       if (this._prods) this.pintarProductos(cont, 'Sin productos.');
     },
 
@@ -2114,24 +2329,48 @@ tr:hover td{background:var(--panel-2)}
 
     // Dispatcher: pinta la lista de productos en el formato elegido.
     pintarProductos(cont, vacio) {
+      if (!cont) return;
       const prods = this._prods || [];
       cont.innerHTML = prods.length
         ? (this.vista === 'lista' ? this.htmlLista(prods) : this.htmlBloques(prods))
         : UI.vacio(vacio);
       this.enganchar(cont);
+      this.pintarSub();
     },
+
+    // El estado del mueble de un vistazo, que es lo que cambia la conversación
+    // con el cliente: si hay en depósito se entrega ya; si no, se fabrica.
+    estado(p) {
+      if (p.publicado_tn === false && p.publicado === false) return { label: 'Oculto', pill: 'soft' };
+      if ((p.stock || 0) > 0) return { label: `Stock ${p.stock}`, pill: 'ok' };
+      return { label: 'A pedido', pill: 'warn' };
+    },
+    puntos(p) {
+      const ts = (p.terminaciones || []).slice(0, 5);
+      if (!ts.length) return '';
+      return `<span class="pts">${ts.map(t =>
+        `<span class="pt" title="${UI.esc(t)}" style="background:${global.DB.colorDe(t)}"></span>`).join('')}
+        ${(p.terminaciones || []).length > 5
+          ? `<small class="muted">+${p.terminaciones.length - 5}</small>` : ''}</span>`;
+    },
+    catDe(id) { return (this.arbol.find(c => c.id === id) || {}).nombre || ''; },
 
     htmlLista(prods) {
       return `<div class="card"><table>
-        <thead><tr><th>Producto</th><th>Código</th><th style="text-align:right">Desde</th>
-          <th style="text-align:right">Variantes</th><th></th></tr></thead>
+        <thead><tr><th>Producto</th><th>Código</th><th>Tipo</th>
+          <th style="text-align:right">Variantes</th><th style="text-align:right">Stock</th>
+          <th style="text-align:right">Desde</th><th>Terminaciones</th><th></th><th></th></tr></thead>
         <tbody>${prods.map(p => {
-          const tn = p.publicado_tn ? '<span class="pill ok">TN</span>' : '<span class="pill soft">interno</span>';
+          const e = this.estado(p);
           return `<tr data-prod="${p.id}" style="cursor:pointer">
-            <td><b>${UI.esc(p.nombre)}</b> ${tn}</td>
+            <td><b>${UI.esc(p.nombre)}</b></td>
             <td class="muted tnum">${UI.esc(p.sku || '—')}</td>
-            <td style="text-align:right" class="tnum">${p.desde ? UI.pesos(p.desde) : '—'}</td>
+            <td class="muted">${UI.esc(this.catDe(p.categoria_id))}</td>
             <td style="text-align:right" class="tnum">${p.variantes}</td>
+            <td style="text-align:right" class="tnum">${p.stock || '—'}</td>
+            <td style="text-align:right" class="tnum">${p.desde ? UI.pesos(p.desde) : '—'}</td>
+            <td>${this.puntos(p)}</td>
+            <td><span class="pill ${e.pill}">${UI.esc(e.label)}</span></td>
             <td style="text-align:right" class="muted">ver ›</td></tr>`;
         }).join('')}</tbody></table></div>`;
     },
@@ -2153,27 +2392,18 @@ tr:hover td{background:var(--panel-2)}
 
     htmlBloques(prods) {
       return `<div class="grid-prod">${prods.map(p => {
-        const tn = p.publicado_tn ? '<span class="pill ok">TN</span>' : '<span class="pill soft">interno</span>';
+        const e = this.estado(p);
         return `<button class="prod-tile" data-prod="${p.id}">
-            <div class="prod-img">${this.silueta(p.categoria_id)}</div>
-            <div class="prod-top"><span class="prod-n">${UI.esc(p.nombre)}</span> ${tn}</div>
-            <div class="prod-meta">${p.desde ? `desde <b class="tnum">${UI.pesos(p.desde)}</b> · ` : ''}<b class="tnum">${p.variantes}</b> variantes</div>
+            <div class="prod-img">${this.silueta(p.categoria_id)}
+              <span class="pill ${e.pill} prod-est">${UI.esc(e.label)}</span></div>
+            <div class="prod-n">${UI.esc(p.nombre)}</div>
+            <div class="prod-c">${UI.esc(this.catDe(p.categoria_id))}</div>
+            <div class="prod-p">${p.desde
+              ? `desde <b class="tnum">${UI.pesos(p.desde)}</b>` : '<span class="muted">sin precio</span>'}</div>
+            <div class="prod-b"><span class="prod-v">${p.variantes}
+              ${p.variantes === 1 ? 'variante' : 'variantes'}</span>${this.puntos(p)}</div>
           </button>`;
-      }).join('')}</div>
-        <style>
-          .grid-prod{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
-          .prod-tile{display:flex;flex-direction:column;gap:8px;align-items:stretch;padding:12px;
-            border:1px solid var(--line);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);
-            cursor:pointer;text-align:left;transition:.15s}
-          .prod-tile:hover{border-color:var(--brand);transform:translateY(-1px)}
-          .prod-img{display:grid;place-items:center;background:var(--panel-2);border-radius:9px;
-            padding:10px;color:var(--muted);min-height:104px}
-          .prod-tile:hover .prod-img{color:var(--brand)}
-          .sil{width:100%;max-width:150px;height:88px}
-          .prod-top{display:flex;align-items:center;gap:8px}
-          .prod-n{font-weight:650;color:var(--navy);flex:1;font-size:13.5px}
-          .prod-meta{color:var(--muted);font-size:12.5px}
-        </style>`;
+      }).join('')}</div>`;
     },
 
     enganchar(cont) {

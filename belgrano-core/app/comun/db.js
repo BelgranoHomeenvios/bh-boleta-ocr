@@ -557,8 +557,16 @@
           const vs = DEMO.variantes.filter(v => v.producto_id === p.id);
           const pr = vs.map(v => v.precio);
           // La grilla muestra "desde": el vendedor necesita el piso de precio
-          // antes de abrir el mueble.
-          return { ...p, variantes: vs.length, desde: pr.length ? Math.min(...pr) : 0, hasta: pr.length ? Math.max(...pr) : 0 };
+          // antes de abrir el mueble. Y con qué terminaciones viene, que es lo
+          // primero que pregunta el cliente.
+          return {
+            ...p,
+            variantes: vs.length,
+            desde: pr.length ? Math.min(...pr) : 0,
+            hasta: pr.length ? Math.max(...pr) : 0,
+            stock: vs.reduce((a, v) => a + (Number(v.stock) || 0), 0),
+            terminaciones: [...new Set(vs.map(v => v.estructura).filter(Boolean))],
+          };
         });
       }
       let q = cliente().from('producto')
@@ -989,6 +997,21 @@
         .order('medida').order('estructura').order('frente');
       if (error) throw error;
       return data || [];
+    },
+
+    // El color con el que se pinta una terminación en el catálogo. No es la
+    // foto: es un redondelito para reconocerla de un vistazo.
+    COLORES: [
+      { busca: 'blanc', color: '#f4f2ee' }, { busca: 'negro', color: '#1b1b1b' },
+      { busca: 'paraiso', color: '#c49a6c' }, { busca: 'nogal', color: '#6b4a2f' },
+      { busca: 'natural', color: '#d9c3a2' }, { busca: 'roble', color: '#b08d5f' },
+      { busca: 'gris', color: '#9aa0a6' }, { busca: 'olmo', color: '#a8845c' },
+      { busca: 'petiribi', color: '#8a5a3b' }, { busca: 'laque', color: '#e8e6e1' },
+    ],
+    colorDe(valor) {
+      const t = sinTilde(valor || '');
+      const m = this.COLORES.find(c => t.includes(c.busca));
+      return m ? m.color : '#c9ccd1';
     },
 
     async totales() {

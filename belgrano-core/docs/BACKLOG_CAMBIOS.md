@@ -859,6 +859,44 @@ Compra y venta · Documentos · Contabilidad.
   *Ver inventario*: se define una vez y después sólo se consulta. De paso se
   arregló el remiendo de secciones que dejaba escondido el aviso de mínimos.
 
+### Lote 29 — APLICADO (El catálogo: la A y la C juntas)
+
+De las tres propuestas quedó **A + C**: las fotos de la A con el filtro al
+costado de la C, y el listado de la B como segunda vista.
+
+**Arriba**
+- ✅ 368. Los **ambientes en fila**: *Todo · Dormitorio · Living*. Un clic y
+  listo, que es la navegación de todos los días. Cambiar de ambiente limpia los
+  tipos marcados —los de Living no existen en Dormitorio y quedarían filtrando
+  en falso—.
+- ✅ 369. El botón de vista dice **Fotos / Listado** en vez de dos íconos.
+- ✅ 370. A la derecha, **cuántos se están viendo**: *5 de 12 muebles*.
+
+**El filtro del costado**
+- ✅ 371. **Tipo de mueble · Terminación · Disponibilidad · Publicación**, cada
+  opción con **cuántos muebles quedarían**. La terminación además con su
+  redondelito de color.
+- ✅ 372. Adentro de un grupo, marcar dos **suma** (cómodas o placards); entre
+  grupos, **cruza** (cómodas Y blancas). Es lo que uno espera y lo que evita
+  que marcar dos cosas devuelva vacío siempre.
+- ✅ 373. Las cuentas de cada grupo se calculan **ignorando ese mismo grupo**:
+  si no, al marcar una opción el resto quedaría en cero y no se podría elegir
+  una segunda.
+- ✅ 374. Un grupo con una sola opción no se muestra: no filtra nada.
+- ✅ 375. *Blanca* y *BLANCA* son la misma terminación — se agrupan sin tildes
+  ni mayúsculas.
+
+**Las dos vistas**
+- ✅ 376. **Fotos**: dibujo grande, el **estado** arriba a la izquierda —*Stock
+  2* / *A pedido* / *Oculto*—, nombre, tipo de mueble, *desde $*, variantes y
+  los redondelitos de terminación.
+- ✅ 377. **Listado**: producto, código, tipo, variantes, **stock**, desde,
+  terminaciones y estado. Para trabajar y comparar.
+- ✅ 378. La elección de vista se recuerda.
+
+> Falta decidir **qué información va en cada vista** —ésta es la primera pasada—
+> y si el filtro guarda lo último usado por rol.
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·
