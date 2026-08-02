@@ -894,6 +894,25 @@ costado de la C, y el listado de la B como segunda vista.
   terminaciones y estado. Para trabajar y comparar.
 - ✅ 378. La elección de vista se recuerda.
 
+### Lote 30 — APLICADO (El catálogo se piensa por categoría)
+
+- ✅ 379. **Arriba van las categorías de mueble**, no los ambientes: *Cómodas ·
+  Mesas de luz · Placards · Racks*, cada una con su cuenta. Así se trabaja el
+  catálogo —todas las mesas de luz, todas las cómodas—; el ambiente pasó a ser
+  un filtro más del costado.
+- ✅ 380. **Ver todo agrupa por categoría**, con el título de cada una, cuántos
+  muebles tiene y un *ver sólo esta ›*. Recorrer el catálogo es recorrerlo como
+  está ordenado en la cabeza, no una lista suelta.
+- ✅ 381. La cabecera queda en un renglón: **buscador ancho**, botón **Filtrar**
+  con la cuenta de filtros marcados, **cómo se ordena** y **Fotos / Listado**.
+- ✅ 382. El orden por defecto es **por categoría**. También hay por nombre y
+  por precio —y ahí el agrupado se sale solo, porque agrupar y ordenar por otra
+  cosa a la vez no se entiende—.
+- ✅ 383. El **costado se puede esconder** con el botón Filtrar, y la elección
+  se recuerda.
+- ✅ 384. El buscador ya no vuelve a la base: filtra lo que hay, y se combina
+  con las categorías y los filtros.
+
 > Falta decidir **qué información va en cada vista** —ésta es la primera pasada—
 > y si el filtro guarda lo último usado por rol.
 

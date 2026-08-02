@@ -5,11 +5,13 @@
 // =====================================================================
 (function (global) {
   const VISTA_KEY = 'bh_catalogo_vista';
+  const FILTROS_KEY = 'bh_catalogo_filtros';
   const Catalogo = {
     arbol: [],           // categorías cargadas
     ruta: [],            // breadcrumb: [{id,nombre}] hasta la categoría actual
     texto: '',           // búsqueda libre
     vista: (() => { try { return localStorage.getItem(VISTA_KEY) || 'bloques'; } catch { return 'bloques'; } })(),
+    verFiltros: (() => { try { return localStorage.getItem(FILTROS_KEY) !== '0'; } catch { return true; } })(),
     _prods: null,        // últimos productos pintados (para re-render al cambiar de vista)
 
     async render(mount = 'view') {
@@ -23,18 +25,25 @@
             <div class="h-sub" id="cat-sub"></div>
           </div>
           <div class="sp"></div>
-          <label class="fld" style="width:260px">
-            <span class="lbl">Buscar en todo el catálogo</span>
-            <input id="cat-q" placeholder="Amberes, oliver, mesa…" value="${UI.esc(this.texto)}">
-          </label>
-          <div class="vista-tog" role="group" aria-label="Formato de vista" style="align-self:flex-end">
+        </div>
+        <div class="cat-bar">
+          <div class="cat-busca">
+            <input id="cat-q" placeholder="Buscar por nombre o código…" value="${UI.esc(this.texto)}">
+          </div>
+          <button class="btn" id="cat-verf" aria-pressed="true">Filtrar<span id="cat-fn"></span></button>
+          <select id="cat-orden" class="cat-ord" title="Cómo se ordenan">
+            <option value="cat">Por categoría</option>
+            <option value="nombre">Por nombre</option>
+            <option value="precio">Por precio</option>
+          </select>
+          <div class="vista-tog" role="group" aria-label="Formato de vista">
             <button id="v-bloques" title="Con foto">Fotos</button>
             <button id="v-lista"   title="Listado">Listado</button>
           </div>
         </div>
-        <div class="row" style="align-items:center;margin-bottom:4px">
-          <div id="cat-crumb" style="flex:1;min-width:0"></div>
-          <span class="hint" id="cat-cuenta"></span>
+        <div id="cat-crumb"></div>
+        <div class="row" style="align-items:center;margin:2px 0 6px">
+          <div class="sp"></div><span class="hint" id="cat-cuenta"></span>
         </div>
         <div id="cat-lista">${UI.spinner()}</div>
         <style>
@@ -46,7 +55,29 @@
 
           /* Filtros al costado y resultados al lado: el vendedor filtra sin
              perder de vista lo que está mirando. */
-          .cat-amb{display:flex;gap:6px;flex-wrap:wrap}
+          .cat-bar{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+          @media(max-width:760px){.cat-bar{flex-wrap:wrap}}
+          .cat-busca{flex:1 1 auto;min-width:160px}
+          .cat-busca input{width:100%;padding:9px 12px;font-size:13px}
+          .cat-bar .btn{flex:none;white-space:nowrap}
+          .cat-ord{flex:none;width:auto;min-width:146px;padding:8px 10px;font-size:12.5px;
+            font-weight:650;color:var(--ink-soft);border:1px solid var(--line);border-radius:10px;
+            background:var(--panel)}
+          .cat-bar .vista-tog{flex:none}
+          #cat-fn{margin-left:6px;font-size:11px;background:var(--brand);color:#fff;border-radius:999px;
+            padding:1px 6px}
+          #cat-fn:empty{display:none}
+          .cat-amb{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+          .amb-n{font-size:11px;opacity:.65;margin-left:3px}
+          /* Cada categoría con su título: "ver todo" es recorrer el catálogo
+             como está ordenado en la cabeza, no una lista suelta. */
+          .cat-sec+.cat-sec{margin-top:22px}
+          .cat-sec-h{display:flex;align-items:baseline;gap:9px;margin-bottom:9px;
+            border-bottom:1px solid var(--line);padding-bottom:6px}
+          .cat-sec-t{font-size:12.5px;font-weight:700;color:var(--navy);text-transform:uppercase;
+            letter-spacing:.04em}
+          .cat-sec-n{font-size:11.5px;color:var(--muted)}
+          .cat-sec-v{margin-left:auto;font-size:11.5px}
           .amb{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 13px;
             font:inherit;font-size:12.5px;font-weight:650;color:var(--ink-soft);cursor:pointer;transition:.12s}
           .amb:hover{border-color:var(--brand);color:var(--navy)}
@@ -90,6 +121,16 @@
       this.pintarTog();
       document.getElementById('v-bloques').onclick = () => this.setVista('bloques');
       document.getElementById('v-lista').onclick   = () => this.setVista('lista');
+      const so = document.getElementById('cat-orden');
+      so.value = this.orden;
+      so.onchange = () => { this.orden = so.value; this.pintar(); };
+      // El costado se puede esconder: con el catálogo filtrado uno quiere la
+      // pantalla entera para mirar muebles.
+      document.getElementById('cat-verf').onclick = () => {
+        this.verFiltros = !this.verFiltros;
+        try { localStorage.setItem(FILTROS_KEY, this.verFiltros ? '1' : '0'); } catch {}
+        this.pintar();
+      };
 
       if (global.DB.modo() === 'demo') {
         v.insertAdjacentHTML('afterbegin',
@@ -100,9 +141,8 @@
 
       const q = document.getElementById('cat-q');
       let t; q.oninput = () => { clearTimeout(t); t = setTimeout(() => {
-        this.texto = q.value.trim();
-        if (this.texto) this.buscar(); else { this.ruta = []; this.pintar(); }
-      }, 250); };
+        this.texto = q.value.trim(); this.pintar();
+      }, 220); };
 
       try {
         this.arbol = await global.DB.arbolCategorias();
@@ -195,7 +235,7 @@
         .sort((a, b) => b.n - a.n || String(a.label).localeCompare(String(b.label)));
 
       return [
-        { k: 'tipo', titulo: 'Tipo de mueble', ops: ord(cTipo, nom) },
+        { k: 'ambiente', titulo: 'Ambiente', ops: ord(cAmb, nom) },
         { k: 'term', titulo: 'Terminación', ops: ord(cTerm, k => nomTerm.get(k) || k), color: true },
         { k: 'disp', titulo: 'Disponibilidad',
           ops: ord(cDisp, k => (k === 'stock' ? 'Con stock' : 'A pedido')) },
@@ -244,35 +284,46 @@
       };
     },
 
+    // Las categorías de mueble, arriba y en una fila. Así se piensa el
+    // catálogo: todas las mesas de luz, todas las cómodas — no por ambiente ni
+    // por fecha de alta. Cada una dice cuántos muebles tiene.
     crumb() {
       const c = document.getElementById('cat-crumb');
       if (!c) return;
-      const ambientes = this.hijos(null);
-      const sel = this._f.ambiente;
+      const g = this.grupoTipos();
+      const sel = this._f.tipo;
       c.innerHTML = `<div class="cat-amb">
-        <button class="amb ${sel.length ? '' : 'on'}" data-amb="">Todo</button>
-        ${ambientes.map(a => `<button class="amb ${sel.includes(a.id) ? 'on' : ''}"
-          data-amb="${a.id}">${UI.esc(a.nombre)}</button>`).join('')}
+        <button class="amb ${sel.length ? '' : 'on'}" data-tipo="">Ver todo
+          <span class="amb-n">${(this._todo || []).filter(p => this.pasa(p, 'tipo')).length}</span></button>
+        ${g.map(o => `<button class="amb ${sel.includes(o.k) ? 'on' : ''}" data-tipo="${o.k}">
+          ${UI.esc(o.label)} <span class="amb-n">${o.n}</span></button>`).join('')}
       </div>`;
-      c.querySelectorAll('[data-amb]').forEach(b => b.onclick = () => {
-        const v = b.dataset.amb;
-        if (!v) { this._f.ambiente = []; this._f.tipo = []; }
+      c.querySelectorAll('[data-tipo]').forEach(b => b.onclick = () => {
+        const v = b.dataset.tipo;
+        if (!v) this._f.tipo = [];
         else {
           const id = Number(v);
-          // Cambiar de ambiente limpia los tipos: los de Living no existen
-          // en Dormitorio y quedarían filtrando en falso.
-          this._f.ambiente = sel.includes(id) ? sel.filter(x => x !== id) : [...sel, id];
-          this._f.tipo = this._f.tipo.filter(t => {
-            const amb = this.ambienteDe(t);
-            return !this._f.ambiente.length || (amb && this._f.ambiente.includes(amb.id));
-          });
+          this._f.tipo = sel.includes(id) ? sel.filter(x => x !== id) : [...sel, id];
         }
         this.pintar();
       });
     },
 
+    // Las categorías que se ofrecen arriba, con su cuenta. Se calculan
+    // ignorando la selección de categoría —si no, al elegir una las demás
+    // quedarían en cero y no se podría sumar una segunda— pero sí respetan el
+    // resto de los filtros.
+    grupoTipos() {
+      const m = new Map();
+      (this._todo || []).filter(p => this.pasa(p, 'tipo')).forEach(p => {
+        m.set(p.categoria_id, (m.get(p.categoria_id) || 0) + 1);
+      });
+      const nom = id => (this.arbol.find(c => c.id === id) || {}).nombre || '—';
+      return [...m.entries()].map(([k, n]) => ({ k, n, label: nom(k) }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+    },
+
     async pintar() {
-      this.crumb();
       const cont = document.getElementById('cat-lista');
       cont.innerHTML = UI.spinner();
       const actual = this.ruta.length ? this.ruta[this.ruta.length - 1].id : null;
@@ -283,6 +334,7 @@
         cont.innerHTML = `<div class="banner warn">No se pudo leer: ${UI.esc(e.message || e)}</div>`;
         return;
       }
+      this.crumb();
 
       // Lo que se ve es: lo que cuelga de donde estoy parado, filtrado, y si
       // hay texto, lo que coincide en todo el catálogo.
@@ -308,10 +360,17 @@
         .filter(this.texto ? enTexto : bajo(actual))
         .filter(p => this.pasa(p));
 
-      cont.innerHTML = `<div class="cat-cols">
-        ${this.htmlFiltros()}
-        <div class="cat-res" id="cat-res"></div>
-      </div>`;
+      const fh = this.verFiltros ? this.htmlFiltros() : '';
+      cont.innerHTML = fh
+        ? `<div class="cat-cols">${fh}<div class="cat-res" id="cat-res"></div></div>`
+        : '<div class="cat-res" id="cat-res"></div>';
+      const bf = document.getElementById('cat-verf');
+      if (bf) {
+        bf.setAttribute('aria-pressed', String(this.verFiltros));
+        bf.classList.toggle('primary', this.verFiltros && !!this.marcados());
+        const n = document.getElementById('cat-fn');
+        if (n) n.textContent = this.marcados() || '';
+      }
       this.pintarProductos(document.getElementById('cat-res') || cont, this.texto
         ? 'No hay muebles para esa búsqueda.'
         : (this.marcados() ? 'Ningún mueble cumple con esos filtros.' : 'No hay muebles acá.'));
@@ -351,15 +410,53 @@
       l.className = this.vista === 'lista' ? 'on' : '';
     },
 
-    // Dispatcher: pinta la lista de productos en el formato elegido.
+    // Dispatcher: pinta la lista de productos en el formato elegido. Cuando
+    // se ordena por categoría, cada una lleva su título: recorrer "todo" es
+    // recorrer el catálogo como está ordenado en la cabeza.
     pintarProductos(cont, vacio) {
       if (!cont) return;
-      const prods = this._prods || [];
-      cont.innerHTML = prods.length
-        ? (this.vista === 'lista' ? this.htmlLista(prods) : this.htmlBloques(prods))
-        : UI.vacio(vacio);
+      const prods = this.ordenados(this._prods || []);
+      const uno = p => (this.vista === 'lista' ? this.htmlLista(p) : this.htmlBloques(p));
+      if (!prods.length) { cont.innerHTML = UI.vacio(vacio); this.enganchar(cont); this.pintarSub(); return; }
+
+      const grupos = this.orden === 'cat' ? this.porCategoria(prods) : null;
+      cont.innerHTML = grupos && grupos.length > 1
+        ? grupos.map(g => `<section class="cat-sec">
+            <div class="cat-sec-h">
+              <span class="cat-sec-t">${UI.esc(g.nombre)}</span>
+              <span class="cat-sec-n">${g.items.length} ${g.items.length === 1 ? 'mueble' : 'muebles'}</span>
+              <a class="cat-sec-v" href="#" data-solo="${g.id}">ver sólo esta ›</a>
+            </div>
+            ${uno(g.items)}
+          </section>`).join('')
+        : uno(prods);
       this.enganchar(cont);
+      cont.querySelectorAll('[data-solo]').forEach(a => a.onclick = e => {
+        e.preventDefault();
+        this._f.tipo = [Number(a.dataset.solo)];
+        this.pintar();
+      });
       this.pintarSub();
+    },
+
+    orden: 'cat',
+    ordenados(prods) {
+      const l = [...prods];
+      if (this.orden === 'nombre') return l.sort((a, b) => a.nombre.localeCompare(b.nombre));
+      if (this.orden === 'precio') return l.sort((a, b) => (a.desde || 0) - (b.desde || 0));
+      const nom = id => (this.arbol.find(c => c.id === id) || {}).nombre || '';
+      return l.sort((a, b) => nom(a.categoria_id).localeCompare(nom(b.categoria_id))
+        || a.nombre.localeCompare(b.nombre));
+    },
+    porCategoria(prods) {
+      const m = new Map();
+      prods.forEach(p => {
+        if (!m.has(p.categoria_id)) m.set(p.categoria_id, []);
+        m.get(p.categoria_id).push(p);
+      });
+      const nom = id => (this.arbol.find(c => c.id === id) || {}).nombre || 'Sin categoría';
+      return [...m.entries()].map(([id, items]) => ({ id, nombre: nom(id), items }))
+        .sort((a, b) => a.nombre.localeCompare(b.nombre));
     },
 
     // El estado del mueble de un vistazo, que es lo que cambia la conversación
