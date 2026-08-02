@@ -679,6 +679,17 @@ Compra y venta · Documentos · Contabilidad.
   comprometido pero no se puede entregar. Todavía no tiene serie ni código —
   se le asignan cuando entra.
 
+### Lote 23 — APLICADO (Proporción del bloque de propiedades)
+
+- ✅ 321. Los botones de agregar pasan a **`btn sm`**: acompañan, no compiten
+  con el contenido. Antes eran del mismo peso que el bloque entero.
+- ✅ 322. El signo de más es **➕** en toda la app — antes convivían `⊕`, `＋`
+  y `⊞`.
+- ✅ 323. Las **flechas `›`** al costado de cada propiedad se van: ahora la
+  propiedad se edita con **✎** y se saca con **✕**, igual que un chip de
+  secundaria. Aparecen al pasar el mouse, así la fila queda limpia.
+- ✅ 324. El contador de combinaciones se separa con una línea del resto.
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·

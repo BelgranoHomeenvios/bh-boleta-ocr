@@ -598,7 +598,7 @@
           <div class="rb-pares">
             ${pares.map(x => `<span class="chip">${UI.esc(x.nombre)}</span>`).join('')
               || '<span class="hint">Todavía no hay nadie cargado en este rubro.</span>'}
-            ${ed ? `<button class="chip-add" data-nuevoprov="${r.k}">＋</button>` : ''}
+            ${ed ? `<button class="chip-add" data-nuevoprov="${r.k}">➕</button>` : ''}
           </div></div>` : ''}
 
         <div class="fr fr-sep"><label for="pd-modo-${i}">Cómo se pide</label>
@@ -706,7 +706,7 @@
             ${global.DB.planillas().map(x => `<option value="${x.k}" ${r.plantilla === x.k ? 'selected' : ''}
               >${UI.esc(x.nombre)}</option>`).join('')}
           </select>
-          ${ed ? `<button class="btn" data-guardarpl="${i}">＋ Guardar como planilla</button>` : ''}
+          ${ed ? `<button class="btn" data-guardarpl="${i}">➕ Guardar como planilla</button>` : ''}
         </div>
         ${t ? `<div class="banner info">Usa la planilla <b>${UI.esc(t.nombre)}</b>${usos > 1
             ? `, que comparten <b>${usos}</b> muebles` : ''}. Lo que cambies acá les llega a todos.</div>`
@@ -1001,23 +1001,23 @@
           <div class="prow" draggable="${ed}" data-orden="${UI.esc(p.k)}">
             ${ed ? '<span class="prow-drag" title="Arrastrar para cambiar el orden">⠿</span>' : ''}
             <div class="prow-i">
-              <div class="prow-n">${UI.esc(p.nombre)}</div>
+              <div class="prow-n">${UI.esc(p.nombre)}
+                ${ed ? `<button class="chip-e" data-prop="${UI.esc(p.k)}"
+                    title="Editar ${UI.esc(p.nombre)}">✎</button>
+                  <button class="chip-x" data-quitarprop="${UI.esc(p.k)}"
+                    title="Quitar del mueble">✕</button>` : ''}</div>
               <div class="chips" data-vals="${UI.esc(p.k)}">${p.usados.map(v =>
                 `<span class="chip val" draggable="${ed}" data-val="${UI.esc(v)}"
                   ${ed ? 'title="Arrastrá para cambiar el orden"' : ''}
                   >${ed ? '<span class="chip-drag">⠿</span>' : ''}${UI.esc(v)}</span>`).join('')
                 || '<span class="hint">Sin valores todavía.</span>'}
-                ${ed ? `<button class="chip-add" data-addv="${UI.esc(p.k)}">＋ Agregar</button>` : ''}</div>
+                ${ed ? `<button class="chip-add" data-addv="${UI.esc(p.k)}">➕ Agregar</button>` : ''}</div>
             </div>
-            <button class="prow-go" data-prop="${UI.esc(p.k)}"
-              title="Editar ${UI.esc(p.nombre)}">›</button>
           </div>`).join('') || '<div class="hint">Este mueble todavía no tiene propiedades.</div>'}
         </div>
         ${ed && ps.length ? '<div class="hint" style="margin-top:7px">Arrastrá una <b>propiedad</b> o un '
           + '<b>valor</b> para cambiar el orden: es el que ordena las variantes de abajo.</div>' : ''}
-        ${ed ? `<div class="prow-add">
-          <button class="btn" id="pd-addprop">⊕ Agregar propiedad principal</button>
-        </div>` : ''}
+        ${ed ? '<button class="btn sm mas" id="pd-addprop">➕ Agregar propiedad</button>' : ''}
         ${n ? `<div class="combo" style="margin-top:9px"><b class="tnum">${n}</b> combinaciones posibles
           ${this.vars.length !== n ? `<span class="muted">· ${this.vars.length} creadas</span>` : ''}</div>` : ''}
 
@@ -1037,9 +1037,7 @@
           </span>`).join('')
             || '<span class="hint">Ninguna. La variante sale con la imagen y el nombre nada más.</span>'}
         </div>
-        ${ed ? `<div class="prow-add">
-          <button class="btn" id="pd-addsec">⊕ Agregar propiedad secundaria</button>
-        </div>` : ''}
+        ${ed ? '<button class="btn sm mas" id="pd-addsec">➕ Agregar secundaria</button>' : ''}
       </${dentro ? 'div' : 'section'}>`;
     },
 
@@ -1115,7 +1113,7 @@
           <div class="vr-xi"><input inputmode="decimal" class="pn" data-sec="${v.id}|${x.k}"
             value="${UI.esc(global.DB.valorSec(v, x.k))}" placeholder="—" ${ed ? '' : 'readonly'}
             >${x.unidad ? `<span class="uni">${UI.esc(x.unidad)}</span>` : ''}</div>
-          <button class="aplic" data-aplic="${v.id}|${x.k}" hidden>⊞ Aplicar a todas</button>
+          <button class="aplic" data-aplic="${v.id}|${x.k}" hidden>⧉ Aplicar a todas</button>
         </div>`).join('')}
         <div class="vr-a">
           <button class="lx" data-hist="${v.id}" title="Historial">↺</button>
@@ -1175,7 +1173,7 @@
           ${ps.map((x, i) => `<span class="chip">${UI.esc(x.nombre)}${this.puedeEditar()
             ? `<button class="chip-x" data-quitarprov="${i}" aria-label="Quitar">✕</button>` : ''}</span>`).join('')
             || '<span class="hint">Todavía no se cargó ninguno.</span>'}
-          ${this.puedeEditar() ? '<button class="chip-add" id="pd-addprov">＋ proveedor</button>' : ''}
+          ${this.puedeEditar() ? '<button class="chip-add" id="pd-addprov">➕ proveedor</button>' : ''}
         </div>
         <div class="hint" style="margin-top:8px">Van por mueble, no por variante: los mismos hacen todas las
           medidas. El costo sale del <b>promedio</b> de lo que pasa cada uno.</div>
@@ -1235,6 +1233,11 @@
       });
       document.querySelectorAll('[data-editsec]').forEach(b => b.onclick = () =>
         this.modalEditarSecundaria(b.dataset.editsec));
+      document.querySelectorAll('[data-quitarprop]').forEach(b => b.onclick = () => {
+        const k = b.dataset.quitarprop;
+        const pr = this.props().find(x => x.k === k);
+        this.quitarPropiedad(k, pr ? pr.nombre : k);
+      });
       document.querySelectorAll('[data-finv]').forEach(b => b.onclick = () => {
         this._fInv = b.dataset.finv; this.pintar();
       });
@@ -1488,7 +1491,7 @@
         </div>
         <div class="pd-sepl"></div>
         <div class="row">
-          <button class="btn" id="ei-subir">＋ Subir uno nuevo</button>
+          <button class="btn" id="ei-subir">➕ Subir uno nuevo</button>
           ${actual ? '<button class="btn" id="ei-quitar">Quitar la imagen</button>' : ''}
           <div class="sp"></div>
           <button class="btn" id="ei-x">Cerrar</button>
@@ -1799,7 +1802,7 @@
           </select></label>
         <div class="pd-sepl"></div>
         <div class="hint">¿No está en la lista?</div>
-        <button class="btn" id="ap-nueva" style="margin-top:7px">＋ Crear una propiedad nueva</button>
+        <button class="btn" id="ap-nueva" style="margin-top:7px">➕ Crear una propiedad nueva</button>
         <div class="row" style="margin-top:18px;justify-content:flex-end;gap:10px">
           <button class="btn" id="ap-x">Cancelar</button>
           <button class="btn primary" id="ap-ok">Continuar</button>
@@ -1851,7 +1854,7 @@
         <div class="ad-t">Crear un valor que no está</div>
         <div class="fx">
           <input id="av-nuevo" placeholder="Ej: ESTRUCTURA ROBLE">
-          <button class="btn" id="av-crear">＋ Crear</button>
+          <button class="btn" id="av-crear">➕ Crear</button>
         </div>
         <div class="hint" style="margin-top:5px">Queda disponible para todos los muebles del catálogo.</div>
 
@@ -2162,7 +2165,7 @@
         <p class="h-sub">Dónde entra este mueble. Se pueden marcar varias.</p>
         <div class="fx" style="margin:12px 0 10px">
           <input id="mc-q" class="busca" placeholder="Buscar categoría">
-          <button class="btn" id="mc-crear">＋ Crear</button>
+          <button class="btn" id="mc-crear">➕ Crear</button>
         </div>
         <div class="lstc" id="mc-lista">${filas.map(({ c, r }) => `
           <label class="lc" data-txt="${UI.esc(r.join('/').toLowerCase())}">
@@ -2291,7 +2294,7 @@
         </div>
         <div class="pd-sepl"></div>
         <div class="row">
-          <button class="btn" id="ep-subir">＋ Subir uno nuevo</button>
+          <button class="btn" id="ep-subir">➕ Subir uno nuevo</button>
           ${actual ? '<button class="btn" id="ep-quitar">Quitar</button>' : ''}
           <div class="sp"></div>
           <button class="btn" id="ep-x">Cerrar</button>
@@ -2399,7 +2402,7 @@
           <input id="ms-n" placeholder="Ej: Medida del hueco">
           <select id="ms-u" style="max-width:190px">${global.DB.UNIDADES.map(u =>
             `<option value="${UI.esc(u.k)}">${UI.esc(u.label)}</option>`).join('')}</select>
-          <button class="btn" id="ms-crear">＋ Crear</button>
+          <button class="btn" id="ms-crear">➕ Crear</button>
         </div>
         <div class="hint" style="margin-top:5px">La unidad sale de una lista para que todos midan
           igual. Queda disponible para todos los muebles.</div>
@@ -2595,10 +2598,15 @@
         .prow:hover .prow-n{color:var(--brand)}
         .prow:hover .prow-go{color:var(--brand);transform:translateX(2px)}
         .prow-i{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
-        .prow-n{font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--navy)}
+        .prow-n{font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--navy);
+          display:flex;align-items:center;gap:3px}
+        .prow-n .chip-e,.prow-n .chip-x{opacity:0}
+        .prow:hover .chip-e,.prow:hover .chip-x{opacity:1}
         .prow-go{color:var(--muted);font-size:19px;line-height:1;transition:.15s;border:0;
           background:none;cursor:pointer;padding:2px 6px;font:inherit;font-size:19px}
         .prow-go:hover{color:var(--brand);transform:translateX(2px)}
+        /* El botón de agregar acompaña, no compite con el contenido. */
+        .btn.mas{margin-top:10px;font-size:12.5px;padding:5px 11px}
         .prow-add{margin-top:10px;padding-top:9px;border-top:1px solid var(--line)}
         .prow-drag{color:var(--muted);cursor:grab;font-size:13px;line-height:1;letter-spacing:-2px;
           flex:none;align-self:flex-start;margin-top:2px}
@@ -2636,7 +2644,9 @@
         .btn.ghost:hover{border-color:var(--crit)}
         .prop-pie{display:flex;align-items:center;gap:10px;margin-top:9px;padding-top:9px;
           border-top:1px solid var(--line);flex-wrap:wrap}
-        .combo{font-size:12.5px;color:var(--ink-soft)} .combo b{font-size:15px;color:var(--navy)}
+        .combo{font-size:12.5px;color:var(--ink-soft);margin-top:11px;padding-top:10px;
+          border-top:1px solid var(--line-soft)}
+        .combo b{font-size:15px;color:var(--navy)}
 
         .vr-tools{display:flex;align-items:center;gap:10px;margin-bottom:8px}
         .vr-tools .busca{max-width:320px;padding:7px 10px;font-size:13px}
