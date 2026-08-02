@@ -604,6 +604,43 @@ Se separan dos cosas que estaban mezcladas:
   entera cuando no había secundarias — la tabla se apilaba en una columna. El
   template ahora se arma en JS.
 
+### Lote 21 — APLICADO (Limpieza final del producto)
+
+**Orden de solapas**: Información general · Inventario · Producción ·
+Compra y venta · Documentos · Contabilidad.
+
+- ✅ 301. **Compra y venta** queda sólo con la tabla de costo y precio. Todo lo
+  que repetía Información general y Producción se sacó: dos lugares para
+  cargar lo mismo terminan siempre desincronizados.
+
+**Inventario**
+- ✅ 302. Módulo **Ver inventario**, cerrado por default: todas las unidades del
+  mueble con su **número de serie** y su **código de barras**, sin importar la
+  medida ni si están en depósito o ya salieron. Las vendidas muestran en qué
+  orden salieron.
+
+**Producción**
+- ✅ 303. **Quién lo fabrica** con botonera de **1 · 2 · 3 proveedores**, y
+  debajo de cada uno su **cómo se pide**. Los proveedores se muestran **por
+  nombre**, sin la capacidad semanal: acá importa quién puede hacerlo, no
+  cuánto entrega.
+- ✅ 304. **Un módulo plegable por proveedor**, numerado, con su resumen.
+- ✅ 305. Los **dibujos se cargan todos juntos** desde el módulo del proveedor,
+  uno por variante, con el estado de cada uno — no hay que entrar variante por
+  variante.
+- ✅ 306. **Mixta** muestra los dibujos arriba y la planilla abajo.
+- ✅ 307. **Materiales y notas para fábrica** pasan a ser **por proveedor** y
+  arrancan cerrados.
+
+**La planilla se edita sobre la tabla**
+- ✅ 308. El **título de cada columna se escribe en su encabezado** y abajo se
+  elige de dónde sale el valor. Se fue la lista de columnas de arriba: era
+  mantener lo mismo en dos lados.
+- ✅ 309. Las columnas se **mueven con flechitas** y se agregan con **＋** al
+  final de la tabla.
+- ✅ 310. Por default arranca con las **propiedades del mueble + ESTADO +
+  CANT. + OBSERVACIONES**.
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·

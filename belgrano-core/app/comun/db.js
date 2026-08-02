@@ -562,6 +562,37 @@
       return (data || []).map(p => ({ ...p, variantes: p.variante?.[0]?.count ?? 0 }));
     },
 
+    // ---- Unidades del depósito --------------------------------------------
+    // Con rastreo por número de serie, el stock no es un número: son unidades
+    // concretas, cada una con su código. Esto es lo que después va a permitir
+    // saber cuál salió en qué orden.
+    unidades(productoId) {
+      const vs = DEMO.variantes.filter(v => v.producto_id === Number(productoId));
+      const out = [];
+      let n = 0;
+      vs.forEach(v => {
+        const hay = Math.max(0, Number(v.stock) || 0);
+        for (let i = 0; i < hay; i++) {
+          n++;
+          out.push({
+            serie: `${v.sku || 'SKU'}-${String(n).padStart(3, '0')}`,
+            barras: `779${String(v.id).padStart(4, '0')}${String(n).padStart(6, '0')}`,
+            varianteId: v.id, estado: 'stock', desde: '12/07',
+          });
+        }
+      });
+      // Las que ya salieron quedan en el histórico: es lo que permite
+      // contestar "¿cuál se le entregó a ese cliente?".
+      DEMO.variantes.filter(v => v.producto_id === Number(productoId)).slice(0, 2).forEach((v, i) => {
+        out.push({
+          serie: `${v.sku || 'SKU'}-${String(900 + i).padStart(3, '0')}`,
+          barras: `779${String(v.id).padStart(4, '0')}${String(900 + i).padStart(6, '0')}`,
+          varianteId: v.id, estado: 'vendido', orden: `#S000${19 + i}`, desde: '28/07',
+        });
+      });
+      return out;
+    },
+
     // ---- Propiedades secundarias ------------------------------------------
     secundarias() {
       let guardadas = [];
