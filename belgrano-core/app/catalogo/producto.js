@@ -170,7 +170,11 @@
         this._tab = b.dataset.tab; this.pintar();
       });
       document.querySelectorAll('[data-mod]').forEach(b => b.onclick = () => {
-        const k = b.dataset.mod; this._abre[k] = this._abre[k] === false; this.pintar();
+        // El botón dice si está abierto en su aria-expanded. Hay que mirarlo a
+        // él y no al estado guardado: los módulos arrancan abiertos y otros
+        // bloques arrancan plegados, y con un solo default no salía bien.
+        this._abre[b.dataset.mod] = b.getAttribute('aria-expanded') !== 'true';
+        this.pintar();
       });
       this.enganchar();
     },
@@ -192,8 +196,7 @@
           `${this.vars.length} ${this.vars.length === 1 ? 'variante' : 'variantes'} · ${this.activas().length} activas`,
           this.bloqueVariantes(true), this.vars.length > 0)
         + this.modulo('entrega', 4, 'Entrega',
-          `${global.DB.plazoDe(this.p, this.cats()).dias} días · `
-          + `${this.p.instalacion ? 'requiere instalación' : 'sin instalación'} · `
+          `${this.p.instalacion ? 'Requiere instalación' : 'Sin instalación'} · `
           + `${this.p.bultos || 1} ${(this.p.bultos || 1) === 1 ? 'bulto' : 'bultos'}`,
           this.bloqueEntrega(), true);
     },
@@ -268,11 +271,10 @@
             title="${v.pisado ? 'Pisado a mano en este mueble' : 'Viene de la plantilla de precios'}"
             >${val ? UI.pesos(val) : '—'}</span></div>`;
         return `<div class="cv-r ${v.activa === false ? 'off' : ''}" data-v="${v.id}">
-          ${ejes.map(pr => `<div class="cv-p">${UI.esc(v[pr.k] || '—')}</div>`).join('')}
+          <div class="cv-p"><b>${UI.esc(this.nombreVar(v))}</b>
+            <span class="cv-sku tnum">${UI.esc(v.sku || global.DB.skuDe(this.p, v))}</span></div>
           ${celda('costo', v.costo)}
           ${celda('efec', ef)}
-          <div class="cv-n"><span class="tnum" data-marg="${v.id}">${
-            mg ? mg.toFixed(1).replace('.', ',') + ' %' : '—'}</span></div>
           <div class="cv-n"><span class="mk ${banda.pill}" data-mk="${v.id}">${
             mk ? mk.toFixed(2).replace('.', ',') + 'x' : '—'}</span></div>
           <div class="cv-a">
@@ -293,11 +295,11 @@
             ? `<b>${pisados}</b> ${pisados === 1 ? 'pisada' : 'pisadas'} a mano`
             : 'Todas vienen de la plantilla'}</span>
         </div>
-        <div class="cv-tabla" style="--ejes:${ejes.length}">
+        <div class="cv-tabla">
           <div class="cv-h">
-            ${ejes.map(pr => `<span>${UI.esc(pr.nombre)}</span>`).join('')}
+            <span>Variante</span>
             <span class="num">Costo</span><span class="num">P. efectivo</span>
-            <span class="num">Margen</span><span class="num">Markup</span><span></span>
+            <span class="num">Markup</span><span></span>
           </div>
           <div id="pd-vars">${lista.map(fila).join('') || UI.vacio('Ninguna variante coincide.')}</div>
         </div>
@@ -321,24 +323,9 @@
     // Información general y no en Otros.
     bloqueEntrega() {
       const p = this.p, ed = this.puedeEditar();
-      const cs = this.cats();
-      const pl = global.DB.plazoDe(p, cs);
-      const propia = cs[0] || null;
-      return `<div class="fr"><label for="pd-dias">Plazo de fábrica</label>
-          <div class="fx"><input id="pd-dias" inputmode="numeric" value="${UI.esc(p.dias || '')}"
-            placeholder="${pl.dias}" ${ed ? '' : 'readonly'} style="max-width:96px">
-            <span class="hint">días${p.dias ? '' : ` · heredado${pl.de === 'categoria'
-              ? ` de ${UI.esc(pl.cat.nombre)}` : ' del estándar de la casa'}`}</span></div></div>
-        <div class="fr"><label></label><span class="hint">Vacío hereda; cargado, manda. Se pisa cuando
-          este mueble se aparta del promedio de su rubro — porque siempre hay stock, o porque el color
-          que más sale se repone rápido.</span></div>
-        ${propia ? `<div class="fr"><label for="pd-diascat">Plazo de ${UI.esc(propia.nombre)}</label>
-            <div class="fx"><input id="pd-diascat" inputmode="numeric"
-              value="${global.DB.plazoCat(propia.id) || ''}"
-              placeholder="${global.DB.ENTREGA_DIAS.max}" ${ed ? '' : 'readonly'} style="max-width:96px">
-              <span class="hint">días · vale para todos los muebles de la categoría</span></div></div>` : ''}
-        <div class="pd-sep2"></div>
-        <label class="chk"><input type="checkbox" id="pd-inst" ${p.instalacion ? 'checked' : ''}
+      // La demora no está acá: es de depósito —depende de qué hay hecho— y
+      // vive en Inventario, donde se ve variante por variante.
+      return `<label class="chk"><input type="checkbox" id="pd-inst" ${p.instalacion ? 'checked' : ''}
           ${ed ? '' : 'disabled'}> Requiere instalación</label>
         <div class="hint">${p.instalacion
           ? 'En la orden va a saltar solo, con <b>a convenir</b>; el costo se define en Instalaciones, no acá.'
@@ -365,8 +352,7 @@
       };
       const est = k => global.DB.ESTADOS_UNIDAD.find(x => x.k === k) || { label: k, pill: 'soft' };
 
-      return `</section>
-      <section class="pd-m ${on ? 'on' : ''}" style="margin-top:9px">
+      return `<section class="pd-m ${on ? 'on' : ''}" style="margin-top:9px">
         <button class="pd-mh" data-mod="inventario" aria-expanded="${on}">
           <span class="pd-mt">Ver inventario</span>
           <span class="pd-mr">${cuenta('stock')} en depósito · ${cuenta('entrando')} por entrar ·
@@ -402,8 +388,66 @@
             todavía no llegó: ya está comprometido pero no se puede entregar, y todavía no tiene
             etiqueta —la recibe cuando entra al depósito—.</div>
         </div>` : ''}
-      </section>
-      <section style="display:none">`;
+      </section>`;
+    },
+
+    // Cuánto tarda en llegar. Va en Inventario y no en el catálogo porque no
+    // es una característica del mueble: depende de qué hay hecho. Baja en
+    // cascada —casa, categoría, mueble, variante— y el escalón fino es el que
+    // sirve: si de la cómoda Miami 1,20 paraíso y blanco siempre hay alguna en
+    // producción, esa entrega en 15 días aunque el modelo tarde 30.
+    bloqueDemora() {
+      const p = this.p, ed = this.puedeEditar();
+      const cs = this.cats();
+      const pl = global.DB.plazoDe(p, cs);
+      const heredado = global.DB.plazoDe({}, cs);
+      const propia = cs[0] || null;
+      const distintas = this.vars.filter(v => Number(v.dias)).length;
+      return `<section class="pd-b">
+        <div class="pd-h">Demora del producto</div>
+        <div class="hint" style="margin-bottom:11px">Lo que se le promete al cliente. Sale sola de la
+          categoría; se pisa acá cuando este mueble se aparta, y variante por variante más abajo.</div>
+        ${propia ? `<div class="fr"><label for="pd-diascat">Demora de ${UI.esc(propia.nombre)}</label>
+            <div class="fx"><input id="pd-diascat" inputmode="numeric"
+              value="${global.DB.plazoCat(propia.id) || ''}"
+              placeholder="${global.DB.ENTREGA_DIAS.max}" ${ed ? '' : 'readonly'} style="max-width:88px">
+              <span class="hint">días · vale para todos los muebles de la categoría</span></div></div>` : ''}
+        <div class="fr"><label for="pd-dias">Demora de este mueble</label>
+          <div class="fx"><input id="pd-dias" inputmode="numeric" value="${UI.esc(p.dias || '')}"
+            placeholder="${heredado.dias}" ${ed ? '' : 'readonly'} style="max-width:88px">
+            <span class="hint">días${p.dias ? '' : ` · vacío hereda ${heredado.de === 'categoria'
+              ? `los ${heredado.dias} de ${UI.esc(heredado.cat.nombre)}`
+              : `los ${heredado.dias} del estándar de la casa`}`}</span></div></div>
+        <div class="banner info" style="margin-top:9px">Hoy el vendedor ve <b>${pl.dias} días</b> para
+          este mueble${distintas
+            ? `, y <b>${distintas}</b> ${distintas === 1 ? 'variante entrega' : 'variantes entregan'} en
+               otro plazo —abajo, en la columna <b>demora</b>—.`
+            : '. Si alguna variante sale antes porque siempre hay alguna hecha, se carga abajo.'}</div>
+      </section>`;
+    },
+
+    // Cómo se numera cada unidad. Va al final, debajo del inventario: se define
+    // una vez y después sólo se consulta.
+    bloqueNumeracion() {
+      const prox = global.DB.proximaSerie();
+      return `<section class="pd-b">
+        <div class="pd-h">Cómo se numeran las unidades</div>
+        <div class="etiq">
+          <div class="etiq-a">
+            <div class="etiq-b">${UI.barras(prox, 40, 1.6)}</div>
+            <div class="etiq-n tnum">${UI.esc(prox)}</div>
+          </div>
+          <div class="hint">Un <b>correlativo único para toda la empresa</b>, no uno por mueble: el
+            próximo que sale es el ${UI.esc(prox)}. El número no lleva adentro el mueble ni la medida a
+            propósito —el sistema ya sabe de qué unidad se trata al leerlo, y meterlo sólo alarga la
+            etiqueta—. Se imprime en <b>Code 128</b>, que es lo que lee cualquier lector de mano y
+            admite letras: se escanea igual cuando la unidad <b>entra</b> al depósito que cuando
+            <b>sale</b> en una orden. La etiqueta se genera al recibir la unidad, no antes.</div>
+        </div>
+        <div class="hint" style="margin-top:9px">El <b>EAN-13</b> de cada variante es otra cosa y está
+          en la tabla de arriba: ese es para la venta al público y Tienda Nube, e identifica el modelo
+          —no la unidad—.</div>
+      </section>`;
     },
 
     tabInventario() {
@@ -413,31 +457,16 @@
       const conMin = this.vars.filter(v => (v.minStock || 0) > 0);
       const faltan = conMin.filter(v => (v.stock || 0) < v.minStock);
       const lista = this.ordenadas();
+      const her = global.DB.plazoDe(this.p, this.cats());
 
-      return `<section class="pd-b">
+      return `${this.bloqueDemora()}
+
+      <section class="pd-b">
         <div class="pd-h">Cómo se rastrea el stock</div>
         <div class="fr"><label for="pd-track">Se rastrea</label>
           <select id="pd-track" ${ed ? '' : 'disabled'}>${this.RASTREO.map(x =>
             `<option value="${x.k}" ${modo === x.k ? 'selected' : ''}>${UI.esc(x.label)}</option>`).join('')}</select></div>
         <div class="fr"><label></label><span class="hint">${UI.esc(elegido.pie)}</span></div>
-        ${modo === 'serie' ? `<div class="pd-sep2"></div>
-          <div class="cx-h2">Cómo se numeran</div>
-          <div class="etiq">
-            <div class="etiq-a">
-              <div class="etiq-b">${UI.barras(global.DB.proximaSerie(), 40, 1.6)}</div>
-              <div class="etiq-n tnum">${UI.esc(global.DB.proximaSerie())}</div>
-            </div>
-            <div class="hint">Un <b>correlativo único para toda la empresa</b>, no uno por mueble: el
-              próximo que sale es el ${UI.esc(global.DB.proximaSerie())}. El número no lleva adentro el
-              mueble ni la medida a propósito —el sistema ya sabe de qué unidad se trata al leerlo, y
-              meterlo sólo alarga la etiqueta—. Se imprime en <b>Code 128</b>, que es lo que lee
-              cualquier lector de mano y admite letras: se escanea igual cuando la unidad
-              <b>entra</b> al depósito que cuando <b>sale</b> en una orden. La etiqueta se genera al
-              recibir la unidad, no antes.</div>
-          </div>
-          <div class="hint" style="margin-top:9px">El <b>EAN-13</b> de cada variante es otra cosa y
-            está en la tabla de abajo: ese es para la venta al público y Tienda Nube, e identifica el
-            modelo —no la unidad—.</div>` : ''}
         <div class="hint" style="margin-top:9px">A quién se le pide y con qué —dibujo o planilla— se
           define en <b>Producción</b>: cada rubro se pide a su manera.</div>
       </section>
@@ -447,7 +476,8 @@
         <div class="inv-tabla">
           <div class="inv-head">
             <span>Variante</span><span>SKU</span><span>Código de barras</span>
-            <span class="num">Stock</span><span class="num">Stock mínimo deseado</span><span></span>
+            <span class="num">Stock</span><span class="num">Mínimo deseado</span>
+            <span class="num">Demora</span><span></span>
           </div>
           ${lista.map(v => {
             const min = Number(v.minStock) || 0;
@@ -464,6 +494,10 @@
                 value="${v.stock || 0}" ${ed ? '' : 'readonly'}></div>
               <div class="num"><input class="pn" inputmode="numeric" data-min="${v.id}"
                 value="${min || ''}" placeholder="—" ${ed ? '' : 'readonly'}></div>
+              <div class="num fx"><input class="pn ${v.dias ? '' : 'bloq'}" inputmode="numeric"
+                  data-vdias="${v.id}" value="${UI.esc(v.dias || '')}" placeholder="${her.dias}"
+                  title="${v.dias ? 'Propia de esta variante' : `Heredada: ${her.dias} días`}"
+                  ${ed ? '' : 'readonly'}><span class="uni">d</span></div>
               <div>${falta
                 ? `<span class="pill warn">faltan ${min - (v.stock || 0)}</span>`
                 : (min ? '<span class="pill ok">cubierto</span>' : '')}</div>
@@ -472,9 +506,9 @@
         </div>
         <div class="hint" style="margin-top:9px">Todo se repone cuando se vende. El <b>mínimo deseado</b>
           es aparte: lo que querés tener siempre en el depósito, aunque nadie lo haya pedido. El
-          <b>SKU</b> sale solo del código del mueble y de la variante; se puede pisar y volver atrás
-          con la flechita.</div>
-        ${this.bloqueVerInventario()}
+          <b>SKU</b> sale solo del código del mueble y de la variante. La <b>demora</b> en gris es la
+          del mueble: se escribe encima cuando esta variante sale antes —porque siempre hay alguna
+          hecha— y es lo que va a ver el vendedor al cotizarla.</div>
         ${conMin.length ? `<div class="banner ${faltan.length ? 'warn' : 'info'}" style="margin-top:10px">
           ${faltan.length
             ? `<b>${faltan.length}</b> ${faltan.length === 1 ? 'variante está' : 'variantes están'} por debajo del mínimo.
@@ -482,7 +516,10 @@
             : `<b>${conMin.length}</b> ${conMin.length === 1 ? 'variante tiene' : 'variantes tienen'} mínimo y
                ${conMin.length === 1 ? 'está cubierta' : 'están cubiertas'}.`}
         </div>` : ''}
-      </section>`;
+      </section>
+
+      ${this.bloqueVerInventario()}
+      ${modo === 'serie' ? this.bloqueNumeracion() : ''}`;
     },
 
     // Arriba, sólo cuántos rubros hacen falta. Cada uno se carga adentro de su
@@ -645,7 +682,7 @@
       const k = `notas${i}`;
       const on = this._abre[k] === true;
       return `<div class="pd-sepl"></div>
-        <button class="sub-h" data-mod="${k}">
+        <button class="sub-h" data-mod="${k}" aria-expanded="${on}">
           <span>${on ? '▴' : '▾'}</span> Materiales y notas para fábrica</button>
         ${on ? `<div style="margin-top:9px">
           <label class="lbl-t" for="pd-mat-${i}">Materiales y herrajes</label>
@@ -661,12 +698,21 @@
 
     // Los dibujos de un rubro, uno por variante y todos juntos: no hay que
     // entrar a cada variante para cargarlos.
+    // Un dibujo por variante son muchos renglones: con 27 variantes el rubro
+    // se come la pantalla. Se pliega, y cerrado sigue diciendo cuántos faltan.
     bloquePlanos(r, i) {
       const lista = this.ordenadas();
       const faltan = lista.filter(v => !(v.planos || [])[i]).length;
-      return `<div class="ad-t">Dibujos para ${UI.esc(this.nombreRubro(r.k))}
-          ${faltan ? `<span class="pill warn">faltan ${faltan}</span>`
-                   : '<span class="pill ok">completos</span>'}</div>
+      const k = `planos${i}`;
+      const on = this._abre[k] === true;
+      return `<div class="grp ${on ? 'on' : ''}" style="margin-bottom:11px">
+        <button class="grp-h click" data-mod="${k}" aria-expanded="${on}">
+          <span class="grp-t">Dibujos para ${UI.esc(this.nombreRubro(r.k))}</span>
+          <span class="grp-r">${lista.length} ${lista.length === 1 ? 'variante' : 'variantes'} ·
+            ${faltan ? `<b>faltan ${faltan}</b>` : 'todos cargados'}</span>
+          <span class="pd-mg">${on ? '▴' : '▾'}</span>
+        </button>
+        ${on ? `<div class="grp-b">
         <div class="hint" style="margin-bottom:10px">Cada variante tiene sus medidas, así que cada una
           lleva su dibujo. Se cargan todos desde acá.</div>
         <div class="dib">${lista.map(v => {
@@ -682,7 +728,8 @@
             <div class="dib-e">${url ? '<span class="pill ok">cargado</span>'
               : '<span class="pill warn">falta</span>'}</div>
           </div>`;
-        }).join('')}</div>`;
+        }).join('')}</div></div>` : ''}
+      </div>`;
     },
 
     // Las columnas de la planilla de un rubro. Si usa una PLANTILLA salen de
@@ -1015,13 +1062,15 @@
       </${dentro ? 'div' : 'section'}>`;
     },
 
+    // Las dos clases de propiedad no son lo mismo y no tienen que parecerlo:
+    // cada una va en su propia tarjeta, con su título. Las secundarias además
+    // vienen plegadas — se cargan una vez y después no se tocan más.
     bloquePropiedades(dentro) {
       const ps = this.props(), n = this.combinatorio(), ed = this.puedeEditar();
       const secs = this.secsDe();
-      return `<${dentro ? 'div' : 'section class="pd-b"'}>
-        <div class="pd-h">Principales</div>
-        <div class="hint" style="margin-bottom:9px">Multiplican las variantes y definen el precio y el
-          pedido.</div>
+      const abSec = this._abre.secundarias === true;
+
+      const principales = `
         <div class="props">${ps.map(p => `
           <div class="prow" draggable="${ed}" data-orden="${UI.esc(p.k)}">
             ${ed ? '<span class="prow-drag" title="Arrastrar para cambiar el orden">⠿</span>' : ''}
@@ -1042,16 +1091,9 @@
         </div>
         ${ed && ps.length ? '<div class="hint" style="margin-top:7px">Arrastrá una <b>propiedad</b> o un '
           + '<b>valor</b> para cambiar el orden: es el que ordena las variantes de abajo.</div>' : ''}
-        ${ed ? '<button class="btn sm mas" id="pd-addprop">Agregar propiedad</button>' : ''}
-        ${n ? `<div class="combo" style="margin-top:9px"><b class="tnum">${n}</b> combinaciones posibles
-          ${this.vars.length !== n ? `<span class="muted">· ${this.vars.length} creadas</span>` : ''}</div>` : ''}
+        ${ed ? '<button class="btn sm mas" id="pd-addprop">Agregar propiedad</button>' : ''}`;
 
-        <div class="pd-sep2"></div>
-
-        <div class="pd-h">Secundarias</div>
-        <div class="hint" style="margin-bottom:9px">Datos de cada variante que <b>no</b> multiplican
-          nada: se cargan al costado en la tabla de abajo. En una cómoda importa el alto; en un
-          placard, la medida del hueco.</div>
+      const secundarias = `
         <div class="chips" data-secs="1">
           ${secs.map(x => `<span class="chip sec" draggable="${ed}" data-sec="${UI.esc(x.k)}"
             ${ed ? 'title="Arrastrá para cambiar el orden"' : ''}>
@@ -1062,7 +1104,39 @@
           </span>`).join('')
             || '<span class="hint">Ninguna. La variante sale con la imagen y el nombre nada más.</span>'}
         </div>
-        ${ed ? '<button class="btn sm mas" id="pd-addsec">Agregar secundaria</button>' : ''}
+        ${ed ? '<button class="btn sm mas" id="pd-addsec">Agregar secundaria</button>' : ''}`;
+
+      return `<${dentro ? 'div' : 'section class="pd-b"'}>
+        <div class="grp">
+          <div class="grp-h">
+            <span class="grp-t">Propiedades principales</span>
+            <span class="grp-r">${ps.length
+              ? `${ps.length} ${ps.length === 1 ? 'propiedad' : 'propiedades'}${n
+                ? ` · <b class="tnum">${n}</b> ${n === 1 ? 'combinación' : 'combinaciones'}` : ''}`
+              : 'ninguna todavía'}</span>
+          </div>
+          <div class="grp-b">
+            <div class="hint" style="margin-bottom:9px">Multiplican las variantes y definen el precio y
+              el pedido.</div>
+            ${principales}
+          </div>
+        </div>
+
+        <div class="grp ${abSec ? 'on' : ''}">
+          <button class="grp-h click" data-mod="secundarias" aria-expanded="${abSec}">
+            <span class="grp-t">Propiedades secundarias</span>
+            <span class="grp-r">${secs.length
+              ? UI.esc(secs.map(x => x.nombre).join(' · '))
+              : 'ninguna'}</span>
+            <span class="pd-mg">${abSec ? '▴' : '▾'}</span>
+          </button>
+          ${abSec ? `<div class="grp-b">
+            <div class="hint" style="margin-bottom:9px">Datos de cada variante que <b>no</b> multiplican
+              nada: se cargan al costado en la tabla de abajo. En una cómoda importa el alto; en un
+              placard, la medida del hueco.</div>
+            ${secundarias}
+          </div>` : ''}
+        </div>
       </${dentro ? 'div' : 'section'}>`;
     },
 
@@ -1376,6 +1450,15 @@
           global.DB.guardarVariante(v); this.pintar();
         };
       });
+      // La demora de una variante: vacía hereda la del mueble.
+      document.querySelectorAll('[data-vdias]').forEach(i => {
+        if (!ed) return;
+        i.onchange = () => {
+          const v = this.vars.find(x => x.id === Number(i.dataset.vdias)); if (!v) return;
+          v.dias = Math.max(0, Number(String(i.value).replace(/[^\d]/g, '')) || 0) || null;
+          global.DB.guardarVariante(v); this.pintar();
+        };
+      });
       // El SKU y el código de barras identifican la unidad física, así que
       // viven acá y no en Compra y venta.
       document.querySelectorAll('[data-sku]').forEach(i => {
@@ -1544,6 +1627,9 @@
           </button>`).join('')
           || `<div class="hint">No hay archivos de ${esVenta ? 'venta' : 'producción'} cargados todavía.</div>`}
         </div>
+        <div class="hint" style="margin-top:8px">Salen de <b>Documentos → ${esVenta ? 'Venta'
+          : 'Producción'}</b>. Lo que subas acá queda guardado ahí y lo puede usar cualquier otra
+          variante.</div>
         <div class="pd-sepl"></div>
         <div class="row">
           <button class="btn" id="ei-subir">Subir uno nuevo</button>
@@ -2136,7 +2222,10 @@
           <input id="mp-nom" value="${UI.esc(prop.nombre)}" ${ed ? '' : 'readonly'}></label>
         <div class="pd-sepl"></div>
         <p class="hint">Agregá valores relacionados a esta propiedad. Tildá los que puede tener
-          <b>${UI.esc(this.p.nombre)}</b>.</p>
+          <b>${UI.esc(this.p.nombre)}</b>. Escribí <b>sólo el valor</b> —<i>BLANCA</i>, no
+          <i>ESTRUCTURA BLANCA</i>—: el nombre de la propiedad se lo pone el sistema adelante, y así la
+          variante siempre sale <b>${UI.esc(prop.nombre)} BLANCA</b> sin repetirlo ni escribirlo dos
+          veces.</p>
         <div class="lbl" style="margin:11px 0 7px">Valores seleccionados</div>
         <div class="vrows" id="mp-vals">${orden.map(fila).join('')}</div>
         ${ed ? '<button class="lnk" id="mp-add" style="margin-top:10px">Agregar valor</button>' : ''}
@@ -2447,8 +2536,10 @@
               ? `<img src="${UI.esc(f.url)}" alt="">` : 'plano'}</div>
             <div class="doc-n">${UI.esc(f.nombre)}</div>
           </button>`).join('')
-          || '<div class="hint">No hay planos cargados. Subilos en <b>Documentos</b> o desde acá.</div>'}
+          || '<div class="hint">No hay planos cargados todavía.</div>'}
         </div>
+        <div class="hint" style="margin-top:8px">Salen de <b>Documentos → Producción</b>. Lo que subas
+          acá queda guardado ahí y lo puede usar cualquier otra variante o cualquier rubro.</div>
         <div class="pd-sepl"></div>
         <div class="row">
           <button class="btn" id="ep-subir">Subir uno nuevo</button>
@@ -2686,7 +2777,11 @@
         /* Con siete solapas no entran a lo ancho: antes que partirse en dos
            renglones, la barra scrollea. */
         .pd-tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0 0 12px;
-          overflow-x:auto;scrollbar-width:none}
+          overflow-x:auto;scrollbar-width:none;
+          /* Quedan a la vista todo el scroll: son largas y uno se pierde de
+             en qué solapa está. Se pegan abajo de la barra de módulo. */
+          position:sticky;top:95px;z-index:20;background:var(--bg);
+          padding-top:4px;margin-left:-4px;padding-left:4px;margin-right:-4px;padding-right:4px}
         .pd-tabs::-webkit-scrollbar{display:none}
         .pd-tab{flex:none;white-space:nowrap;border:0;background:none;font:inherit;font-size:13px;
           font-weight:650;color:var(--muted);cursor:pointer;padding:9px 12px;
@@ -2829,8 +2924,8 @@
         .aplic:hover{background:var(--brand-soft)}
         /* Compra y venta: una columna por propiedad y después los números. */
         .cv-tabla{overflow-x:auto;margin:0 -14px;padding:0 14px}
-        .cv-h,.cv-r{display:grid;min-width:820px;gap:8px;align-items:center;
-          grid-template-columns:repeat(var(--ejes),minmax(140px,1fr)) 104px 104px 72px 66px 64px}
+        .cv-h,.cv-r{display:grid;min-width:680px;gap:10px;align-items:center;
+          grid-template-columns:minmax(240px,1fr) 108px 108px 70px 64px}
         .cv-a{display:flex;gap:1px;justify-content:flex-end}
         .lx.on{color:var(--ok)}
         /* El número que baja de la plantilla se lee; el pisado a mano se marca. */
@@ -2840,7 +2935,10 @@
           font-weight:700;padding-bottom:8px;border-bottom:1px solid var(--line)}
         .cv-r{padding:5px 0;border-bottom:1px solid var(--line-soft)}
         .cv-r.off{opacity:.5}
-        .cv-p{font-size:12.5px;color:var(--brand);font-weight:600;overflow:hidden;
+        .cv-p b{display:block;font-size:12.5px;color:var(--navy);font-weight:700;
+          white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .cv-sku{display:block;font-size:10.5px;color:var(--muted);margin-top:1px}
+        .cv-p-vieja{font-size:12.5px;color:var(--brand);font-weight:600;overflow:hidden;
           text-overflow:ellipsis;white-space:nowrap}
         .cv-n{text-align:right;font-size:12.5px}
         .cv-n .pn{width:100%;text-align:right;padding:5px 8px}
@@ -2965,6 +3063,20 @@
           padding:5px 0;font-size:12.5px}
         .cx-r span{color:var(--ink-soft)} .cx-r small{font-size:10.5px}
         .cx-r .pn{width:104px;text-align:right;padding:4px 7px}
+        /* Los dos grupos de propiedades. Cada uno en su tarjeta, con su
+           título en gris: de un vistazo se ve que son cosas distintas. */
+        .grp{border:1px solid var(--line);border-radius:10px;background:var(--panel);overflow:hidden}
+        .grp+.grp{margin-top:11px}
+        .grp-h{display:flex;align-items:center;gap:10px;width:100%;padding:8px 13px;
+          background:var(--panel-2);border-bottom:1px solid var(--line);text-align:left}
+        button.grp-h{border:0;cursor:pointer;font:inherit}
+        button.grp-h:hover{background:var(--brand-soft)}
+        .grp:not(.on) button.grp-h{border-bottom:0}
+        .grp-t{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;
+          letter-spacing:.05em;flex:none}
+        .grp-r{font-size:11.5px;color:var(--muted);flex:1;min-width:0;overflow:hidden;
+          text-overflow:ellipsis;white-space:nowrap;text-align:right}
+        .grp-b{padding:11px 13px}
         .cx-fin{display:flex;align-items:center;gap:6px;justify-content:flex-end;flex:none}
         .cx-fin .uni{font-size:11.5px;color:var(--muted)}
         .cx-fin .pn{width:96px}
@@ -3018,8 +3130,9 @@
         .pl-prev td{padding:6px 10px;white-space:nowrap;border-top:1px solid var(--line-soft)}
         .ad-t{font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px}
         .inv-tabla{overflow-x:auto;margin:0 -14px;padding:0 14px}
-        .inv-head,.inv-r{display:grid;min-width:860px;
-          grid-template-columns:minmax(190px,1fr) 158px 132px 78px 104px 90px;gap:10px;align-items:center}
+        .inv-head,.inv-r{display:grid;min-width:940px;
+          grid-template-columns:minmax(180px,1fr) 152px 126px 74px 96px 86px 84px;gap:9px;align-items:center}
+        .inv-r .fx .uni{font-size:11px;color:var(--muted);flex:none}
         .inv-r .pn.izq{text-align:left;font-size:11.5px}
         /* La etiqueta de una unidad, como se va a imprimir. */
         .etiq{display:flex;gap:14px;align-items:center;flex-wrap:wrap}

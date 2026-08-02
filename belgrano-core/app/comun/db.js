@@ -1131,9 +1131,13 @@
       if (n) t[id] = n; else delete t[id];
       try { localStorage.setItem(this.PLAZO_KEY, JSON.stringify(t)); } catch {}
     },
-    // De dónde sale el plazo de un mueble y por qué. La razón se muestra en
-    // pantalla: sin eso nadie sabe si el número lo puso alguien o lo heredó.
-    plazoDe(prod, cats = []) {
+    // De dónde sale el plazo y por qué. La razón se muestra en pantalla: sin
+    // eso nadie sabe si el número lo puso alguien o lo heredó. La variante es
+    // el escalón más fino y el que más importa: si de la cómoda Miami 1,20
+    // paraíso y blanco siempre hay alguna en producción, esa entrega en 15
+    // días aunque el resto del modelo tarde 30.
+    plazoDe(prod, cats = [], v = null) {
+      if (Number(v && v.dias)) return { dias: Number(v.dias), de: 'variante' };
       if (Number(prod && prod.dias)) return { dias: Number(prod.dias), de: 'mueble' };
       for (const c of cats) {
         const d = this.plazoCat(c.id);

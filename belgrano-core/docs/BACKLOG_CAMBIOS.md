@@ -808,6 +808,57 @@ Compra y venta · Documentos · Contabilidad.
   aporta: el dibujo y la planilla de cada uno ya dicen qué tiene que fabricar.
   Cargarlo sería escribir dos veces lo mismo.
 
+### Lote 28 — APLICADO (Que cada cosa se vea donde va)
+
+**Propiedades**
+- ✅ 355. **Principales y secundarias en tarjetas separadas**, cada una con su
+  título en gris. Antes parecían lo mismo.
+- ✅ 356. Las **secundarias vienen plegadas** —se cargan una vez y no se tocan
+  más— y cerradas siguen diciendo cuáles son: *Alto · Profundidad · Peso*.
+- ✅ 357. Se arregló el desplegar/plegar: los bloques que arrancan **cerrados**
+  —Ver inventario, las notas por rubro, las secundarias— no abrían al hacer
+  clic. El botón ahora dice si está abierto y el estado sale de ahí.
+
+**Demora**
+- ✅ 358. Se va de Información general y pasa a **Inventario**, arriba de todo:
+  no es una característica del mueble, depende de qué hay hecho.
+- ✅ 359. Baja en cascada de cuatro escalones: **casa → categoría → mueble →
+  variante**. El fino es el que importa: si de la cómoda Miami 1,20 paraíso y
+  blanco siempre hay alguna en producción, esa entrega en 15 días aunque el
+  modelo tarde 30, y eso es lo que va a ver el vendedor al cotizarla.
+- ✅ 360. En **Stock por variante** hay una columna **demora**: en gris muestra
+  la heredada, y se escribe encima para la variante que sale antes.
+
+**Producción**
+- ✅ 361. Los **dibujos de un rubro se pliegan**. Con 27 variantes el rubro se
+  comía la pantalla; cerrado dice cuántas son y cuántas faltan.
+
+**Costo y precio por variante**
+- ✅ 362. **Un renglón, un nombre**: *MEDIDAS 1.60 · ESTRUCTURA BLANCA · FRENTE
+  NOGAL* en una sola línea, con el SKU debajo. Las columnas por propiedad se
+  cortaban a la mitad (*ESTRUCTURA NATUR…*).
+- ✅ 363. **Se va la columna Margen**: con el markup alcanza para mirar de un
+  vistazo. El margen sigue en el panel de la variante.
+
+**Cómo cargar los valores** — la duda del nombre repetido
+- ✅ 364. La regla es **escribir sólo el valor**: *BLANCA*, no *ESTRUCTURA
+  BLANCA*. El nombre de la propiedad lo pone el sistema adelante, así la
+  variante siempre sale *ESTRUCTURA BLANCA* sin escribirlo dos veces ni correr
+  el riesgo de que queden mitad y mitad. El editor de valores ahora lo dice.
+  Lo ya cargado con el nombre adentro sigue funcionando: el sistema no lo
+  repite.
+
+**Solapas y documentos**
+- ✅ 365. Las **solapas del mueble quedan fijas** al hacer scroll, pegadas abajo
+  de la barra de módulo.
+- ✅ 366. Los pickers de imagen dicen de dónde salen los archivos —**Documentos
+  → Venta** para la imagen de la variante, **Documentos → Producción** para el
+  dibujo— y que lo que se sube desde ahí queda guardado en Documentos y lo puede
+  usar cualquier otra variante.
+- ✅ 367. El **numerado de unidades** se movió al final de Inventario, debajo de
+  *Ver inventario*: se define una vez y después sólo se consulta. De paso se
+  arregló el remiendo de secciones que dejaba escondido el aviso de mínimos.
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·
