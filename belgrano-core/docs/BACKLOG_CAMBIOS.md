@@ -578,6 +578,32 @@ igual. La de respaldos vale para los 40 respaldos: no se diseñan 40 distintas.
   medida, alto, tela, color, obs) y **Sillas** (estado, modelo, material,
   color, color de pata, cant., obs).
 
+### Lote 20 — APLICADO (Propiedades secundarias)
+
+Se separan dos cosas que estaban mezcladas:
+
+- **Principales** (ESTRUCTURA, FRENTE, MEDIDA) → **multiplican** las variantes
+  y definen el precio y el pedido.
+- **Secundarias** (alto, profundidad, peso, medida del hueco…) → **no
+  multiplican nada**: son un dato más de cada variante, y **cada mueble elige
+  cuáles le sirven**. En una cómoda importa el alto; en un placard, la medida
+  del hueco.
+
+- ✅ 295. Bloque **Propiedades secundarias** debajo de las principales,
+  separado por una línea, con sus chips y **＋ Agregar**.
+- ✅ 296. El pop-up muestra el catálogo (alto · profundidad · peso · medida del
+  hueco · ancho interior · cajones · volumen) y permite **crear una nueva con
+  su unidad**, que queda para todos los muebles.
+- ✅ 297. La tabla de variantes arma **una columna por secundaria elegida**. Sin
+  ninguna, la variante es **sólo su imagen y su nombre** — que era lo que
+  faltaba.
+- ✅ 298. **Aplicar a todas** sigue andando en cada columna.
+- ✅ 299. Los valores viejos (alto, prof, peso, largo) se siguen leyendo, así
+  que los muebles ya cargados no pierden nada.
+- ✅ 300. **Bug**: `repeat(0, …)` no es CSS válido y tiraba abajo la grilla
+  entera cuando no había secundarias — la tabla se apilaba en una columna. El
+  template ahora se arma en JS.
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·

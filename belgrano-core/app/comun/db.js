@@ -179,6 +179,22 @@
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg.replace(/\s+/g, ' '));
   }
 
+  // ---- Propiedades secundarias ----------------------------------------
+  // Las principales (ESTRUCTURA, FRENTE, MEDIDA) multiplican las variantes y
+  // definen el precio y el pedido. Las secundarias NO multiplican nada: son un
+  // dato más de cada variante, y cada mueble elige cuáles le sirven. En una
+  // cómoda importa el alto; en un placard, la medida del hueco.
+  const SEC_KEY = 'bh_secundarias';
+  const SEC_BASE = [
+    { k: 'alto', nombre: 'Alto', unidad: 'cm' },
+    { k: 'prof', nombre: 'Profundidad', unidad: 'cm' },
+    { k: 'peso', nombre: 'Peso', unidad: 'kg' },
+    { k: 'hueco', nombre: 'Medida del hueco', unidad: 'cm' },
+    { k: 'interior', nombre: 'Ancho interior', unidad: 'cm' },
+    { k: 'cajones', nombre: 'Cajones', unidad: '' },
+    { k: 'volumen', nombre: 'Volumen', unidad: 'm³' },
+  ];
+
   const DEMO = {
     categorias: [
       { id: 1, nombre: 'DORMITORIO', padre_id: null, nivel: 2 },
@@ -195,6 +211,9 @@
       { id: 1, categoria_id: 2, nombre: 'CÓMODA AMBERES 55', publicado_tn: true, sku: 'CO-AMB-55',
         desc: 'Cómoda de 4 cajones con guías de extracción total y tiradores embutidos. El clásico de la línea Amberes.',
         alto: 0.85, prof: 0.45, materiales: 'MDF 18 mm laqueado · guías telescópicas · tiradores de aluminio', dias: 32,
+        // Cuáles secundarias usa este mueble. Vacío = la tabla de variantes
+        // sale limpia, con la imagen y el nombre y nada más.
+        secundarias: [],
         nProveedores: 1, rubros: [{ k: 'carpinteria', modo: 'dibujo' }],
         obtencion: 'dibujo', instalacion: false },
       { id: 4, categoria_id: 2, nombre: 'CÓMODA OLIVER 60', publicado_tn: true, sku: 'CO-OLI-60',
@@ -541,6 +560,41 @@
       const { data, error } = await q;
       if (error) throw error;
       return (data || []).map(p => ({ ...p, variantes: p.variante?.[0]?.count ?? 0 }));
+    },
+
+    // ---- Propiedades secundarias ------------------------------------------
+    secundarias() {
+      let guardadas = [];
+      try { guardadas = JSON.parse(localStorage.getItem(SEC_KEY)) || []; } catch {}
+      const mapa = new Map(SEC_BASE.map(x => [x.k, { ...x }]));
+      guardadas.forEach(g => mapa.set(g.k, g));
+      return [...mapa.values()];
+    },
+    secundaria(k) { return this.secundarias().find(x => x.k === k) || null; },
+    crearSecundaria(nombre, unidad) {
+      const n = String(nombre || '').trim(); if (!n) return null;
+      const ya = this.secundarias().find(x => sinTilde(x.nombre) === sinTilde(n));
+      if (ya) return ya;
+      let guardadas = [];
+      try { guardadas = JSON.parse(localStorage.getItem(SEC_KEY)) || []; } catch {}
+      const nueva = { k: slug(n), nombre: n, unidad: String(unidad || '').trim() };
+      guardadas.push(nueva);
+      try { localStorage.setItem(SEC_KEY, JSON.stringify(guardadas)); } catch {}
+      return nueva;
+    },
+    // El valor de una secundaria en una variante. Los muebles viejos las
+    // guardaban como campos sueltos, así que se leen de los dos lados.
+    VIEJAS: { alto: 'alto', prof: 'prof', peso: 'peso', largo: 'frenteCm' },
+    valorSec(v, k) {
+      if (v.sec && v.sec[k] != null) return v.sec[k];
+      const viejo = this.VIEJAS[k];
+      return viejo && v[viejo] != null ? v[viejo] : '';
+    },
+    ponerSec(v, k, val) {
+      v.sec = v.sec || {};
+      v.sec[k] = val;
+      const viejo = this.VIEJAS[k];
+      if (viejo) v[viejo] = val;   // se mantiene por si algo todavía lo lee
     },
 
     // ---- Rubros y proveedores ---------------------------------------------

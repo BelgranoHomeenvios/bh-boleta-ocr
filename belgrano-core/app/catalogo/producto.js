@@ -822,14 +822,13 @@
       </${dentro ? 'div' : 'section'}>`;
     },
 
-    // 4 · Propiedades ------------------------------------------------------
-    // Se ve la lista de las que usa este mueble, cada una con sus valores, y
-    // se ENTRA a una para cargarle los que puede tener. Abajo de todo, agregar
-    // otra propiedad.
     bloquePropiedades(dentro) {
       const ps = this.props(), n = this.combinatorio(), ed = this.puedeEditar();
+      const secs = this.secsDe();
       return `<${dentro ? 'div' : 'section class="pd-b"'}>
         <div class="pd-h">Propiedades</div>
+        <div class="hint" style="margin-bottom:9px">Las que multiplican las variantes y definen el
+          precio y el pedido.</div>
         <div class="props">${ps.map(p => `
           <div class="prow" draggable="${ed}" data-orden="${UI.esc(p.k)}">
             ${ed ? '<span class="prow-drag" title="Arrastrar para cambiar el orden">⠿</span>' : ''}
@@ -853,33 +852,59 @@
         </div>` : ''}
         ${n ? `<div class="prop-pie"><div class="combo"><b class="tnum">${n}</b> combinaciones posibles
           ${this.vars.length !== n ? `<span class="muted">· ${this.vars.length} creadas</span>` : ''}</div></div>` : ''}
+
+        <div class="pd-sepl"></div>
+        <div class="pd-h">Propiedades secundarias</div>
+        <div class="hint" style="margin-bottom:9px">Datos de cada variante que <b>no</b> multiplican
+          nada: se cargan al costado en la tabla de abajo. En una cómoda importa el alto; en un
+          placard, la medida del hueco.</div>
+        <div class="chips">
+          ${secs.map(x => `<span class="chip">${UI.esc(x.nombre)}${x.unidad
+            ? ` <small class="muted">${UI.esc(x.unidad)}</small>` : ''}${ed
+            ? `<button class="chip-x" data-quitarsec="${UI.esc(x.k)}" aria-label="Quitar">✕</button>` : ''}</span>`).join('')
+            || '<span class="hint">Ninguna. La variante sale con la imagen y el nombre nada más.</span>'}
+          ${ed ? '<button class="chip-add" id="pd-addsec">＋ Agregar</button>' : ''}
+        </div>
       </${dentro ? 'div' : 'section'}>`;
     },
 
-    // 5 · Listado de variantes ---------------------------------------------
+    // Las secundarias que usa este mueble, en orden.
+    // El ancho de la tabla de variantes depende de cuántas secundarias haya.
+    // Se arma acá porque repeat(0, …) no es CSS válido y rompía la grilla.
+    gridVar(n) {
+      return `grid-template-columns:76px minmax(180px,1fr)${' 86px'.repeat(n)} 50px;`
+        + `min-width:${400 + n * 94}px`;
+    },
+
+    secsDe() {
+      return (this.p.secundarias || [])
+        .map(k => global.DB.secundaria(k))
+        .filter(Boolean);
+    },
+
     bloqueVariantes(dentro) {
       const f = this._fVar.trim().toLowerCase();
       const lista = this.ordenadas(this.vars.filter(v => !f || this.nombreVar(v).toLowerCase().includes(f)));
-      const cost = this.muestraCostos();
+      const secs = this.secsDe();
       return `<${dentro ? 'div' : 'section class="pd-b"'}>
-        ${dentro ? '' : `<div class="pd-h">${cost ? 'Costo y precio por variante' : 'Variantes'}
-          <span class="muted">(${this.vars.length})</span>
-          ${cost ? `<span class="pill ${this.estado().pill}" style="float:right">${UI.esc(this.estado().label)}</span>` : ''}</div>`}
+        ${dentro ? '' : '<div class="pd-h">Variantes</div>'}
         <div class="vr-tools">
           <input id="pd-fvar" class="busca" placeholder="Filtrar por medida, estructura, frente…" value="${UI.esc(this._fVar)}">
           <div class="sp"></div>
           <span class="hint">${this.activas().length} activas · ${this.vars.length - this.activas().length} desactivadas</span>
         </div>
         <div class="vr-tabla">
-        <div class="vr-head ${cost ? 'concosto' : ''}">
+        <div class="vr-head" style="${this.gridVar(secs.length)}">
           <span>Imagen</span><span>Variante</span>
-          <span class="num">Largo</span><span class="num">Alto</span>
-          <span class="num">Prof.</span><span class="num">Peso</span>
+          ${secs.map(x => `<span class="num">${UI.esc(x.nombre)}</span>`).join('')}
           <span></span>
         </div>
-        <div id="pd-vars">${lista.map(v => this.filaVar(v, cost)).join('')
+        <div id="pd-vars">${lista.map(v => this.filaVar(v, secs)).join('')
           || UI.vacio('Ninguna variante coincide con el filtro.')}</div>
         </div>
+        ${secs.length ? '' : `<div class="hint" style="margin-top:9px">Sin propiedades secundarias, la
+          variante es sólo su imagen y su nombre. Agregá las que le sirvan a este mueble desde
+          <b>Categorías y propiedades</b>.</div>`}
       </${dentro ? 'div' : 'section'}>`;
     },
 
@@ -896,33 +921,27 @@
       }).filter(Boolean).join(' · ');
     },
 
-    filaVar(v, cost) {
+    filaVar(v, secs) {
       const off = v.activa === false;
-      // 2 × 2 cm en pantalla: se ve de qué mueble se trata sin abrir nada.
-      const img = (ref, k, tit) => { const url = this.urlDe(ref) || ref;
-        return `<button class="vimg ${url ? 'hay' : ''}" data-img="${v.id}|${k}" title="${tit}">
-        ${url ? `<img src="${UI.esc(url)}" alt="">` : `<span class="vimg-v">${k === 'imgProd' ? '📐' : '📷'}</span>`}
-        <span class="vimg-e">✎</span></button>`; };
-      // Debajo de cada medida aparece "Aplicar a todas" apenas se escribe algo:
-      // el alto y la profundidad casi siempre son iguales en todas las
-      // variantes, y cargarlos de a uno en 27 filas no tiene sentido.
-      const campo = (attr, val, uni) => `<div class="vr-x">
-        <div class="vr-xi"><input inputmode="decimal" class="pn"
-          data-${attr}="${v.id}" value="${val || ''}" placeholder="—" ${this.puedeEditar() ? '' : 'readonly'}
-          >${uni ? `<span class="uni">${uni}</span>` : ''}</div>
-        <button class="aplic" data-aplic="${attr}|${v.id}" hidden>⊞ Aplicar a todas</button>
-      </div>`;
-      // Acá van las características del mueble y nada más: el plano vive en
-      // Producción y el stock en Inventario.
-      return `<div class="vr ${off ? 'off' : ''}" data-v="${v.id}">
-        ${img(v.imgVenta, 'imgVenta', 'Imagen de venta — sale impresa en la cotización')}
+      const ref = v.imgVenta;
+      const url = this.urlDe(ref) || ref;
+      const ed = this.puedeEditar();
+      return `<div class="vr ${off ? 'off' : ''}" data-v="${v.id}" style="${this.gridVar(secs.length)}">
+        <button class="vimg ${url ? 'hay' : ''}" data-img="${v.id}|imgVenta"
+          title="Imagen de venta — sale impresa en la cotización">
+          ${url ? `<img src="${UI.esc(url)}" alt="">` : '<span class="vimg-v">📷</span>'}
+          <span class="vimg-e">✎</span></button>
         <div class="vr-n">
           <button class="vr-nom" data-abrir="${v.id}">${UI.esc(this.nombreVar(v))}</button>
           <div class="vr-sku tnum">${UI.esc(v.sku || global.DB.skuDe(this.p, v))}${
             off ? ' · <b class="warn-t">desactivada</b>' : ''}</div>
         </div>
-        ${campo('largo', v.frenteCm, 'cm')}${campo('alto', v.alto, 'cm')}
-        ${campo('prof', v.prof, 'cm')}${campo('peso', v.peso, 'kg')}
+        ${secs.map(x => `<div class="vr-x">
+          <div class="vr-xi"><input inputmode="decimal" class="pn" data-sec="${v.id}|${x.k}"
+            value="${UI.esc(global.DB.valorSec(v, x.k))}" placeholder="—" ${ed ? '' : 'readonly'}
+            >${x.unidad ? `<span class="uni">${UI.esc(x.unidad)}</span>` : ''}</div>
+          <button class="aplic" data-aplic="${v.id}|${x.k}" hidden>⊞ Aplicar a todas</button>
+        </div>`).join('')}
         <div class="vr-a">
           <button class="lx" data-hist="${v.id}" title="Historial">↺</button>
         </div>
@@ -1034,6 +1053,11 @@
       this.arrastrarPropiedades();
       this.arrastrarValores();
       if (g('pd-addprop')) g('pd-addprop').onclick = () => this.desplegarPropiedades();
+      if (g('pd-addsec')) g('pd-addsec').onclick = () => this.modalSecundarias();
+      document.querySelectorAll('[data-quitarsec]').forEach(b => b.onclick = () => {
+        p.secundarias = (p.secundarias || []).filter(x => x !== b.dataset.quitarsec);
+        this.guardar(); this.pintar();
+      });
       document.querySelectorAll('[data-quitarcat]').forEach(b => b.onclick = () => {
         const id = Number(b.dataset.quitarcat);
         this.p.categorias = (this.p.categorias || []).filter(x => x !== id);
@@ -1150,6 +1174,7 @@
     },
 
     engancharVars() {
+      const ed = this.puedeEditar();
       document.querySelectorAll('[data-abrir]').forEach(b =>
         b.onclick = () => this.abrirVariante(Number(b.dataset.abrir)));
       document.querySelectorAll('[data-img]').forEach(b => b.onclick = () => {
@@ -1164,7 +1189,35 @@
           this.refrescarFila(v);
         };
       });
-      num('costo', 'costo'); num('precio', 'precio'); num('peso', 'peso');
+      num('costo', 'costo'); num('precio', 'precio');
+      // Las columnas de la tabla de variantes son las secundarias que eligió
+      // el mueble: se cargan por clave, no por campo fijo.
+      document.querySelectorAll('[data-sec]').forEach(i => {
+        const [id, k] = i.dataset.sec.split('|');
+        const v = this.vars.find(x => x.id === Number(id));
+        const bt = i.closest('.vr-x') && i.closest('.vr-x').querySelector('.aplic');
+        i.onchange = () => {
+          if (!v) return;
+          global.DB.ponerSec(v, k, Number(String(i.value).replace(',', '.').replace(/[^\d.]/g, '')) || 0);
+          global.DB.guardarVariante(v);
+        };
+        if (!bt || !ed) return;
+        // Al escribir aparece el botón para bajar ese valor a todas.
+        i.oninput = () => {
+          document.querySelectorAll('.aplic').forEach(x => { x.hidden = true; });
+          bt.hidden = !String(i.value).trim();
+        };
+        i.onblur = () => setTimeout(() => { if (document.activeElement !== bt) bt.hidden = true; }, 150);
+      });
+      document.querySelectorAll('[data-aplic]').forEach(b => b.onmousedown = e => {
+        e.preventDefault();
+        const [id, k] = b.dataset.aplic.split('|');
+        const campo = document.querySelector(`[data-sec="${id}|${k}"]`);
+        const valor = Number(String(campo.value).replace(',', '.').replace(/[^\d.]/g, '')) || 0;
+        this.vars.forEach(x => { global.DB.ponerSec(x, k, valor); global.DB.guardarVariante(x); });
+        UI.aviso(`${this.vars.length} variantes con ${valor}`, 'ok');
+        this.pintar();
+      });
       // El efectivo es lo que se carga; la lista, el margen y el markup se
       // recalculan en la misma fila sin repintar toda la tabla.
       const refrescarCV = v => {
@@ -1198,30 +1251,6 @@
       document.querySelectorAll('[data-medc]').forEach(sl => sl.onchange = () => {
         const v = this.vars.find(x => x.id === Number(sl.dataset.medc)); if (!v) return;
         v.medidaCosteo = sl.value; global.DB.guardarVariante(v);
-      });
-      num('largo', 'frenteCm'); num('alto', 'alto'); num('prof', 'prof');
-      // Al escribir una medida aparece el botón para bajarla a todas.
-      [['largo', 'frenteCm'], ['alto', 'alto'], ['prof', 'prof'], ['peso', 'peso']].forEach(([attr]) => {
-        document.querySelectorAll(`[data-${attr}]`).forEach(i => {
-          const bt = i.closest('.vr-x') && i.closest('.vr-x').querySelector('.aplic');
-          if (!bt) return;
-          i.oninput = () => {
-            document.querySelectorAll('.aplic').forEach(x => { x.hidden = true; });
-            bt.hidden = !String(i.value).trim();
-          };
-          i.onblur = () => setTimeout(() => { if (document.activeElement !== bt) bt.hidden = true; }, 150);
-        });
-      });
-      document.querySelectorAll('[data-aplic]').forEach(b => b.onmousedown = e => {
-        e.preventDefault();
-        const [attr, id] = b.dataset.aplic.split('|');
-        const campo = { largo: 'frenteCm', alto: 'alto', prof: 'prof', peso: 'peso' }[attr];
-        const v = this.vars.find(x => x.id === Number(id)); if (!v) return;
-        const valor = Number(String(document.querySelector(`[data-${attr}="${id}"]`).value)
-          .replace(',', '.').replace(/[^\d.]/g, '')) || 0;
-        this.vars.forEach(x => { x[campo] = valor; global.DB.guardarVariante(x); });
-        UI.aviso(`${this.vars.length} variantes con ${valor}`, 'ok');
-        this.pintar();
       });
       document.querySelectorAll('[data-hist]').forEach(b =>
         b.onclick = () => this.historial(Number(b.dataset.hist)));
@@ -2221,6 +2250,65 @@
       document.getElementById('mgp-n').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); guardar(); } };
     },
 
+    // Elegir qué secundarias usa este mueble. No multiplican variantes: sólo
+    // agregan una columna para cargar el dato.
+    modalSecundarias() {
+      const usa = new Set(this.p.secundarias || []);
+      const todas = global.DB.secundarias();
+      const cerrar = this.modal(`
+        <h3 class="h-title" style="font-size:17px">Propiedades secundarias</h3>
+        <p class="h-sub">Qué datos querés cargar en cada variante de
+          <b>${UI.esc(this.p.nombre)}</b>. No multiplican nada: agregan una columna.</p>
+        <div class="vsels" style="margin-top:14px">${todas.map(x => `
+          <label class="vsel ${usa.has(x.k) ? 'on' : ''}" data-v="${UI.esc(x.k)}">
+            <input type="checkbox" ${usa.has(x.k) ? 'checked' : ''}>
+            <span>${UI.esc(x.nombre)}${x.unidad ? ` <small class="muted">${UI.esc(x.unidad)}</small>` : ''}</span>
+          </label>`).join('')}</div>
+        <div class="pd-sepl"></div>
+        <div class="ad-t">Crear una que no está</div>
+        <div class="fx">
+          <input id="ms-n" placeholder="Ej: Medida del hueco">
+          <input id="ms-u" placeholder="cm" style="max-width:80px">
+          <button class="btn" id="ms-crear">＋ Crear</button>
+        </div>
+        <div class="hint" style="margin-top:5px">Queda disponible para todos los muebles.</div>
+        <div class="row" style="margin-top:18px;gap:10px">
+          <span class="hint" id="ms-n2"></span><div class="sp"></div>
+          <button class="btn" id="ms-x">Cancelar</button>
+          <button class="btn primary" id="ms-ok">Guardar</button>
+        </div>`, 520);
+
+      const contar = () => {
+        const n = document.querySelectorAll('.vsel input:checked').length;
+        document.getElementById('ms-n2').textContent = n
+          ? `${n} ${n === 1 ? 'marcada' : 'marcadas'}` : 'ninguna marcada';
+      };
+      const enganchar = () => document.querySelectorAll('.vsel').forEach(l => {
+        const chk = l.querySelector('input');
+        chk.onchange = () => { l.classList.toggle('on', chk.checked); contar(); };
+      });
+      enganchar(); contar();
+
+      document.getElementById('ms-crear').onclick = () => {
+        const n = document.getElementById('ms-n').value.trim();
+        if (!n) return UI.aviso('Poné el nombre', 'warn');
+        const nueva = global.DB.crearSecundaria(n, document.getElementById('ms-u').value);
+        document.querySelector('.vsels').insertAdjacentHTML('afterbegin',
+          `<label class="vsel on" data-v="${UI.esc(nueva.k)}"><input type="checkbox" checked>
+            <span>${UI.esc(nueva.nombre)}${nueva.unidad
+              ? ` <small class="muted">${UI.esc(nueva.unidad)}</small>` : ''}</span></label>`);
+        enganchar(); contar();
+        document.getElementById('ms-n').value = '';
+        document.getElementById('ms-u').value = '';
+      };
+      document.getElementById('ms-x').onclick = cerrar;
+      document.getElementById('ms-ok').onclick = () => {
+        this.p.secundarias = [...document.querySelectorAll('.vsel')]
+          .filter(l => l.querySelector('input').checked).map(l => l.dataset.v);
+        this.guardar(); cerrar(); this.pintar();
+      };
+    },
+
     estilos() {
       return `<style>
         /* Estas las comparte con la cotización, pero acá no está su hoja: van
@@ -2383,9 +2471,9 @@
            entran en 920 px, así que la tabla scrollea sola sin ensanchar la
            pantalla. */
         .vr-tabla{overflow-x:auto;margin:0 -14px;padding:0 14px}
-        .vr-head,.vr{display:grid;min-width:700px;
-          grid-template-columns:76px minmax(180px,1fr) 76px 76px 76px 76px 50px;
-          gap:8px;align-items:center}
+        /* Una columna por propiedad secundaria. El template lo arma gridVar(),
+           porque repeat(0, …) no es CSS válido. */
+        .vr-head,.vr{display:grid;gap:8px;align-items:center}
         .num{text-align:right}
         .vr-x{position:relative}
         .vr-xi{display:flex;align-items:center;gap:3px}
