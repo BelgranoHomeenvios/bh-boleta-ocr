@@ -110,7 +110,6 @@
       { k: 'contabilidad', label: 'Contabilidad' },
       { k: 'documentos', label: 'Documentos' },
     ],
-    _tab: 'producto',
     solapas() {
       // El vendedor ve sólo la primera, y de lectura: el catálogo es interno.
       if (global.App && global.App.rol === 'vendedor') return [this.SOLAPAS[0]];
@@ -261,15 +260,12 @@
         const mk = global.DB.markupDe(v.costo, ef);
         const mg = global.DB.margenDe(v.costo, ef);
         const banda = global.DB.bandaDe(mk);
-        // Los números bajan de la plantilla de precios. Se muestran, no se
-        // escriben: recién con el lápiz se pisan para esta variante.
-        const abierto = this._abiertos.has(v.id);
-        const celda = (attr, val) => abierto
-          ? `<div class="cv-n"><input class="pn" inputmode="numeric" data-${attr}="${v.id}"
-              value="${val || ''}" placeholder="—" ${ed ? '' : 'readonly'}></div>`
-          : `<div class="cv-n"><span class="cv-fijo ${v.pisado ? 'pisado' : ''}"
-              title="${v.pisado ? 'Pisado a mano en este mueble' : 'Viene de la plantilla de precios'}"
-              >${val ? UI.pesos(val) : '—'}</span></div>`;
+        // Los números bajan de la plantilla de precios. Acá sólo se miran:
+        // se cambian adentro del panel, que es donde está todo junto.
+        const celda = (attr, val) => `<div class="cv-n">
+          <span class="cv-fijo ${v.pisado ? 'pisado' : ''}"
+            title="${v.pisado ? 'Pisado a mano en este mueble' : 'Viene de la plantilla de precios'}"
+            >${val ? UI.pesos(val) : '—'}</span></div>`;
         return `<div class="cv-r ${v.activa === false ? 'off' : ''}" data-v="${v.id}">
           ${ejes.map(pr => `<div class="cv-p">${UI.esc(v[pr.k] || '—')}</div>`).join('')}
           ${celda('costo', v.costo)}
@@ -279,9 +275,7 @@
           <div class="cv-n"><span class="mk ${banda.pill}" data-mk="${v.id}">${
             mk ? mk.toFixed(2).replace('.', ',') + 'x' : '—'}</span></div>
           <div class="cv-a">
-            ${ed ? `<button class="lx ${abierto ? 'on' : ''}" data-editar="${v.id}"
-              title="${abierto ? 'Listo' : 'Pisar el precio de esta variante'}">${abierto ? '✓' : '✏️'}</button>` : ''}
-            <button class="lx" data-abrir="${v.id}" title="Ver todo">⋯</button>
+            <button class="lx" data-abrir="${v.id}" title="Abrir la variante">⋯</button>
           </div>
         </div>`;
       };
@@ -306,45 +300,15 @@
           </div>
           <div id="pd-vars">${lista.map(fila).join('') || UI.vacio('Ninguna variante coincide.')}</div>
         </div>
-        <div class="hint" style="margin-top:9px">El <b>precio de lista</b> y la <b>medida de costeo</b>
-          están en el panel de cada variante: se abre con los tres puntitos.</div>
+        <div class="hint" style="margin-top:9px">Todo se edita adentro de la variante —costo por rubro,
+          adicionales, precios—: se abre con los <b>tres puntitos</b>. Acá sólo se mira.</div>
       </section>`;
       // Nada más: quién lo fabrica está en Producción y las características
       // del mueble en Información general. Repetirlo acá sólo genera dos
       // lugares donde cargar lo mismo.
     },
 
-    // Cómo se rastrea el stock de este mueble y cuánto hay que tener.
-    RASTREO: [
-      { k: 'serie', label: 'Por número de serie único',
-        pie: 'Cada unidad es distinta y lleva su código. Si hay 12 mesas de luz Miami blancas, son 12 unidades distintas y se sabe cuál salió en cada orden.' },
-      { k: 'lote', label: 'Por lotes',
-        pie: 'Las unidades de una misma tanda comparten identificación. Sirve cuando lo que importa es de qué producción salió, no cuál pieza.' },
-      { k: 'cantidad', label: 'Por cantidad',
-        pie: 'Sólo se cuenta cuántas hay. No se puede saber cuál se entregó ni de qué tanda salió.' },
-    ],
-    // Los que se reponen contra pedido no llevan mínimo: el mínimo y la
-    // reposición van de la mano y no tienen sentido por separado.
-    REPO: [
-      { k: 'pedido', label: 'Se pide cuando se vende' },
-      { k: 'minimo', label: 'Mantener un mínimo' },
-    ],
 
-    // Cómo se rastrea el stock de este mueble y cuánto hay que tener.
-    RASTREO: [
-      { k: 'serie', label: 'Por número de serie único',
-        pie: 'Cada unidad es distinta y lleva su código. Si hay 12 mesas de luz Miami blancas, son 12 unidades distintas y se sabe cuál salió en cada orden.' },
-      { k: 'lote', label: 'Por lotes',
-        pie: 'Las unidades de una misma tanda comparten identificación. Sirve cuando lo que importa es de qué producción salió, no cuál pieza.' },
-      { k: 'cantidad', label: 'Por cantidad',
-        pie: 'Sólo se cuenta cuántas hay. No se puede saber cuál se entregó ni de qué tanda salió.' },
-    ],
-    // Los que se reponen contra pedido no llevan mínimo: el mínimo y la
-    // reposición van de la mano y no tienen sentido por separado.
-    REPO: [
-      { k: 'pedido', label: 'Se pide cuando se vende' },
-      { k: 'minimo', label: 'Mantener un mínimo' },
-    ],
 
 
     // 2 · Fotos ------------------------------------------------------------
@@ -352,11 +316,6 @@
     // producción, folletos. Van a ser muchos, así que tienen su propia solapa y
     // no se mezclan con la información del mueble. Desde acá se elige cuál usa
     // cada variante.
-    TIPOS: [
-      { k: 'venta', label: 'Venta', icono: '📷' },
-      { k: 'produccion', label: 'Producción', icono: '📐' },
-      { k: 'otro', label: 'Otro', icono: '📄' },
-    ],
     // Cómo se entrega. Es una característica del mueble, así que va en
     // Información general y no en Otros.
     bloqueEntrega() {
@@ -373,21 +332,6 @@
           usa la subida por escalera, que se cobra por piso y por bulto.</span></div>`;
     },
 
-    // Cómo se rastrea el stock de este mueble y cuánto hay que tener.
-    RASTREO: [
-      { k: 'serie', label: 'Por número de serie único',
-        pie: 'Cada unidad es distinta y lleva su código. Si hay 12 mesas de luz Miami blancas, son 12 unidades distintas y se sabe cuál salió en cada orden.' },
-      { k: 'lote', label: 'Por lotes',
-        pie: 'Las unidades de una misma tanda comparten identificación. Sirve cuando lo que importa es de qué producción salió, no cuál pieza.' },
-      { k: 'cantidad', label: 'Por cantidad',
-        pie: 'Sólo se cuenta cuántas hay. No se puede saber cuál se entregó ni de qué tanda salió.' },
-    ],
-    // Los que se reponen contra pedido no llevan mínimo: el mínimo y la
-    // reposición van de la mano y no tienen sentido por separado.
-    REPO: [
-      { k: 'pedido', label: 'Se pide cuando se vende' },
-      { k: 'minimo', label: 'Mantener un mínimo' },
-    ],
 
     // El inventario real: lo que hay, lo que está por entrar y lo que ya
     // salió. Cerrado por default porque con muchas unidades es largo.
@@ -406,7 +350,6 @@
       return `</section>
       <section class="pd-m ${on ? 'on' : ''}" style="margin-top:9px">
         <button class="pd-mh" data-mod="inventario" aria-expanded="${on}">
-          <span class="pd-mn">👁</span>
           <span class="pd-mt">Ver inventario</span>
           <span class="pd-mr">${cuenta('stock')} en depósito · ${cuenta('entrando')} por entrar ·
             ${cuenta('vendido')} ya salieron</span>
@@ -467,15 +410,20 @@
         <div class="pd-h">Stock por variante</div>
         <div class="inv-tabla">
           <div class="inv-head">
-            <span>Variante</span><span class="num">Stock</span>
-            <span class="num">Stock mínimo deseado</span><span></span>
+            <span>Variante</span><span>SKU</span><span>Código de barras</span>
+            <span class="num">Stock</span><span class="num">Stock mínimo deseado</span><span></span>
           </div>
           ${lista.map(v => {
             const min = Number(v.minStock) || 0;
             const falta = min > 0 && (v.stock || 0) < min;
             return `<div class="inv-r ${v.activa === false ? 'off' : ''}">
-              <div><b>${UI.esc(this.nombreVar(v))}</b>
-                <div class="vr-sku tnum">${UI.esc(v.sku || global.DB.skuDe(this.p, v))}</div></div>
+              <div><b>${UI.esc(this.nombreVar(v))}</b></div>
+              <div class="fx"><input class="pn tnum izq" data-sku="${v.id}"
+                  value="${UI.esc(v.sku || global.DB.skuDe(this.p, v))}" ${ed ? '' : 'readonly'}>
+                ${ed ? `<button class="lapiz" data-skuauto="${v.id}"
+                  title="Volver al automático">↺</button>` : ''}</div>
+              <div><input class="pn tnum izq" data-barras="${v.id}" value="${UI.esc(v.barras || '')}"
+                placeholder="13 números" ${ed ? '' : 'readonly'}></div>
               <div class="num"><input class="pn" inputmode="numeric" data-stock="${v.id}"
                 value="${v.stock || 0}" ${ed ? '' : 'readonly'}></div>
               <div class="num"><input class="pn" inputmode="numeric" data-min="${v.id}"
@@ -487,7 +435,9 @@
           }).join('')}
         </div>
         <div class="hint" style="margin-top:9px">Todo se repone cuando se vende. El <b>mínimo deseado</b>
-          es aparte: lo que querés tener siempre en el depósito, aunque nadie lo haya pedido.</div>
+          es aparte: lo que querés tener siempre en el depósito, aunque nadie lo haya pedido. El
+          <b>SKU</b> sale solo del código del mueble y de la variante; se puede pisar y volver atrás
+          con la flechita.</div>
         ${this.bloqueVerInventario()}
         ${conMin.length ? `<div class="banner ${faltan.length ? 'warn' : 'info'}" style="margin-top:10px">
           ${faltan.length
@@ -689,7 +639,7 @@
           return `<div class="dib-r">
             <button class="vimg ${url ? 'hay' : ''}" data-plano="${v.id}|${i}"
               title="Dibujo de ${UI.esc(this.nombreRubro(r.k))} para esta variante">
-              ${url ? `<img src="${UI.esc(url)}" alt="">` : '<span class="vimg-v">📐</span>'}
+              ${url ? `<img src="${UI.esc(url)}" alt="">` : '<span class="vimg-v">sin dibujo</span>'}
               <span class="vimg-e">✎</span></button>
             <div class="dib-n"><b>${UI.esc(this.nombreVar(v))}</b>
               <div class="vr-sku tnum">${UI.esc(v.sku || global.DB.skuDe(this.p, v))}</div></div>
@@ -924,9 +874,9 @@
     // no se mezclan con la información del mueble. Desde acá se elige cuál usa
     // cada variante.
     TIPOS: [
-      { k: 'venta', label: 'Venta', icono: '📷' },
-      { k: 'produccion', label: 'Producción', icono: '📐' },
-      { k: 'otro', label: 'Otro', icono: '📄' },
+      { k: 'venta', label: 'Venta' },
+      { k: 'produccion', label: 'Producción' },
+      { k: 'otro', label: 'Otro' },
     ],
     archivos(tipo) {
       const a = this.p.archivos || [];
@@ -946,14 +896,14 @@
       const grupo = t => {
         const fs = this.archivos(t.k);
         return `<section class="pd-b">
-          <div class="pd-h">${t.icono} ${UI.esc(t.label)} <span class="muted">(${fs.length})</span></div>
+          <div class="pd-h">${UI.esc(t.label)} <span class="muted">(${fs.length})</span></div>
           ${ed ? `<div class="dropz chico" data-drop="${t.k}">
             <div class="dz-t">Arrastrá acá, o hacé clic para subir</div>
             <input type="file" data-file="${t.k}" accept="image/*,application/pdf,video/*" multiple hidden>
           </div>` : ''}
           <div class="docs">${fs.map(f => `<div class="doc">
             <div class="doc-im">${/^data:image|\.(png|jpe?g|webp|svg)$/i.test(f.url)
-              ? `<img src="${UI.esc(f.url)}" alt="${UI.esc(f.nombre)}">` : t.icono}</div>
+              ? `<img src="${UI.esc(f.url)}" alt="${UI.esc(f.nombre)}">` : UI.esc(t.label)}</div>
             <div class="doc-n" title="${UI.esc(f.nombre)}">${UI.esc(f.nombre)}</div>
             <div class="doc-u">${this.usoDe(f.id)
               ? `<span class="pill info">en ${this.usoDe(f.id)} ${this.usoDe(f.id) === 1 ? 'variante' : 'variantes'}</span>`
@@ -961,7 +911,7 @@
             ${ed ? `<div class="doc-a">
               <select data-tipo="${f.id}">${this.TIPOS.map(x =>
                 `<option value="${x.k}" ${f.tipo === x.k ? 'selected' : ''}>${UI.esc(x.label)}</option>`).join('')}</select>
-              <button class="lx" data-borrar="${f.id}" title="Borrar">🗑</button>
+              <button class="lx" data-borrar="${f.id}" title="Borrar">✕</button>
             </div>` : ''}
           </div>`).join('') || '<div class="hint">Todavía no hay archivos de este tipo.</div>'}</div>
         </section>`;
@@ -1141,7 +1091,7 @@
       return `<div class="vr ${off ? 'off' : ''}" data-v="${v.id}" style="${this.gridVar(secs.length)}">
         <button class="vimg ${url ? 'hay' : ''}" data-img="${v.id}|imgVenta"
           title="Imagen de venta — sale impresa en la cotización">
-          ${url ? `<img src="${UI.esc(url)}" alt="">` : '<span class="vimg-v">📷</span>'}
+          ${url ? `<img src="${UI.esc(url)}" alt="">` : '<span class="vimg-v">sin foto</span>'}
           <span class="vimg-e">✎</span></button>
         <div class="vr-n">
           <button class="vr-nom" data-abrir="${v.id}">${UI.esc(this.nombreVar(v))}</button>
@@ -1390,6 +1340,26 @@
           global.DB.guardarVariante(v); this.pintar();
         };
       });
+      // El SKU y el código de barras identifican la unidad física, así que
+      // viven acá y no en Compra y venta.
+      document.querySelectorAll('[data-sku]').forEach(i => {
+        if (!ed) return;
+        i.onchange = () => {
+          const v = this.vars.find(x => x.id === Number(i.dataset.sku)); if (!v) return;
+          v.sku = i.value.trim(); global.DB.guardarVariante(v); this.pintar();
+        };
+      });
+      document.querySelectorAll('[data-barras]').forEach(i => {
+        if (!ed) return;
+        i.onchange = () => {
+          const v = this.vars.find(x => x.id === Number(i.dataset.barras)); if (!v) return;
+          v.barras = i.value.trim(); global.DB.guardarVariante(v);
+        };
+      });
+      document.querySelectorAll('[data-skuauto]').forEach(b => b.onclick = () => {
+        const v = this.vars.find(x => x.id === Number(b.dataset.skuauto)); if (!v) return;
+        v.sku = ''; global.DB.guardarVariante(v); this.pintar();
+      });
       ['pd-iva', 'pd-cfact', 'pd-mat', 'pd-notaprod'].forEach(id => {
         const el = g(id); if (!el || !ed) return;
         const campo = { 'pd-iva': 'iva', 'pd-cfact': 'conceptoFactura',
@@ -1489,12 +1459,6 @@
         p.listas[Number(sl.dataset.lista)] = sl.value;
         this.guardar(); this.pintar();
       });
-      document.querySelectorAll('[data-editar]').forEach(b => b.onclick = () => {
-        const id = Number(b.dataset.editar);
-        this._abiertos = this._abiertos || new Set();
-        if (this._abiertos.has(id)) this._abiertos.delete(id); else this._abiertos.add(id);
-        this.pintar();
-      });
       document.querySelectorAll('[data-medc]').forEach(sl => sl.onchange = () => {
         const v = this.vars.find(x => x.id === Number(sl.dataset.medc)); if (!v) return;
         v.medidaCosteo = sl.value; global.DB.guardarVariante(v);
@@ -1528,7 +1492,7 @@
         <div class="docs elegir" id="ei-lista" style="margin-top:14px">
           ${fs.map(f => `<button class="doc ${actual === f.id ? 'on' : ''}" data-usar="${f.id}">
             <div class="doc-im">${/^data:image/.test(f.url)
-              ? `<img src="${UI.esc(f.url)}" alt="">` : (esVenta ? '📷' : '📐')}</div>
+              ? `<img src="${UI.esc(f.url)}" alt="">` : (esVenta ? 'foto' : 'plano')}</div>
             <div class="doc-n">${UI.esc(f.nombre)}</div>
           </button>`).join('')
           || `<div class="hint">No hay archivos de ${esVenta ? 'venta' : 'producción'} cargados todavía.</div>`}
@@ -1587,10 +1551,96 @@
       const banda = global.DB.bandaDe(mk);
       const obj = this.objetivoDe(v);
 
-      const kpi = (icono, lbl, val, pie, clase) => `<div class="kp">
-        <div class="kp-t"><span class="kp-i">${icono}</span>${UI.esc(lbl)}</div>
+      // Arriba los cuatro números, y abajo dos columnas: a la izquierda qué
+      // es la variante y a cuánto se vende, a la derecha de qué está hecho el
+      // costo. Los códigos no están acá: son de la unidad física y viven en
+      // Inventario.
+      const kpi = (lbl, val, pie, clase) => `<div class="kp">
+        <div class="kp-t">${UI.esc(lbl)}</div>
         <div class="kp-v ${clase || ''}">${val}</div>
         ${pie ? `<div class="kp-p">${pie}</div>` : ''}</div>`;
+
+      const d = this.descEfectivo();
+      const promo = Number(v.promo) || 0;
+      const nro = n => (n ? UI.pesos(n) : '—');
+      const coma = n => String(n).replace('.', ',');
+      // Cuánto se le descontó al efectivo para llegar al promocional.
+      const dtoDe = (e, pr) => (e && pr ? Math.round((1 - pr / e) * 1000) / 10 : 0);
+      const pieDto = (e, pr) => (pr ? `−${coma(dtoDe(e, pr))} % sobre el efectivo` : 'sin descuento');
+
+      const bloquePrecio = `<section class="cx-b">
+        <div class="cx-h">Precio</div>
+        <div class="cx-r"><span>Precio de efectivo</span>
+          <span class="cx-fin"><span class="uni">$</span>
+            <input class="pn" id="pv-efec" inputmode="numeric" value="${ef || ''}"
+              ${ed ? '' : 'readonly'}></span></div>
+        <div class="cx-r"><span>Precio promocional
+            <small class="muted" id="pv-dto">${pieDto(ef, promo)}</small></span>
+          <span class="cx-fin"><span class="uni">$</span>
+            <input class="pn" id="pv-promo" inputmode="numeric" value="${UI.esc(v.promo ?? '')}"
+              placeholder="—" ${ed ? '' : 'readonly'}></span></div>
+
+        <div class="cx-sep"></div>
+        <div class="cx-r"><span>Precio de lista <small class="muted">automático</small></span>
+          <b class="tnum" id="pv-lista">${nro(this.listaDe(ef))}</b></div>
+        <div class="cx-r"><span>Precio de lista promocional</span>
+          <b class="tnum" id="pv-listap">${nro(this.listaDe(promo))}</b></div>
+        <div class="hint">Se carga el <b>efectivo</b>, que es lo que realmente entra. Los de lista se
+          recalculan solos: le suman el ${coma(Math.round(d * 1000) / 10)} % que se descuenta al
+          pagar en efectivo.</div>
+      </section>`;
+
+      const bloqueCosto = `<section class="cx-b">
+        <div class="cx-h">Composición del costo</div>
+        ${comp.porRubro.map((r, j) => `<div class="cx-r">
+          <span>${UI.esc(r.label)} <small class="muted">${UI.esc(
+            ((global.DB.lista((this.listasDe()[j] || {}).lista) || {}).label || 'sin lista')
+              .replace(/^[^·]+· /, ''))}</small></span>
+          <input class="pn" inputmode="numeric" data-costorubro="${v.id}|${j}"
+            value="${r.monto || ''}" placeholder="—" ${ed ? '' : 'readonly'}>
+        </div>`).join('') || '<div class="hint">Definí los rubros en <b>Producción</b>.</div>'}
+        ${comp.porRubro.length > 1 ? `<div class="cx-r sub">
+          <span>Subtotal de los ${comp.porRubro.length} rubros</span>
+          <b class="tnum">${UI.pesos(comp.base)}</b></div>` : ''}
+
+        <div class="cx-sep"></div>
+        <div class="cx-h2">Adicionales</div>
+        ${comp.adicionales.map(a => `<div class="cx-r">
+          <span>${UI.esc(a.label)} <small class="muted">${
+            a.tipo === '%' ? coma(a.valor) + ' % del costo' : 'monto fijo'}</small></span>
+          <span class="cx-fin"><b class="tnum">${UI.pesos(a.monto)}</b>
+            ${ed ? `<button class="lx mini" data-quitaad="${UI.esc(a.id)}"
+              title="Sacar este adicional">✕</button>` : ''}</span>
+        </div>`).join('') || `<div class="hint">Todavía no tiene. Acá van las cosas que se suman a lo
+          que cobra el rubro: vidrio, ranuras, corte 45°, herrajes.</div>`}
+        ${ed ? '<button class="chip-add" id="pv-addad" style="margin-top:9px">Agregar adicional</button>' : ''}
+
+        <div class="cx-sep"></div>
+        <div class="cx-r total"><span>Costo final</span>
+          <b class="tnum">${UI.pesos(comp.total)}</b></div>
+      </section>`;
+
+      const bloquePub = `<section class="cx-b">
+        <div class="cx-h">Publicación</div>
+        <label class="chk"><input type="checkbox" id="pv-mostrar" ${v.mostrar !== false ? 'checked' : ''}
+          ${ed ? '' : 'disabled'}> Mostrar esta variante a los vendedores</label>
+        <div class="hint" style="margin-top:5px">El peso y las medidas están en <b>Información
+          general</b>; el SKU y el código de barras, en <b>Inventario</b>; a quién se le pide, en
+          <b>Producción</b>.</div>
+      </section>`;
+
+      const bloqueDatos = `<section class="cx-b chico">
+        <div class="cx-h">Datos generales <span class="muted">de la variante</span></div>
+        ${this.props().map(pr => `<div class="fr sm2">
+          <label>${UI.esc(pr.nombre)}</label>
+          <div class="valf">${UI.esc(v[pr.k] || '—')}
+            <small class="muted">${UI.esc((global.DB.rol(global.DB.rolDe(pr.k)) || {}).label || '')}</small></div>
+        </div>`).join('')}
+        <div class="fr sm2"><label>Medida de costeo</label>
+          <div class="valf">${UI.esc(v.medidaCosteo || v.medida || '—')}</div></div>
+        <div class="hint">Cada propiedad dice en qué tabla buscarse. Las listas se eligen arriba, en
+          <b>De dónde salen los costos</b>.</div>
+      </section>`;
 
       document.getElementById('pd-panel').innerHTML = `
         <div class="pv-back" id="pv-back"></div>
@@ -1606,92 +1656,20 @@
           </div>
           <div class="pv-body">
             ${cost ? `<div class="kpis4">
-              ${kpi('📦', 'Costo final', UI.pesos(comp.total))}
-              ${kpi('🏷️', 'Precio efectivo', UI.pesos(ef), `lista ${UI.pesos(this.listaDe(ef))}`)}
-              ${kpi('📈', 'Margen', mg ? mg.toFixed(1).replace('.', ',') + ' %' : '—',
+              ${kpi('Costo final', UI.pesos(comp.total))}
+              ${kpi('Precio efectivo', UI.pesos(ef), `lista ${UI.pesos(this.listaDe(ef))}`)}
+              ${kpi('Margen', mg ? coma(mg.toFixed(1)) + ' %' : '—',
                 mg >= 40 ? 'sobre el mínimo' : 'bajo el mínimo', mg >= 40 ? 'ok-t' : 'warn-t')}
-              ${kpi('🎯', 'Markup', mk ? mk.toFixed(2).replace('.', ',') + 'x' : '—',
-                `objetivo ${String(obj).replace('.', ',')}`, banda.pill === 'ok' ? 'ok-t' : 'warn-t')}
+              ${kpi('Markup', mk ? coma(mk.toFixed(2)) + 'x' : '—',
+                `objetivo ${coma(obj)}`, banda.pill === 'ok' ? 'ok-t' : 'warn-t')}
             </div>
 
             <div class="dos">
-              <section class="cx-b">
-                <div class="cx-h">Datos generales <span class="muted">de la variante</span></div>
-                ${this.props().map(pr => `<div class="fr sm2">
-                  <label>${UI.esc(pr.nombre)}</label>
-                  <div class="valf">${UI.esc(v[pr.k] || '—')}
-                    <small class="muted">${UI.esc((global.DB.rol(global.DB.rolDe(pr.k)) || {}).label || '')}</small></div>
-                </div>`).join('')}
-                <div class="fr sm2"><label>Medida de costeo</label>
-                  <div class="valf">${UI.esc(v.medidaCosteo || v.medida || '—')}</div></div>
-                <div class="hint">Cada propiedad dice en qué tabla buscarse — es lo que evita cargar
-                  el número a mano. Las listas se eligen arriba, en <b>De dónde salen los costos</b>.</div>
-              </section>
-
-              <section class="cx-b">
-                <div class="cx-h">Composición del costo</div>
-                ${comp.porRubro.map((r, j) => `<div class="cx-r">
-                  <span>${UI.esc(r.label)} <small class="muted">${UI.esc(
-                    ((global.DB.lista((this.listasDe()[j] || {}).lista) || {}).label || 'sin lista')
-                      .replace(/^[^·]+· /, ''))}</small></span>
-                  <input class="pn" inputmode="numeric" data-costorubro="${v.id}|${j}"
-                    value="${r.monto || ''}" placeholder="—" ${ed ? '' : 'readonly'}>
-                </div>`).join('')}
-                ${comp.porRubro.length > 1 ? `<div class="cx-r sub">
-                  <span>Subtotal de los ${comp.porRubro.length} rubros</span>
-                  <b class="tnum">${UI.pesos(comp.base)}</b></div>` : ''}
-
-                <div class="cx-sep"></div>
-                <div class="cx-h2">Recargos</div>
-                <div class="chips">${global.DB.RECARGOS.map(r => {
-                  const on = (v.recargos || []).includes(r.k);
-                  return `<button class="chip-add ${on ? 'on' : ''}" data-recargo="${v.id}|${r.k}"
-                    ${ed ? '' : 'disabled'}>${on ? '✓ ' : ''}${UI.esc(r.label)}
-                    <small>${r.tipo === '%' ? r.valor + '%' : UI.pesos(r.valor)}</small></button>`;
-                }).join('')}</div>
-                ${comp.recargos.map(r => `<div class="cx-r">
-                  <span>${UI.esc(r.label)} <small class="muted">${
-                    r.tipo === '%' ? r.valor + '% sobre el costo' : 'fijo'}</small></span>
-                  <b class="tnum">${UI.pesos(r.monto)}</b></div>`).join('')}
-
-                <div class="cx-r"><span>Ajuste manual</span>
-                  <input class="pn" inputmode="numeric" data-ajuste="${v.id}"
-                    value="${v.ajuste || ''}" placeholder="0" ${ed ? '' : 'readonly'}></div>
-
-                <div class="cx-sep"></div>
-                <div class="cx-r total"><span>Costo final</span>
-                  <b class="tnum">${UI.pesos(comp.total)}</b></div>
-              </section>
-            </div>
-
-            <div class="pv-h">Precio</div>
-            <div class="pv-2">
-              <label class="fld"><span class="lbl">Precio de efectivo</span>
-                <div class="fx"><span class="uni">$</span>
-                  <input id="pv-efec" inputmode="numeric" value="${ef || ''}" ${ed ? '' : 'readonly'}></div></label>
-              <label class="fld"><span class="lbl">Precio promocional</span>
-                <div class="fx"><span class="uni">$</span>
-                  <input id="pv-promo" inputmode="numeric" value="${UI.esc(v.promo ?? '')}"
-                    placeholder="sin descuento" ${ed ? '' : 'readonly'}></div></label>
-            </div>` : ''}
-
-            <div class="pv-h">Códigos</div>
-            <div class="pv-2">
-              <label class="fld"><span class="lbl">SKU</span>
-                <div class="fx"><input id="pv-sku" value="${UI.esc(v.sku || global.DB.skuDe(this.p, v))}"
-                  ${ed ? '' : 'readonly'}>
-                  <button class="lapiz" id="pv-sku-auto" title="Volver al automático">↺</button></div></label>
-              <label class="fld"><span class="lbl">Código de barras</span>
-                <input id="pv-barras" value="${UI.esc(v.barras || '')}" placeholder="13 números"
-                  ${ed ? '' : 'readonly'}></label>
-            </div>
-
-            <div class="pv-h">Publicación</div>
-            <label class="chk"><input type="checkbox" id="pv-mostrar" ${v.mostrar !== false ? 'checked' : ''}
-              ${ed ? '' : 'disabled'}> Mostrar esta variante a los vendedores</label>
-            <label class="chk"><input type="checkbox" id="pv-activa" ${v.activa !== false ? 'checked' : ''}
-              ${ed ? '' : 'disabled'}> Se fabrica</label>
-            <div class="hint">El peso y las medidas están en <b>Información general</b>.</div>
+              <div class="col">${bloqueDatos}${bloquePrecio}</div>
+              <div class="col">${bloqueCosto}${bloquePub}</div>
+            </div>`
+            : `<div class="dos"><div class="col">${bloqueDatos}</div>
+                 <div class="col">${bloquePub}</div></div>`}
           </div>
         </aside>`;
 
@@ -1704,17 +1682,27 @@
 
       const bind = (id2, fn) => { const el = document.getElementById(id2); if (el && ed) el.onchange = () => fn(el); };
       const num = el => Number(String(el.value).replace(/[^\d]/g, '')) || 0;
+
+      // Los precios de lista se recalculan mientras se escribe: no hay que
+      // guardar para verlos.
+      const espejo = () => {
+        const e = num(document.getElementById('pv-efec') || { value: '' });
+        const pr = num(document.getElementById('pv-promo') || { value: '' });
+        const set = (idd, txt) => { const el = document.getElementById(idd); if (el) el.textContent = txt; };
+        set('pv-lista', nro(this.listaDe(e)));
+        set('pv-listap', nro(this.listaDe(pr)));
+        set('pv-dto', pieDto(e, pr));
+      };
+      ['pv-efec', 'pv-promo'].forEach(idd => {
+        const el = document.getElementById(idd); if (el) el.oninput = espejo;
+      });
+
       bind('pv-efec', el => {
         v.efectivo = num(el); v.precio = this.listaDe(v.efectivo); v.pisado = true;
         global.DB.guardarVariante(v); this.pintar(); this.abrirVariante(id);
       });
-      bind('pv-promo', el => { v.promo = num(el); global.DB.guardarVariante(v); });
-      bind('pv-sku', el => { v.sku = el.value.trim(); global.DB.guardarVariante(v); this.pintar(); });
-      bind('pv-barras', el => { v.barras = el.value.trim(); global.DB.guardarVariante(v); });
+      bind('pv-promo', el => { v.promo = num(el); global.DB.guardarVariante(v); espejo(); });
       bind('pv-mostrar', el => { v.mostrar = el.checked; global.DB.guardarVariante(v); });
-      bind('pv-activa', el => { v.activa = el.checked; global.DB.guardarVariante(v); this.pintar(); this.abrirVariante(id); });
-      const auto = document.getElementById('pv-sku-auto');
-      if (auto && ed) auto.onclick = () => { v.sku = ''; global.DB.guardarVariante(v); this.pintar(); this.abrirVariante(id); };
 
       // El costo de cada rubro por separado: con dos rubros hay dos costos.
       document.querySelectorAll('[data-costorubro]').forEach(el => { if (!ed) return;
@@ -1727,18 +1715,68 @@
           global.DB.guardarVariante(v); this.pintar(); this.abrirVariante(id);
         };
       });
-      bind('pv-ajuste', () => {});
-      document.querySelectorAll('[data-ajuste]').forEach(el => { if (!ed) return;
-        el.onchange = () => { v.ajuste = num(el); global.DB.guardarVariante(v); this.pintar(); this.abrirVariante(id); };
-      });
-      document.querySelectorAll('[data-recargo]').forEach(b => { if (!ed) return;
+      // Los adicionales: se agregan de a uno y se sacan con la cruz.
+      const addad = document.getElementById('pv-addad');
+      if (addad) addad.onclick = () => this.modalAdicional(v.id);
+      document.querySelectorAll('[data-quitaad]').forEach(b => { if (!ed) return;
         b.onclick = () => {
-          const k = b.dataset.recargo.split('|')[1];
-          v.recargos = v.recargos || [];
-          v.recargos = v.recargos.includes(k) ? v.recargos.filter(x => x !== k) : [...v.recargos, k];
+          const k = b.dataset.quitaad;
+          v.recargos = (v.recargos || []).filter(x => x !== k);
+          v.adicionales = (v.adicionales || []).filter(x => String(x.id) !== k);
           global.DB.guardarVariante(v); this.pintar(); this.abrirVariante(id);
         };
       });
+    },
+
+    // Un adicional es cualquier cosa que se suma a lo que cobra el rubro:
+    // vidrio, ranuras, corte 45°. Los de siempre están de atajo; el resto se
+    // escribe. Puede ser un porcentaje del costo o un monto fijo.
+    modalAdicional(idVar) {
+      const v = this.vars.find(x => x.id === idVar); if (!v) return;
+      const cerrar = this.modal(`
+        <h3 class="h-title" style="font-size:17px">Agregar un adicional</h3>
+        <p class="h-sub">Se suma al costo de <b>${UI.esc(this.nombreVar(v))}</b>, arriba de lo que
+          cobra cada rubro.</p>
+        <div class="chips" style="margin:12px 0 14px">${global.DB.RECARGOS.map(r =>
+          `<button class="chip-add" data-suge="${UI.esc(r.k)}">${UI.esc(r.label)}
+            <small>${r.tipo === '%' ? r.valor + '%' : UI.pesos(r.valor)}</small></button>`).join('')}</div>
+        <div class="cz-cols">
+          <label class="fld"><span class="lbl">Concepto</span>
+            <input id="ad-n" placeholder="Ej: Vidrio"></label>
+          <label class="fld"><span class="lbl">Cómo se calcula</span>
+            <select id="ad-t"><option value="fijo">Monto fijo</option>
+              <option value="%">Porcentaje del costo</option></select></label>
+        </div>
+        <label class="fld" style="margin-top:9px;max-width:220px"><span class="lbl">Valor</span>
+          <div class="fx"><span class="uni" id="ad-u">$</span>
+            <input id="ad-v" inputmode="numeric" placeholder="0"></div></label>
+        <div class="hint" style="margin-top:5px">El porcentaje se calcula sobre lo que suman los
+          rubros. Un monto en negativo descuenta.</div>
+        <div class="row" style="margin-top:18px;gap:10px">
+          <div class="sp"></div>
+          <button class="btn" id="ad-x">Cancelar</button>
+          <button class="btn primary" id="ad-ok">Agregar</button>
+        </div>`, 520);
+
+      const g = idd => document.getElementById(idd);
+      const uni = () => { g('ad-u').textContent = g('ad-t').value === '%' ? '%' : '$'; };
+      g('ad-t').onchange = uni;
+      document.querySelectorAll('[data-suge]').forEach(b => b.onclick = () => {
+        const r = global.DB.recargo(b.dataset.suge); if (!r) return;
+        g('ad-n').value = r.label; g('ad-t').value = r.tipo; g('ad-v').value = r.valor; uni();
+      });
+      g('ad-x').onclick = cerrar;
+      g('ad-ok').onclick = () => {
+        const nombre = g('ad-n').value.trim();
+        if (!nombre) return UI.aviso('Poné el concepto', 'warn');
+        const valor = Number(String(g('ad-v').value).replace(',', '.').replace(/[^\d.-]/g, '')) || 0;
+        if (!valor) return UI.aviso('Poné el valor', 'warn');
+        v.adicionales = v.adicionales || [];
+        const n = Math.max(0, ...v.adicionales.map(x => Number(String(x.id).slice(2)) || 0)) + 1;
+        v.adicionales.push({ id: 'ad' + n, label: nombre, tipo: g('ad-t').value, valor });
+        global.DB.guardarVariante(v);
+        cerrar(); this.pintar(); this.abrirVariante(idVar);
+      };
     },
 
     // ---- Simulador -----------------------------------------------------------
@@ -2359,7 +2397,7 @@
         <div class="docs elegir" style="margin-top:14px">
           ${fs.map(f => `<button class="doc ${actual === f.id ? 'on' : ''}" data-usarplano="${f.id}">
             <div class="doc-im">${/^data:image/.test(f.url)
-              ? `<img src="${UI.esc(f.url)}" alt="">` : '📐'}</div>
+              ? `<img src="${UI.esc(f.url)}" alt="">` : 'plano'}</div>
             <div class="doc-n">${UI.esc(f.nombre)}</div>
           </button>`).join('')
           || '<div class="hint">No hay planos cargados. Subilos en <b>Documentos</b> o desde acá.</div>'}
@@ -2554,6 +2592,7 @@
         @media(max-width:820px){.cz-cols{grid-template-columns:1fr}}
         .cz-col{display:flex;flex-direction:column;gap:9px}
         .fr{display:grid;grid-template-columns:138px minmax(0,1fr);align-items:center;gap:9px}
+        .fr+.fr{margin-top:5px}
         .fr>label{font-size:12.5px;color:var(--ink-soft)}
         .fr input,.fr select{padding:6px 9px;font-size:12.5px;width:100%}
         .fr .hint{font-size:11.5px;color:var(--muted)}
@@ -2868,7 +2907,8 @@
         .kp-i{font-size:12px}
         .kp-v{font-size:17px;font-weight:800;color:var(--navy);margin-top:3px}
         .kp-p{font-size:10.5px;color:var(--muted);margin-top:1px}
-        .dos{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+        .dos{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
+        .dos>.col{display:flex;flex-direction:column;gap:10px;min-width:0}
         @media(max-width:700px){.dos{grid-template-columns:1fr}}
         .cx-b{border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:var(--panel)}
         .cx-h{font-size:12.5px;font-weight:700;color:var(--navy);margin-bottom:9px}
@@ -2878,6 +2918,16 @@
           padding:5px 0;font-size:12.5px}
         .cx-r span{color:var(--ink-soft)} .cx-r small{font-size:10.5px}
         .cx-r .pn{width:104px;text-align:right;padding:4px 7px}
+        .cx-fin{display:flex;align-items:center;gap:6px;justify-content:flex-end;flex:none}
+        .cx-fin .uni{font-size:11.5px;color:var(--muted)}
+        .cx-fin .pn{width:96px}
+        .lx.mini{font-size:11px;padding:1px 5px;line-height:1.4;color:var(--muted)}
+        /* Datos generales va apretado: es para mirar, no para cargar. */
+        .cx-b.chico{padding:9px 11px}
+        .cx-b.chico .fr.sm2{grid-template-columns:118px minmax(0,1fr);gap:6px;margin-bottom:3px}
+        .cx-b.chico .fr.sm2>label{font-size:11px}
+        .cx-b.chico .fr.sm2 .valf{font-size:12px}
+        .cx-b.chico .hint{margin-top:7px;font-size:11px}
         .cx-r.sub{border-top:1px dashed var(--line);margin-top:3px;padding-top:7px}
         .cx-r.total{font-size:14px} .cx-r.total b{font-size:16px;color:var(--navy)}
         .cx-sep{height:1px;background:var(--line);margin:9px 0}
@@ -2921,8 +2971,9 @@
         .pl-prev td{padding:6px 10px;white-space:nowrap;border-top:1px solid var(--line-soft)}
         .ad-t{font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px}
         .inv-tabla{overflow-x:auto;margin:0 -14px;padding:0 14px}
-        .inv-head,.inv-r{display:grid;min-width:640px;
-          grid-template-columns:minmax(220px,1fr) 92px 150px 96px;gap:10px;align-items:center}
+        .inv-head,.inv-r{display:grid;min-width:860px;
+          grid-template-columns:minmax(190px,1fr) 158px 132px 78px 104px 90px;gap:10px;align-items:center}
+        .inv-r .pn.izq{text-align:left;font-size:11.5px}
         .inv-r.off{opacity:.5}
         .uni-h,.uni-r{display:grid;min-width:640px;gap:10px;align-items:center;
           grid-template-columns:150px 130px minmax(0,1fr) 130px 60px}

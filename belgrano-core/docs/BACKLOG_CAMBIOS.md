@@ -736,6 +736,45 @@ Compra y venta · Documentos · Contabilidad.
   ordena los dibujos y las planillas: el **A** recibe el primer dibujo y la
   primera planilla, el **B** los segundos.
 
+### Lote 26 — APLICADO (El panel de la variante, prolijo)
+
+**Sin emojis**
+- ✅ 337. Se van de todo el Catálogo: los botones dicen **Agregar** y **Guardar
+  como planilla** y nada más; los cuatro números de arriba del panel, las
+  solapas de Documentos y **Ver inventario** quedan sin ícono.
+
+**La tabla de variantes**
+- ✅ 338. **Se va el lápiz.** Todo se edita adentro de la variante, que se abre
+  con los **tres puntitos**: ahí está el costo por rubro, los adicionales y los
+  precios. La tabla es para mirar y comparar.
+
+**El panel, en dos columnas**
+- ✅ 339. **Izquierda: Datos generales** —más chico, sin tanto aire: es para
+  mirar de qué variante se trata— y abajo **Precio**.
+- ✅ 340. **Precio**: se carga el **efectivo** y el **promocional** (que muestra
+  al lado **cuánto % le descontó al efectivo**). Abajo, separados, el **precio
+  de lista** y el **precio de lista promocional**, los dos automáticos: se
+  recalculan mientras se escribe, sin guardar.
+- ✅ 341. **Derecha: Composición del costo** — un renglón por rubro, el subtotal
+  si son dos, los **adicionales** y el **costo final**.
+- ✅ 342. **Agregar adicional** abre un pop-up: concepto, si es **% del costo o
+  monto fijo**, y el valor. Los de siempre (ranuras, corte 45°, laqueado,
+  herrajes) están de atajo para no escribirlos. Se agregan de a uno y se apilan
+  —vidrio, después ranuras— cada uno con su valor, y el costo final se mueve
+  solo. Se sacan con la cruz.
+- ✅ 343. Abajo del costo, **Publicación**: sólo *mostrar esta variante a los
+  vendedores*. **Se fabrica** no va más: eso ya está en Producción.
+
+**Los códigos son de la unidad, no del precio**
+- ✅ 344. **SKU** y **código de barras** se van de Compra y venta y aparecen como
+  columnas en **Inventario → Stock por variante**, que es donde se identifica la
+  pieza física. El SKU sigue saliendo solo y se vuelve al automático con la
+  flechita.
+
+**Aire**
+- ✅ 345. Los desplegables no van más pegados: entre un renglón y el que sigue
+  hay separación en toda la app.
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·

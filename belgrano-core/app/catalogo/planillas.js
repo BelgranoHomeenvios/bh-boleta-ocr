@@ -32,7 +32,7 @@
                 ${lista.length} ${lista.length === 1 ? 'planilla' : 'planillas'}.</div>
             </div>
             <div class="sp"></div>
-            ${ed ? '<button class="btn primary" id="pz-nueva">＋ Nueva planilla</button>' : ''}
+            ${ed ? '<button class="btn primary" id="pz-nueva">Nueva planilla</button>' : ''}
           </div>
 
           <div class="banner info">Una planilla se arma una vez y se usa en todos los muebles que se
@@ -62,7 +62,7 @@
                   : 'todavía no la usa ningún mueble'}</div>
           </div>
           <div class="sp"></div>
-          ${ed ? `<button class="btn" data-abrir="${UI.esc(t.k)}">✎ Editar</button>` : ''}
+          ${ed ? `<button class="btn" data-abrir="${UI.esc(t.k)}">Editar</button>` : ''}
         </div>
         <div class="pz-cols">${t.cols.map(c => `<span class="chip">${UI.esc(c.label)}
           <small class="muted">${UI.esc(this.nombreOrigen(c.origen))}</small></span>`).join('')}</div>

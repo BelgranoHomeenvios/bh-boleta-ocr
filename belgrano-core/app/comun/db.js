@@ -655,7 +655,8 @@
     lista(k) { return this.LISTAS.find(x => x.k === k) || null; },
     // Las listas de un rubro, para no ofrecer la de herrería al carpintero.
     listasDe(rubro) { return this.LISTAS.filter(x => x.rubro === rubro); },
-    // Recargos que se pueden marcar en una variante.
+    // Adicionales sugeridos. Son los de siempre: aparecen en el pop-up para
+    // no escribirlos de nuevo, pero cualquier variante puede tener el suyo.
     RECARGOS: [
       { k: 'ranuras', label: 'Ranuras', tipo: '%', valor: 8 },
       { k: 'corte45', label: 'Corte 45°', tipo: '%', valor: 5 },
@@ -674,12 +675,18 @@
         monto: Number((v.costos || [])[i]) || (i === 0 ? Number(v.costo) || 0 : 0),
       }));
       const base = porRubro.reduce((a, b) => a + b.monto, 0);
-      const recargos = (v.recargos || []).map(k => this.recargo(k)).filter(Boolean).map(r => ({
-        ...r, monto: r.tipo === '%' ? Math.round(base * r.valor / 100) : r.valor,
+      // Los adicionales son libres: cada uno con su nombre y su valor. Los
+      // marcados con el sistema viejo siguen valiendo y entran igual.
+      const viejos = (v.recargos || []).map(k => this.recargo(k)).filter(Boolean)
+        .map(r => ({ id: r.k, label: r.label, tipo: r.tipo, valor: r.valor }));
+      const adicionales = [...viejos, ...(v.adicionales || [])].map(a => ({
+        ...a,
+        monto: a.tipo === '%' ? Math.round(base * (Number(a.valor) || 0) / 100) : Number(a.valor) || 0,
       }));
-      const sumaRec = recargos.reduce((a, b) => a + b.monto, 0);
+      const sumaRec = adicionales.reduce((a, b) => a + b.monto, 0);
       const ajuste = Number(v.ajuste) || 0;
-      return { porRubro, base, recargos, sumaRec, ajuste, total: base + sumaRec + ajuste };
+      return { porRubro, base, adicionales, sumaAd: sumaRec,
+        recargos: adicionales, sumaRec, ajuste, total: base + sumaRec + ajuste };
     },
 
     // ---- Propiedades secundarias ------------------------------------------
