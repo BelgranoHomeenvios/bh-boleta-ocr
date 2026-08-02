@@ -574,6 +574,30 @@
     },
 
     // ---- Unidades del depósito --------------------------------------------
+    // Cómo se numera una unidad. Un solo correlativo para toda la empresa:
+    // BH-000123. No lleva adentro el mueble ni la variante a propósito —el
+    // sistema ya sabe de qué mueble es esa unidad, meterlo en el número sólo
+    // alarga la etiqueta—. Un contador único no se pisa nunca y no hay que
+    // llevar la cuenta mueble por mueble.
+    SERIE: { prefijo: 'BH', digitos: 6 },
+    serieDe(n) {
+      return `${this.SERIE.prefijo}-${String(Math.max(1, Number(n) || 1)).padStart(this.SERIE.digitos, '0')}`;
+    },
+    // El próximo número libre. Cuando haya base de verdad esto es una secuencia
+    // de Postgres; en demo alcanza con el contador guardado.
+    proximaSerie() {
+      let n = 0;
+      try { n = Number(localStorage.getItem('bh_serie')) || 0; } catch {}
+      return this.serieDe(n + 1);
+    },
+    tomarSerie() {
+      let n = 0;
+      try { n = Number(localStorage.getItem('bh_serie')) || 0; } catch {}
+      n++;
+      try { localStorage.setItem('bh_serie', String(n)); } catch {}
+      return this.serieDe(n);
+    },
+
     // Con rastreo por número de serie, el stock no es un número: son unidades
     // concretas, cada una con su código. Esto es lo que después va a permitir
     // saber cuál salió en qué orden.
@@ -586,8 +610,7 @@
         for (let i = 0; i < hay; i++) {
           n++;
           out.push({
-            serie: `${v.sku || 'SKU'}-${String(n).padStart(3, '0')}`,
-            barras: `779${String(v.id).padStart(4, '0')}${String(n).padStart(6, '0')}`,
+            serie: this.serieDe(v.id * 40 + n),
             varianteId: v.id, estado: 'stock', desde: '12/07',
           });
         }
@@ -596,8 +619,7 @@
       // contestar "¿cuál se le entregó a ese cliente?".
       vs.slice(0, 2).forEach((v, i) => {
         out.push({
-          serie: `${v.sku || 'SKU'}-${String(900 + i).padStart(3, '0')}`,
-          barras: `779${String(v.id).padStart(4, '0')}${String(900 + i).padStart(6, '0')}`,
+          serie: this.serieDe(v.id * 40 + 900 + i),
           varianteId: v.id, estado: 'vendido', orden: `#S000${19 + i}`, desde: '28/07',
         });
       });
@@ -1094,6 +1116,31 @@
     // Plazo estándar de fabricación, en días. La cotización muestra las fechas
     // que salen de acá ("entre 15/09 y el 20/09") con el plazo entre paréntesis.
     ENTREGA_DIAS: { min: 30, max: 35 },
+    // El plazo baja en cascada: lo del mueble manda; si no tiene, el de su
+    // categoría; y si tampoco, el estándar de la casa. Así una cómoda tarda lo
+    // que tardan las cómodas sin cargarlo mueble por mueble, pero el que se
+    // aparta —porque su color siempre está en stock— se pisa y listo.
+    PLAZO_KEY: 'bh_plazo_cat',
+    plazosCat() {
+      try { return JSON.parse(localStorage.getItem(this.PLAZO_KEY)) || {}; } catch { return {}; }
+    },
+    plazoCat(id) { return Number(this.plazosCat()[id]) || 0; },
+    guardarPlazoCat(id, dias) {
+      const t = this.plazosCat();
+      const n = Math.max(0, Number(dias) || 0);
+      if (n) t[id] = n; else delete t[id];
+      try { localStorage.setItem(this.PLAZO_KEY, JSON.stringify(t)); } catch {}
+    },
+    // De dónde sale el plazo de un mueble y por qué. La razón se muestra en
+    // pantalla: sin eso nadie sabe si el número lo puso alguien o lo heredó.
+    plazoDe(prod, cats = []) {
+      if (Number(prod && prod.dias)) return { dias: Number(prod.dias), de: 'mueble' };
+      for (const c of cats) {
+        const d = this.plazoCat(c.id);
+        if (d) return { dias: d, de: 'categoria', cat: c };
+      }
+      return { dias: this.ENTREGA_DIAS.max, de: 'casa' };
+    },
     ENTREGA_DEFAULT: 'entre 30 y 35 días',
     // Cuando no hay domicilio cargado no se puede cotizar el envío.
     ENVIO_SIN_DOMICILIO: 'A confirmar posteriormente',

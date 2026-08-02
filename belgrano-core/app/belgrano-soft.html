@@ -787,6 +787,30 @@ tr:hover td{background:var(--panel-2)}
     },
 
     // ---- Unidades del depósito --------------------------------------------
+    // Cómo se numera una unidad. Un solo correlativo para toda la empresa:
+    // BH-000123. No lleva adentro el mueble ni la variante a propósito —el
+    // sistema ya sabe de qué mueble es esa unidad, meterlo en el número sólo
+    // alarga la etiqueta—. Un contador único no se pisa nunca y no hay que
+    // llevar la cuenta mueble por mueble.
+    SERIE: { prefijo: 'BH', digitos: 6 },
+    serieDe(n) {
+      return `${this.SERIE.prefijo}-${String(Math.max(1, Number(n) || 1)).padStart(this.SERIE.digitos, '0')}`;
+    },
+    // El próximo número libre. Cuando haya base de verdad esto es una secuencia
+    // de Postgres; en demo alcanza con el contador guardado.
+    proximaSerie() {
+      let n = 0;
+      try { n = Number(localStorage.getItem('bh_serie')) || 0; } catch {}
+      return this.serieDe(n + 1);
+    },
+    tomarSerie() {
+      let n = 0;
+      try { n = Number(localStorage.getItem('bh_serie')) || 0; } catch {}
+      n++;
+      try { localStorage.setItem('bh_serie', String(n)); } catch {}
+      return this.serieDe(n);
+    },
+
     // Con rastreo por número de serie, el stock no es un número: son unidades
     // concretas, cada una con su código. Esto es lo que después va a permitir
     // saber cuál salió en qué orden.
@@ -799,8 +823,7 @@ tr:hover td{background:var(--panel-2)}
         for (let i = 0; i < hay; i++) {
           n++;
           out.push({
-            serie: `${v.sku || 'SKU'}-${String(n).padStart(3, '0')}`,
-            barras: `779${String(v.id).padStart(4, '0')}${String(n).padStart(6, '0')}`,
+            serie: this.serieDe(v.id * 40 + n),
             varianteId: v.id, estado: 'stock', desde: '12/07',
           });
         }
@@ -809,8 +832,7 @@ tr:hover td{background:var(--panel-2)}
       // contestar "¿cuál se le entregó a ese cliente?".
       vs.slice(0, 2).forEach((v, i) => {
         out.push({
-          serie: `${v.sku || 'SKU'}-${String(900 + i).padStart(3, '0')}`,
-          barras: `779${String(v.id).padStart(4, '0')}${String(900 + i).padStart(6, '0')}`,
+          serie: this.serieDe(v.id * 40 + 900 + i),
           varianteId: v.id, estado: 'vendido', orden: `#S000${19 + i}`, desde: '28/07',
         });
       });
@@ -1307,6 +1329,31 @@ tr:hover td{background:var(--panel-2)}
     // Plazo estándar de fabricación, en días. La cotización muestra las fechas
     // que salen de acá ("entre 15/09 y el 20/09") con el plazo entre paréntesis.
     ENTREGA_DIAS: { min: 30, max: 35 },
+    // El plazo baja en cascada: lo del mueble manda; si no tiene, el de su
+    // categoría; y si tampoco, el estándar de la casa. Así una cómoda tarda lo
+    // que tardan las cómodas sin cargarlo mueble por mueble, pero el que se
+    // aparta —porque su color siempre está en stock— se pisa y listo.
+    PLAZO_KEY: 'bh_plazo_cat',
+    plazosCat() {
+      try { return JSON.parse(localStorage.getItem(this.PLAZO_KEY)) || {}; } catch { return {}; }
+    },
+    plazoCat(id) { return Number(this.plazosCat()[id]) || 0; },
+    guardarPlazoCat(id, dias) {
+      const t = this.plazosCat();
+      const n = Math.max(0, Number(dias) || 0);
+      if (n) t[id] = n; else delete t[id];
+      try { localStorage.setItem(this.PLAZO_KEY, JSON.stringify(t)); } catch {}
+    },
+    // De dónde sale el plazo de un mueble y por qué. La razón se muestra en
+    // pantalla: sin eso nadie sabe si el número lo puso alguien o lo heredó.
+    plazoDe(prod, cats = []) {
+      if (Number(prod && prod.dias)) return { dias: Number(prod.dias), de: 'mueble' };
+      for (const c of cats) {
+        const d = this.plazoCat(c.id);
+        if (d) return { dias: d, de: 'categoria', cat: c };
+      }
+      return { dias: this.ENTREGA_DIAS.max, de: 'casa' };
+    },
     ENTREGA_DEFAULT: 'entre 30 y 35 días',
     // Cuando no hay domicilio cargado no se puede cotizar el envío.
     ENVIO_SIN_DOMICILIO: 'A confirmar posteriormente',
@@ -1541,6 +1588,40 @@ tr:hover td{background:var(--panel-2)}
       return `<div class="empty"><span class="spin"></span> ${UI.esc(txt)}</div>`;
     },
     vacio(txt) { return `<div class="empty">${UI.esc(txt)}</div>`; },
+
+    // Código de barras Code 128 (juego B) dibujado como SVG. Se usa para las
+    // etiquetas de las unidades: cualquier lector de mano lo lee, admite
+    // letras y números, y ocupa poco. El EAN-13 es para la venta al público
+    // —hay que comprarle el prefijo a GS1— y ese vive en la variante.
+    C128: ('212222 222122 222221 121223 121322 131222 122213 122312 132212 221213 221312 231212 ' +
+      '112232 122132 122231 113222 123122 123221 223211 221132 221231 213212 223112 312131 311222 ' +
+      '321122 321221 312212 322112 322211 212123 212321 232121 111323 131123 131321 112313 132113 ' +
+      '132311 211313 231113 231311 112133 112331 132131 113123 113321 133121 313121 211331 231131 ' +
+      '213113 213311 213131 311123 311321 331121 312113 312311 332111 314111 221411 431111 111224 ' +
+      '111422 121124 121421 141122 141221 112214 112412 122114 122411 142112 142211 241211 221114 ' +
+      '413111 241112 134111 111242 121142 121241 114212 124112 124211 411212 421112 421211 212141 ' +
+      '214121 412121 111143 111341 131141 114113 114311 411113 411311 113141 114131 311141 411131 ' +
+      '211412 211214 211232 2331112').split(' '),
+    barras(texto, alto = 34, modulo = 1.6) {
+      const t = String(texto || '');
+      if (!t) return '';
+      const vals = [...t].map(c => c.charCodeAt(0) - 32).filter(n => n >= 0 && n < 95);
+      if (!vals.length) return '';
+      // Arranca en el juego B y cierra con el dígito de control, que es lo que
+      // hace que el lector avise si leyó mal en vez de inventar un número.
+      const suma = vals.reduce((a, v, i) => a + v * (i + 1), 104);
+      const codigos = [104, ...vals, suma % 103, 106];
+      let x = 0, barras = '';
+      codigos.forEach(c => {
+        [...UI.C128[c]].forEach((ancho, i) => {
+          const w = Number(ancho) * modulo;
+          if (i % 2 === 0) barras += `<rect x="${x}" y="0" width="${w}" height="${alto}"/>`;
+          x += w;
+        });
+      });
+      return `<svg class="cbar" viewBox="0 0 ${x} ${alto}" width="${x}" height="${alto}"
+        role="img" aria-label="Código ${UI.esc(t)}">${barras}</svg>`;
+    },
     // Pill de estado a partir de un mapa {label, pill}.
     estado(mapa, clave) {
       const e = mapa?.[clave] || { label: clave || '—', pill: 'soft' };
@@ -2510,7 +2591,8 @@ tr:hover td{background:var(--panel-2)}
           `${this.vars.length} ${this.vars.length === 1 ? 'variante' : 'variantes'} · ${this.activas().length} activas`,
           this.bloqueVariantes(true), this.vars.length > 0)
         + this.modulo('entrega', 4, 'Entrega',
-          `${this.p.instalacion ? 'Requiere instalación' : 'Sin instalación'} · `
+          `${global.DB.plazoDe(this.p, this.cats()).dias} días · `
+          + `${this.p.instalacion ? 'requiere instalación' : 'sin instalación'} · `
           + `${this.p.bultos || 1} ${(this.p.bultos || 1) === 1 ? 'bulto' : 'bultos'}`,
           this.bloqueEntrega(), true);
     },
@@ -2638,7 +2720,24 @@ tr:hover td{background:var(--panel-2)}
     // Información general y no en Otros.
     bloqueEntrega() {
       const p = this.p, ed = this.puedeEditar();
-      return `<label class="chk"><input type="checkbox" id="pd-inst" ${p.instalacion ? 'checked' : ''}
+      const cs = this.cats();
+      const pl = global.DB.plazoDe(p, cs);
+      const propia = cs[0] || null;
+      return `<div class="fr"><label for="pd-dias">Plazo de fábrica</label>
+          <div class="fx"><input id="pd-dias" inputmode="numeric" value="${UI.esc(p.dias || '')}"
+            placeholder="${pl.dias}" ${ed ? '' : 'readonly'} style="max-width:96px">
+            <span class="hint">días${p.dias ? '' : ` · heredado${pl.de === 'categoria'
+              ? ` de ${UI.esc(pl.cat.nombre)}` : ' del estándar de la casa'}`}</span></div></div>
+        <div class="fr"><label></label><span class="hint">Vacío hereda; cargado, manda. Se pisa cuando
+          este mueble se aparta del promedio de su rubro — porque siempre hay stock, o porque el color
+          que más sale se repone rápido.</span></div>
+        ${propia ? `<div class="fr"><label for="pd-diascat">Plazo de ${UI.esc(propia.nombre)}</label>
+            <div class="fx"><input id="pd-diascat" inputmode="numeric"
+              value="${global.DB.plazoCat(propia.id) || ''}"
+              placeholder="${global.DB.ENTREGA_DIAS.max}" ${ed ? '' : 'readonly'} style="max-width:96px">
+              <span class="hint">días · vale para todos los muebles de la categoría</span></div></div>` : ''}
+        <div class="pd-sep2"></div>
+        <label class="chk"><input type="checkbox" id="pd-inst" ${p.instalacion ? 'checked' : ''}
           ${ed ? '' : 'disabled'}> Requiere instalación</label>
         <div class="hint">${p.instalacion
           ? 'En la orden va a saltar solo, con <b>a convenir</b>; el costo se define en Instalaciones, no acá.'
@@ -2685,12 +2784,13 @@ tr:hover td{background:var(--panel-2)}
           </div>
           <div class="inv-tabla">
             <div class="uni-h">
-              <span>N° de serie</span><span>Código de barras</span><span>Variante</span>
+              <span>N° de serie</span><span>Etiqueta</span><span>Variante</span>
               <span>Estado</span><span>Desde</span>
             </div>
             ${lista.map(u => `<div class="uni-r ${u.estado !== 'stock' ? 'off' : ''}">
               <div class="tnum"><b>${UI.esc(u.serie)}</b></div>
-              <div class="tnum muted">${UI.esc(u.barras)}</div>
+              <div>${u.serie === '—' ? '<span class="muted">sin etiqueta todavía</span>'
+                : UI.barras(u.serie, 26, 1.15)}</div>
               <div>${UI.esc(nom(u.varianteId))}</div>
               <div><span class="pill ${est(u.estado).pill}">${UI.esc(est(u.estado).label)}${
                 u.orden ? ` · ${UI.esc(u.orden)}` : ''}</span></div>
@@ -2698,8 +2798,8 @@ tr:hover td{background:var(--panel-2)}
             </div>`).join('') || UI.vacio('Ninguna unidad en ese estado.')}
           </div>
           <div class="hint" style="margin-top:9px"><b>Por entrar</b> es lo pedido al proveedor que
-            todavía no llegó: ya está comprometido pero no se puede entregar. Las series son de ejemplo
-            hasta que definamos cómo se numeran.</div>
+            todavía no llegó: ya está comprometido pero no se puede entregar, y todavía no tiene
+            etiqueta —la recibe cuando entra al depósito—.</div>
         </div>` : ''}
       </section>
       <section style="display:none">`;
@@ -2718,8 +2818,25 @@ tr:hover td{background:var(--panel-2)}
         <div class="fr"><label for="pd-track">Se rastrea</label>
           <select id="pd-track" ${ed ? '' : 'disabled'}>${this.RASTREO.map(x =>
             `<option value="${x.k}" ${modo === x.k ? 'selected' : ''}>${UI.esc(x.label)}</option>`).join('')}</select></div>
-        <div class="fr"><label></label><span class="hint">${UI.esc(elegido.pie)}${modo === 'serie'
-          ? ' Cada unidad va a necesitar su <b>código de barras</b>; falta definir cómo se numeran.' : ''}</span></div>
+        <div class="fr"><label></label><span class="hint">${UI.esc(elegido.pie)}</span></div>
+        ${modo === 'serie' ? `<div class="pd-sep2"></div>
+          <div class="cx-h2">Cómo se numeran</div>
+          <div class="etiq">
+            <div class="etiq-a">
+              <div class="etiq-b">${UI.barras(global.DB.proximaSerie(), 40, 1.6)}</div>
+              <div class="etiq-n tnum">${UI.esc(global.DB.proximaSerie())}</div>
+            </div>
+            <div class="hint">Un <b>correlativo único para toda la empresa</b>, no uno por mueble: el
+              próximo que sale es el ${UI.esc(global.DB.proximaSerie())}. El número no lleva adentro el
+              mueble ni la medida a propósito —el sistema ya sabe de qué unidad se trata al leerlo, y
+              meterlo sólo alarga la etiqueta—. Se imprime en <b>Code 128</b>, que es lo que lee
+              cualquier lector de mano y admite letras: se escanea igual cuando la unidad
+              <b>entra</b> al depósito que cuando <b>sale</b> en una orden. La etiqueta se genera al
+              recibir la unidad, no antes.</div>
+          </div>
+          <div class="hint" style="margin-top:9px">El <b>EAN-13</b> de cada variante es otra cosa y
+            está en la tabla de abajo: ese es para la venta al público y Tienda Nube, e identifica el
+            modelo —no la unidad—.</div>` : ''}
         <div class="hint" style="margin-top:9px">A quién se le pide y con qué —dibujo o planilla— se
           define en <b>Producción</b>: cada rubro se pide a su manera.</div>
       </section>
@@ -3685,6 +3802,17 @@ tr:hover td{background:var(--panel-2)}
         el.onchange = () => { p[campo] = el.value.trim(); this.guardar(); };
       });
       const bul = g('pd-bultos');
+      const dias = g('pd-dias');
+      if (dias && ed) dias.onchange = () => {
+        p.dias = Math.max(0, Number(String(dias.value).replace(/[^\d]/g, '')) || 0) || null;
+        this.guardar(); this.pintar();
+      };
+      const diasc = g('pd-diascat');
+      if (diasc && ed) diasc.onchange = () => {
+        const c = this.cats()[0]; if (!c) return;
+        global.DB.guardarPlazoCat(c.id, String(diasc.value).replace(/[^\d]/g, ''));
+        this.pintar();
+      };
       if (bul && ed) bul.onchange = () => {
         p.bultos = Math.max(0, Number(String(bul.value).replace(/[^\d]/g, '')) || 0); this.guardar();
       };
@@ -5292,9 +5420,17 @@ tr:hover td{background:var(--panel-2)}
         .inv-head,.inv-r{display:grid;min-width:860px;
           grid-template-columns:minmax(190px,1fr) 158px 132px 78px 104px 90px;gap:10px;align-items:center}
         .inv-r .pn.izq{text-align:left;font-size:11.5px}
+        /* La etiqueta de una unidad, como se va a imprimir. */
+        .etiq{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+        .etiq-a{border:1px solid var(--line);border-radius:8px;padding:9px 12px;background:#fff;
+          text-align:center;flex:none}
+        .etiq-n{font-size:12px;font-weight:700;color:#000;letter-spacing:.06em;margin-top:3px}
+        .etiq .hint{flex:1;min-width:240px}
+        .cbar rect{fill:#000}
+        .uni-r .cbar{display:block;max-width:100%}
         .inv-r.off{opacity:.5}
-        .uni-h,.uni-r{display:grid;min-width:640px;gap:10px;align-items:center;
-          grid-template-columns:150px 130px minmax(0,1fr) 130px 60px}
+        .uni-h,.uni-r{display:grid;min-width:700px;gap:10px;align-items:center;
+          grid-template-columns:122px 176px minmax(0,1fr) 130px 60px}
         .uni-h{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);
           font-weight:700;padding-bottom:7px;border-bottom:1px solid var(--line)}
         .uni-r{padding:7px 0;border-bottom:1px solid var(--line-soft);font-size:12px}

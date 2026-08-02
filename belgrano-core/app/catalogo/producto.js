@@ -192,7 +192,8 @@
           `${this.vars.length} ${this.vars.length === 1 ? 'variante' : 'variantes'} · ${this.activas().length} activas`,
           this.bloqueVariantes(true), this.vars.length > 0)
         + this.modulo('entrega', 4, 'Entrega',
-          `${this.p.instalacion ? 'Requiere instalación' : 'Sin instalación'} · `
+          `${global.DB.plazoDe(this.p, this.cats()).dias} días · `
+          + `${this.p.instalacion ? 'requiere instalación' : 'sin instalación'} · `
           + `${this.p.bultos || 1} ${(this.p.bultos || 1) === 1 ? 'bulto' : 'bultos'}`,
           this.bloqueEntrega(), true);
     },
@@ -320,7 +321,24 @@
     // Información general y no en Otros.
     bloqueEntrega() {
       const p = this.p, ed = this.puedeEditar();
-      return `<label class="chk"><input type="checkbox" id="pd-inst" ${p.instalacion ? 'checked' : ''}
+      const cs = this.cats();
+      const pl = global.DB.plazoDe(p, cs);
+      const propia = cs[0] || null;
+      return `<div class="fr"><label for="pd-dias">Plazo de fábrica</label>
+          <div class="fx"><input id="pd-dias" inputmode="numeric" value="${UI.esc(p.dias || '')}"
+            placeholder="${pl.dias}" ${ed ? '' : 'readonly'} style="max-width:96px">
+            <span class="hint">días${p.dias ? '' : ` · heredado${pl.de === 'categoria'
+              ? ` de ${UI.esc(pl.cat.nombre)}` : ' del estándar de la casa'}`}</span></div></div>
+        <div class="fr"><label></label><span class="hint">Vacío hereda; cargado, manda. Se pisa cuando
+          este mueble se aparta del promedio de su rubro — porque siempre hay stock, o porque el color
+          que más sale se repone rápido.</span></div>
+        ${propia ? `<div class="fr"><label for="pd-diascat">Plazo de ${UI.esc(propia.nombre)}</label>
+            <div class="fx"><input id="pd-diascat" inputmode="numeric"
+              value="${global.DB.plazoCat(propia.id) || ''}"
+              placeholder="${global.DB.ENTREGA_DIAS.max}" ${ed ? '' : 'readonly'} style="max-width:96px">
+              <span class="hint">días · vale para todos los muebles de la categoría</span></div></div>` : ''}
+        <div class="pd-sep2"></div>
+        <label class="chk"><input type="checkbox" id="pd-inst" ${p.instalacion ? 'checked' : ''}
           ${ed ? '' : 'disabled'}> Requiere instalación</label>
         <div class="hint">${p.instalacion
           ? 'En la orden va a saltar solo, con <b>a convenir</b>; el costo se define en Instalaciones, no acá.'
@@ -367,12 +385,13 @@
           </div>
           <div class="inv-tabla">
             <div class="uni-h">
-              <span>N° de serie</span><span>Código de barras</span><span>Variante</span>
+              <span>N° de serie</span><span>Etiqueta</span><span>Variante</span>
               <span>Estado</span><span>Desde</span>
             </div>
             ${lista.map(u => `<div class="uni-r ${u.estado !== 'stock' ? 'off' : ''}">
               <div class="tnum"><b>${UI.esc(u.serie)}</b></div>
-              <div class="tnum muted">${UI.esc(u.barras)}</div>
+              <div>${u.serie === '—' ? '<span class="muted">sin etiqueta todavía</span>'
+                : UI.barras(u.serie, 26, 1.15)}</div>
               <div>${UI.esc(nom(u.varianteId))}</div>
               <div><span class="pill ${est(u.estado).pill}">${UI.esc(est(u.estado).label)}${
                 u.orden ? ` · ${UI.esc(u.orden)}` : ''}</span></div>
@@ -380,8 +399,8 @@
             </div>`).join('') || UI.vacio('Ninguna unidad en ese estado.')}
           </div>
           <div class="hint" style="margin-top:9px"><b>Por entrar</b> es lo pedido al proveedor que
-            todavía no llegó: ya está comprometido pero no se puede entregar. Las series son de ejemplo
-            hasta que definamos cómo se numeran.</div>
+            todavía no llegó: ya está comprometido pero no se puede entregar, y todavía no tiene
+            etiqueta —la recibe cuando entra al depósito—.</div>
         </div>` : ''}
       </section>
       <section style="display:none">`;
@@ -400,8 +419,25 @@
         <div class="fr"><label for="pd-track">Se rastrea</label>
           <select id="pd-track" ${ed ? '' : 'disabled'}>${this.RASTREO.map(x =>
             `<option value="${x.k}" ${modo === x.k ? 'selected' : ''}>${UI.esc(x.label)}</option>`).join('')}</select></div>
-        <div class="fr"><label></label><span class="hint">${UI.esc(elegido.pie)}${modo === 'serie'
-          ? ' Cada unidad va a necesitar su <b>código de barras</b>; falta definir cómo se numeran.' : ''}</span></div>
+        <div class="fr"><label></label><span class="hint">${UI.esc(elegido.pie)}</span></div>
+        ${modo === 'serie' ? `<div class="pd-sep2"></div>
+          <div class="cx-h2">Cómo se numeran</div>
+          <div class="etiq">
+            <div class="etiq-a">
+              <div class="etiq-b">${UI.barras(global.DB.proximaSerie(), 40, 1.6)}</div>
+              <div class="etiq-n tnum">${UI.esc(global.DB.proximaSerie())}</div>
+            </div>
+            <div class="hint">Un <b>correlativo único para toda la empresa</b>, no uno por mueble: el
+              próximo que sale es el ${UI.esc(global.DB.proximaSerie())}. El número no lleva adentro el
+              mueble ni la medida a propósito —el sistema ya sabe de qué unidad se trata al leerlo, y
+              meterlo sólo alarga la etiqueta—. Se imprime en <b>Code 128</b>, que es lo que lee
+              cualquier lector de mano y admite letras: se escanea igual cuando la unidad
+              <b>entra</b> al depósito que cuando <b>sale</b> en una orden. La etiqueta se genera al
+              recibir la unidad, no antes.</div>
+          </div>
+          <div class="hint" style="margin-top:9px">El <b>EAN-13</b> de cada variante es otra cosa y
+            está en la tabla de abajo: ese es para la venta al público y Tienda Nube, e identifica el
+            modelo —no la unidad—.</div>` : ''}
         <div class="hint" style="margin-top:9px">A quién se le pide y con qué —dibujo o planilla— se
           define en <b>Producción</b>: cada rubro se pide a su manera.</div>
       </section>
@@ -1367,6 +1403,17 @@
         el.onchange = () => { p[campo] = el.value.trim(); this.guardar(); };
       });
       const bul = g('pd-bultos');
+      const dias = g('pd-dias');
+      if (dias && ed) dias.onchange = () => {
+        p.dias = Math.max(0, Number(String(dias.value).replace(/[^\d]/g, '')) || 0) || null;
+        this.guardar(); this.pintar();
+      };
+      const diasc = g('pd-diascat');
+      if (diasc && ed) diasc.onchange = () => {
+        const c = this.cats()[0]; if (!c) return;
+        global.DB.guardarPlazoCat(c.id, String(diasc.value).replace(/[^\d]/g, ''));
+        this.pintar();
+      };
       if (bul && ed) bul.onchange = () => {
         p.bultos = Math.max(0, Number(String(bul.value).replace(/[^\d]/g, '')) || 0); this.guardar();
       };
@@ -2974,9 +3021,17 @@
         .inv-head,.inv-r{display:grid;min-width:860px;
           grid-template-columns:minmax(190px,1fr) 158px 132px 78px 104px 90px;gap:10px;align-items:center}
         .inv-r .pn.izq{text-align:left;font-size:11.5px}
+        /* La etiqueta de una unidad, como se va a imprimir. */
+        .etiq{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+        .etiq-a{border:1px solid var(--line);border-radius:8px;padding:9px 12px;background:#fff;
+          text-align:center;flex:none}
+        .etiq-n{font-size:12px;font-weight:700;color:#000;letter-spacing:.06em;margin-top:3px}
+        .etiq .hint{flex:1;min-width:240px}
+        .cbar rect{fill:#000}
+        .uni-r .cbar{display:block;max-width:100%}
         .inv-r.off{opacity:.5}
-        .uni-h,.uni-r{display:grid;min-width:640px;gap:10px;align-items:center;
-          grid-template-columns:150px 130px minmax(0,1fr) 130px 60px}
+        .uni-h,.uni-r{display:grid;min-width:700px;gap:10px;align-items:center;
+          grid-template-columns:122px 176px minmax(0,1fr) 130px 60px}
         .uni-h{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);
           font-weight:700;padding-bottom:7px;border-bottom:1px solid var(--line)}
         .uni-r{padding:7px 0;border-bottom:1px solid var(--line-soft);font-size:12px}

@@ -775,6 +775,39 @@ Compra y venta · Documentos · Contabilidad.
 - ✅ 345. Los desplegables no van más pegados: entre un renglón y el que sigue
   hay separación en toda la app.
 
+### Lote 27 — APLICADO (Cómo se numera una unidad y cuánto tarda)
+
+**Número de serie y etiqueta** — decidido acá, no pedido
+- ✅ 346. **Un correlativo único para toda la empresa**: `BH-000123`. No uno por
+  mueble. Un solo contador no se pisa nunca, no hay que llevar la cuenta modelo
+  por modelo, y la etiqueta queda corta.
+- ✅ 347. El número **no lleva adentro el mueble ni la medida**: al leerlo el
+  sistema ya sabe de qué unidad se trata, de qué mueble es, en qué orden salió y
+  dónde está. Meterlo en el código sólo alarga la etiqueta.
+- ✅ 348. Se imprime en **Code 128**, que es lo que lee cualquier lector de mano
+  —admite letras, es compacto y lleva dígito de control, así que si lee mal
+  avisa en vez de inventar un número—. Se escanea igual cuando la unidad
+  **entra** al depósito que cuando **sale** en una orden.
+- ✅ 349. La etiqueta **se genera al recibir la unidad**, no antes: lo que está
+  *por entrar* todavía no tiene número.
+- ✅ 350. El **EAN-13 de la variante es otra cosa** y sigue donde estaba: ese es
+  para la venta al público y Tienda Nube, e identifica el modelo, no la unidad.
+- ✅ 351. Inventario muestra **la etiqueta como se va a imprimir** —código de
+  barras de verdad, dibujado por el sistema— y el listado de unidades lleva el
+  suyo en cada renglón.
+
+**Plazo de entrega**
+- ✅ 352. Baja en cascada: **el del mueble manda**; si no tiene, **el de su
+  categoría**; y si tampoco, el estándar de la casa. En pantalla dice de dónde
+  salió, así nadie duda si el número lo puso alguien o lo heredó.
+- ✅ 353. Los dos se cargan desde el mueble, en **Entrega**: el suyo y el de su
+  categoría —que vale para todos los muebles de esa categoría—.
+
+**Lo que se decidió NO hacer**
+- ❌ 354. Que el sistema sepa **qué parte hace cada rubro** cuando son dos. No
+  aporta: el dibujo y la planilla de cada uno ya dicen qué tiene que fabricar.
+  Cargarlo sería escribir dos veces lo mismo.
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·
