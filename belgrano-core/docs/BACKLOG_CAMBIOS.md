@@ -556,6 +556,28 @@ distintas.
 - **Proveedor destacado**: queda para más adelante. Hoy todos los del rubro son
   pares.
 
+### Lote 19 — APLICADO (Planillas reutilizables)
+
+Una planilla se arma **una vez** y se usa en todos los muebles que se piden
+igual. La de respaldos vale para los 40 respaldos: no se diseñan 40 distintas.
+
+- ✅ 290. **Catálogo → Planillas**: todas juntas en un solo lado, con cuántos
+  muebles usa cada una. Se crean, se editan y se borran desde ahí — y no se
+  puede borrar una que esté en uso.
+- ✅ 291. Cada rubro de cada mueble **elige** su planilla de una lista, o usa
+  columnas propias ("Sólo para este mueble"). Con **Guardar como planilla** las
+  columnas de un mueble pasan a ser reutilizables.
+- ✅ 292. **Editar la planilla le llega a todos** los muebles que la usan, y el
+  bloque lo avisa antes: *"Usa la planilla Respaldos, que comparten 12 muebles.
+  Lo que cambies acá se cambia para todos ellos."*
+- ✅ 293. Si un mueble **no tiene** la propiedad de una columna, esa columna le
+  queda **vacía** — igual que hoy en el papel, cuando a esa silla no hay que
+  aclararle el color del respaldo. Se marca con borde punteado y dice
+  "no la tiene", y abajo lista cuáles no aplican.
+- ✅ 294. Vienen cargadas las dos de referencia: **Respaldos** (estado, modelo,
+  medida, alto, tela, color, obs) y **Sillas** (estado, modelo, material,
+  color, color de pata, cant., obs).
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·

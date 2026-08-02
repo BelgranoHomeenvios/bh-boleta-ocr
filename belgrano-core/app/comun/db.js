@@ -605,6 +605,67 @@
     // dice de dónde sale su valor, y por eso el renglón se puede llenar solo
     // cuando se vende: la orden pone el número, el mueble pone el modelo y la
     // variante pone sus propiedades.
+    // Las planillas son PLANTILLAS reutilizables: la de respaldos se usa en
+    // los 40 respaldos, no se diseña una por mueble. Si un mueble no tiene la
+    // propiedad de una columna, ese casillero le queda vacío — que es
+    // justamente lo que pasa hoy en el papel.
+    PLAN_KEY: 'bh_planillas',
+    PLAN_BASE: [
+      { k: 'respaldos', nombre: 'Respaldos', cols: [
+        { label: 'ESTADO', origen: 'orden' },
+        { label: 'MODELO', origen: 'producto', campo: 'nombre' },
+        { label: 'MEDIDA', origen: 'propiedad', campo: 'medida' },
+        { label: 'ALTO', origen: 'propiedad', campo: 'alto' },
+        { label: 'TELA', origen: 'propiedad', campo: 'tela' },
+        { label: 'COLOR', origen: 'propiedad', campo: 'color' },
+        { label: 'OBS', origen: 'libre' },
+      ] },
+      { k: 'sillas', nombre: 'Sillas', cols: [
+        { label: 'ESTADO', origen: 'orden' },
+        { label: 'MODELO', origen: 'producto', campo: 'nombre' },
+        { label: 'MATERIAL', origen: 'propiedad', campo: 'material' },
+        { label: 'COLOR', origen: 'propiedad', campo: 'color' },
+        { label: 'COLOR DE PATA', origen: 'propiedad', campo: 'colorpata' },
+        { label: 'CANT.', origen: 'cantidad' },
+        { label: 'OBS', origen: 'libre' },
+      ] },
+    ],
+    planillas() {
+      let guardadas = [];
+      try { guardadas = JSON.parse(localStorage.getItem(this.PLAN_KEY)) || []; } catch {}
+      const mapa = new Map(this.PLAN_BASE.map(x => [x.k, JSON.parse(JSON.stringify(x))]));
+      guardadas.forEach(g => mapa.set(g.k, g));
+      return [...mapa.values()].filter(x => !x.oculta);
+    },
+    planilla(k) { return this.planillas().find(x => x.k === k) || null; },
+    // Guarda una plantilla. Si la clave ya existe, la pisa: editar la de
+    // respaldos cambia la de todos los respaldos, que es la idea.
+    guardarPlanilla(nombre, cols, k) {
+      const n = String(nombre || '').trim(); if (!n) return null;
+      const clave = k || slug(n);
+      let guardadas = [];
+      try { guardadas = JSON.parse(localStorage.getItem(this.PLAN_KEY)) || []; } catch {}
+      const i = guardadas.findIndex(x => x.k === clave);
+      const reg = { k: clave, nombre: n, cols: JSON.parse(JSON.stringify(cols || [])) };
+      if (i >= 0) guardadas[i] = reg; else guardadas.push(reg);
+      try { localStorage.setItem(this.PLAN_KEY, JSON.stringify(guardadas)); } catch {}
+      return reg;
+    },
+    borrarPlanilla(k) {
+      let guardadas = [];
+      try { guardadas = JSON.parse(localStorage.getItem(this.PLAN_KEY)) || []; } catch {}
+      guardadas = guardadas.filter(x => x.k !== k);
+      // Las de fábrica no se borran de verdad: se ocultan guardándolas vacías.
+      if (this.PLAN_BASE.some(x => x.k === k)) guardadas.push({ k, nombre: '', cols: [], oculta: true });
+      try { localStorage.setItem(this.PLAN_KEY, JSON.stringify(guardadas)); } catch {}
+    },
+
+    // Cuántos muebles usan una plantilla, para avisar antes de tocarla.
+    usosPlanilla(k) {
+      return DEMO.productos.filter(p => (p.rubros || [])
+        .some(r => r && r.plantilla === k)).length;
+    },
+
     ORIGENES: [
       { k: 'orden', label: 'De la orden', pie: 'N° de venta, o STOCK si es para reponer.' },
       { k: 'producto', label: 'Del mueble', pie: 'El nombre o el código del mueble.' },
@@ -643,7 +704,7 @@
         // A qué rubros se les pide, en orden. Cada uno con lo suyo: cómo se
         // le pide y, si es por planilla, qué columnas lleva la de ÉL.
         nProveedores: 1,
-        rubros: [{ k: 'carpinteria', modo: 'dibujo', planilla: null }],
+        rubros: [{ k: 'carpinteria', modo: 'dibujo', plantilla: null, planilla: null }],
         instalacion: false,
         // Cada mueble es distinto: 12 mesas de luz iguales son 12 unidades
         // distintas, y hay que saber cuál salió en cada orden.

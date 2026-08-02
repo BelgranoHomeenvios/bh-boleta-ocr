@@ -43,6 +43,7 @@
       S('productos', 'Productos', m => global.Catalogo.render(m)),
       S('familias', 'Familias', skel('Familias')),
       S('variantes', 'Variantes', skel('Variantes')),
+      S('planillas', 'Planillas', m => global.Planillas.render(m)),
       S('materiales', 'Materiales', skel('Materiales')),
       S('colores', 'Colores', skel('Colores')),
       S('herrajes', 'Herrajes', skel('Herrajes')),

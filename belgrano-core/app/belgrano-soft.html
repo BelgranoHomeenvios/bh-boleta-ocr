@@ -818,6 +818,67 @@ tr:hover td{background:var(--panel-2)}
     // dice de dónde sale su valor, y por eso el renglón se puede llenar solo
     // cuando se vende: la orden pone el número, el mueble pone el modelo y la
     // variante pone sus propiedades.
+    // Las planillas son PLANTILLAS reutilizables: la de respaldos se usa en
+    // los 40 respaldos, no se diseña una por mueble. Si un mueble no tiene la
+    // propiedad de una columna, ese casillero le queda vacío — que es
+    // justamente lo que pasa hoy en el papel.
+    PLAN_KEY: 'bh_planillas',
+    PLAN_BASE: [
+      { k: 'respaldos', nombre: 'Respaldos', cols: [
+        { label: 'ESTADO', origen: 'orden' },
+        { label: 'MODELO', origen: 'producto', campo: 'nombre' },
+        { label: 'MEDIDA', origen: 'propiedad', campo: 'medida' },
+        { label: 'ALTO', origen: 'propiedad', campo: 'alto' },
+        { label: 'TELA', origen: 'propiedad', campo: 'tela' },
+        { label: 'COLOR', origen: 'propiedad', campo: 'color' },
+        { label: 'OBS', origen: 'libre' },
+      ] },
+      { k: 'sillas', nombre: 'Sillas', cols: [
+        { label: 'ESTADO', origen: 'orden' },
+        { label: 'MODELO', origen: 'producto', campo: 'nombre' },
+        { label: 'MATERIAL', origen: 'propiedad', campo: 'material' },
+        { label: 'COLOR', origen: 'propiedad', campo: 'color' },
+        { label: 'COLOR DE PATA', origen: 'propiedad', campo: 'colorpata' },
+        { label: 'CANT.', origen: 'cantidad' },
+        { label: 'OBS', origen: 'libre' },
+      ] },
+    ],
+    planillas() {
+      let guardadas = [];
+      try { guardadas = JSON.parse(localStorage.getItem(this.PLAN_KEY)) || []; } catch {}
+      const mapa = new Map(this.PLAN_BASE.map(x => [x.k, JSON.parse(JSON.stringify(x))]));
+      guardadas.forEach(g => mapa.set(g.k, g));
+      return [...mapa.values()].filter(x => !x.oculta);
+    },
+    planilla(k) { return this.planillas().find(x => x.k === k) || null; },
+    // Guarda una plantilla. Si la clave ya existe, la pisa: editar la de
+    // respaldos cambia la de todos los respaldos, que es la idea.
+    guardarPlanilla(nombre, cols, k) {
+      const n = String(nombre || '').trim(); if (!n) return null;
+      const clave = k || slug(n);
+      let guardadas = [];
+      try { guardadas = JSON.parse(localStorage.getItem(this.PLAN_KEY)) || []; } catch {}
+      const i = guardadas.findIndex(x => x.k === clave);
+      const reg = { k: clave, nombre: n, cols: JSON.parse(JSON.stringify(cols || [])) };
+      if (i >= 0) guardadas[i] = reg; else guardadas.push(reg);
+      try { localStorage.setItem(this.PLAN_KEY, JSON.stringify(guardadas)); } catch {}
+      return reg;
+    },
+    borrarPlanilla(k) {
+      let guardadas = [];
+      try { guardadas = JSON.parse(localStorage.getItem(this.PLAN_KEY)) || []; } catch {}
+      guardadas = guardadas.filter(x => x.k !== k);
+      // Las de fábrica no se borran de verdad: se ocultan guardándolas vacías.
+      if (this.PLAN_BASE.some(x => x.k === k)) guardadas.push({ k, nombre: '', cols: [], oculta: true });
+      try { localStorage.setItem(this.PLAN_KEY, JSON.stringify(guardadas)); } catch {}
+    },
+
+    // Cuántos muebles usan una plantilla, para avisar antes de tocarla.
+    usosPlanilla(k) {
+      return DEMO.productos.filter(p => (p.rubros || [])
+        .some(r => r && r.plantilla === k)).length;
+    },
+
     ORIGENES: [
       { k: 'orden', label: 'De la orden', pie: 'N° de venta, o STOCK si es para reponer.' },
       { k: 'producto', label: 'Del mueble', pie: 'El nombre o el código del mueble.' },
@@ -856,7 +917,7 @@ tr:hover td{background:var(--panel-2)}
         // A qué rubros se les pide, en orden. Cada uno con lo suyo: cómo se
         // le pide y, si es por planilla, qué columnas lleva la de ÉL.
         nProveedores: 1,
-        rubros: [{ k: 'carpinteria', modo: 'dibujo', planilla: null }],
+        rubros: [{ k: 'carpinteria', modo: 'dibujo', plantilla: null, planilla: null }],
         instalacion: false,
         // Cada mueble es distinto: 12 mesas de luz iguales son 12 unidades
         // distintas, y hay que saber cuál salió en cada orden.
@@ -2592,8 +2653,9 @@ tr:hover td{background:var(--panel-2)}
       return Array.from({ length: n }, (_, i) => {
         const r = crudos[i];
         // Los muebles viejos guardaban sólo la clave del rubro.
-        if (typeof r === 'string') return { k: r, modo: 'dibujo', planilla: null };
-        return { k: (r && r.k) || '', modo: (r && r.modo) || 'dibujo', planilla: (r && r.planilla) || null };
+        if (typeof r === 'string') return { k: r, modo: 'dibujo', plantilla: null, planilla: null };
+        return { k: (r && r.k) || '', modo: (r && r.modo) || 'dibujo',
+          plantilla: (r && r.plantilla) || null, planilla: (r && r.planilla) || null };
       });
     },
     nombreRubro(k) { const r = global.DB.rubro(k); return r ? r.label : 'Sin definir'; },
@@ -2640,10 +2702,14 @@ tr:hover td{background:var(--panel-2)}
           <b>${UI.esc(this.nombreRubro(r.k))}</b>. Sale de los archivos de producción de Documentos.</div>`;
     },
 
-    // La planilla de UN rubro. Se define por mueble porque cada mueble se pide
-    // siempre igual; después, al juntar varios en un pedido, Producción une
-    // las columnas y deja vacías las que ese mueble no usa.
+    // Las columnas de la planilla de un rubro. Si tiene una PLANTILLA elegida,
+    // las columnas salen de ahí: la de respaldos se usa en los 40 respaldos y
+    // se edita en un solo lado. Si no, son propias de este mueble.
     planillaDe(r) {
+      if (r && r.plantilla) {
+        const t = global.DB.planilla(r.plantilla);
+        if (t) return t.cols;
+      }
       if (r && r.planilla) return r.planilla;
       return [
         { label: 'ESTADO', origen: 'orden' },
@@ -2665,32 +2731,62 @@ tr:hover td{background:var(--panel-2)}
       const cols = this.planillaDe(r);
       const ed = this.puedeEditar();
       const lista = this.ordenadas().slice(0, 3);
+      const t = r.plantilla ? global.DB.planilla(r.plantilla) : null;
+      const usos = t ? global.DB.usosPlanilla(t.k) : 0;
+      const mias = this.props().map(x => x.k);
+      // Una columna de la plantilla que este mueble no tiene queda vacía —
+      // igual que hoy en el papel, cuando a esa silla no hay que aclararle el
+      // color del respaldo.
+      const sinPropiedad = cols.filter(c => c.origen === 'propiedad' && !mias.includes(c.campo));
+
       return `<div class="pd-sepl"></div>
         <div class="ad-t">Planilla de pedido para ${UI.esc(this.nombreRubro(r.k))}</div>
-        <div class="hint" style="margin-bottom:9px">Cada columna dice de dónde sale su valor, y por eso
-          el renglón se llena solo cuando se vende.</div>
-        <div class="pl-cols" data-cols="${i}">
-          ${cols.map((c, j) => `<div class="pl-col" draggable="${ed}" data-col="${j}">
-            ${ed ? '<span class="vr-drag">⠿</span>' : ''}
-            <input class="pl-lbl" data-collbl="${i}|${j}" value="${UI.esc(c.label)}" ${ed ? '' : 'readonly'}>
-            <select data-colorig="${i}|${j}" ${ed ? '' : 'disabled'}>${global.DB.ORIGENES.map(o =>
-              `<option value="${o.k}" ${c.origen === o.k ? 'selected' : ''}>${UI.esc(o.label)}</option>`).join('')}</select>
-            ${c.origen === 'propiedad' ? `<select data-colcampo="${i}|${j}" ${ed ? '' : 'disabled'}>${
-              this.props().map(pr => `<option value="${pr.k}" ${c.campo === pr.k ? 'selected' : ''}
-                >${UI.esc(pr.nombre)}</option>`).join('')}</select>` : ''}
-            ${c.origen === 'producto' ? `<select data-colcampo="${i}|${j}" ${ed ? '' : 'disabled'}>
-              <option value="nombre" ${c.campo === 'nombre' ? 'selected' : ''}>Nombre</option>
-              <option value="sku" ${c.campo === 'sku' ? 'selected' : ''}>Código</option></select>` : ''}
-            ${ed ? `<button class="lx" data-quitarcol="${i}|${j}" title="Quitar">✕</button>` : ''}
-          </div>`).join('')}
+        <div class="fx" style="margin-bottom:9px">
+          <select data-plantilla="${i}" ${ed ? '' : 'disabled'}>
+            <option value="">Sólo para este mueble</option>
+            ${global.DB.planillas().map(x => `<option value="${x.k}" ${r.plantilla === x.k ? 'selected' : ''}
+              >${UI.esc(x.nombre)}</option>`).join('')}
+          </select>
+          ${ed ? `<button class="btn" data-guardarpl="${i}">＋ Guardar como planilla</button>` : ''}
+        </div>
+        ${t ? `<div class="banner info">Usa la planilla <b>${UI.esc(t.nombre)}</b>${usos > 1
+            ? `, que comparten <b>${usos}</b> muebles` : ''}. Lo que cambies acá se cambia para
+            ${usos > 1 ? 'todos ellos' : 'todos los que la usen'}.</div>`
+          : '<div class="hint">Estas columnas valen sólo para este mueble. Guardala como planilla si la vas a repetir.</div>'}
+
+        <div class="pl-cols" data-cols="${i}" style="margin-top:9px">
+          ${cols.map((c, j) => {
+            const huerfana = c.origen === 'propiedad' && !mias.includes(c.campo);
+            return `<div class="pl-col ${huerfana ? 'vacia' : ''}" draggable="${ed}" data-col="${j}">
+              ${ed ? '<span class="vr-drag">⠿</span>' : ''}
+              <input class="pl-lbl" data-collbl="${i}|${j}" value="${UI.esc(c.label)}" ${ed ? '' : 'readonly'}>
+              <select data-colorig="${i}|${j}" ${ed ? '' : 'disabled'}>${global.DB.ORIGENES.map(o =>
+                `<option value="${o.k}" ${c.origen === o.k ? 'selected' : ''}>${UI.esc(o.label)}</option>`).join('')}</select>
+              ${c.origen === 'propiedad' ? `<select data-colcampo="${i}|${j}" ${ed ? '' : 'disabled'}>
+                ${huerfana ? `<option value="${UI.esc(c.campo || '')}" selected>${UI.esc(c.campo || '—')} · no la tiene</option>` : ''}
+                ${this.props().map(pr => `<option value="${pr.k}" ${c.campo === pr.k ? 'selected' : ''}
+                  >${UI.esc(pr.nombre)}</option>`).join('')}</select>` : ''}
+              ${c.origen === 'producto' ? `<select data-colcampo="${i}|${j}" ${ed ? '' : 'disabled'}>
+                <option value="nombre" ${c.campo === 'nombre' ? 'selected' : ''}>Nombre</option>
+                <option value="sku" ${c.campo === 'sku' ? 'selected' : ''}>Código</option></select>` : ''}
+              ${ed ? `<button class="lx" data-quitarcol="${i}|${j}" title="Quitar">✕</button>` : ''}
+            </div>`;
+          }).join('')}
         </div>
         ${ed ? `<button class="btn" data-addcol="${i}" style="margin-top:9px">⊞ Agregar columna</button>` : ''}
+        ${sinPropiedad.length ? `<div class="hint" style="margin-top:8px">
+          <b>${sinPropiedad.map(c => c.label).join(' · ')}</b>
+          ${sinPropiedad.length === 1 ? 'no aplica' : 'no aplican'} a este mueble: ${
+          sinPropiedad.length === 1 ? 'esa columna le queda vacía' : 'esas columnas le quedan vacías'},
+          igual que en el papel.</div>` : ''}
+
         <div class="ad-t" style="margin-top:13px">Así se va a ver el pedido</div>
         <div class="pl-prev"><table>
           <thead><tr>${cols.map(c => `<th>${UI.esc(c.label)}</th>`).join('')}</tr></thead>
-          <tbody>${lista.map(v => `<tr>${cols.map(c =>
-            `<td class="${c.origen === 'libre' ? 'muted' : ''}">${UI.esc(this.valorPlanilla(c, v) || '—')}</td>`
-          ).join('')}</tr>`).join('')}</tbody>
+          <tbody>${lista.map(v => `<tr>${cols.map(c => {
+            const val = this.valorPlanilla(c, v);
+            return `<td class="${val ? '' : 'muted'}">${UI.esc(val || '—')}</td>`;
+          }).join('')}</tr>`).join('')}</tbody>
         </table></div>
         <div class="hint" style="margin-top:8px">En <b>ESTADO</b> va el número de venta, o <b>STOCK</b>
           si se pide para reponer. Cuando se junten varios muebles en un pedido a
@@ -3102,6 +3198,13 @@ tr:hover td{background:var(--panel-2)}
         rub(Number(sl.dataset.modo)).modo = sl.value;
         this.guardar(); this.pintar();
       });
+      document.querySelectorAll('[data-plantilla]').forEach(sl => sl.onchange = () => {
+        const r = rub(Number(sl.dataset.plantilla));
+        r.plantilla = sl.value || null;
+        this.guardar(); this.pintar();
+      });
+      document.querySelectorAll('[data-guardarpl]').forEach(b => b.onclick = () =>
+        this.modalGuardarPlanilla(Number(b.dataset.guardarpl)));
       document.querySelectorAll('[data-nuevoprov]').forEach(b => b.onclick = () =>
         this.modalProveedor(b.dataset.nuevoprov));
       document.querySelectorAll('[data-plano]').forEach(b => b.onclick = () => {
@@ -4124,18 +4227,35 @@ tr:hover td{background:var(--panel-2)}
     engancharPlanilla() {
       if (!document.querySelector('.pl-cols')) return;
       const ed = this.puedeEditar(); if (!ed) return;
+      // Devuelve las columnas que hay que editar. Si el rubro usa una
+      // plantilla, se editan las de la plantilla —y el cambio le llega a
+      // todos los muebles que la usan—; si no, las propias del mueble.
       const cols = i => {
         this.p.rubros = this.rubrosDe();
         const r = this.p.rubros[i];
+        if (r.plantilla) {
+          const t = global.DB.planilla(r.plantilla);
+          if (t) return t.cols;
+        }
         r.planilla = r.planilla || this.planillaDe(r);
         return r.planilla;
+      };
+      // Después de tocar columnas, si venían de una plantilla hay que
+      // guardarla: si no, el cambio se pierde al recargar.
+      const persistir = i => {
+        const r = this.rubrosDe()[i];
+        if (r.plantilla) {
+          const t = global.DB.planilla(r.plantilla);
+          if (t) global.DB.guardarPlanilla(t.nombre, t.cols, t.k);
+        }
+        this.guardar();
       };
       const par = el => el.split('|').map(Number);
 
       document.querySelectorAll('[data-collbl]').forEach(el => el.onchange = () => {
         const [i, j] = par(el.dataset.collbl);
         cols(i)[j].label = el.value.trim().toUpperCase() || 'COLUMNA';
-        this.guardar(); this.pintar();
+        persistir(i); this.pintar();
       });
       document.querySelectorAll('[data-colorig]').forEach(el => el.onchange = () => {
         const [i, j] = par(el.dataset.colorig);
@@ -4144,21 +4264,22 @@ tr:hover td{background:var(--panel-2)}
         // Al cambiar de origen, el campo anterior ya no aplica.
         c.campo = c.origen === 'propiedad' ? (this.props()[0] || {}).k
           : (c.origen === 'producto' ? 'nombre' : undefined);
-        this.guardar(); this.pintar();
+        persistir(i); this.pintar();
       });
       document.querySelectorAll('[data-colcampo]').forEach(el => el.onchange = () => {
         const [i, j] = par(el.dataset.colcampo);
         cols(i)[j].campo = el.value;
-        this.guardar(); this.pintar();
+        persistir(i); this.pintar();
       });
       document.querySelectorAll('[data-quitarcol]').forEach(el => el.onclick = () => {
         const [i, j] = par(el.dataset.quitarcol);
         cols(i).splice(j, 1);
-        this.guardar(); this.pintar();
+        persistir(i); this.pintar();
       });
       document.querySelectorAll('[data-addcol]').forEach(el => el.onclick = () => {
-        cols(Number(el.dataset.addcol)).push({ label: 'NUEVA', origen: 'libre' });
-        this.guardar(); this.pintar();
+        const i = Number(el.dataset.addcol);
+        cols(i).push({ label: 'NUEVA', origen: 'libre' });
+        persistir(i); this.pintar();
       });
       document.querySelectorAll('.pl-cols').forEach(caja => {
         const i = Number(caja.dataset.cols);
@@ -4169,7 +4290,12 @@ tr:hover td{background:var(--panel-2)}
             c.classList.remove('drag'); origen = null;
             const orden = [...caja.querySelectorAll('.pl-col')].map(x => Number(x.dataset.col));
             const antes = cols(i);
-            this.p.rubros[i].planilla = orden.map(j => antes[j]);
+            const nuevas = orden.map(j => antes[j]);
+            const r = this.rubrosDe()[i];
+            if (r.plantilla) {
+              const t = global.DB.planilla(r.plantilla);
+              if (t) global.DB.guardarPlanilla(t.nombre, nuevas, t.k);
+            } else this.p.rubros[i].planilla = nuevas;
             this.guardar(); this.pintar();
           };
           c.ondragover = e => {
@@ -4180,6 +4306,39 @@ tr:hover td{background:var(--panel-2)}
           };
         });
       });
+    },
+
+    // Guardar las columnas de este rubro como una planilla reutilizable, para
+    // no diseñar la misma 40 veces.
+    modalGuardarPlanilla(i) {
+      const r = this.rubrosDe()[i];
+      const cols = this.planillaDe(r);
+      const cerrar = this.modal(`
+        <h3 class="h-title" style="font-size:17px">Guardar como planilla</h3>
+        <p class="h-sub">Queda disponible para cualquier mueble. La de respaldos se usa en los 40
+          respaldos y se edita en un solo lado.</p>
+        <label class="fld" style="margin-top:12px"><span class="lbl">Nombre</span>
+          <input id="mgp-n" placeholder="Respaldos, Sillas, Mesas…"></label>
+        <div class="hint" style="margin-top:8px">Va a guardar estas
+          <b>${cols.length}</b> columnas: ${UI.esc(cols.map(c => c.label).join(' · '))}</div>
+        <div class="row" style="margin-top:16px;justify-content:flex-end;gap:10px">
+          <button class="btn" id="mgp-x">Cancelar</button>
+          <button class="btn primary" id="mgp-ok">Guardar</button>
+        </div>`, 480);
+      document.getElementById('mgp-x').onclick = cerrar;
+      const guardar = () => {
+        const n = document.getElementById('mgp-n').value.trim();
+        if (!n) return UI.aviso('Poné el nombre', 'warn');
+        const t = global.DB.guardarPlanilla(n, cols);
+        this.p.rubros = this.rubrosDe();
+        this.p.rubros[i].plantilla = t.k;
+        this.p.rubros[i].planilla = null;
+        this.guardar(); cerrar();
+        UI.aviso(`Planilla "${t.nombre}" guardada`, 'ok');
+        this.pintar();
+      };
+      document.getElementById('mgp-ok').onclick = guardar;
+      document.getElementById('mgp-n').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); guardar(); } };
     },
 
     estilos() {
@@ -4457,6 +4616,8 @@ tr:hover td{background:var(--panel-2)}
         .pl-col{display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:9px;
           padding:6px 9px;background:var(--panel-2)}
         .pl-col.drag{opacity:.4}
+        /* Columna de la plantilla que este mueble no tiene: queda vacía. */
+        .pl-col.vacia{border-style:dashed;opacity:.7}
         .pl-lbl{width:150px;flex:none;font-weight:650;font-size:12.5px;text-transform:uppercase}
         .pl-col select{width:auto;flex:1;min-width:0;font-size:12px;padding:5px 8px}
         .pl-prev{overflow-x:auto;border:1px solid var(--line);border-radius:9px}
@@ -4524,6 +4685,207 @@ tr:hover td{background:var(--panel-2)}
   };
 
   global.ProductoDet = Producto;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script><script>
+// =====================================================================
+//  Belgrano Soft · Planillas de pedido
+//  Todas juntas en un solo lado. Una planilla dice CÓMO se le pide un
+//  mueble a un rubro: qué columnas lleva y de dónde sale cada valor.
+//  La de respaldos se usa en los 40 respaldos — se edita acá una vez y
+//  el cambio le llega a todos.
+// =====================================================================
+(function (global) {
+  const Planillas = {
+    _mount: 'view',
+
+    async render(mount = 'view') {
+      this._mount = mount;
+      this.pintar();
+    },
+
+    // Qué muebles usan cada planilla, para saber a quién le pega un cambio.
+    usos(k) { return global.DB.usosPlanilla(k); },
+
+    pintar() {
+      const v = document.getElementById(this._mount); if (!v) return;
+      const ed = !global.App || !global.App.editaCatalogo || global.App.editaCatalogo();
+      const lista = global.DB.planillas();
+
+      v.innerHTML = `
+        <div class="pl-wrap">
+          <div class="row" style="margin-bottom:14px">
+            <div>
+              <div class="kick">Catálogo</div>
+              <h1 class="h-title">Planillas de pedido</h1>
+              <div class="h-sub">Cómo se le pide cada tipo de mueble a su rubro.
+                ${lista.length} ${lista.length === 1 ? 'planilla' : 'planillas'}.</div>
+            </div>
+            <div class="sp"></div>
+            ${ed ? '<button class="btn primary" id="pz-nueva">＋ Nueva planilla</button>' : ''}
+          </div>
+
+          <div class="banner info">Una planilla se arma una vez y se usa en todos los muebles que se
+            piden igual. Si un mueble no tiene una de las propiedades de la planilla, ese casillero le
+            queda vacío — igual que hoy en el papel.</div>
+
+          ${lista.map(t => this.tarjeta(t, ed)).join('')
+            || UI.vacio('Todavía no hay planillas. Se crean desde acá o desde Producción de un mueble.')}
+        </div>
+        ${this.estilos()}`;
+
+      if (ed && document.getElementById('pz-nueva')) {
+        document.getElementById('pz-nueva').onclick = () => this.modalNueva();
+      }
+      document.querySelectorAll('[data-abrir]').forEach(b =>
+        b.onclick = () => this.abrir(b.dataset.abrir));
+    },
+
+    tarjeta(t, ed) {
+      const n = this.usos(t.k);
+      return `<section class="card pad pz-t">
+        <div class="row">
+          <div>
+            <div class="pz-n">${UI.esc(t.nombre)}</div>
+            <div class="hint">${t.cols.length} columnas ·
+              ${n ? `<b>${n}</b> ${n === 1 ? 'mueble la usa' : 'muebles la usan'}`
+                  : 'todavía no la usa ningún mueble'}</div>
+          </div>
+          <div class="sp"></div>
+          ${ed ? `<button class="btn" data-abrir="${UI.esc(t.k)}">✎ Editar</button>` : ''}
+        </div>
+        <div class="pz-cols">${t.cols.map(c => `<span class="chip">${UI.esc(c.label)}
+          <small class="muted">${UI.esc(this.nombreOrigen(c.origen))}</small></span>`).join('')}</div>
+      </section>`;
+    },
+
+    nombreOrigen(k) {
+      const o = (global.DB.ORIGENES || []).find(x => x.k === k);
+      return o ? o.label.toLowerCase() : k;
+    },
+
+    // El detalle de una planilla: sus columnas y qué muebles la usan.
+    abrir(k) {
+      const t = global.DB.planilla(k); if (!t) return;
+      const n = this.usos(k);
+      const cerrar = this.modal(`
+        <h3 class="h-title" style="font-size:18px">${UI.esc(t.nombre)}</h3>
+        <p class="h-sub">${t.cols.length} columnas ·
+          ${n ? `la usan <b>${n}</b> ${n === 1 ? 'mueble' : 'muebles'}` : 'sin usar todavía'}</p>
+        ${n ? `<div class="banner warn" style="margin-top:12px">Lo que cambies acá se cambia en
+          <b>${n}</b> ${n === 1 ? 'mueble' : 'muebles'}.</div>` : ''}
+        <label class="fld" style="margin-top:12px"><span class="lbl">Nombre</span>
+          <input id="pz-nom" value="${UI.esc(t.nombre)}"></label>
+        <div class="ad-t" style="margin-top:14px">Columnas</div>
+        <div class="pz-lista" id="pz-lista">
+          ${t.cols.map((c, i) => `<div class="pz-c" data-i="${i}">
+            <input class="pz-lbl" data-lbl="${i}" value="${UI.esc(c.label)}">
+            <select data-orig="${i}">${(global.DB.ORIGENES || []).map(o =>
+              `<option value="${o.k}" ${c.origen === o.k ? 'selected' : ''}>${UI.esc(o.label)}</option>`).join('')}</select>
+            ${['propiedad', 'producto'].includes(c.origen)
+              ? `<input class="pz-campo" data-campo="${i}" value="${UI.esc(c.campo || '')}"
+                  placeholder="clave">` : '<span></span>'}
+            <button class="lx" data-quitar="${i}" title="Quitar">✕</button>
+          </div>`).join('')}
+        </div>
+        <button class="btn" id="pz-add" style="margin-top:9px">⊞ Agregar columna</button>
+        <div class="hint" style="margin-top:9px">La <b>clave</b> es el nombre interno de la propiedad
+          (medida, tela, color). Si un mueble no la tiene, esa columna le queda vacía.</div>
+        <div class="row" style="margin-top:18px;gap:10px">
+          <button class="btn danger ghost" id="pz-borrar">Borrar planilla</button>
+          <div class="sp"></div>
+          <button class="btn" id="pz-x">Cancelar</button>
+          <button class="btn primary" id="pz-ok">Guardar</button>
+        </div>`, 620);
+
+      const cols = JSON.parse(JSON.stringify(t.cols));
+      const leer = () => {
+        document.querySelectorAll('[data-lbl]').forEach(i =>
+          cols[Number(i.dataset.lbl)].label = i.value.trim().toUpperCase() || 'COLUMNA');
+        document.querySelectorAll('[data-orig]').forEach(sl =>
+          cols[Number(sl.dataset.orig)].origen = sl.value);
+        document.querySelectorAll('[data-campo]').forEach(i =>
+          cols[Number(i.dataset.campo)].campo = i.value.trim());
+      };
+      document.querySelectorAll('[data-quitar]').forEach(b => b.onclick = () => {
+        leer(); cols.splice(Number(b.dataset.quitar), 1);
+        global.DB.guardarPlanilla(t.nombre, cols, t.k); cerrar(); this.abrir(k);
+      });
+      document.getElementById('pz-add').onclick = () => {
+        leer(); cols.push({ label: 'NUEVA', origen: 'libre' });
+        global.DB.guardarPlanilla(t.nombre, cols, t.k); cerrar(); this.abrir(k);
+      };
+      document.getElementById('pz-x').onclick = cerrar;
+      document.getElementById('pz-ok').onclick = () => {
+        leer();
+        global.DB.guardarPlanilla(document.getElementById('pz-nom').value.trim() || t.nombre, cols, t.k);
+        cerrar(); UI.aviso('Planilla guardada', 'ok'); this.pintar();
+      };
+      document.getElementById('pz-borrar').onclick = () => {
+        if (n) return UI.aviso(`No se puede: la usan ${n} ${n === 1 ? 'mueble' : 'muebles'}`, 'warn');
+        global.DB.borrarPlanilla(k); cerrar(); this.pintar();
+      };
+    },
+
+    modalNueva() {
+      const cerrar = this.modal(`
+        <h3 class="h-title" style="font-size:17px">Nueva planilla</h3>
+        <p class="h-sub">Arranca con las columnas de siempre y después se ajusta.</p>
+        <label class="fld" style="margin-top:12px"><span class="lbl">Nombre</span>
+          <input id="pn-n" placeholder="Respaldos, Sillas, Mesas…"></label>
+        <div class="row" style="margin-top:16px;justify-content:flex-end;gap:10px">
+          <button class="btn" id="pn-x">Cancelar</button>
+          <button class="btn primary" id="pn-ok">Crear</button>
+        </div>`, 460);
+      document.getElementById('pn-x').onclick = cerrar;
+      const crear = () => {
+        const n = document.getElementById('pn-n').value.trim();
+        if (!n) return UI.aviso('Poné el nombre', 'warn');
+        const t = global.DB.guardarPlanilla(n, [
+          { label: 'ESTADO', origen: 'orden' },
+          { label: 'MODELO', origen: 'producto', campo: 'nombre' },
+          { label: 'CANT.', origen: 'cantidad' },
+          { label: 'OBS', origen: 'libre' },
+        ]);
+        cerrar(); this.pintar(); this.abrir(t.k);
+      };
+      document.getElementById('pn-ok').onclick = crear;
+      document.getElementById('pn-n').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); crear(); } };
+    },
+
+    modal(html, ancho = 520) {
+      document.body.insertAdjacentHTML('beforeend',
+        `<div class="mdlz" id="mdlz"><div class="card pad" style="max-width:${ancho}px;width:100%">${html}</div></div>`);
+      const cerrar = () => { const m = document.getElementById('mdlz'); if (m) m.remove(); };
+      document.getElementById('mdlz').onclick = e => { if (e.target.id === 'mdlz') cerrar(); };
+      return cerrar;
+    },
+
+    estilos() {
+      return `<style>
+        .pl-wrap{max-width:920px;margin:0 auto}
+        .pz-t{margin-bottom:9px}
+        .pz-n{font-size:15px;font-weight:700;color:var(--navy)}
+        .pz-cols{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}
+        .pz-cols .chip small{margin-left:5px;font-size:10.5px}
+        .pz-lista{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow:auto}
+        .pz-c{display:grid;grid-template-columns:150px minmax(0,1fr) 110px 30px;gap:7px;align-items:center;
+          border:1px solid var(--line);border-radius:9px;padding:6px 9px;background:var(--panel-2)}
+        .pz-lbl{font-weight:650;font-size:12.5px;text-transform:uppercase}
+        .pz-c select,.pz-campo{font-size:12px;padding:5px 8px}
+        .ad-t{font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px}
+        .hint{font-size:11.5px;color:var(--muted);line-height:1.45}
+        .mdlz{position:fixed;inset:0;background:rgba(12,22,44,.4);z-index:50;display:grid;
+          place-items:center;padding:20px}
+        .btn.ghost{background:none;border-color:transparent;color:var(--crit)}
+        .btn.ghost:hover{border-color:var(--crit)}
+        .lx{border:0;background:none;cursor:pointer;font-size:13px;padding:4px 6px;border-radius:6px;color:var(--muted)}
+        .lx:hover{background:var(--panel-2)}
+      </style>`;
+    },
+  };
+
+  global.Planillas = Planillas;
 })(typeof window !== 'undefined' ? window : globalThis);
 
 </script><script>
@@ -8819,6 +9181,7 @@ tr:hover td{background:var(--panel-2)}
       S('productos', 'Productos', m => global.Catalogo.render(m)),
       S('familias', 'Familias', skel('Familias')),
       S('variantes', 'Variantes', skel('Variantes')),
+      S('planillas', 'Planillas', m => global.Planillas.render(m)),
       S('materiales', 'Materiales', skel('Materiales')),
       S('colores', 'Colores', skel('Colores')),
       S('herrajes', 'Herrajes', skel('Herrajes')),
