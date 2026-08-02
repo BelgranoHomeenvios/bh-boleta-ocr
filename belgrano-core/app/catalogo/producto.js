@@ -347,31 +347,20 @@
     tabInventario() {
       const p = this.p, ed = this.puedeEditar();
       const modo = p.rastreo || 'serie';
-      const obt = p.obtencion || 'dibujo';
-      const cual = global.DB.OBTENCION.find(x => x.k === obt) || global.DB.OBTENCION[0];
       const elegido = this.RASTREO.find(x => x.k === modo) || this.RASTREO[0];
       const conMin = this.vars.filter(v => (v.minStock || 0) > 0);
       const faltan = conMin.filter(v => (v.stock || 0) < v.minStock);
       const lista = this.ordenadas();
 
       return `<section class="pd-b">
-        <div class="pd-h">Cómo se le pide al proveedor</div>
-        <div class="fr"><label for="pd-obt">Se pide</label>
-          <select id="pd-obt" ${ed ? '' : 'disabled'}>${global.DB.OBTENCION.map(x =>
-            `<option value="${x.k}" ${obt === x.k ? 'selected' : ''}>${UI.esc(x.label)}</option>`).join('')}</select></div>
-        <div class="fr"><label></label><span class="hint">${UI.esc(cual.pie)}</span></div>
-        ${obt !== 'planilla' && !this.vars.every(v => v.imgProd)
-          ? `<div class="banner warn" style="margin-top:9px">Se pide por dibujo y
-             <b>${this.vars.filter(v => !v.imgProd).length}</b> de ${this.vars.length} variantes no tienen
-             el plano cargado. Se suben en <b>Producción</b>.</div>` : ''}
-        <div class="hint" style="margin-top:9px">Cuántos proveedores hacen falta y quiénes son se
-          define en <b>Producción → Quién lo fabrica</b>.</div>
-        <div class="pd-sepl"></div>
-        <div class="fr"><label for="pd-track">Cómo se rastrea el stock</label>
+        <div class="pd-h">Cómo se rastrea el stock</div>
+        <div class="fr"><label for="pd-track">Se rastrea</label>
           <select id="pd-track" ${ed ? '' : 'disabled'}>${this.RASTREO.map(x =>
             `<option value="${x.k}" ${modo === x.k ? 'selected' : ''}>${UI.esc(x.label)}</option>`).join('')}</select></div>
         <div class="fr"><label></label><span class="hint">${UI.esc(elegido.pie)}${modo === 'serie'
           ? ' Cada unidad va a necesitar su <b>código de barras</b>; falta definir cómo se numeran.' : ''}</span></div>
+        <div class="hint" style="margin-top:9px">A quién se le pide y con qué —dibujo o planilla— se
+          define en <b>Producción</b>: cada rubro se pide a su manera.</div>
       </section>
 
       <section class="pd-b">
@@ -413,28 +402,28 @@
       const p = this.p, ed = this.puedeEditar();
       const n = Math.min(3, Math.max(1, Number(p.nProveedores) || 1));
       const rubros = this.rubrosDe();
-      const sinDefinir = rubros.filter(x => !x).length;
+      const sinDefinir = rubros.filter(x => !x.k).length;
 
       const campo = i => {
-        const k = rubros[i];
-        const pares = k ? global.DB.proveedores(k) : [];
+        const r = rubros[i];
+        const pares = r.k ? global.DB.proveedores(r.k) : [];
         return `<div class="rb">
           <div class="fr">
             <label for="pd-rubro-${i}">${n === 1 ? 'Se le pide a' : `Rubro ${i + 1}`}</label>
             <select id="pd-rubro-${i}" data-rubro="${i}" ${ed ? '' : 'disabled'}>
               <option value="">Elegir…</option>
-              ${global.DB.RUBROS.map(r => `<option value="${r.k}" ${k === r.k ? 'selected' : ''}
-                >${UI.esc(r.label)}</option>`).join('')}
+              ${global.DB.RUBROS.map(x => `<option value="${x.k}" ${r.k === x.k ? 'selected' : ''}
+                >${UI.esc(x.label)}</option>`).join('')}
             </select></div>
-          ${k ? `<div class="fr"><label></label><div class="rb-pares">
+          ${r.k ? `<div class="fr"><label></label><div class="rb-pares">
             ${pares.map(x => `<span class="chip">${UI.esc(x.nombre)}
               <small class="muted">${x.capacidad}/sem</small></span>`).join('')
               || '<span class="hint">Todavía no hay nadie cargado en este rubro.</span>'}
-            ${ed ? `<button class="chip-add" data-nuevoprov="${k}">＋ proveedor</button>` : ''}
+            ${ed ? `<button class="chip-add" data-nuevoprov="${r.k}">＋ proveedor</button>` : ''}
           </div></div>
           <div class="fr"><label></label><span class="hint">Los <b>${pares.length}</b> de este rubro son
             <b>pares</b>: ninguno es mejor que otro, sólo cambia cuánto entrega por semana. Entre todos,
-            <b>${global.DB.capacidadRubro(k)}</b> unidades semanales.</span></div>` : ''}
+            <b>${global.DB.capacidadRubro(r.k)}</b> unidades semanales.</span></div>` : ''}
         </div>`;
       };
 
@@ -453,8 +442,8 @@
           <b>${sinDefinir}</b> ${sinDefinir === 1 ? 'rubro' : 'rubros'}. Producción no va a poder armar
           el pedido completo.</div>` : ''}
         <div class="hint" style="margin-top:8px">El pedido va dirigido al <b>rubro</b>, no a una
-          persona: adentro se reparte según la capacidad de cada uno. El orden importa — el
-          <b>rubro 1</b> recibe el primer plano y la primera columna de la planilla.</div>
+          persona: adentro se reparte según la capacidad de cada uno. Cada rubro se pide a su manera y
+          con su propia planilla — abajo hay una sección por cada uno.</div>
       </section>`;
     },
 
@@ -528,61 +517,75 @@
     ],
 
 
-    // Lo que necesita fábrica: el plano de cada variante y cómo se hace.
+    // Producción se arma por rubro: primero quiénes, y después una sección
+    // para cada uno con lo que necesita — el plano, la planilla, o las dos.
     tabProduccion() {
-      const obt = this.p.obtencion || 'dibujo';
       return this.bloqueQuienFabrica()
-        + (obt !== 'planilla' ? this.bloquePlanos() : '')
-        + (obt !== 'dibujo' ? this.bloquePlanilla() : '')
+        + this.rubrosDe().map((r, i) => this.bloqueRubro(r, i)).join('')
         + this.bloqueComoSeHace();
     },
 
-    // Los rubros a los que se les pide, en orden: el primero recibe el primer
-    // plano y la primera columna de la planilla.
+    // Los rubros del mueble, en orden y ya normalizados: el primero recibe el
+    // primer plano y su propia planilla.
     rubrosDe() {
       const n = Math.min(3, Math.max(1, Number(this.p.nProveedores) || 1));
-      return Array.from({ length: n }, (_, i) => (this.p.rubros || [])[i] || '');
+      const crudos = this.p.rubros || [];
+      return Array.from({ length: n }, (_, i) => {
+        const r = crudos[i];
+        // Los muebles viejos guardaban sólo la clave del rubro.
+        if (typeof r === 'string') return { k: r, modo: 'dibujo', planilla: null };
+        return { k: (r && r.k) || '', modo: (r && r.modo) || 'dibujo', planilla: (r && r.planilla) || null };
+      });
     },
     nombreRubro(k) { const r = global.DB.rubro(k); return r ? r.label : 'Sin definir'; },
 
-    // ---- Un plano por rubro -------------------------------------------------
-    bloquePlanos() {
-      const rubros = this.rubrosDe();
-      const lista = this.ordenadas();
-      const falta = i => lista.filter(v => !(v.planos || [])[i]).length;
-      const celda = (v, i) => {
-        const ref = (v.planos || [])[i] || (i === 0 ? v.imgProd : '');
-        const url = this.urlDe(ref) || ref;
-        return `<button class="vimg ${url ? 'hay' : ''}" data-plano="${v.id}|${i}"
-          title="Plano para ${UI.esc(this.nombreRubro(rubros[i]))}">
-          ${url ? `<img src="${UI.esc(url)}" alt="">` : '<span class="vimg-v">📐</span>'}
-          <span class="vimg-e">✎</span></button>`;
-      };
+
+    // La sección de un rubro: cómo se le pide y, según eso, sus planos o su
+    // planilla. Dos rubros del mismo mueble piden cosas distintas, así que
+    // cada uno tiene lo suyo.
+    bloqueRubro(r, i) {
+      if (!r.k) return '';
+      const nom = this.nombreRubro(r.k);
       return `<section class="pd-b">
-        <div class="pd-h">Planos por variante</div>
-        <div class="hint" style="margin-bottom:11px">${rubros.length === 1
-          ? 'Un plano por variante: es la hoja que se le manda al rubro.'
-          : 'Un plano <b>por rubro</b>. Cuando se pide el mueble a cada uno le va el suyo: el de carpintería no es el de herrería.'}</div>
-        <div class="pl-tabla" style="--n:${rubros.length}">
-          <div class="pl-h"><span>Variante</span>
-            ${rubros.map((r, i) => `<span>${UI.esc(this.nombreRubro(r))}
-              ${falta(i) ? `<b class="warn-t">· faltan ${falta(i)}</b>` : ''}</span>`).join('')}</div>
-          ${lista.map(v => `<div class="pl-r">
-            <div><b>${UI.esc(this.nombreVar(v))}</b>
-              <div class="vr-sku tnum">${UI.esc(v.sku || global.DB.skuDe(this.p, v))}</div></div>
-            ${rubros.map((r, i) => `<div>${celda(v, i)}</div>`).join('')}
-          </div>`).join('')}
-        </div>
-        <div class="hint" style="margin-top:9px">Acepta imagen o PDF. Sale de los archivos de
-          <b>producción</b> de Documentos. No aparece nunca en la cotización del cliente.</div>
+        <div class="pd-h">${i + 1} · ${UI.esc(nom)}</div>
+        <div class="fr"><label for="pd-modo-${i}">Se le pide</label>
+          <select id="pd-modo-${i}" data-modo="${i}" ${this.puedeEditar() ? '' : 'disabled'}>${
+            global.DB.OBTENCION.map(o => `<option value="${o.k}" ${r.modo === o.k ? 'selected' : ''}
+              >${UI.esc(o.label)}</option>`).join('')}</select></div>
+        <div class="fr"><label></label><span class="hint">${UI.esc(
+          (global.DB.OBTENCION.find(o => o.k === r.modo) || {}).pie || '')}</span></div>
+        ${r.modo !== 'planilla' ? this.bloquePlanos(r, i) : ''}
+        ${r.modo !== 'dibujo' ? this.bloquePlanilla(r, i) : ''}
       </section>`;
     },
 
-    // ---- La planilla de pedido ----------------------------------------------
-    // Se diseña una vez: qué columnas lleva y de dónde sale cada una. Por eso
-    // después cada venta se convierte en un renglón sola.
-    planillaDe() {
-      if (this.p.planilla) return this.p.planilla;
+    // ---- Los planos de un rubro ---------------------------------------------
+    bloquePlanos(r, i) {
+      const lista = this.ordenadas();
+      const faltan = lista.filter(v => !(v.planos || [])[i]).length;
+      return `<div class="pd-sepl"></div>
+        <div class="ad-t">Planos por variante
+          ${faltan ? `<span class="pill warn">faltan ${faltan}</span>` : '<span class="pill ok">completos</span>'}</div>
+        <div class="pl-grid">${lista.map(v => {
+          const ref = (v.planos || [])[i] || (i === 0 ? v.imgProd : '');
+          const url = this.urlDe(ref) || ref;
+          return `<div class="pl-c">
+            <button class="vimg ${url ? 'hay' : ''}" data-plano="${v.id}|${i}"
+              title="Plano de ${UI.esc(this.nombreRubro(r.k))} para esta variante">
+              ${url ? `<img src="${UI.esc(url)}" alt="">` : '<span class="vimg-v">📐</span>'}
+              <span class="vimg-e">✎</span></button>
+            <div class="pl-n">${UI.esc(this.nombreVar(v))}</div>
+          </div>`;
+        }).join('')}</div>
+        <div class="hint" style="margin-top:8px">Es la hoja que se le manda a
+          <b>${UI.esc(this.nombreRubro(r.k))}</b>. Sale de los archivos de producción de Documentos.</div>`;
+    },
+
+    // La planilla de UN rubro. Se define por mueble porque cada mueble se pide
+    // siempre igual; después, al juntar varios en un pedido, Producción une
+    // las columnas y deja vacías las que ese mueble no usa.
+    planillaDe(r) {
+      if (r && r.planilla) return r.planilla;
       return [
         { label: 'ESTADO', origen: 'orden' },
         { label: 'MODELO', origen: 'producto', campo: 'nombre' },
@@ -599,44 +602,41 @@
       return '';
     },
 
-    bloquePlanilla() {
-      const cols = this.planillaDe();
+    bloquePlanilla(r, i) {
+      const cols = this.planillaDe(r);
       const ed = this.puedeEditar();
-      const lista = this.ordenadas().slice(0, 4);
-      const rubros = this.rubrosDe().filter(Boolean).map(r => this.nombreRubro(r));
-      return `<section class="pd-b">
-        <div class="pd-h">Planilla de pedido</div>
-        <div class="hint" style="margin-bottom:11px">Cómo se le pide este mueble${rubros.length
-          ? ` a <b>${UI.esc(rubros.join(' y '))}</b>` : ''}. Cada columna dice de dónde sale su valor,
-          y por eso el renglón se llena solo cuando se vende.</div>
-        <div class="pl-cols">
-          ${cols.map((c, i) => `<div class="pl-col" draggable="${ed}" data-col="${i}">
+      const lista = this.ordenadas().slice(0, 3);
+      return `<div class="pd-sepl"></div>
+        <div class="ad-t">Planilla de pedido para ${UI.esc(this.nombreRubro(r.k))}</div>
+        <div class="hint" style="margin-bottom:9px">Cada columna dice de dónde sale su valor, y por eso
+          el renglón se llena solo cuando se vende.</div>
+        <div class="pl-cols" data-cols="${i}">
+          ${cols.map((c, j) => `<div class="pl-col" draggable="${ed}" data-col="${j}">
             ${ed ? '<span class="vr-drag">⠿</span>' : ''}
-            <input class="pl-lbl" data-collbl="${i}" value="${UI.esc(c.label)}" ${ed ? '' : 'readonly'}>
-            <select data-colorig="${i}" ${ed ? '' : 'disabled'}>${global.DB.ORIGENES.map(o =>
+            <input class="pl-lbl" data-collbl="${i}|${j}" value="${UI.esc(c.label)}" ${ed ? '' : 'readonly'}>
+            <select data-colorig="${i}|${j}" ${ed ? '' : 'disabled'}>${global.DB.ORIGENES.map(o =>
               `<option value="${o.k}" ${c.origen === o.k ? 'selected' : ''}>${UI.esc(o.label)}</option>`).join('')}</select>
-            ${c.origen === 'propiedad' ? `<select data-colcampo="${i}" ${ed ? '' : 'disabled'}>${
+            ${c.origen === 'propiedad' ? `<select data-colcampo="${i}|${j}" ${ed ? '' : 'disabled'}>${
               this.props().map(pr => `<option value="${pr.k}" ${c.campo === pr.k ? 'selected' : ''}
                 >${UI.esc(pr.nombre)}</option>`).join('')}</select>` : ''}
-            ${c.origen === 'producto' ? `<select data-colcampo="${i}" ${ed ? '' : 'disabled'}>
+            ${c.origen === 'producto' ? `<select data-colcampo="${i}|${j}" ${ed ? '' : 'disabled'}>
               <option value="nombre" ${c.campo === 'nombre' ? 'selected' : ''}>Nombre</option>
               <option value="sku" ${c.campo === 'sku' ? 'selected' : ''}>Código</option></select>` : ''}
-            ${ed ? `<button class="lx" data-quitarcol="${i}" title="Quitar">✕</button>` : ''}
+            ${ed ? `<button class="lx" data-quitarcol="${i}|${j}" title="Quitar">✕</button>` : ''}
           </div>`).join('')}
         </div>
-        ${ed ? '<button class="btn" id="pl-add" style="margin-top:9px">⊞ Agregar columna</button>' : ''}
-        <div class="pd-sepl"></div>
-        <div class="ad-t">Así se va a ver el pedido</div>
+        ${ed ? `<button class="btn" data-addcol="${i}" style="margin-top:9px">⊞ Agregar columna</button>` : ''}
+        <div class="ad-t" style="margin-top:13px">Así se va a ver el pedido</div>
         <div class="pl-prev"><table>
           <thead><tr>${cols.map(c => `<th>${UI.esc(c.label)}</th>`).join('')}</tr></thead>
           <tbody>${lista.map(v => `<tr>${cols.map(c =>
             `<td class="${c.origen === 'libre' ? 'muted' : ''}">${UI.esc(this.valorPlanilla(c, v) || '—')}</td>`
           ).join('')}</tr>`).join('')}</tbody>
         </table></div>
-        <div class="hint" style="margin-top:8px">Renglones de ejemplo con las primeras variantes. Cuando
-          se venda una sale igual pero con el número de venta real; si es para reponer stock, en
-          <b>ESTADO</b> va a decir STOCK.</div>
-      </section>`;
+        <div class="hint" style="margin-top:8px">En <b>ESTADO</b> va el número de venta, o <b>STOCK</b>
+          si se pide para reponer. Cuando se junten varios muebles en un pedido a
+          ${UI.esc(this.nombreRubro(r.k))}, las columnas se suman: las que este mueble no usa quedan
+          vacías en su renglón.</div>`;
     },
 
     bloqueComoSeHace() {
@@ -1023,14 +1023,24 @@
       const obt = g('pd-obt');
       if (obt && ed) obt.onchange = () => { p.obtencion = obt.value; this.guardar(); this.pintar(); };
       document.querySelectorAll('[data-nprov]').forEach(b => b.onclick = () => {
+        // Al subir o bajar la cantidad, se conserva lo cargado de los que
+        // siguen y se descarta lo de los que se van.
+        const antes = this.rubrosDe();
         p.nProveedores = Number(b.dataset.nprov);
-        // Si baja la cantidad, los rubros que sobran se descartan.
-        p.rubros = (p.rubros || []).slice(0, p.nProveedores);
+        p.rubros = antes.slice(0, p.nProveedores);
         this.guardar(); this.pintar();
       });
+      // Cada rubro guarda su clave, cómo se le pide y su planilla.
+      const rub = i => {
+        p.rubros = this.rubrosDe();
+        return p.rubros[i];
+      };
       document.querySelectorAll('[data-rubro]').forEach(sl => sl.onchange = () => {
-        p.rubros = p.rubros || [];
-        p.rubros[Number(sl.dataset.rubro)] = sl.value;
+        rub(Number(sl.dataset.rubro)).k = sl.value;
+        this.guardar(); this.pintar();
+      });
+      document.querySelectorAll('[data-modo]').forEach(sl => sl.onchange = () => {
+        rub(Number(sl.dataset.modo)).modo = sl.value;
         this.guardar(); this.pintar();
       });
       document.querySelectorAll('[data-nuevoprov]').forEach(b => b.onclick = () =>
@@ -2050,51 +2060,66 @@
     },
 
     // Las columnas de la planilla: nombre, de dónde sale el valor, y el orden.
+    // Las columnas de la planilla de cada rubro: nombre, de dónde sale el
+    // valor, y el orden.
     engancharPlanilla() {
-      const caja = document.querySelector('.pl-cols'); if (!caja) return;
-      const ed = this.puedeEditar();
-      const cols = () => { this.p.planilla = this.p.planilla || this.planillaDe(); return this.p.planilla; };
+      if (!document.querySelector('.pl-cols')) return;
+      const ed = this.puedeEditar(); if (!ed) return;
+      const cols = i => {
+        this.p.rubros = this.rubrosDe();
+        const r = this.p.rubros[i];
+        r.planilla = r.planilla || this.planillaDe(r);
+        return r.planilla;
+      };
+      const par = el => el.split('|').map(Number);
 
-      document.querySelectorAll('[data-collbl]').forEach(i => { if (ed) i.onchange = () => {
-        cols()[Number(i.dataset.collbl)].label = i.value.trim().toUpperCase() || 'COLUMNA';
+      document.querySelectorAll('[data-collbl]').forEach(el => el.onchange = () => {
+        const [i, j] = par(el.dataset.collbl);
+        cols(i)[j].label = el.value.trim().toUpperCase() || 'COLUMNA';
         this.guardar(); this.pintar();
-      }; });
-      document.querySelectorAll('[data-colorig]').forEach(sl => { if (ed) sl.onchange = () => {
-        const c = cols()[Number(sl.dataset.colorig)];
-        c.origen = sl.value;
+      });
+      document.querySelectorAll('[data-colorig]').forEach(el => el.onchange = () => {
+        const [i, j] = par(el.dataset.colorig);
+        const c = cols(i)[j];
+        c.origen = el.value;
         // Al cambiar de origen, el campo anterior ya no aplica.
         c.campo = c.origen === 'propiedad' ? (this.props()[0] || {}).k
           : (c.origen === 'producto' ? 'nombre' : undefined);
         this.guardar(); this.pintar();
-      }; });
-      document.querySelectorAll('[data-colcampo]').forEach(sl => { if (ed) sl.onchange = () => {
-        cols()[Number(sl.dataset.colcampo)].campo = sl.value;
+      });
+      document.querySelectorAll('[data-colcampo]').forEach(el => el.onchange = () => {
+        const [i, j] = par(el.dataset.colcampo);
+        cols(i)[j].campo = el.value;
         this.guardar(); this.pintar();
-      }; });
-      document.querySelectorAll('[data-quitarcol]').forEach(b => { if (ed) b.onclick = () => {
-        cols().splice(Number(b.dataset.quitarcol), 1);
+      });
+      document.querySelectorAll('[data-quitarcol]').forEach(el => el.onclick = () => {
+        const [i, j] = par(el.dataset.quitarcol);
+        cols(i).splice(j, 1);
         this.guardar(); this.pintar();
-      }; });
-      const add = document.getElementById('pl-add');
-      if (add && ed) add.onclick = () => {
-        cols().push({ label: 'NUEVA', origen: 'libre' });
+      });
+      document.querySelectorAll('[data-addcol]').forEach(el => el.onclick = () => {
+        cols(Number(el.dataset.addcol)).push({ label: 'NUEVA', origen: 'libre' });
         this.guardar(); this.pintar();
-      };
-      let origen = null;
-      caja.querySelectorAll('.pl-col').forEach(c => {
-        c.ondragstart = () => { origen = c; c.classList.add('drag'); };
-        c.ondragend = () => {
-          c.classList.remove('drag'); origen = null;
-          const orden = [...caja.querySelectorAll('.pl-col')].map(x => Number(x.dataset.col));
-          this.p.planilla = orden.map(i => cols()[i]);
-          this.guardar(); this.pintar();
-        };
-        c.ondragover = e => {
-          e.preventDefault();
-          if (!origen || origen === c) return;
-          const r = c.getBoundingClientRect();
-          caja.insertBefore(origen, e.clientY < r.top + r.height / 2 ? c : c.nextSibling);
-        };
+      });
+      document.querySelectorAll('.pl-cols').forEach(caja => {
+        const i = Number(caja.dataset.cols);
+        let origen = null;
+        caja.querySelectorAll('.pl-col').forEach(c => {
+          c.ondragstart = () => { origen = c; c.classList.add('drag'); };
+          c.ondragend = () => {
+            c.classList.remove('drag'); origen = null;
+            const orden = [...caja.querySelectorAll('.pl-col')].map(x => Number(x.dataset.col));
+            const antes = cols(i);
+            this.p.rubros[i].planilla = orden.map(j => antes[j]);
+            this.guardar(); this.pintar();
+          };
+          c.ondragover = e => {
+            e.preventDefault();
+            if (!origen || origen === c) return;
+            const rr = c.getBoundingClientRect();
+            caja.insertBefore(origen, e.clientY < rr.top + rr.height / 2 ? c : c.nextSibling);
+          };
+        });
       });
     },
 
@@ -2364,6 +2389,10 @@
         .pl-r{padding:7px 0;border-bottom:1px solid var(--line-soft);font-size:12.5px}
         .pl-r b{color:var(--navy)}
         .pl-r .vimg{width:92px;height:70px}
+        .pl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(122px,1fr));gap:11px}
+        .pl-c .vimg{width:100%;height:96px}
+        .pl-n{font-size:11px;color:var(--navy);font-weight:650;margin-top:5px;line-height:1.3}
+        .ad-t .pill{margin-left:6px;font-weight:700}
         /* Diseñador de la planilla. */
         .pl-cols{display:flex;flex-direction:column;gap:6px}
         .pl-col{display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:9px;

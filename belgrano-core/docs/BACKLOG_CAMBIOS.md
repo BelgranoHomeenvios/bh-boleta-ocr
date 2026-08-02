@@ -528,6 +528,34 @@ Todo en **una sola columna**, un bloque abajo del otro, y en modo edición.
   (159 KB → 118 KB) y se agregó `test_sanidad.cjs`, que falla si vuelve a
   aparecer un método repetido.
 
+### Lote 18 — APLICADO (Producción por rubro)
+
+**Lo que cambió de fondo**: cómo se pide **no es del mueble, es de cada rubro**.
+Un mismo mueble puede ir a carpintería **por dibujo** y a herrería **por
+planilla**, y cada uno con su propia planilla porque se le piden cosas
+distintas.
+
+- ✅ 286. Cada rubro guarda **su modo** (dibujo · planilla · mixta) y **su
+  planilla**. Producción muestra una **sección por rubro**, numerada.
+- ✅ 287. **Por dibujo** → sus planos por variante, con el aviso de cuántos
+  faltan. **Por planilla** → su diseñador de columnas y su vista previa.
+  **Mixta** → las dos.
+- ✅ 288. "Cómo se le pide al proveedor" **sale de Inventario**: ahí quedó sólo
+  cómo se rastrea el stock, con un puntero a Producción.
+- ✅ 289. Los muebles viejos que guardaban sólo la clave del rubro
+  (`['carpinteria']`) siguen abriendo: se normalizan al leerlos.
+
+**Respuestas de Brian anotadas**
+- La planilla se define **por mueble**, porque cada mueble se pide siempre
+  igual. Al **agrupar** varios en un pedido al mismo rubro, las columnas se
+  **suman** y las que ese mueble no usa quedan **vacías** en su renglón — así
+  la silla que sí necesita color de respaldo no obliga a las demás. Eso se
+  resuelve en Producción; el diseño de acá ya lo permite.
+- **ESTADO** = el número de venta si es para un cliente, o **STOCK** si es para
+  reponer. Se termina de definir cuando armemos los pedidos.
+- **Proveedor destacado**: queda para más adelante. Hoy todos los del rubro son
+  pares.
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·

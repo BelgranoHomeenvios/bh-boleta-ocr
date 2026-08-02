@@ -195,7 +195,7 @@
       { id: 1, categoria_id: 2, nombre: 'CÓMODA AMBERES 55', publicado_tn: true, sku: 'CO-AMB-55',
         desc: 'Cómoda de 4 cajones con guías de extracción total y tiradores embutidos. El clásico de la línea Amberes.',
         alto: 0.85, prof: 0.45, materiales: 'MDF 18 mm laqueado · guías telescópicas · tiradores de aluminio', dias: 32,
-        nProveedores: 1, rubros: ['carpinteria'],
+        nProveedores: 1, rubros: [{ k: 'carpinteria', modo: 'dibujo' }],
         obtencion: 'dibujo', instalacion: false },
       { id: 4, categoria_id: 2, nombre: 'CÓMODA OLIVER 60', publicado_tn: true, sku: 'CO-OLI-60',
         desc: 'Seis cajones sobre patas de madera maciza. Frente ranurado, sin tiradores a la vista.',
@@ -206,7 +206,7 @@
       { id: 2, categoria_id: 3, nombre: 'PLACARD OLIVER', publicado_tn: true, sku: 'PL-OLI',
         desc: 'Placard de dos y tres puertas con interior armado: barral, estantes y cajonera.',
         alto: 2.10, prof: 0.55, materiales: 'MDF 18 mm · barral cromado · bisagras con freno', dias: 40,
-        nProveedores: 1, rubros: ['carpinteria'], obtencion: 'dibujo', instalacion: true },
+        nProveedores: 1, rubros: [{ k: 'carpinteria', modo: 'dibujo' }], instalacion: true },
       { id: 6, categoria_id: 3, nombre: 'PLACARD AMBERES 2 PUERTAS', publicado_tn: true, sku: 'PL-AMB-2P',
         desc: 'Dos puertas batientes con cajonera interna de tres cajones y estante alto.',
         alto: 2.00, prof: 0.55, materiales: 'MDF 18 mm laqueado · bisagras con freno', dias: 40 },
@@ -228,7 +228,7 @@
       { id: 12, categoria_id: 7, nombre: 'MUEBLE TV TASOS 55', publicado_tn: true, sku: 'S-MT-TA',
         desc: 'Mueble de TV de 1,60 con cuatro cajones y frente ranurado. La base se retira en los cuatro lados y el corte de la tapa es a 45°.',
         alto: 0.55, prof: 0.40, materiales: 'MDF 18 mm · frente ranurado · corte 45° · guías telescópicas', dias: 32,
-        nProveedores: 2, rubros: ['carpinteria', 'herreria'],
+        nProveedores: 2, rubros: [{ k: 'carpinteria', modo: 'dibujo' }, { k: 'herreria', modo: 'planilla' }],
         obtencion: 'dibujo', instalacion: false },
       { id: 11, categoria_id: 7, nombre: 'RACK OSLO 1.80', publicado_tn: true, sku: 'RK-OSL-180',
         desc: 'Dos cajones y un módulo abierto, sobre patas de madera. La versión larga del living Oslo.',
@@ -625,8 +625,8 @@
       return nueva;
     },
 
-    // Con qué se le pide al proveedor. No es de dónde sale el mueble —eso es
-    // siempre contra pedido— sino qué papel hay que mandarle para que lo haga.
+    // Con qué se le pide. Va POR RUBRO, no por mueble: a carpintería se le
+    // puede mandar el plano y a herrería una planilla, para el mismo mueble.
     OBTENCION: [
       { k: 'dibujo', label: 'Se pide por dibujo',
         pie: 'Se le manda el plano de producción de la variante. Sin el plano cargado, el pedido no se puede armar.' },
@@ -640,10 +640,11 @@
       return {
         // Cuántos proveedores hacen falta para terminarlo y quiénes son. Un
         // rack con módulo laqueado y patas de hierro necesita dos.
-        // A qué rubros se les pide, en orden: el primero recibe el primer
-        // plano, el segundo el segundo.
-        nProveedores: 1, rubros: ['carpinteria'], obtencion: 'dibujo', instalacion: false,
-        planilla: null,
+        // A qué rubros se les pide, en orden. Cada uno con lo suyo: cómo se
+        // le pide y, si es por planilla, qué columnas lleva la de ÉL.
+        nProveedores: 1,
+        rubros: [{ k: 'carpinteria', modo: 'dibujo', planilla: null }],
+        instalacion: false,
         // Cada mueble es distinto: 12 mesas de luz iguales son 12 unidades
         // distintas, y hay que saber cuál salió en cada orden.
         rastreo: 'serie',
