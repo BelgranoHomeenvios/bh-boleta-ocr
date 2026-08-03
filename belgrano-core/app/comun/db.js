@@ -632,17 +632,36 @@
       { k: 'pedir', label: 'A pedir', pill: 'crit',
         pie: 'Vendida y todavía sin proveedor. Es lo que hay que pedir esta semana.' },
       { k: 'produccion', label: 'En producción', pill: 'viol',
-        pie: 'La está haciendo el proveedor. Todavía no llegó, pero se puede reservar.' },
+        pie: 'La está haciendo el proveedor. Todavía no llegó.' },
       { k: 'stock', label: 'En stock', pill: 'ok',
         pie: 'Llegó, tiene etiqueta y está en su ubicación.' },
       { k: 'entregada', label: 'Entregada', pill: 'soft',
         pie: 'Ya salió. Queda el histórico para los reclamos.' },
     ],
+    // Cómo se lee de verdad en pantalla, con el vocabulario de la planilla.
+    // Son cinco y cada uno dice qué falta hacer con esa pieza, que es lo que
+    // uno quiere saber al mirarla.
+    VISTAS_UNIDAD: [
+      { k: 'stock', label: 'Stock', pill: 'ok', pie: 'Está y no tiene dueño: se puede vender.' },
+      { k: 'pedir', label: 'A pedir', pill: 'crit', pie: 'Vendida y sin proveedor asignado.' },
+      { k: 'fabricando', label: 'En producción', pill: 'viol', pie: 'La está haciendo el proveedor.' },
+      { k: 'lista', label: 'Lista para entregar', pill: 'warn', pie: 'Vendida y ya en el depósito.' },
+      { k: 'entregada', label: 'Entregada', pill: 'soft', pie: 'Ya salió.' },
+    ],
+    // En cuál de esas cinco cae una unidad.
+    vistaUnidad(u) {
+      if (u.estado === 'entregada') return 'entregada';
+      if (u.estado === 'pedir') return 'pedir';
+      if (u.estado === 'produccion') return 'fabricando';
+      return u.orden ? 'lista' : 'stock';
+    },
     estadoUnidad(k) { return this.ESTADOS_UNIDAD.find(x => x.k === k) || this.ESTADOS_UNIDAD[1]; },
 
     // CÓMO está. No reemplaza al estado: una unidad a reparar sigue estando
     // físicamente y tiene que contar en el inventario, sólo que no se vende.
     MARCAS_UNIDAD: [
+      { k: 'sena', label: 'A confirmar la venta', pill: 'warn',
+        pie: 'Dejó una seña chica: está apartada pero la venta no está cerrada. Si pasan los días se cae sola.' },
       { k: 'reparar', label: 'A reparar', pill: 'warn',
         pie: 'Está, pero no se puede vender hasta que se arregle.' },
       { k: 'confirmar', label: 'A confirmar', pill: 'soft',
@@ -758,6 +777,15 @@
       return out;
     },
     unidad(id) { return this.unidadesTodas().find(u => u.id === Number(id)) || null; },
+    // Todas las variantes, para poder leer las propiedades de una unidad.
+    variantesTodas() { return DEMO.variantes; },
+    // "1 de 6": una orden puede tener seis muebles y ésta es uno de ellos.
+    posEnOrden(u) {
+      if (!u.orden) return null;
+      const hs = this.unidadesTodas().filter(x => x.orden === u.orden);
+      const i = hs.findIndex(x => x.id === u.id);
+      return i < 0 ? null : { n: i + 1, de: hs.length };
+    },
     // El stock ya no se carga a mano en el mueble: se cuenta de las unidades.
     // Una sola fuente — si no, hay dos números que dicen cosas distintas.
     stockDeVariante(varianteId) {

@@ -1094,6 +1094,56 @@ al **costado derecho**, no arriba, y se pueden **marcar varias a la vez**.
 - ✅ 434. *A pedir* **no cuenta en el depósito** ni está disponible: todavía no
   existe físicamente.
 
+### Lote 39 — APLICADO (De acá no se reserva, y se lee por categoría)
+
+**La reserva vive en la venta**
+- ✅ 435. Se sacaron **Reservar** y **Liberar** del inventario. Acá se consulta:
+  qué hay, con qué número de serie y dónde está. Reservar se reserva **desde la
+  venta**, siempre atada a una orden — así ninguna reserva queda sin respaldo.
+- ✅ 436. El botón del renglón es **Ver** (la ficha de la pieza, de sólo lectura)
+  o **Pedir** cuando está *a pedir*. La ficha lo dice con todas las letras: *"No
+  tiene dueño. Se reserva desde la venta, no desde acá"*.
+- ✅ 437. La columna **Venta** muestra la orden y qué parte del pedido es esa
+  pieza: **#S00200 · 1 de 6**. El número es de la orden, no del mueble; por eso
+  se repite.
+
+**Los botones de arriba, repensados**
+- ✅ 438. En vez de *disponibles / en stock / a pedir / en producción* —que
+  mezclaban tres cosas— quedan **cinco lecturas** con las palabras de la casa:
+  **Stock · A pedir · En producción · Lista para entregar · Entregada**. Suman
+  exactamente el total: cada unidad está en una sola.
+- ✅ 439. *Reservada* dejó de ser un botón: es la **etiqueta** del renglón, que
+  combina dónde está, de quién es y cómo está (*reservada · lista*, *reservada ·
+  en fábrica*, *a reparar*).
+
+**Cada categoría se lee con sus propias columnas**
+- ✅ 440. Arriba, el **nombre de la categoría** —PLACARDS— más grande y **fijo**
+  mientras se recorre; abajo los títulos de las columnas de *esa* categoría; y
+  recién ahí los muebles. Una tabla por categoría, no una sola con cortes.
+- ✅ 441. Las columnas quedan **N° · foto · modelo** y después **las propiedades
+  del mueble** —medidas del frente, estructura, frente—, que **cambian con la
+  categoría**: un placard no se lee con las mismas que una mesa de luz. Se lee
+  igual que el catálogo.
+- ✅ 442. Marcando una categoría se ve **de a una por vez**, y los filtros del
+  costado derecho pasan a ser los de esa categoría.
+- ✅ 443. El **buscador busca en todo**: si se escribe algo, la categoría marcada
+  deja de acotar y aparecen todas las que coinciden, agrupadas por categoría.
+
+**Los costados y lo que se mira de un vistazo**
+- ✅ 444. A la izquierda **Categorías** y **Proveedor** —"qué me tiene que traer
+  Tony"—; a la derecha **las propiedades de la variante** en vez de
+  terminaciones. Todos los grupos **se pliegan y arrancan cerrados**, con la
+  cuenta al lado y un resumen de lo marcado.
+- ✅ 445. Arriba, cuatro números: **En el depósito · Falta pedir · Vienen en
+  camino · Plata en el depósito**. La plata sólo la ve quien ve costos.
+- ✅ 446. La **seña chica** es una marca, no un estado: *a confirmar la venta*.
+  La unidad sigue donde estaba y, si pasan los días, se cae sola.
+
+> Pendiente de este lote: *lo que se entrega en estos días* y *lo que está en
+> viaje* necesitan Logística; la **recepción** (llegan 5 de 8, se tildan y se les
+> asigna serie y ubicación) y la **confirmación administrativa** de las órdenes
+> antes de Producción van con esos módulos.
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·

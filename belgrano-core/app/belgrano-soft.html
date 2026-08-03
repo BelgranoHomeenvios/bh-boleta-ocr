@@ -845,17 +845,36 @@ tr:hover td{background:var(--panel-2)}
       { k: 'pedir', label: 'A pedir', pill: 'crit',
         pie: 'Vendida y todavía sin proveedor. Es lo que hay que pedir esta semana.' },
       { k: 'produccion', label: 'En producción', pill: 'viol',
-        pie: 'La está haciendo el proveedor. Todavía no llegó, pero se puede reservar.' },
+        pie: 'La está haciendo el proveedor. Todavía no llegó.' },
       { k: 'stock', label: 'En stock', pill: 'ok',
         pie: 'Llegó, tiene etiqueta y está en su ubicación.' },
       { k: 'entregada', label: 'Entregada', pill: 'soft',
         pie: 'Ya salió. Queda el histórico para los reclamos.' },
     ],
+    // Cómo se lee de verdad en pantalla, con el vocabulario de la planilla.
+    // Son cinco y cada uno dice qué falta hacer con esa pieza, que es lo que
+    // uno quiere saber al mirarla.
+    VISTAS_UNIDAD: [
+      { k: 'stock', label: 'Stock', pill: 'ok', pie: 'Está y no tiene dueño: se puede vender.' },
+      { k: 'pedir', label: 'A pedir', pill: 'crit', pie: 'Vendida y sin proveedor asignado.' },
+      { k: 'fabricando', label: 'En producción', pill: 'viol', pie: 'La está haciendo el proveedor.' },
+      { k: 'lista', label: 'Lista para entregar', pill: 'warn', pie: 'Vendida y ya en el depósito.' },
+      { k: 'entregada', label: 'Entregada', pill: 'soft', pie: 'Ya salió.' },
+    ],
+    // En cuál de esas cinco cae una unidad.
+    vistaUnidad(u) {
+      if (u.estado === 'entregada') return 'entregada';
+      if (u.estado === 'pedir') return 'pedir';
+      if (u.estado === 'produccion') return 'fabricando';
+      return u.orden ? 'lista' : 'stock';
+    },
     estadoUnidad(k) { return this.ESTADOS_UNIDAD.find(x => x.k === k) || this.ESTADOS_UNIDAD[1]; },
 
     // CÓMO está. No reemplaza al estado: una unidad a reparar sigue estando
     // físicamente y tiene que contar en el inventario, sólo que no se vende.
     MARCAS_UNIDAD: [
+      { k: 'sena', label: 'A confirmar la venta', pill: 'warn',
+        pie: 'Dejó una seña chica: está apartada pero la venta no está cerrada. Si pasan los días se cae sola.' },
       { k: 'reparar', label: 'A reparar', pill: 'warn',
         pie: 'Está, pero no se puede vender hasta que se arregle.' },
       { k: 'confirmar', label: 'A confirmar', pill: 'soft',
@@ -971,6 +990,15 @@ tr:hover td{background:var(--panel-2)}
       return out;
     },
     unidad(id) { return this.unidadesTodas().find(u => u.id === Number(id)) || null; },
+    // Todas las variantes, para poder leer las propiedades de una unidad.
+    variantesTodas() { return DEMO.variantes; },
+    // "1 de 6": una orden puede tener seis muebles y ésta es uno de ellos.
+    posEnOrden(u) {
+      if (!u.orden) return null;
+      const hs = this.unidadesTodas().filter(x => x.orden === u.orden);
+      const i = hs.findIndex(x => x.id === u.id);
+      return i < 0 ? null : { n: i + 1, de: hs.length };
+    },
     // El stock ya no se carga a mano en el mueble: se cuenta de las unidades.
     // Una sola fuente — si no, hay dos números que dicen cosas distintas.
     stockDeVariante(varianteId) {
@@ -6732,9 +6760,9 @@ tr:hover td{background:var(--panel-2)}
 // =====================================================================
 //  Belgrano Soft · Inventario · Unidades
 //  La planilla de siempre, hecha sistema. Una fila por unidad —la pieza,
-//  no el modelo— con su estado a la vista y el botón de reservar en el
-//  renglón. El vendedor busca lo que le pidió el cliente y reserva ESA
-//  unidad; Administración ve proveedor, ubicación y fechas sin salir.
+//  no el modelo— con su estado a la vista. Es de CONSULTA: acá se mira qué
+//  hay y con qué número de serie, pero no se reserva — la reserva vive en la
+//  venta, encadenada a su orden, para que ninguna quede sin respaldo.
 // =====================================================================
 (function (global) {
   const VER_KEY = 'bh_inv_cats';
@@ -6744,7 +6772,8 @@ tr:hover td{background:var(--panel-2)}
     texto: '',
     filtro: 'todo',        // todo · disponible · stock · produccion · reservada · entregada · marcas
     cats: [],              // categorías marcadas — costado izquierdo
-    terms: [],             // terminaciones marcadas — costado derecho
+    props: {},             // propiedades marcadas — costado derecho
+    provs: [],             // proveedores marcados — "qué me tiene que traer Tony"
 
     async render(mount = 'view') {
       this._mount = mount;
@@ -6758,11 +6787,12 @@ tr:hover td{background:var(--panel-2)}
           </div>
         </div>
         <div class="un-bar">
-          <div class="un-busca"><input id="un-q" placeholder="Buscar por número, modelo, medida o color…"
+          <div class="un-busca"><input id="un-q" placeholder="Buscar en todo el inventario: número, modelo, medida o color…"
             value="${UI.esc(this.texto)}"></div>
           <select id="un-orden" class="un-ord" title="Cómo se ordenan">${this.ORDENES.map(o =>
             `<option value="${o.k}">${UI.esc(o.label)}</option>`).join('')}</select>
         </div>
+        <div id="un-kpis"></div>
         <div id="un-filtros" style="margin-bottom:12px"></div>
         <div id="un-lista">${UI.spinner()}</div>
         ${this.estilos()}`;
@@ -6791,49 +6821,51 @@ tr:hover td{background:var(--panel-2)}
       const t = this.texto.toLowerCase().split(/\s+/).filter(Boolean);
       return global.DB.unidadesTodas().filter(u => {
         if (!this.pasaCat(u)) return false;
-        if (!this.pasaTerm(u)) return false;
+        if (!this.pasaProv(u)) return false;
+        if (!this.pasaProps(u)) return false;
         if (!this.pasaFiltro(u)) return false;
         if (!t.length) return true;
         const txt = `${u.serie} ${u.modelo} ${u.medida} ${u.color} ${u.orden || ''}`.toLowerCase();
         return t.every(x => txt.includes(x));
       });
     },
+    // Se mira de a una categoría por vez —así las columnas y los filtros son
+    // los de ese mueble—, pero el buscador busca en todo: si se escribe algo,
+    // la categoría marcada deja de acotar. Es lo que se espera de un buscador.
     pasaCat(u) {
+      if (this.texto) return true;
       if (!this.cats.length) return true;
       const c = this.catDe(u);
       return !!c && this.cats.includes(c.id);
     },
-    pasaTerm(u) {
-      if (!this.terms.length) return true;
-      return this.terms.includes(this.normT(u.terminacion));
+    pasaProv(u) {
+      return !this.provs.length || this.provs.includes(u.proveedor);
+    },
+    // Cada propiedad filtra aparte: marcar Blanca en ESTRUCTURA y 1.60 en
+    // MEDIDA busca las que tienen las dos cosas, igual que en el catálogo.
+    pasaProps(u) {
+      for (const k of Object.keys(this.props)) {
+        const sel = this.props[k]; if (!sel.length) continue;
+        if (!sel.includes(this.normT(this.valorProp(u, k)))) return false;
+      }
+      return true;
     },
     pasaFiltro(u) {
-      const f = this.filtro;
-      if (f === 'todo') return true;
-      if (f === 'disponible') return global.DB.disponible(u);
-      if (f === 'reservada') return !!u.orden && u.estado !== 'entregada';
-      if (f === 'marcas') return !!u.marca;
-      return u.estado === f;
+      if (this.filtro === 'todo') return true;
+      return global.DB.vistaUnidad(u) === this.filtro;
     },
     cuenta(f) {
       const antes = this.filtro;
       this.filtro = f;
       const n = global.DB.unidadesTodas()
-        .filter(u => this.pasaCat(u) && this.pasaTerm(u) && this.pasaFiltro(u)).length;
+        .filter(u => this.pasaCat(u) && this.pasaProv(u) && this.pasaProps(u) && this.pasaFiltro(u)).length;
       this.filtro = antes;
       return n;
     },
 
-    FILTROS: [
-      { k: 'todo', label: 'Todo' },
-      { k: 'disponible', label: 'Disponible' },
-      { k: 'stock', label: 'En stock' },
-      { k: 'pedir', label: 'A pedir' },
-      { k: 'produccion', label: 'En producción' },
-      { k: 'reservada', label: 'Reservadas' },
-      { k: 'entregada', label: 'Entregadas' },
-      { k: 'marcas', label: 'Con marca' },
-    ],
+    filtros() {
+      return [{ k: 'todo', label: 'Todo' }, ...global.DB.VISTAS_UNIDAD];
+    },
 
     // Cómo se ordena adentro de cada categoría. Por default por estado: lo que
     // hay para entregar arriba, después lo que se está haciendo, y al final lo
@@ -6845,7 +6877,9 @@ tr:hover td{background:var(--panel-2)}
       { k: 'ubicacion', label: 'Por ubicación' },
     ],
     orden: 'estado',
-    PESO_ESTADO: { stock: 0, produccion: 1, pedir: 2, entregada: 3 },
+    // El orden en que se mira: primero lo que se puede vender, después lo
+    // vendido que ya está, después lo que falta hacer, y al final lo que salió.
+    PESO_VISTA: { stock: 0, lista: 1, fabricando: 2, pedir: 3, entregada: 4 },
     ordenar(us) {
       const cmp = (a, b) => {
         if (this.orden === 'modelo') {
@@ -6868,7 +6902,8 @@ tr:hover td{background:var(--panel-2)}
       return [...us].sort(cmp);
     },
     porEstado(a, b) {
-      const pa = this.PESO_ESTADO[a.estado] ?? 3, pb = this.PESO_ESTADO[b.estado] ?? 3;
+      const pa = this.PESO_VISTA[global.DB.vistaUnidad(a)] ?? 9;
+      const pb = this.PESO_VISTA[global.DB.vistaUnidad(b)] ?? 9;
       return pa - pb;
     },
     // A igualdad de todo lo demás, primero lo libre: es lo que se puede vender.
@@ -6896,12 +6931,14 @@ tr:hover td{background:var(--panel-2)}
       const sub = document.getElementById('un-sub');
       if (sub) {
         const tot = global.DB.unidadesTodas().length;
-        sub.textContent = us.length === tot
-          ? `${tot} unidades` : `${us.length} de ${tot} unidades`;
+        const base = us.length === tot ? `${tot} unidades` : `${us.length} de ${tot} unidades`;
+        sub.innerHTML = this.texto && this.cats.length
+          ? `${base} — <b>buscando en todas las categorías</b>` : base;
       }
+      this.pintarKpis(us);
       const f = document.getElementById('un-filtros');
       if (f) {
-        f.innerHTML = `<div class="segm">${this.FILTROS.map(x =>
+        f.innerHTML = `<div class="segm">${this.filtros().map(x =>
           `<button class="seg ${this.filtro === x.k ? 'on' : ''}" data-f="${x.k}">${UI.esc(x.label)}
             <b>${this.cuenta(x.k)}</b></button>`).join('')}</div>`;
         f.querySelectorAll('[data-f]').forEach(b => b.onclick = () => {
@@ -6915,126 +6952,285 @@ tr:hover td{background:var(--panel-2)}
       cont.innerHTML = `<div class="un-cols">
         ${this.htmlCats()}
         <div id="un-tabla"></div>
-        ${this.htmlTerms()}
+        ${this.htmlProps()}
       </div>`;
       this.pintarTabla(document.getElementById('un-tabla'), us);
       this.engancharLados();
     },
 
-    // Izquierda: las categorías, en orden alfabético. Es por donde se entra.
+    // Lo que se mira de un vistazo: cuánto hay, cuánto falta pedir, y cuánta
+    // plata está parada en el depósito. La plata sólo la ve quien ve costos.
+    costoDe(u) {
+      const v = (global.DB.variantesTodas() || []).find(x => x.id === u.varianteId);
+      if (!v) return 0;
+      const prod = (this.prods || []).find(p => p.id === u.productoId) || {};
+      const c = global.DB.composicion(prod, v);
+      return c ? c.total : (Number(v.costo) || 0);
+    },
+    pintarKpis(us) {
+      const k = document.getElementById('un-kpis'); if (!k) return;
+      const plata = global.App && global.App.puede && global.App.puede('verCostos');
+      const enPiso = us.filter(u => global.DB.enPiso(u));
+      const libres = us.filter(u => global.DB.disponible(u));
+      const aPedir = us.filter(u => u.estado === 'pedir');
+      const viniendo = us.filter(u => u.estado === 'produccion');
+      const valor = enPiso.reduce((a, u) => a + this.costoDe(u), 0);
+      const valorLibre = libres.reduce((a, u) => a + this.costoDe(u), 0);
+      const c = (t, v, p, cl) => `<div class="un-k">
+        <div class="un-k-t">${t}</div><div class="un-k-v ${cl || ''}">${v}</div>
+        <div class="un-k-p">${p}</div></div>`;
+      k.innerHTML = `<div class="un-kpis">
+        ${c('En el depósito', enPiso.length, `<b>${libres.length}</b> libres para vender`)}
+        ${c('Falta pedir', aPedir.length, aPedir.length ? 'vendidas sin proveedor' : 'nada pendiente',
+          aPedir.length ? 'alerta' : '')}
+        ${c('Vienen en camino', viniendo.length, 'las está haciendo el proveedor')}
+        ${plata ? c('Plata en el depósito', UI.pesos(valor),
+          `<b>${UI.pesos(valorLibre)}</b> sin vender`) : ''}
+      </div>`;
+    },
+
+    // Izquierda: las categorías. Derecha: las propiedades de la variante
+    // —medida, estructura, frente—, las mismas del catálogo, para que se lea
+    // igual en los dos lados. Los dos costados se pliegan.
+    _gAbiertos: new Set(),
+    grupoAbierto(k) { return this._gAbiertos.has(k); },
+    abrirGrupo(k) {
+      if (this._gAbiertos.has(k)) this._gAbiertos.delete(k); else this._gAbiertos.add(k);
+    },
+    // Las propiedades principales de cada unidad, sacadas de su variante.
+    propsDe(u) {
+      const v = (global.DB.variantesTodas ? global.DB.variantesTodas() : [])
+        .find(x => x.id === u.varianteId);
+      return v || null;
+    },
+    valorProp(u, k) {
+      const v = this.propsDe(u);
+      return v ? (v[k] || '') : '';
+    },
+    clavesProp() {
+      // Cuando hay categorías marcadas, las propiedades son las de esas
+      // categorías: un placard no se lee con las mismas columnas que una mesa
+      // de luz, así que los filtros de la derecha cambian con lo que se mira.
+      const ps = this.cats.length
+        ? (this.prods || []).filter(p => this.cats.includes(p.categoria_id))
+        : (this.prods || []);
+      return this.clavesDe(ps);
+    },
+    // Las propiedades principales de un conjunto de muebles, en el orden en que
+    // se leen: primero la medida, después cómo está terminado.
+    clavesDe(ps) {
+      const out = [];
+      (ps || []).forEach(p => Object.keys(p.props || {})
+        .forEach(k => { if (!out.includes(k)) out.push(k); }));
+      return out.length ? out : ['medida', 'estructura', 'frente'];
+    },
+    // Las columnas de propiedad de una categoría: son las que cambian de título
+    // según lo que se esté mirando.
+    clavesCat(catId) {
+      return this.clavesDe((this.prods || []).filter(p => p.categoria_id === catId));
+    },
+    tituloProp(k) {
+      const p = global.DB.propiedad(k);
+      return (p && p.nombre) || k;
+    },
+
     htmlCats() {
       const m = new Map();
       global.DB.unidadesTodas().forEach(u => {
-        if (!this.pasaTerm(u) || !this.pasaFiltro(u)) return;
+        if (!this.pasaProps(u) || !this.pasaFiltro(u)) return;
         const c = this.catDe(u); if (!c) return;
         m.set(c.id, (m.get(c.id) || 0) + 1);
       });
       const ops = [...m.entries()].map(([id, n]) => ({
         id, n, label: (this.arbol.find(c => c.id === id) || {}).nombre || '—',
       })).sort((a, b) => a.label.localeCompare(b.label));
-      if (!ops.length) return '<aside class="un-c"></aside>';
+      const on = this.grupoAbierto('cats');
       return `<aside class="un-c">
-        <div class="un-c-h"><span>Categorías</span>
-          ${this.cats.length ? '<button class="lnk" data-limpia="cats">ver todas</button>' : ''}</div>
-        ${ops.map(o => `<label class="un-o ${this.cats.includes(o.id) ? 'on' : ''}">
-          <input type="checkbox" data-cat="${o.id}" ${this.cats.includes(o.id) ? 'checked' : ''}>
-          <span class="un-o-n">${UI.esc(o.label)}</span>
-          <span class="un-o-c tnum">${o.n}</span></label>`).join('')}
+        <div class="un-c-h"><span>Filtros</span>
+          ${this.cats.length || this.provs.length || Object.keys(this.props).length
+            ? '<button class="lnk" data-limpia="todo">limpiar</button>' : ''}</div>
+        <div class="un-g2 ${on ? 'on' : ''}">
+          <button class="un-g-t" data-grupo="cats" aria-expanded="${on}">
+            <span class="un-g-fl">${on ? '▾' : '▸'}</span>
+            <span class="un-g-n">Categorías</span>
+            ${this.cats.length ? `<span class="un-g-m">${this.cats.length}</span>` : ''}
+          </button>
+          ${!on && this.cats.length ? `<div class="un-g-r">${UI.esc(ops
+            .filter(o => this.cats.includes(o.id)).map(o => o.label).join(', '))}</div>` : ''}
+          ${on ? ops.map(o => `<label class="un-o ${this.cats.includes(o.id) ? 'on' : ''}">
+            <input type="checkbox" data-cat="${o.id}" ${this.cats.includes(o.id) ? 'checked' : ''}>
+            <span class="un-o-n">${UI.esc(o.label)}</span>
+            <span class="un-o-c tnum">${o.n}</span></label>`).join('') : ''}
+        </div>
+        ${this.htmlProvs()}
       </aside>`;
     },
 
-    // Derecha: las terminaciones, con su redondelito.
-    htmlTerms() {
-      const m = new Map(); const nom = new Map();
+    // Quién la trae. Con el estado "en producción" marcado, esto contesta la
+    // pregunta de todos los días: qué me tiene que entregar Tony.
+    htmlProvs() {
+      const m = new Map();
       global.DB.unidadesTodas().forEach(u => {
-        if (!this.pasaCat(u) || !this.pasaFiltro(u)) return;
-        const k = this.normT(u.terminacion); if (!k) return;
-        m.set(k, (m.get(k) || 0) + 1);
-        if (!nom.has(k)) nom.set(k, u.terminacion);
+        if (!this.pasaCat(u) || !this.pasaProps(u) || !this.pasaFiltro(u)) return;
+        if (!u.proveedor) return;
+        m.set(u.proveedor, (m.get(u.proveedor) || 0) + 1);
       });
-      const ops = [...m.entries()].map(([k, n]) => ({ k, n, label: nom.get(k) }))
-        .sort((a, b) => String(a.label).localeCompare(String(b.label)));
-      if (!ops.length) return '<aside class="un-c"></aside>';
+      const ops = [...m.entries()].map(([k, n]) => ({ k, n }))
+        .sort((a, b) => a.k.localeCompare(b.k));
+      if (ops.length < 2 && !this.provs.length) return '';
+      const on = this.grupoAbierto('provs');
+      return `<div class="un-g2 ${on ? 'on' : ''}">
+        <button class="un-g-t" data-grupo="provs" aria-expanded="${on}">
+          <span class="un-g-fl">${on ? '▾' : '▸'}</span>
+          <span class="un-g-n">Proveedor</span>
+          ${this.provs.length ? `<span class="un-g-m">${this.provs.length}</span>` : ''}
+        </button>
+        ${!on && this.provs.length ? `<div class="un-g-r">${UI.esc(this.provs.join(', '))}</div>` : ''}
+        ${on ? ops.map(o => `<label class="un-o ${this.provs.includes(o.k) ? 'on' : ''}">
+          <input type="checkbox" data-prov="${UI.esc(o.k)}" ${this.provs.includes(o.k) ? 'checked' : ''}>
+          <span class="un-o-n">${UI.esc(o.k)}</span>
+          <span class="un-o-c tnum">${o.n}</span></label>`).join('') : ''}
+      </div>`;
+    },
+
+    // Las propiedades de la variante, una lista por propiedad — igual que el
+    // catálogo: medidas del frente, estructura, frente.
+    htmlProps() {
+      const claves = this.clavesProp();
+      const gs = claves.map(k => {
+        const m = new Map(); const nom = new Map();
+        global.DB.unidadesTodas().forEach(u => {
+          if (!this.pasaCat(u) || !this.pasaFiltro(u)) return;
+          const val = this.valorProp(u, k); if (!val) return;
+          const nk = this.normT(val);
+          m.set(nk, (m.get(nk) || 0) + 1);
+          if (!nom.has(nk)) nom.set(nk, val);
+        });
+        const prop = global.DB.propiedad(k);
+        const rol = global.DB.rolDe(k);
+        return {
+          k, titulo: (prop && prop.nombre) || k,
+          color: ['estructura', 'frente', 'terminacion', 'material'].includes(rol),
+          ops: [...m.entries()].map(([x, n]) => ({ k: x, n, label: nom.get(x) }))
+            .sort((a, b) => b.n - a.n || String(a.label).localeCompare(String(b.label))),
+        };
+      }).filter(g => g.ops.length > 1 || (this.props[g.k] || []).length);
+      if (!gs.length) return '<aside class="un-c"></aside>';
       return `<aside class="un-c">
-        <div class="un-c-h"><span>Terminación</span>
-          ${this.terms.length ? '<button class="lnk" data-limpia="terms">ver todas</button>' : ''}</div>
-        ${ops.map(o => `<label class="un-o ${this.terms.includes(o.k) ? 'on' : ''}">
-          <input type="checkbox" data-term="${UI.esc(o.k)}" ${this.terms.includes(o.k) ? 'checked' : ''}>
-          <span class="pt" style="background:${global.DB.colorDe(o.label)}"></span>
-          <span class="un-o-n">${UI.esc(o.label)}</span>
-          <span class="un-o-c tnum">${o.n}</span></label>`).join('')}
+        <div class="un-c-h"><span>Propiedades</span></div>
+        ${gs.map(g => {
+          const sel = this.props[g.k] || [];
+          const on = this.grupoAbierto(g.k);
+          return `<div class="un-g2 ${on ? 'on' : ''}">
+            <button class="un-g-t" data-grupo="${UI.esc(g.k)}" aria-expanded="${on}">
+              <span class="un-g-fl">${on ? '▾' : '▸'}</span>
+              <span class="un-g-n">${UI.esc(g.titulo)}</span>
+              ${sel.length ? `<span class="un-g-m">${sel.length}</span>` : ''}
+            </button>
+            ${!on && sel.length ? `<div class="un-g-r">${UI.esc(g.ops
+              .filter(o => sel.includes(o.k)).map(o => o.label).join(', '))}</div>` : ''}
+            ${on ? g.ops.map(o => `<label class="un-o ${sel.includes(o.k) ? 'on' : ''}">
+              <input type="checkbox" data-prop="${UI.esc(g.k)}|${UI.esc(o.k)}"
+                ${sel.includes(o.k) ? 'checked' : ''}>
+              ${g.color ? `<span class="pt" style="background:${global.DB.colorDe(o.label)}"></span>` : ''}
+              <span class="un-o-n">${UI.esc(o.label)}</span>
+              <span class="un-o-c tnum">${o.n}</span></label>`).join('') : ''}
+          </div>`;
+        }).join('')}
       </aside>`;
     },
 
     engancharLados() {
+      document.querySelectorAll('[data-grupo]').forEach(b => b.onclick = () => {
+        this.abrirGrupo(b.dataset.grupo); this.pintar();
+      });
       document.querySelectorAll('[data-cat]').forEach(i => i.onchange = () => {
         const id = Number(i.dataset.cat);
         this.cats = this.cats.includes(id) ? this.cats.filter(x => x !== id) : [...this.cats, id];
         this.pintar();
       });
-      document.querySelectorAll('[data-term]').forEach(i => i.onchange = () => {
-        const k = i.dataset.term;
-        this.terms = this.terms.includes(k) ? this.terms.filter(x => x !== k) : [...this.terms, k];
+      document.querySelectorAll('[data-prop]').forEach(i => i.onchange = () => {
+        const [k, v] = i.dataset.prop.split('|');
+        const sel = this.props[k] || [];
+        this.props[k] = sel.includes(v) ? sel.filter(x => x !== v) : [...sel, v];
+        if (!this.props[k].length) delete this.props[k];
+        this.pintar();
+      });
+      document.querySelectorAll('[data-prov]').forEach(i => i.onchange = () => {
+        const k = i.dataset.prov;
+        this.provs = this.provs.includes(k) ? this.provs.filter(x => x !== k) : [...this.provs, k];
         this.pintar();
       });
       document.querySelectorAll('[data-limpia]').forEach(b => b.onclick = () => {
-        if (b.dataset.limpia === 'cats') this.cats = []; else this.terms = [];
-        this.pintar();
+        this.cats = []; this.props = {}; this.provs = []; this.pintar();
       });
     },
 
-    // El renglón es bajo a propósito: se trabaja mirando muchos a la vez.
+    // Una tabla por categoría: arriba el nombre de la categoría, abajo los
+    // títulos de las columnas —que cambian con ella, porque un placard no se
+    // lee con las mismas propiedades que una mesa de luz— y recién ahí los
+    // muebles. El renglón es bajo a propósito: se trabaja mirando muchos.
     pintarTabla(cont, us) {
       if (!us.length) { cont.innerHTML = UI.vacio('Ninguna unidad con ese filtro.'); return; }
       const ed = global.App && global.App.puede && global.App.puede('editarCatalogo');
       const grupos = this.porCategoria(this.ordenar(us));
 
-      cont.innerHTML = `<div class="card un-tabla">
-        <table>
-          <thead><tr>
-            <th>N°</th><th>Modelo</th><th>Medida</th><th>Color</th><th>Estado</th>
-            <th>Ubicación</th><th>Proveedor</th><th>Llega</th><th>Listo</th><th>Venta</th><th></th>
-          </tr></thead>
-          <tbody>${grupos.map(g => `
-            <tr class="un-g"><td colspan="11">${UI.esc(g.nombre)}
-              <span class="muted">${g.items.length}</span></td></tr>
-            ${g.items.map(u => this.renglon(u, ed)).join('')}`).join('')}
-          </tbody>
-        </table></div>
-        <div class="hint" style="margin-top:9px">Se reserva la unidad exacta, no "una de las
-          cuatro". <b>Disponible</b> es lo que está en stock, sin dueño y sin marcas. La que es
+      cont.innerHTML = `${grupos.map(g => {
+        const claves = this.clavesCat(g.id);
+        return `<section class="un-sec">
+          <div class="un-cat">
+            <h2>${UI.esc(g.nombre)}</h2>
+            <span class="un-cat-n">${g.items.length} ${g.items.length === 1 ? 'unidad' : 'unidades'}</span>
+          </div>
+          <div class="card un-tabla">
+            <table>
+              <thead><tr>
+                <th>N°</th><th class="th-f">Foto</th><th>Modelo</th>
+                ${claves.map(k => `<th>${UI.esc(this.tituloProp(k))}</th>`).join('')}
+                <th>Estado</th><th>Ubicación</th><th>Proveedor</th>
+                <th>Llega</th><th>Listo</th><th>Venta</th><th></th>
+              </tr></thead>
+              <tbody>${g.items.map(u => this.renglon(u, ed, claves)).join('')}</tbody>
+            </table>
+          </div>
+        </section>`;
+      }).join('')}
+        <div class="hint" style="margin-top:9px">Acá se consulta qué hay y con qué número de
+          serie. <b>Reservar se reserva desde la venta</b>, atada a su orden. La que es
           <b>a medida</b> lleva su foto para que el vendedor sepa qué está vendiendo.</div>`;
 
-      cont.querySelectorAll('[data-res]').forEach(b => b.onclick = () => this.reservar(Number(b.dataset.res)));
-      cont.querySelectorAll('[data-lib]').forEach(b => b.onclick = () => this.liberar(Number(b.dataset.lib)));
+      cont.querySelectorAll('[data-ver]').forEach(b => b.onclick = () => this.ficha(Number(b.dataset.ver)));
       cont.querySelectorAll('[data-pedir]').forEach(b => b.onclick = () => this.pedir(Number(b.dataset.pedir)));
       cont.querySelectorAll('[data-foto]').forEach(b => b.onclick = () => this.modalFoto(Number(b.dataset.foto)));
     },
 
-    renglon(u, ed) {
+    renglon(u, ed, claves) {
       const e = global.DB.etiquetaUnidad(u);
       const enProd = u.estado === 'produccion';
-      const disp = global.DB.disponible(u);
       return `<tr class="${u.estado === 'entregada' ? 'off' : ''}">
-        <td class="td-n"><span class="tnum nom">${UI.esc(u.serie)}</span>
-          ${this.botonFoto(u, ed)}</td>
+        <td><span class="tnum nom">${UI.esc(u.serie)}</span></td>
+        <td class="td-f">${this.botonFoto(u, ed)}</td>
         <td>${UI.esc(u.modelo)}${u.tipo === 'medida'
           ? ' <span class="un-tipo med">a medida</span>' : ''}</td>
-        <td class="tnum">${UI.esc(u.medida)}</td>
-        <td>${UI.esc(u.color)}</td>
+        ${(claves || []).map(k => {
+          const val = this.valorProp(u, k) || (k === 'medida' ? u.medida : '');
+          return `<td class="${k === 'medida' ? 'tnum' : ''}">${val
+            ? UI.esc(val) : '<span class="muted">—</span>'}</td>`;
+        }).join('')}
         <td><span class="pill ${e.pill}">${UI.esc(e.label)}</span></td>
         <td class="muted">${UI.esc(global.DB.ubicacionLabel(u.ubicacion) || '—')}</td>
         <td class="muted">${UI.esc(u.proveedor || '—')}</td>
         <td>${enProd && u.llega ? `<b>${UI.esc(u.llega)}</b>`
           : `<span class="muted">—</span>`}</td>
         <td class="muted">${UI.esc(u.listo || '—')}</td>
-        <td class="muted">${u.orden ? `${UI.esc(u.orden)}${u.fechaVenta ? ` · ${UI.esc(u.fechaVenta)}` : ''}` : '—'}</td>
-        <td class="td-acc">${
-          u.estado === 'pedir' ? `<button class="bres" data-pedir="${u.id}">Pedir</button>`
-          : disp ? `<button class="bres" data-res="${u.id}">Reservar</button>`
-          : (enProd && !u.orden) ? `<button class="bres" data-res="${u.id}">Reservar</button>`
-          : (u.orden && u.estado !== 'entregada') ? `<button class="b-x" data-lib="${u.id}">Liberar</button>`
-          : ''}</td>
+        <td class="muted">${u.orden ? (() => {
+          const pos = global.DB.posEnOrden(u);
+          return `<b class="nom">${UI.esc(u.orden)}</b>${pos
+            ? ` <span class="un-pos">${pos.n} de ${pos.de}</span>` : ''}`;
+        })() : '—'}</td>
+        <td class="td-acc">${u.estado === 'pedir' && ed
+          ? `<button class="bres" data-pedir="${u.id}">Pedir</button>`
+          : `<button class="b-x" data-ver="${u.id}">Ver</button>`}</td>
       </tr>`;
     },
 
@@ -7107,38 +7303,54 @@ tr:hover td{background:var(--panel-2)}
 
     // Reservar es asignarle un dueño. Cuando Ventas esté enganchado, la orden
     // sale de ahí; por ahora se escribe, que es lo que hoy se hace a mano.
-    reservar(id) {
+    // La ficha de una unidad: todo lo que se sabe de esa pieza, y de dónde
+    // sale cada dato. Es una consulta — para reservarla hay que ir a la venta.
+    ficha(id) {
       const u = global.DB.unidad(id); if (!u) return;
+      const v = global.DB.vistaUnidad(u);
+      const e = global.DB.VISTAS_UNIDAD.find(x => x.k === v) || {};
+      const pos = global.DB.posEnOrden(u);
+      const m = global.DB.marcaUnidad(u.marca);
+      const dato = (t, val) => val ? `<div class="fi-r"><span>${t}</span><b>${UI.esc(val)}</b></div>` : '';
       document.body.insertAdjacentHTML('beforeend', `
         <div class="un-back" id="un-mdl">
-          <div class="card pad" style="max-width:440px;width:100%">
-            <h3 class="h-title" style="font-size:17px">Reservar ${UI.esc(u.serie)}</h3>
-            <p class="h-sub">${UI.esc(u.modelo)} ${UI.esc(u.medida)} · ${UI.esc(u.color)}${
-              u.estado === 'produccion'
-                ? ` — <b>todavía en fábrica, llega el ${UI.esc(u.fechaProv)}</b>` : ''}</p>
-            <label class="fld" style="margin-top:14px"><span class="lbl">Número de venta</span>
-              <input id="un-orden" placeholder="#S00250"></label>
-            <div class="hint" style="margin-top:6px">${u.estado === 'produccion'
-              ? 'Queda vendida sobre pedido: el cliente sabe que llega con esa fecha.'
-              : 'Queda apartada para esa venta y deja de estar disponible.'}</div>
+          <div class="card pad" style="max-width:480px;width:100%">
+            <div class="row" style="align-items:flex-start">
+              <div>
+                <h3 class="h-title" style="font-size:17px">${UI.esc(u.serie === '—' ? 'Sin etiqueta' : u.serie)}</h3>
+                <p class="h-sub">${UI.esc(u.modelo)} · ${UI.esc(u.medida)} · ${UI.esc(u.color)}</p>
+              </div>
+              <div class="sp"></div>
+              <span class="pill ${e.pill}">${UI.esc(e.label || '')}</span>
+            </div>
+            ${m ? `<div class="banner warn" style="margin-top:10px">${UI.esc(m.label)} —
+              ${UI.esc(m.pie)}</div>` : ''}
+            <div class="fi" style="margin-top:12px">
+              ${dato('Tipo', u.tipo === 'medida' ? 'A medida' : 'Estándar')}
+              ${dato('Ubicación', global.DB.ubicacionLabel(u.ubicacion))}
+              ${dato('Proveedor', u.proveedor)}
+              ${dato('Llega', u.llega)}
+              ${dato('Listo desde', u.listo)}
+              ${u.orden ? `<div class="fi-r"><span>Orden de venta</span>
+                <b>${UI.esc(u.orden)}${pos ? ` · ${pos.n} de ${pos.de}` : ''}</b></div>` : ''}
+              ${dato('Vendida el', u.fechaVenta)}
+              ${dato('Entregada el', u.fechaEntrega)}
+            </div>
+            <div class="hint" style="margin-top:11px">${u.orden
+              ? 'Está atada a esa venta. Para liberarla hay que hacerlo desde la orden.'
+              : 'No tiene dueño. <b>Se reserva desde la venta</b>, no desde acá: así toda reserva queda respaldada por una orden.'}</div>
             <div class="row" style="margin-top:16px;gap:10px">
               <div class="sp"></div>
-              <button class="btn" id="un-x">Cancelar</button>
-              <button class="btn primary" id="un-ok">Reservar</button>
+              <button class="btn" id="un-x">Cerrar</button>
             </div>
           </div>
         </div>`);
-      const cerrar = () => { const m = document.getElementById('un-mdl'); if (m) m.remove(); };
+      const cerrar = () => { const x = document.getElementById('un-mdl'); if (x) x.remove(); };
       document.getElementById('un-x').onclick = cerrar;
-      document.getElementById('un-mdl').onclick = e => { if (e.target.id === 'un-mdl') cerrar(); };
-      document.getElementById('un-ok').onclick = () => {
-        const o = document.getElementById('un-orden').value.trim();
-        if (!o) return UI.aviso('Poné el número de venta', 'warn');
-        global.DB.guardarUnidad({ id, orden: o, fechaVenta: hoy() });
-        UI.aviso(`${u.serie} reservada para ${o}`, 'ok');
-        cerrar(); this.pintar();
-      };
+      document.getElementById('un-mdl').onclick = ev => { if (ev.target.id === 'un-mdl') cerrar(); };
     },
+
+
     // Pedirla es asignarle proveedor y fecha: ahí deja de ser una promesa y
     // pasa a ser una pieza que alguien está haciendo.
     pedir(id) {
@@ -7179,13 +7391,6 @@ tr:hover td{background:var(--panel-2)}
       };
     },
 
-    liberar(id) {
-      const u = global.DB.unidad(id); if (!u) return;
-      global.DB.guardarUnidad({ id, orden: null, fechaVenta: '' });
-      UI.aviso(`${u.serie} vuelve a estar disponible`, 'ok');
-      this.pintar();
-    },
-
     estilos() {
       return `<style>
         .un-bar{display:flex;gap:8px;align-items:center;margin-bottom:12px}
@@ -7208,7 +7413,7 @@ tr:hover td{background:var(--panel-2)}
            derecha. El estado va arriba, que es el corte de todos los días. */
         .un-cols{display:grid;grid-template-columns:176px minmax(0,1fr) 166px;gap:14px;
           align-items:start;max-width:100%}
-        .un-cols>#un-tabla{min-width:0;overflow:hidden}
+        .un-cols>#un-tabla{min-width:0}
         @media(max-width:1240px){.un-cols{grid-template-columns:1fr}}
         .un-ord{flex:none;width:auto;min-width:150px;padding:8px 10px;font-size:12.5px;font-weight:650;
           color:var(--ink-soft);border:1px solid var(--line);border-radius:10px;background:var(--panel)}
@@ -7217,6 +7422,19 @@ tr:hover td{background:var(--panel-2)}
         .un-c{position:sticky;top:104px;display:flex;flex-direction:column}
         .un-c-h{display:flex;align-items:baseline;gap:8px;font-size:11px;font-weight:700;
           text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:5px}
+        /* Cada grupo se pliega, igual que en el catálogo. */
+        .un-g2{display:flex;flex-direction:column;margin-bottom:6px}
+        .un-g-t{display:flex;align-items:center;gap:6px;width:100%;border:0;background:none;
+          padding:3px 0;cursor:pointer;font:inherit;font-size:11px;font-weight:700;
+          text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:left}
+        .un-g-t:hover{color:var(--navy)}
+        .un-g2.on .un-g-t{color:var(--ink-soft);margin-bottom:3px}
+        .un-g-fl{font-size:9px;width:9px;flex:none}
+        .un-g-n{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .un-g-m{font-size:10px;font-weight:700;background:var(--brand);color:#fff;
+          border-radius:999px;padding:0 6px;line-height:15px;flex:none}
+        .un-g-r{font-size:11.5px;color:var(--brand);padding-left:15px;margin-bottom:2px;
+          overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .un-c .lnk{border:0;background:none;padding:0;font:inherit;font-size:11px;font-weight:600;
           color:var(--brand);cursor:pointer;text-transform:none;letter-spacing:0}
         .un-c .lnk:hover{text-decoration:underline}
@@ -7234,33 +7452,53 @@ tr:hover td{background:var(--panel-2)}
         .un-tabla table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:880px}
         .un-tabla th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;
           color:var(--muted);font-weight:700;padding:7px 9px;border-bottom:1px solid var(--line);
-          white-space:nowrap;background:var(--panel);position:sticky;top:95px;z-index:2}
+          white-space:nowrap;background:var(--panel)}
         .un-tabla td{padding:3px 8px;border-bottom:1px solid var(--line-soft);white-space:nowrap;
           line-height:1.35}
         .un-tabla th{padding-left:8px;padding-right:8px}
         .un-tabla tr.off{opacity:.55}
         .un-tabla tr:hover td{background:var(--panel-2)}
-        .un-g td{background:var(--panel-2);font-weight:700;color:var(--navy);font-size:11px;
-          text-transform:uppercase;letter-spacing:.04em;padding:5px 9px;
-          border-top:1px solid var(--line)}
-        .un-g:hover td{background:var(--panel-2)}
-        .un-g .muted{font-weight:600;margin-left:6px}
         .un-tabla .nom{font-weight:700;color:var(--navy)}
+        /* La categoría manda: va arriba de todo, más grande, y recién debajo
+           los títulos de las columnas de ESA categoría. */
+        .un-sec{margin-bottom:20px}
+        /* El título queda fijo mientras se recorre su categoría: son muchos
+           renglones y hay que saber siempre qué se está mirando. */
+        .un-cat{display:flex;align-items:baseline;gap:9px;margin:0;padding:7px 0 6px;
+          position:sticky;top:95px;z-index:4;background:var(--bg)}
+        .un-cat h2{margin:0;font-size:17px;font-weight:800;color:var(--navy);letter-spacing:-.01em}
+        .un-cat-n{font-size:12px;color:var(--muted)}
+        .th-f{width:34px}
+        .td-f{width:34px;padding-left:4px;padding-right:4px}
+        .un-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+        @media(max-width:900px){.un-kpis{grid-template-columns:1fr 1fr}}
+        .un-k{border:1px solid var(--line);border-radius:11px;padding:9px 12px;background:var(--panel)}
+        .un-k-t{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+          font-weight:700}
+        .un-k-v{font-size:19px;font-weight:800;color:var(--navy);margin-top:1px}
+        .un-k-v.alerta{color:var(--crit)}
+        .un-k-p{font-size:11px;color:var(--muted)}
+        .un-k-p b{color:var(--ink-soft)}
+        .un-pos{font-size:11px;color:var(--muted)}
+        .fi{display:flex;flex-direction:column;gap:1px}
+        .fi-r{display:flex;align-items:baseline;gap:10px;padding:4px 0;font-size:12.5px;
+          border-bottom:1px solid var(--line-soft)}
+        .fi-r:last-child{border-bottom:0}
+        .fi-r span{color:var(--muted);flex:0 0 118px}
+        .fi-r b{color:var(--navy)}
         .un-tipo{font-size:11px;padding:1px 7px;border:1px solid var(--line);border-radius:999px;
           background:var(--panel);color:var(--muted);white-space:nowrap}
         .un-tipo[data-tipo]{cursor:pointer}
         .un-tipo[data-tipo]:hover{border-color:var(--brand);color:var(--brand)}
         .un-tipo.med{background:var(--brand-soft);border-color:#cfe0fb;color:var(--brand-ink);
           font-weight:700}
-        .td-n{display:flex;align-items:center;gap:7px}
-        /* El número y el botón de reservar quedan pegados a los bordes: son
+        /* El número y la acción quedan pegados a los bordes: son
            las dos puntas que se miran, y la tabla es más ancha que la pantalla. */
         .un-tabla th:first-child,.un-tabla td:first-child{position:sticky;left:0;z-index:1;
           background:var(--panel);box-shadow:1px 0 0 var(--line-soft)}
         .un-tabla th:last-child,.un-tabla td.td-acc{position:sticky;right:0;z-index:1;
           background:var(--panel);box-shadow:-1px 0 0 var(--line-soft)}
         .un-tabla tr:hover td:first-child,.un-tabla tr:hover td.td-acc{background:var(--panel-2)}
-        .un-tabla .un-g td{position:static;box-shadow:none}
         .un-tabla th:first-child{z-index:3} .un-tabla th:last-child{z-index:3}
         .td-acc{text-align:right;padding-right:10px}
         .un-foto{width:26px;height:26px;border:1px dashed var(--line);border-radius:7px;
