@@ -260,6 +260,46 @@ tr:last-child td{border-bottom:0}
 .hist div{padding:6px 0;border-bottom:1px solid var(--line-soft);display:flex;gap:10px}
 .hist div:last-child{border-bottom:0}
 .hist .f{color:var(--muted);flex:0 0 82px}
+
+/* ---- comparar los dos dibujos ---- */
+.comp{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+@media(max-width:1000px){.comp{grid-template-columns:1fr}}
+.pane{border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden;
+  box-shadow:var(--shadow);display:flex;flex-direction:column}
+.pane-h{display:flex;align-items:center;gap:9px;padding:8px 11px;border-bottom:1px solid var(--line);
+  background:var(--panel-2);font-size:11px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.05em;color:var(--muted)}
+.pane-h .sp{flex:1}
+.tool{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);
+  background:var(--panel);border-radius:7px;padding:3px 8px;font-size:11px;font-weight:650;
+  color:var(--ink-soft);cursor:pointer;text-transform:none;letter-spacing:0}
+.tool.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.tool:hover{border-color:var(--brand)}
+.lienzo{position:relative;height:340px;background:#fff;display:grid;place-items:center;
+  border-bottom:1px solid var(--line-soft)}
+.lienzo .ph{text-align:center;color:#c2c9d2;font-size:11px;letter-spacing:.16em;font-weight:700}
+.lienzo .ph small{display:block;font-size:10.5px;letter-spacing:0;font-weight:500;margin-top:4px;
+  color:#ccd3db;max-width:230px;line-height:1.5}
+.pin{position:absolute;width:22px;height:22px;border-radius:50%;background:var(--crit);color:#fff;
+  font-size:11px;font-weight:800;display:grid;place-items:center;box-shadow:0 2px 6px rgba(0,0,0,.25);
+  cursor:pointer;border:2px solid #fff}
+.pin.ok{background:var(--ok)}
+.trazo{position:absolute;pointer-events:none}
+.trazo path{stroke:#e11d48;stroke-width:2.6;fill:none;stroke-linecap:round;opacity:.85}
+.marcas{padding:10px 12px;font-size:12.5px}
+.marca-i{display:flex;gap:9px;align-items:flex-start;padding:7px 0;
+  border-bottom:1px solid var(--line-soft)}
+.marca-i:last-child{border-bottom:0}
+.marca-i .b{flex:none;width:20px;height:20px;border-radius:50%;background:var(--crit);color:#fff;
+  font-size:10.5px;font-weight:800;display:grid;place-items:center}
+.marca-i.ok .b{background:var(--ok)}
+.marca-i .t{flex:1;color:var(--ink-soft)}
+.marca-i .t b{color:var(--navy);display:block}
+.marca-i .t small{color:var(--muted);font-size:11px}
+.rap{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.rap button{border:1px dashed var(--line);background:var(--panel);border-radius:999px;
+  padding:3px 11px;font-size:11.5px;color:var(--ink-soft);cursor:pointer}
+.rap button:hover{border-style:solid;border-color:var(--brand);color:var(--brand)}
 .cola{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 @media(max-width:980px){.cola{grid-template-columns:1fr 1fr}}
 @media(max-width:600px){.cola{grid-template-columns:1fr}}
@@ -324,6 +364,7 @@ tr:last-child td{border-bottom:0}
     <button class="opt on" data-o="h">Tu plano<small>Qué completa el sistema</small></button>
     <button class="opt" data-o="d">De dónde sale<small>Estándar vs a medida</small></button>
     <button class="opt" data-o="x">A medida<small>Dibujar, verificar, recién ahí pedir</small></button>
+    <button class="opt" data-o="z">Comparar y corregir<small>Los dos grandes, con marcas</small></button>
     <button class="opt" data-o="p">El pedido abierto<small>Se llena, se cierra, se manda</small></button>
     <button class="opt" data-o="c">La carpeta de Toni<small>Lo que tiene en el taller</small></button>
     <button class="opt" data-o="r">La recepción<small>Trajo 5 de 8, y cómo llegaron</small></button>
@@ -656,6 +697,137 @@ tr:last-child td{border-bottom:0}
       </table>
       <div class="hint" style="margin-top:9px">Un mueble <b>estándar</b> no pasa por acá: ya tiene su
         plano en la variante y se puede pedir apenas se confirma la venta.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ COMPARAR Y CORREGIR ============ -->
+<section data-p="z" class="hide">
+  <div class="idea"><b>Los dos dibujos grandes, uno al lado del otro.</b> Así se verifica de verdad:
+    mirando las dos cosas a la vez. Y si algo no está, se <b>marca sobre el dibujo</b> —con el lápiz
+    o con un comentario clavado en el lugar— en vez de explicarlo de palabra.</div>
+
+  <div class="app">
+    <div class="appbar"><span>Belgrano Soft</span><span>Ventas</span><span class="on">Producción</span>
+      <span>Compras</span><span>Inventario</span></div>
+    <div class="subbar"><div>Resumen</div><div>A fabricar</div><div class="on">A dibujar</div>
+      <div>Pedidos</div><div>Talleres</div><div>Historial</div></div>
+    <div class="body">
+      <div class="fk-bar" style="display:flex;gap:10px;align-items:center;margin-bottom:10px;
+        font-size:12px"><button class="btn" style="padding:4px 10px">‹ Pendientes</button>
+        <span class="mut">3 de 7</span>
+        <div style="flex:1"></div>
+        <button class="btn" style="padding:4px 10px">Anterior</button>
+        <button class="btn" style="padding:4px 10px">Siguiente ›</button></div>
+
+      <div class="row" style="align-items:flex-start;margin-bottom:12px">
+        <div>
+          <div class="kick">Producción · Verificar</div>
+          <div class="h1">MESA DE LUZ NÓRDICA 0.52</div>
+          <div class="sub"><span class="tipo med">a medida</span> Natural · Nogal ·
+            orden 5744 · 2 de 3 · cliente Huego</div>
+        </div>
+        <div class="sp" style="flex:1"></div>
+        <span class="pill p-res">a verificar</span>
+      </div>
+
+      <div class="comp">
+        <div class="pane">
+          <div class="pane-h"><span>Croquis del vendedor</span>
+            <div class="sp"></div>
+            <button class="tool">−</button><span style="font-size:11px">100%</span>
+            <button class="tool">+</button>
+            <button class="tool">Pantalla completa</button></div>
+          <div class="lienzo">
+            <div class="ph">CROQUIS DE LA VENTA<small>lo que subió Martín el 28/7 — foto del papel</small></div>
+            <span class="pin" style="left:18%;top:28%">1</span>
+          </div>
+          <div class="marcas">
+            <div class="hint">Subido por <b>Martín</b> · 28/7 · <a href="#"
+              style="color:var(--brand)">descargar</a></div>
+          </div>
+        </div>
+
+        <div class="pane" style="border-color:var(--brand)">
+          <div class="pane-h"><span>Plano de Adrián</span>
+            <div class="sp"></div>
+            <button class="tool on">Lápiz</button>
+            <button class="tool">Comentario</button>
+            <button class="tool">Borrar</button>
+            <button class="tool">Pantalla completa</button></div>
+          <div class="lienzo">
+            <div class="ph">PLANO DE PRODUCCIÓN<small>el PDF que subió Adrián el 1/8</small></div>
+            <svg class="trazo" viewBox="0 0 400 340" style="width:100%;height:100%">
+              <path d="M112 96 C150 78, 214 82, 250 104"/>
+              <path d="M250 104 C232 118, 214 122, 196 118"/>
+              <path d="M120 216 L268 216"/>
+            </svg>
+            <span class="pin" style="left:30%;top:26%">1</span>
+            <span class="pin" style="left:62%;top:62%">2</span>
+            <span class="pin ok" style="left:44%;top:80%">3</span>
+          </div>
+          <div class="marcas">
+            <div class="marca-i"><span class="b">1</span><div class="t">
+              <b>Falta la medida del hueco</b>
+              <small>Brian · hoy 10:14 · no dice cuánto mide el vano de la izquierda</small></div></div>
+            <div class="marca-i"><span class="b">2</span><div class="t">
+              <b>Acá modificalo</b>
+              <small>Brian · hoy 10:15 · el vendedor puso 0.52 y el plano dice 0.50</small></div></div>
+            <div class="marca-i ok"><span class="b">3</span><div class="t">
+              <b>Falta aclarar el material de la base</b>
+              <small>Adrián · hoy 10:31 · <b>corregido</b> — se agregó "MDF 18 laqueado"</small></div></div>
+            <div class="rap">
+              <button>+ Falta medida</button>
+              <button>+ Acá modificalo</button>
+              <button>+ Falta aclarar</button>
+              <button>+ No coincide con el croquis</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bar" style="margin-top:14px">
+        <span class="hint"><b>2 marcas sin resolver</b> · no se puede verificar hasta que se
+          resuelvan o se den por buenas</span>
+        <div style="flex:1"></div>
+        <button class="btn">Guardar las marcas</button>
+        <button class="btn">Devolver a Adrián con 2 correcciones</button>
+        <button class="btn pri" style="opacity:.45">Verificado</button>
+      </div>
+
+      <div class="dos" style="margin-top:16px">
+        <div class="card" style="padding:16px 18px">
+          <div class="kick" style="margin-bottom:9px">Cómo se marca</div>
+          <ul class="ok-lista">
+            <li><b>Lápiz:</b> se dibuja encima, en rojo. Queda sobre el plano, no lo modifica.</li>
+            <li><b>Comentario:</b> se clava un número en el lugar exacto y se escribe qué falta.</li>
+            <li>Los <b>atajos</b> escriben lo de siempre: <i>falta medida</i>, <i>acá modificalo</i>,
+              <i>falta aclarar</i>.</li>
+            <li>Se puede marcar <b>en los dos lados</b>: si el croquis del vendedor es el que está
+              mal, la marca va ahí y vuelve al vendedor, no a Adrián.</li>
+            <li>Cada marca se <b>resuelve</b>: Adrián sube el plano corregido y la marca queda en
+              verde con qué hizo.</li>
+          </ul>
+        </div>
+        <div class="card" style="padding:16px 18px">
+          <div class="kick" style="margin-bottom:9px">El registro que queda</div>
+          <div class="hist">
+            <div><span class="f">1/8 16:20</span><span><b>Adrián</b> subió el plano · v1</span></div>
+            <div><span class="f">hoy 10:14</span><span><b>Brian</b> marcó 3 correcciones ·
+              devuelto</span></div>
+            <div><span class="f">hoy 10:31</span><span><b>Adrián</b> resolvió 1 y subió el
+              plano · v2</span></div>
+            <div><span class="f">hoy 10:33</span><span>quedan <b>2 sin resolver</b></span></div>
+          </div>
+          <div class="hint" style="margin-top:10px">Las versiones no se pisan: se guardan
+            <b>v1, v2, v3</b> y se puede ver qué cambió entre una y otra. El plano que sale impreso
+            es siempre <b>la última verificada</b>.</div>
+        </div>
+      </div>
+
+      <div class="nota" style="margin-top:14px"><b>Y sirve para mirar hacia atrás:</b> cuántas veces
+        volvió un plano y por qué. No para apretar a nadie — para ver si lo que falla es siempre lo
+        mismo (que el croquis del vendedor viene sin medidas, por ejemplo) y arreglarlo de raíz.</div>
     </div>
   </div>
 </section>
@@ -1591,16 +1763,13 @@ tr:last-child td{border-bottom:0}
 <div class="pregs">
   <h3>Lo que me queda por saber</h3>
   <ol>
-    <li><b>El plano en A4:</b> ¿va uno por hoja o entran dos? Y si son tres camas iguales de la
-      misma venta, ¿le das <b>tres hojas</b> o <b>una que diga 3 UNIDADES</b>?</li>
+    <li><b>La carpeta de Drive con los PDF.</b> Pasámela y te digo cuántos son, cuáles tienen
+      campos escritos para vaciar, cuáles no matchean con ninguna variante del catálogo y qué
+      variantes se quedaron sin plano — esas son las que después no se van a poder pedir.</li>
     <li><b>Los rubros con planilla</b> (respaldos): ¿la planilla que le mandás lleva las mismas
       columnas que me mostraste, o cambia según el proveedor?</li>
-    <li><b>El enlace:</b> ¿lo hace la fábrica o llega cada parte por separado al depósito y lo
-      arman ahí? Cambia dónde va el botón.</li>
-    <li><b>El croquis del vendedor:</b> ¿hoy queda en algún lado —una foto, un papel— o es sólo lo
-      que escribe en la venta? Si no existe, el que verifica no tiene con qué comparar.</li>
-    <li><b>Si no coincide y se devuelve:</b> ¿vuelve a Adrián para que lo redibuje, o hay que ir a
-      preguntarle al vendedor? Cambia a dónde vuelve.</li>
+    <li><b>El enlace de dos rubros:</b> ¿lo hace la fábrica o llega cada parte por separado al
+      depósito y lo arman ahí? Cambia dónde va el botón.</li>
     <li><b>El pedido cerrado, ¿se manda desde el sistema</b> (mail / WhatsApp) o se imprime y se
       entrega en mano como ahora?</li>
   </ol>
