@@ -1201,6 +1201,15 @@ al **costado derecho**, no arriba, y se pueden **marcar varias a la vez**.
 - ✅ 460. `DB.diasDesde()` traduce las fechas de la planilla —"20/7", sin año— a
   cuántos días hace; si la fecha cae en el futuro, era del año pasado.
 
+### Lote 43 — APLICADO (Fuera el filtro de proveedor)
+
+- ✅ 461. Se sacó el **filtro por proveedor** del inventario: armaba una segunda
+  fila de filtros y no hace falta acá. Lo que cada proveedor tiene que entregar
+  se mira en **Producción**, que es donde se sigue el pedido.
+- ✅ 462. Arriba de la tabla queda una sola fila: los **estados**. Las
+  categorías, a la izquierda. El proveedor sigue estando **como dato** en la
+  ficha de cada unidad —de dónde vino—, que es distinto de filtrar por él.
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·
