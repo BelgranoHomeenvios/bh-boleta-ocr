@@ -1,0 +1,366 @@
+<meta charset="utf-8">
+<title>Belgrano Soft · Cómo se navega el catálogo — tres formas</title>
+<style>
+:root{
+  --bg:#f4f6f8; --panel:#fff; --panel-2:#fafbfc; --ink:#0f1a2a; --ink-soft:#5b6675;
+  --line:#d9e0e8; --line-soft:#eef1f5; --navy:#16324f; --brand:#1e5fce;
+  --brand-soft:#e7eefb; --brand-ink:#1a51b0; --ok:#15803d; --ok-bg:#e6f4ea;
+  --warn:#b45309; --warn-bg:#fff7e6; --muted:#8a94a3;
+  --shadow:0 1px 2px rgba(15,26,42,.06),0 1px 3px rgba(15,26,42,.04);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);line-height:1.5;
+  font-family:'Public Sans',-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  font-variant-numeric:tabular-nums}
+h1,h2,h3{margin:0;letter-spacing:-.01em}
+button{font:inherit}
+input,select{font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);
+  border-radius:8px;background:var(--panel);color:var(--ink);width:100%}
+
+.top{background:var(--navy);color:#fff;padding:11px 20px;position:sticky;top:0;z-index:30}
+.top h1{font-size:15px;font-weight:800}
+.top p{margin:2px 0 0;font-size:12px;opacity:.75}
+.opts{display:flex;gap:6px;margin-top:11px;flex-wrap:wrap}
+.opt{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);color:rgba(255,255,255,.8);
+  border-radius:9px;padding:7px 13px;font-size:12.5px;font-weight:650;cursor:pointer;text-align:left}
+.opt:hover{background:rgba(255,255,255,.18);color:#fff}
+.opt.on{background:#fff;color:var(--navy);border-color:#fff}
+.opt small{display:block;font-size:10.5px;font-weight:500;opacity:.75}
+.opt.on small{opacity:.6}
+
+.wrap{padding:18px 20px 60px;max-width:1360px;margin:0 auto}
+.idea{background:var(--brand-soft);border:1px solid #cfe0fb;border-radius:12px;padding:13px 15px;
+  font-size:13px;margin-bottom:6px}
+.idea b{color:var(--brand-ink)}
+.pros{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0 18px}
+@media(max-width:820px){.pros{grid-template-columns:1fr}}
+.pro,.con{border-radius:11px;padding:11px 14px;font-size:12.5px;border:1px solid}
+.pro{background:var(--ok-bg);border-color:#cfe8d8;color:#14532d}
+.con{background:var(--warn-bg);border-color:#f3e2c0;color:#7c4a05}
+.pro b,.con b{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;
+  margin-bottom:3px;opacity:.75}
+
+/* ---- Maqueta: el marco de la app ---- */
+.app{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;
+  box-shadow:var(--shadow)}
+.appbar{background:var(--navy);color:#fff;height:38px;display:flex;align-items:center;gap:9px;
+  padding:0 14px;font-size:11.5px;font-weight:650}
+.appbar span{opacity:.55}
+.appbar .on{opacity:1;background:rgba(255,255,255,.16);padding:3px 9px;border-radius:999px}
+.subbar{display:flex;gap:14px;padding:0 16px;border-bottom:1px solid var(--line);background:var(--panel);
+  font-size:12px;font-weight:600;color:var(--ink-soft)}
+.subbar div{padding:9px 0}
+.subbar .on{color:var(--navy);border-bottom:2px solid var(--brand)}
+.body{padding:16px;background:var(--bg)}
+.kick{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--brand)}
+.h1{font-size:19px;font-weight:800;color:var(--navy);margin:1px 0 1px}
+.sub{font-size:11.5px;color:var(--muted);margin-bottom:12px}
+
+.bar{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+.bar .busca{flex:1}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:8px 12px;
+  font-size:12.5px;font-weight:650;color:var(--ink-soft);cursor:pointer;white-space:nowrap}
+.btn.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.tog{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--panel)}
+.tog div{padding:8px 12px;font-size:12.5px;font-weight:650;color:var(--muted);cursor:pointer}
+.tog div+div{border-left:1px solid var(--line)}
+.tog .on{background:var(--brand-soft);color:var(--brand-ink)}
+
+.cols{display:grid;grid-template-columns:214px minmax(0,1fr);gap:18px;align-items:start}
+aside{display:flex;flex-direction:column;gap:15px}
+.gt{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+  margin-bottom:5px}
+.op{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:12.5px;color:var(--ink-soft);
+  cursor:pointer}
+.op .bx{width:13px;height:13px;border:1px solid var(--line);border-radius:3px;flex:none;background:#fff}
+.op.on{color:var(--navy);font-weight:650}
+.op.on .bx{background:var(--brand);border-color:var(--brand);position:relative}
+.op.on .bx:after{content:"";position:absolute;left:4px;top:1px;width:3px;height:7px;
+  border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.op .n{margin-left:auto;font-size:11px;color:var(--muted)}
+.pt{width:11px;height:11px;border-radius:50%;border:1px solid rgba(0,0,0,.18);flex:none}
+
+/* categorías como lista (opción A y C) */
+.cats{display:flex;flex-direction:column;gap:1px;max-height:264px;overflow:auto;padding-right:4px}
+.cats::-webkit-scrollbar{width:6px}
+.cats::-webkit-scrollbar-thumb{background:var(--line);border-radius:9px}
+.ct{display:flex;align-items:center;gap:8px;padding:4px 7px;border-radius:7px;font-size:12.5px;
+  color:var(--ink-soft);cursor:pointer;border:0;background:none;width:100%;text-align:left}
+.ct:hover{background:var(--panel)}
+.ct.on{background:var(--navy);color:#fff;font-weight:700}
+.ct .n{margin-left:auto;font-size:11px;opacity:.7}
+
+/* menú desplegable (opción B) */
+.mega{background:var(--panel);border:1px solid var(--line);border-radius:11px;margin-bottom:12px}
+.mega-h{display:flex;gap:2px;padding:0 6px}
+.mega-h div{padding:10px 13px;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer;
+  border-bottom:2px solid transparent}
+.mega-h .on{color:var(--navy);border-bottom-color:var(--brand)}
+.mega-b{border-top:1px solid var(--line-soft);padding:14px 16px;
+  display:grid;grid-template-columns:repeat(5,1fr);gap:4px 18px}
+@media(max-width:900px){.mega-b{grid-template-columns:repeat(2,1fr)}}
+.mega-b a{font-size:12px;color:var(--ink-soft);text-decoration:none;padding:3px 0;display:flex;gap:8px}
+.mega-b a:hover{color:var(--brand)}
+.mega-b a .n{margin-left:auto;color:var(--muted);font-size:10.5px}
+.mega-b a.on{color:var(--navy);font-weight:700}
+
+/* índice pegajoso (opción C) */
+.idx{display:flex;flex-direction:column;gap:1px;border-left:2px solid var(--line-soft);padding-left:10px}
+.idx a{font-size:12px;color:var(--muted);text-decoration:none;padding:3px 0}
+.idx a.on{color:var(--navy);font-weight:700;box-shadow:-12px 0 0 -10px var(--brand)}
+.idx a:hover{color:var(--brand)}
+
+/* resultados */
+.sec+.sec{margin-top:20px}
+.sech{display:flex;align-items:baseline;gap:9px;border-bottom:1px solid var(--line);padding-bottom:6px;
+  margin-bottom:9px}
+.sect{font-size:12.5px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.04em}
+.secn{font-size:11.5px;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:11px}
+.card{border:1px solid var(--line);border-radius:11px;background:var(--panel);overflow:hidden;
+  box-shadow:var(--shadow)}
+.im{position:relative;background:var(--panel-2);border-bottom:1px solid var(--line-soft);
+  display:grid;place-items:center;height:104px;color:var(--muted)}
+.pill{font-size:10px;font-weight:700;border-radius:999px;padding:2px 8px}
+.pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.warn{background:var(--warn-bg);color:var(--warn)}
+.im .pill{position:absolute;top:8px;left:8px}
+.cb{padding:8px 10px 10px}
+.cn{font-size:12.5px;font-weight:700;color:var(--navy);line-height:1.25}
+.cc{font-size:11px;color:var(--muted)}
+.cp{font-size:12.5px;margin-top:3px}
+.cp b{color:var(--navy)}
+.cv{font-size:11px;color:var(--brand);font-weight:650;margin-top:3px;display:flex;align-items:center;gap:6px}
+.cv .pts{margin-left:auto;display:flex;gap:3px}
+svg.sil{width:118px;height:74px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+
+.nota{font-size:12.5px;color:var(--ink-soft);background:var(--panel);border:1px solid var(--line);
+  border-left:3px solid var(--brand);border-radius:10px;padding:12px 15px;margin-top:20px}
+.nota b{color:var(--navy)}
+.hide{display:none}
+</style>
+
+<div class="top">
+  <h1>Cómo se navega el catálogo — tres formas</h1>
+  <p>El problema: con 22 categorías (y creciendo) la fila de botones de arriba no entra ni se lee.</p>
+  <div class="opts">
+    <button class="opt on" data-o="a">A · Todo al costado<small>Categorías arriba del filtro</small></button>
+    <button class="opt" data-o="b">B · Menú desplegable<small>Como la web, arriba</small></button>
+    <button class="opt" data-o="c">C · Índice que acompaña<small>Se recorre de corrido</small></button>
+  </div>
+</div>
+
+<div class="wrap">
+
+<!-- ============================ A ============================ -->
+<section data-p="a">
+  <div class="idea"><b>La idea:</b> una sola columna a la izquierda hace las dos cosas — arriba
+    <b>todas las categorías</b> con su cuenta, abajo los filtros. Arriba del contenido no queda nada
+    más que el buscador.</div>
+  <div class="pros">
+    <div class="pro"><b>Para qué sirve</b>Escala igual con 22 categorías que con 60: la lista scrollea
+      y no ensucia el encabezado. Navegar y filtrar están en el mismo lugar, que es lo que uno hace
+      seguido: "cómodas, blancas, con stock".</div>
+    <div class="con"><b>Dónde se complica</b>La columna se hace larga y hay que bajar para llegar a
+      los filtros. Se resuelve plegando el bloque de categorías una vez que elegiste una.</div>
+  </div>
+
+  <div class="app">
+    <div class="appbar"><span>BS</span><span>Inicio</span><span>Ventas</span><div class="on">Catálogo</div><span>Producción</span><span>Inventario</span></div>
+    <div class="subbar"><div class="on">Productos</div><div>Familias</div><div>Variantes</div><div>Planillas</div><div>Materiales</div></div>
+    <div class="body">
+      <div class="kick">Catálogo</div><div class="h1">Productos</div>
+      <div class="sub">633 productos · 4.128 variantes</div>
+      <div class="bar">
+        <div class="busca"><input placeholder="Buscar por nombre o código…"></div>
+        <div class="tog"><div class="on">Fotos</div><div>Listado</div></div>
+      </div>
+      <div class="cols">
+        <aside>
+          <div>
+            <div class="gt">Categorías</div>
+            <div class="cats" id="a-cats"></div>
+          </div>
+          <div><div class="gt">Ambiente</div><div id="a-amb"></div></div>
+          <div><div class="gt">Terminación</div><div id="a-term"></div></div>
+          <div><div class="gt">Disponibilidad</div><div id="a-disp"></div></div>
+        </aside>
+        <div id="a-res"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ B ============================ -->
+<section data-p="b" class="hide">
+  <div class="idea"><b>La idea:</b> arriba, una barra con <b>Muebles ▾ · Ambientes ▾ · Estilos ▾</b>
+    igual que la web. Al tocarla se abre un panel con todas las categorías en columnas. El costado
+    queda sólo para los filtros.</div>
+  <div class="pros">
+    <div class="pro"><b>Para qué sirve</b>Es la navegación que los vendedores ya conocen de la web y
+      la que usa el cliente. El encabezado queda limpio aunque haya 60 categorías, y el panel entra
+      entero en una mirada.</div>
+    <div class="con"><b>Dónde se complica</b>Hay que abrir el menú para saber qué hay: mientras
+      trabajás no ves en qué categoría estás parado ni cuántos muebles tiene cada una.</div>
+  </div>
+
+  <div class="app">
+    <div class="appbar"><span>BS</span><span>Inicio</span><span>Ventas</span><div class="on">Catálogo</div><span>Producción</span><span>Inventario</span></div>
+    <div class="subbar"><div class="on">Productos</div><div>Familias</div><div>Variantes</div><div>Planillas</div><div>Materiales</div></div>
+    <div class="body">
+      <div class="kick">Catálogo</div><div class="h1">Productos</div>
+      <div class="sub">633 productos · 4.128 variantes</div>
+      <div class="mega">
+        <div class="mega-h"><div class="on">Muebles ▾</div><div>Ambientes ▾</div><div>Estilos ▾</div>
+          <div>Novedades ▾</div></div>
+        <div class="mega-b" id="b-mega"></div>
+      </div>
+      <div class="bar">
+        <div class="busca"><input placeholder="Buscar por nombre o código…"></div>
+        <button class="btn on">Filtrar <span style="opacity:.7">2</span></button>
+        <div class="tog"><div class="on">Fotos</div><div>Listado</div></div>
+      </div>
+      <div class="cols">
+        <aside>
+          <div><div class="gt">Ambiente</div><div id="b-amb"></div></div>
+          <div><div class="gt">Terminación</div><div id="b-term"></div></div>
+          <div><div class="gt">Disponibilidad</div><div id="b-disp"></div></div>
+        </aside>
+        <div id="b-res"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ C ============================ -->
+<section data-p="c" class="hide">
+  <div class="idea"><b>La idea:</b> no hay botones de categoría en ningún lado. El catálogo se muestra
+    entero, agrupado por categoría, y a la izquierda un <b>índice que acompaña el scroll</b> y marca en
+    cuál estás parado. Se toca para saltar.</div>
+  <div class="pros">
+    <div class="pro"><b>Para qué sirve</b>Recorrer el catálogo como un catálogo impreso, que es como
+      lo tenés en la cabeza. Nunca perdés el contexto: el índice te dice siempre dónde estás y qué
+      viene después.</div>
+    <div class="con"><b>Dónde se complica</b>Con 633 muebles la página se hace larguísima, así que hay
+      que cargar de a poco mientras bajás. Y para ir directo a una categoría hay que usar el índice o
+      el buscador.</div>
+  </div>
+
+  <div class="app">
+    <div class="appbar"><span>BS</span><span>Inicio</span><span>Ventas</span><div class="on">Catálogo</div><span>Producción</span><span>Inventario</span></div>
+    <div class="subbar"><div class="on">Productos</div><div>Familias</div><div>Variantes</div><div>Planillas</div><div>Materiales</div></div>
+    <div class="body">
+      <div class="kick">Catálogo</div><div class="h1">Productos</div>
+      <div class="sub">633 productos · 4.128 variantes</div>
+      <div class="bar">
+        <div class="busca"><input placeholder="Buscar por nombre o código…"></div>
+        <button class="btn">Filtrar</button>
+        <div class="tog"><div class="on">Fotos</div><div>Listado</div></div>
+      </div>
+      <div class="cols">
+        <aside>
+          <div><div class="gt">En el catálogo</div><div class="idx" id="c-idx"></div></div>
+          <div><div class="gt">Terminación</div><div id="c-term"></div></div>
+        </aside>
+        <div id="c-res"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="nota">
+  <b>Las tres comparten lo demás:</b> el buscador, los filtros del costado con su cuenta, el cambio
+  entre <b>Fotos</b> y <b>Listado</b>, y el agrupado por categoría en los resultados. Lo único que
+  cambia es <b>por dónde elegís la categoría</b>.
+</div>
+
+</div>
+
+<script>
+const CATS = [
+  ['ALZADAS',14],['APARADORES',22],['BIBLIOTECAS',18],['BOTINEROS',9],['CAMAS',41],
+  ['CHIFONIER',12],['CÓMODAS',56],['CRISTALEROS',7],['ESCRITORIOS',26],['JUEGOS DE DORMITORIO',11],
+  ['MESAS',34],['MESAS DE LUZ',48],['MESAS RATONAS',29],['MODULARES',31],['MUEBLES DE TV',37],
+  ['PLACARD',44],['PIE DE CAMA',8],['RECIBIDORES',15],['RESPALDOS',40],['SILLAS',52],
+  ['SILLONES',19],['VAJILLEROS',13],
+];
+const SIL = {
+  comoda:'<rect x="14" y="26" width="92" height="58" rx="3"/><line x1="14" y1="45" x2="106" y2="45"/><line x1="14" y1="64" x2="106" y2="64"/><line x1="50" y1="35" x2="70" y2="35"/><line x1="50" y1="54" x2="70" y2="54"/><line x1="50" y1="74" x2="70" y2="74"/><line x1="22" y1="84" x2="22" y2="92"/><line x1="98" y1="84" x2="98" y2="92"/>',
+  luz:'<rect x="30" y="40" width="60" height="34" rx="3"/><line x1="30" y1="58" x2="90" y2="58"/><line x1="52" y1="49" x2="68" y2="49"/><line x1="36" y1="74" x2="36" y2="88"/><line x1="84" y1="74" x2="84" y2="88"/>',
+  tv:'<rect x="12" y="40" width="96" height="34" rx="3"/><line x1="60" y1="40" x2="60" y2="74"/><line x1="12" y1="62" x2="108" y2="62"/><line x1="24" y1="74" x2="24" y2="86"/><line x1="96" y1="74" x2="96" y2="86"/>',
+  placard:'<rect x="20" y="12" width="80" height="80" rx="3"/><line x1="60" y1="12" x2="60" y2="92"/><circle cx="54" cy="52" r="2.5"/><circle cx="66" cy="52" r="2.5"/><line x1="20" y1="30" x2="100" y2="30"/>',
+};
+const sil = k => `<svg class="sil" viewBox="0 0 120 100">${SIL[k]}</svg>`;
+const P = c => `<span class="pt" style="background:${c}"></span>`;
+
+const MUEBLES = {
+  'CÓMODAS':[
+    ['CÓMODA AMBERES 55','16 variantes','$385.000','comoda','A pedido','warn',['#f4f2ee','#9aa0a6']],
+    ['CÓMODA OLIVER 60','8 variantes','$410.000','comoda','Stock 3','ok',['#f4f2ee','#c49a6c']],
+    ['CÓMODA NÓRDICA 90','12 variantes','$352.000','comoda','A pedido','warn',['#c49a6c']],
+    ['CÓMODA MIAMI 1,20','24 variantes','$498.000','comoda','Stock 2','ok',['#f4f2ee','#1b1b1b','#c49a6c']],
+  ],
+  'MESAS DE LUZ':[
+    ['MESA DE LUZ AMBERES','4 variantes','$148.000','luz','Stock 6','ok',['#f4f2ee','#9aa0a6']],
+    ['MESA DE LUZ NÓRDICA','2 variantes','$132.000','luz','A pedido','warn',['#c49a6c']],
+    ['MESA DE LUZ MIAMI','12 variantes','$164.000','luz','Stock 12','ok',['#f4f2ee','#1b1b1b']],
+  ],
+  'MUEBLES DE TV':[
+    ['MUEBLE TV TASOS 55','2 variantes','$452.000','tv','Stock 2','ok',['#c49a6c']],
+    ['RACK BERGEN 1.60','4 variantes','$415.000','tv','A pedido','warn',['#f4f2ee','#9aa0a6']],
+    ['RACK OSLO 1.80','8 variantes','$498.000','tv','A pedido','warn',['#f4f2ee','#1b1b1b']],
+  ],
+  'PLACARD':[
+    ['PLACARD OLIVER','12 variantes','$860.000','placard','A pedido','warn',['#f4f2ee','#9aa0a6']],
+    ['PLACARD AMBERES 2P','8 variantes','$690.000','placard','A pedido','warn',['#f4f2ee','#c49a6c']],
+  ],
+};
+
+const card = m => `<div class="card">
+  <div class="im"><span class="pill ${m[5]}">${m[4]}</span>${sil(m[3])}</div>
+  <div class="cb">
+    <div class="cn">${m[0]}</div>
+    <div class="cp">desde <b>${m[2]}</b></div>
+    <div class="cv">${m[1]}<span class="pts">${m[6].map(P).join('')}</span></div>
+  </div></div>`;
+
+const seccion = (nom, ms) => `<section class="sec" id="s-${nom.replace(/[^A-Z]/g,'')}">
+  <div class="sech"><span class="sect">${nom}</span>
+    <span class="secn">${ms.length} muebles</span></div>
+  <div class="grid">${ms.map(card).join('')}</div></section>`;
+
+const todas = Object.entries(MUEBLES).map(([k,v]) => seccion(k,v)).join('');
+const op = (t,n,on,color) => `<div class="op ${on?'on':''}"><span class="bx"></span>
+  ${color?`<span class="pt" style="background:${color}"></span>`:''}<span>${t}</span><span class="n">${n}</span></div>`;
+const AMB = [['Living',312],['Dormitorio',418],['Cocina',204],['Recibidor',96]];
+const TERM = [['Blanca',540,'#f4f2ee'],['Negra',602,'#1b1b1b'],['Paraíso',142,'#c49a6c'],['Natural',98,'#d9c3a2']];
+const DISP = [['Con stock',87],['A pedido',1197]];
+
+// ---- A
+document.getElementById('a-cats').innerHTML = CATS.map(([n,c],i) =>
+  `<button class="ct ${i===6?'on':''}">${n}<span class="n">${c}</span></button>`).join('');
+document.getElementById('a-amb').innerHTML = AMB.map(([t,n],i)=>op(t,n,i===0)).join('');
+document.getElementById('a-term').innerHTML = TERM.map(([t,n,c])=>op(t,n,false,c)).join('');
+document.getElementById('a-disp').innerHTML = DISP.map(([t,n])=>op(t,n)).join('');
+document.getElementById('a-res').innerHTML = seccion('CÓMODAS', MUEBLES['CÓMODAS']);
+
+// ---- B
+document.getElementById('b-mega').innerHTML = CATS.map(([n,c],i) =>
+  `<a class="${i===6?'on':''}">${n}<span class="n">${c}</span></a>`).join('');
+document.getElementById('b-amb').innerHTML = AMB.map(([t,n],i)=>op(t,n,i===0)).join('');
+document.getElementById('b-term').innerHTML = TERM.map(([t,n,c],i)=>op(t,n,i===0,c)).join('');
+document.getElementById('b-disp').innerHTML = DISP.map(([t,n])=>op(t,n)).join('');
+document.getElementById('b-res').innerHTML = seccion('CÓMODAS', MUEBLES['CÓMODAS']);
+
+// ---- C
+document.getElementById('c-idx').innerHTML = CATS.map(([n],i) =>
+  `<a class="${i===6?'on':''}">${n}</a>`).join('');
+document.getElementById('c-term').innerHTML = TERM.map(([t,n,c])=>op(t,n,false,c)).join('');
+document.getElementById('c-res').innerHTML = todas;
+
+document.querySelectorAll('.opt').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.opt').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('[data-p]').forEach(s =>
+    s.classList.toggle('hide', s.dataset.p !== b.dataset.o));
+  window.scrollTo(0, 0);
+});
+</script>
