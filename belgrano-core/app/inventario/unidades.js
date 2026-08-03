@@ -712,12 +712,11 @@
         sub.onclick = () => file.click();
         file.onchange = () => {
           const f = file.files[0]; if (!f) return;
-          const r = new FileReader();
-          r.onload = () => {
-            global.DB.guardarUnidad({ id, foto: r.result });
+          UI.achicar(f, 900).then(({ url, achicada, antes, despues }) => {
+            global.DB.guardarUnidad({ id, foto: url });
+            if (achicada) UI.aviso(`Foto guardada · ${UI.peso(antes)} → ${UI.peso(despues)}`, 'ok');
             cerrar(); this.refrescar();
-          };
-          r.readAsDataURL(f);
+          }).catch(() => UI.aviso('No pude leer esa imagen', 'warn'));
         };
       }
     },

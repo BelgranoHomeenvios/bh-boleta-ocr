@@ -1014,16 +1014,16 @@
     // Sube archivos a la biblioteca del mueble.
     subir(files, tipo) {
       [...(files || [])].forEach(f => {
-        const r = new FileReader();
-        r.onload = () => {
+        // Se achica antes de guardar: una foto de celular pesa 4 MB y acá se ve
+        // a 300 px. Los PDF pasan tal cual.
+        UI.achicar(f, 1600).then(({ url }) => {
           this.p.archivos = this.p.archivos || [];
           this.p.archivos.push({
             id: 'a' + (Math.max(0, ...this.p.archivos.map(x => Number(String(x.id).slice(1)) || 0)) + 1),
-            nombre: f.name, url: r.result, tipo: tipo || 'otro',
+            nombre: f.name, url, tipo: tipo || 'otro',
           });
           this.guardar(); this.pintar();
-        };
-        r.readAsDataURL(f);
+        }).catch(() => UI.aviso('No pude leer ' + f.name, 'warn'));
       });
     },
 
@@ -1659,19 +1659,17 @@
       document.getElementById('ei-subir').onclick = () => file.click();
       file.onchange = () => {
         const f = file.files[0]; if (!f) return;
-        const r = new FileReader();
-        r.onload = () => {
+        UI.achicar(f, 1600).then(({ url }) => {
           this.p.archivos = this.p.archivos || [];
           const nuevo = {
             id: 'a' + (Math.max(0, ...this.p.archivos.map(x => Number(String(x.id).slice(1)) || 0)) + 1),
-            nombre: f.name, url: r.result, tipo,
+            nombre: f.name, url, tipo,
           };
           this.p.archivos.push(nuevo);
           v[campo] = nuevo.id;
           this.guardar(); global.DB.guardarVariante(v);
           cerrar(); this.pintar();
-        };
-        r.readAsDataURL(f);
+        }).catch(() => UI.aviso('No pude leer ese archivo', 'warn'));
       };
     },
 
@@ -2570,20 +2568,18 @@
       document.getElementById('ep-subir').onclick = () => file.click();
       file.onchange = () => {
         const f = file.files[0]; if (!f) return;
-        const r = new FileReader();
-        r.onload = () => {
+        UI.achicar(f, 1600).then(({ url }) => {
           this.p.archivos = this.p.archivos || [];
           const nuevo = {
             id: 'a' + (Math.max(0, ...this.p.archivos.map(x => Number(String(x.id).slice(1)) || 0)) + 1),
-            nombre: f.name, url: r.result, tipo: 'produccion',
+            nombre: f.name, url, tipo: 'produccion',
           };
           this.p.archivos.push(nuevo);
           v.planos[i] = nuevo.id;
           if (i === 0) v.imgProd = nuevo.id;
           this.guardar(); global.DB.guardarVariante(v);
           cerrar(); this.pintar();
-        };
-        r.readAsDataURL(f);
+        }).catch(() => UI.aviso('No pude leer ese archivo', 'warn'));
       };
     },
 

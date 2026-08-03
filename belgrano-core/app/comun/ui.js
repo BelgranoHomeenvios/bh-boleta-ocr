@@ -3,6 +3,52 @@
 // =====================================================================
 (function (global) {
   const UI = {
+    // Achicar la imagen ANTES de guardarla. Una foto de celular son 4 MB y en
+    // pantalla se ve a 300 px: guardarla entera llena el almacenamiento y hace
+    // pesado todo. Se redibuja en un canvas al ancho que hace falta y se guarda
+    // en JPG, que para una foto pesa diez veces menos que PNG.
+    achicar(file, maxPx = 1400, calidad = 0.82) {
+      return new Promise((resolve, reject) => {
+        if (!file) return reject(new Error('sin archivo'));
+        // Un PDF no se puede redibujar: se guarda tal cual.
+        if (!/^image\//.test(file.type)) {
+          const r0 = new FileReader();
+          r0.onload = () => resolve({ url: r0.result, achicada: false });
+          r0.onerror = reject; r0.readAsDataURL(file);
+          return;
+        }
+        const r = new FileReader();
+        r.onerror = reject;
+        r.onload = () => {
+          const img = new Image();
+          img.onerror = () => resolve({ url: r.result, achicada: false });
+          img.onload = () => {
+            const esc = Math.min(1, maxPx / Math.max(img.width, img.height));
+            if (esc >= 1 && r.result.length < 400000) {
+              return resolve({ url: r.result, achicada: false });
+            }
+            const c = document.createElement('canvas');
+            c.width = Math.round(img.width * esc);
+            c.height = Math.round(img.height * esc);
+            const cx = c.getContext('2d');
+            cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height);
+            cx.drawImage(img, 0, 0, c.width, c.height);
+            const url = c.toDataURL('image/jpeg', calidad);
+            resolve({ url: url.length < r.result.length ? url : r.result,
+              achicada: url.length < r.result.length,
+              antes: r.result.length, despues: url.length });
+          };
+          img.src = r.result;
+        };
+        r.readAsDataURL(file);
+      });
+    },
+    // Cuánto pesa algo, para poder decirlo en palabras.
+    peso(n) {
+      const kb = (Number(n) || 0) / 1024;
+      return kb < 900 ? `${Math.round(kb)} KB` : `${(kb / 1024).toFixed(1)} MB`;
+    },
+
     // Escape para no romper el HTML con nombres que traen comillas/símbolos.
     esc(s) {
       return String(s ?? '').replace(/[&<>"']/g, c =>

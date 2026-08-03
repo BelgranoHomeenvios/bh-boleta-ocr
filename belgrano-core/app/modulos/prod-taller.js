@@ -150,12 +150,13 @@
         inp.type = 'file'; inp.accept = 'image/*,application/pdf';
         inp.onchange = () => {
           const f = inp.files[0]; if (!f) return;
-          const r = new FileReader();
-          r.onload = () => {
-            global.DB.guardarUnidad({ id: this.abierta, [campo]: r.result });
+          // Los planos se miran grandes, así que se guardan más grandes que una
+          // foto —pero no en el tamaño con que salen del celular o del escáner.
+          UI.achicar(f, 1600).then(({ url, achicada, antes, despues }) => {
+            global.DB.guardarUnidad({ id: this.abierta, [campo]: url });
+            if (achicada) UI.aviso(`Guardado · ${UI.peso(antes)} → ${UI.peso(despues)}`, 'ok');
             this.render(this._mount);
-          };
-          r.readAsDataURL(f);
+          }).catch(() => UI.aviso('No pude leer ese archivo', 'warn'));
         };
         inp.click();
       };
