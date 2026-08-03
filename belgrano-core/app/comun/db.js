@@ -767,6 +767,24 @@
       if ((cero - d) / 86400000 > 240) d = new Date(hoy.getFullYear() + 1, Number(m[2]) - 1, Number(m[1]));
       return Math.round((d - cero) / 86400000);
     },
+    // Cuánto tiene cada taller entre manos ahora. Salen TODOS los proveedores,
+    // también los que no tienen nada: saber quién está libre es la mitad de la
+    // decisión de a quién darle el próximo pedido.
+    cargaTalleres() {
+      const enCurso = this.aFabricar().filter(u => u.proveedor);
+      const m = new Map();
+      enCurso.forEach(u => {
+        if (!m.has(u.proveedor)) m.set(u.proveedor, { nombre: u.proveedor, n: 0, vencidas: 0 });
+        const x = m.get(u.proveedor); x.n++; if (this.vencida(u)) x.vencidas++;
+      });
+      // Los que están en la lista de proveedores pero hoy no tienen trabajo.
+      this.proveedores().forEach(p => {
+        const clave = [...m.keys()].find(k => sinTilde(k).includes(sinTilde(p.nombre)));
+        if (!clave) m.set(p.nombre, { nombre: p.nombre, n: 0, vencidas: 0, libre: true });
+      });
+      return [...m.values()].sort((a, b) => b.n - a.n || a.nombre.localeCompare(b.nombre, 'es'));
+    },
+
     // Está vencido cuando pasó el final del rango comprometido.
     vencida(u) {
       if (u.estado !== 'produccion' || !u.hasta) return false;
@@ -837,6 +855,7 @@
           n++;
           out.push({ ...base, id: n, serie: this.serieDe(n), estado: 'stock',
             ubicacion: UBI[n % UBI.length], proveedor: PROV[n % PROV.length],
+            pedido: this.numPedido(100 + (n % 8)),
             llega: '', listo: `${(n % 28) + 1}/7`,
             orden: j === 0 && i % 3 === 0 ? `#S00${200 + i}` : null,
             fechaVenta: j === 0 && i % 3 === 0 ? `${(n % 28) + 1}/6` : '',
@@ -868,6 +887,7 @@
           n++;
           out.push({ ...base, id: n, serie: this.serieDe(n), estado: 'entregada',
             ubicacion: '', proveedor: PROV[n % PROV.length],
+            pedido: this.numPedido(90 + (n % 8)),
             llega: '', listo: `${(n % 28) + 1}/5`, orden: `#S00${100 + n}`,
             fechaVenta: `${(n % 28) + 1}/5`, fechaEntrega: `${(n % 28) + 1}/6`,
             marca: n % 17 === 0 ? 'reclamo' : null });

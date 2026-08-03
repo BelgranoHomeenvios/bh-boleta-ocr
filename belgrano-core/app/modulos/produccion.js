@@ -7,6 +7,7 @@
 // =====================================================================
 (function (global) {
   const AGR_KEY = 'bh_prod_agrupar';
+  const LAT_KEY = 'bh_prod_lateral';
 
   const Produccion = {
     _mount: 'view',
@@ -15,6 +16,9 @@
     agrupar: (() => { try { return localStorage.getItem(AGR_KEY) || 'proveedor'; }
       catch { return 'proveedor'; } })(),
     soloUrgentes: false,
+    soloSemana: false,
+    taller: null,          // un taller marcado en el costado
+    origen: 'todo',        // todo · venta · stock
     _abiertos: new Set(),
 
     AGRUPACIONES: [
@@ -43,7 +47,6 @@
               `<option value="${a.k}">${UI.esc(a.label)}</option>`).join('')}</select>
         </div>
         <div id="pr-kpis"></div>
-        <div id="pr-filtros" style="margin-bottom:12px"></div>
         <div id="pr-lista">${UI.spinner()}</div>
         ${this.estilos()}`;
 
@@ -59,9 +62,12 @@
     // ---- Datos -------------------------------------------------------------
     lista() {
       const t = this.texto.toLowerCase().split(/\s+/).filter(Boolean);
-      return global.DB.aFabricar().filter(u => {
+      return this.base().filter(u => {
+        if (!this.pasaTaller(u)) return false;
+        if (!this.pasaOrigen(u)) return false;
         if (!this.pasaFiltro(u)) return false;
         if (this.soloUrgentes && !global.DB.vencida(u)) return false;
+        if (this.soloSemana && !this.entraSemana(u)) return false;
         if (!t.length) return true;
         const txt = `${u.modelo} ${u.medida} ${u.color} ${u.proveedor || ''} ${u.pedido || ''} ${u.orden || ''}`
           .toLowerCase();
@@ -71,14 +77,22 @@
     pasaFiltro(u) {
       return this.filtro === 'todo' || global.DB.vistaFab(u) === this.filtro;
     },
-    cuenta(f) {
-      const antes = this.filtro; this.filtro = f;
-      const n = global.DB.aFabricar().filter(u => this.pasaFiltro(u)).length;
-      this.filtro = antes; return n;
+    pasaTaller(u) {
+      if (!this.taller) return true;
+      if (this.taller === '(sin)') return !u.proveedor;
+      return u.proveedor === this.taller;
     },
-    filtros() {
-      return [{ k: 'todo', label: 'Todo' },
-        ...global.DB.VISTAS_FAB.filter(v => v.k !== 'recibido')];
+    pasaOrigen(u) {
+      if (this.origen === 'venta') return !!u.orden;
+      if (this.origen === 'stock') return !u.orden;
+      return true;
+    },
+    // Lo que Producción tiene entre manos, o lo que ya trajo si se pide ver eso.
+    base() {
+      return this.verRecibido
+        ? global.DB.unidadesTodas().filter(u => u.pedido
+          && (u.estado === 'stock' || u.estado === 'entregada'))
+        : global.DB.aFabricar();
     },
 
     // Cómo se apilan. La clave y el título de cada montón salen de acá, así
@@ -129,28 +143,17 @@
     // ---- Pintado -----------------------------------------------------------
     pintar() {
       const us = this.lista();
-      const tot = global.DB.aFabricar();
+      const tot = this.base();
       const sub = document.getElementById('pr-sub');
       if (sub) {
-        const venc = tot.filter(u => global.DB.vencida(u)).length;
+        const venc = global.DB.aFabricar().filter(u => global.DB.vencida(u)).length;
+        const qué = this.verRecibido ? 'muebles ya recibidos' : 'muebles en el circuito';
         sub.innerHTML = `${us.length === tot.length ? tot.length
-          : `${us.length} de ${tot.length}`} muebles en el circuito${
-          venc ? ` · <b style="color:var(--crit)">${venc} vencidos</b>` : ''}`;
+          : `${us.length} de ${tot.length}`} ${qué}${
+          !this.verRecibido && venc ? ` · <b style="color:var(--crit)">${venc} vencidos</b>` : ''}${
+          this.taller ? ` · <b>${UI.esc(this.taller)}</b>` : ''}`;
       }
-      this.pintarKpis(tot);
-      const f = document.getElementById('pr-filtros');
-      if (f) {
-        f.innerHTML = `<div class="segm">${this.filtros().map(x =>
-          `<button class="seg ${this.filtro === x.k ? 'on' : ''}" data-f="${x.k}">${UI.esc(x.label)}
-            <b>${this.cuenta(x.k)}</b></button>`).join('')}
-          <button class="seg urg ${this.soloUrgentes ? 'on' : ''}" data-urg>Vencidos
-            <b>${tot.filter(u => global.DB.vencida(u)).length}</b></button></div>`;
-        f.querySelectorAll('[data-f]').forEach(b => b.onclick = () => {
-          this.filtro = b.dataset.f; this.pintar();
-        });
-        const bu = f.querySelector('[data-urg]');
-        if (bu) bu.onclick = () => { this.soloUrgentes = !this.soloUrgentes; this.pintar(); };
-      }
+      this.pintarKpis(global.DB.aFabricar());
       const sa = document.getElementById('pr-agr');
       if (sa) {
         sa.value = this.agrupar;
@@ -160,34 +163,147 @@
           this._abiertos.clear(); this.pintar();
         };
       }
-      this.pintarLista(document.getElementById('pr-lista'), us);
+      const cont = document.getElementById('pr-lista');
+      cont.innerHTML = `<div class="pr-cols ${this.verLat ? '' : 'sin-i'}">
+        ${this.htmlLateral()}
+        <div id="pr-tabla"></div>
+      </div>`;
+      this.pintarLista(document.getElementById('pr-tabla'), us);
+      this.engancharLateral(cont);
     },
 
+    // ---- El costado: los talleres ------------------------------------------
+    // Igual que las categorías en Inventario: siempre abierto, con la carga de
+    // cada uno. Los que hoy no tienen nada también están — saber quién está
+    // libre es la mitad de la decisión de a quién darle el próximo pedido.
+    verLat: (() => { try { return localStorage.getItem(LAT_KEY) !== '0'; } catch { return true; } })(),
+    htmlLateral() {
+      const ic = `<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13"
+        height="11" rx="2"/><path d="M6.5 2.5v11" /></svg>`;
+      if (!this.verLat) {
+        return `<aside class="pr-lat cerrada">
+          <button class="pr-lat-b" data-verlat title="Mostrar los talleres">${ic}</button>
+          <span class="pr-lat-r">${UI.esc(this.taller || 'Todos los talleres')}</span>
+        </aside>`;
+      }
+      const base = this.base();
+      const cuenta = f => base.filter(u => this.pasaOrigen(u) && this.pasaFiltro(u)
+        && (!this.soloUrgentes || global.DB.vencida(u))
+        && (!this.soloSemana || this.entraSemana(u)) && f(u)).length;
+      const talleres = global.DB.cargaTalleres().map(t => ({
+        ...t, n: cuenta(u => u.proveedor === t.nombre),
+      }));
+      const conTrabajo = talleres.filter(t => t.n > 0);
+      const libres = talleres.filter(t => !t.n);
+      const sinProv = cuenta(u => !u.proveedor);
+      const fila = (k, label, n, extra = '') => `<button class="pr-t-h ${
+        this.taller === k ? 'on' : ''} ${n ? '' : 'vacio'}" data-taller="${UI.esc(k)}">
+        <span class="pr-t-n">${UI.esc(label)}</span>${extra}
+        <span class="pr-t-c tnum">${n}</span></button>`;
+      return `<aside class="pr-lat">
+        <div class="pr-lat-h"><span>Taller</span>
+          <button class="pr-lat-b" data-verlat title="Ocultar los talleres">${ic}</button></div>
+        <button class="pr-t-todos ${this.taller ? '' : 'on'}" data-taller="">Todos
+          <span class="pr-t-c tnum">${cuenta(() => true)}</span></button>
+        ${sinProv ? fila('(sin)', 'Sin proveedor', sinProv,
+          '<span class="pr-t-al">a pedir</span>') : ''}
+        ${conTrabajo.map(t => fila(t.nombre, t.nombre, t.n,
+          t.vencidas ? `<span class="pr-t-mal">${t.vencidas}</span>` : '')).join('')}
+        ${libres.length ? `<div class="pr-t-sep">Sin trabajo hoy</div>
+          ${libres.map(t => fila(t.nombre, t.nombre, 0)).join('')}` : ''}
+
+        <div class="pr-lat-h" style="margin-top:12px"><span>Para qué</span></div>
+        ${['todo', 'venta', 'stock'].map(o => `<button class="pr-t-h ${
+          this.origen === o ? 'on' : ''}" data-origen="${o}">
+          <span class="pr-t-n">${o === 'todo' ? 'Todo' : o === 'venta' ? 'Vendidos' : 'Para stock'}</span>
+          <span class="pr-t-c tnum">${this.base().filter(u => this.pasaTaller(u)
+            && this.pasaFiltro(u) && (o === 'todo' || (o === 'venta' ? !!u.orden : !u.orden))).length}</span>
+          </button>`).join('')}
+      </aside>`;
+    },
+    engancharLateral(cont) {
+      cont.querySelectorAll('[data-verlat]').forEach(b => b.onclick = () => {
+        this.verLat = !this.verLat;
+        try { localStorage.setItem(LAT_KEY, this.verLat ? '1' : '0'); } catch {}
+        this.pintar();
+      });
+      cont.querySelectorAll('[data-taller]').forEach(b => b.onclick = () => {
+        const k = b.dataset.taller;
+        this.taller = (!k || this.taller === k) ? null : k;
+        this.pintar();
+      });
+      cont.querySelectorAll('[data-origen]').forEach(b => b.onclick = () => {
+        this.origen = b.dataset.origen; this.pintar();
+      });
+    },
+
+    // Cada número de arriba es un botón: se aprieta y la lista queda con eso.
+    // Volver a apretarlo lo saca. Son los cuatro cortes de todos los días.
+    entraSemana(u) {
+      const d = global.DB.diasHasta(u.hasta);
+      return u.estado === 'produccion' && d != null && d >= 0 && d <= 7;
+    },
+    KPIS: [
+      { k: 'dibujar', titulo: 'Falta dibujar', pie: 'no se pueden pedir', pieOk: 'nada trabado' },
+      { k: 'pedir', titulo: 'Sin pedir', pie: 'vendidos, sin proveedor', pieOk: 'nada pendiente' },
+      { k: 'fabricando', titulo: 'En fábrica', pie: '', pieOk: '' },
+      { k: 'vencidos', titulo: 'Vencidos', pie: 'se pasó el rango prometido', pieOk: 'todo en fecha' },
+      { k: 'semana', titulo: 'Entran esta semana', pie: 'para hacerles lugar', pieOk: 'nada esta semana' },
+      { k: 'recibido', titulo: 'Ya recibidos', pie: 'lo que trajeron', pieOk: 'todavía nada' },
+    ],
+    verRecibido: false,
+    // Cuántas caen en cada corte. Es la misma cuenta que usa el filtro, así
+    // el número de arriba y lo que se ve abajo no se pueden despegar.
+    esDelKpi(u, k) {
+      if (k === 'vencidos') return global.DB.vencida(u);
+      if (k === 'semana') return this.entraSemana(u);
+      if (k === 'recibido') return u.estado === 'stock' || u.estado === 'entregada';
+      return global.DB.vistaFab(u) === k;
+    },
+    kpiActivo() {
+      if (this.verRecibido) return 'recibido';
+      if (this.soloUrgentes) return 'vencidos';
+      if (this.soloSemana) return 'semana';
+      return this.filtro === 'todo' ? null : this.filtro;
+    },
+    tocarKpi(k) {
+      const ya = this.kpiActivo() === k;
+      this.filtro = 'todo'; this.soloUrgentes = false; this.soloSemana = false;
+      this.verRecibido = false;
+      if (!ya) {
+        if (k === 'vencidos') this.soloUrgentes = true;
+        else if (k === 'semana') this.soloSemana = true;
+        else if (k === 'recibido') this.verRecibido = true;
+        else this.filtro = k;
+      }
+      this._abiertos.clear();
+      this.pintar();
+    },
     pintarKpis(tot) {
       const k = document.getElementById('pr-kpis'); if (!k) return;
-      const sinDibujo = tot.filter(u => !global.DB.planoListo(u)).length;
-      const sinPedir = tot.filter(u => u.estado === 'pedir' && global.DB.planoListo(u)).length;
-      const enFabrica = tot.filter(u => u.estado === 'produccion').length;
-      const venc = tot.filter(u => global.DB.vencida(u)).length;
-      const semana = tot.filter(u => {
-        const d = global.DB.diasHasta(u.hasta);
-        return u.estado === 'produccion' && d != null && d >= 0 && d <= 7;
-      }).length;
-      const c = (t, v, p, cl) => `<div class="pr-k"><div class="pr-k-t">${t}</div>
-        <div class="pr-k-v ${cl || ''}">${v}</div><div class="pr-k-p">${p}</div></div>`;
-      k.innerHTML = `<div class="pr-kpis">
-        ${c('Falta dibujar', sinDibujo, sinDibujo ? 'no se pueden pedir' : 'nada trabado',
-          sinDibujo ? 'alerta' : '')}
-        ${c('Sin pedir', sinPedir, 'vendidos, sin proveedor', sinPedir ? 'alerta' : '')}
-        ${c('En fábrica', enFabrica, `<b>${semana}</b> entran esta semana`)}
-        ${c('Vencidos', venc, venc ? 'se pasó el rango prometido' : 'todo en fecha',
-          venc ? 'alerta' : '')}
-      </div>`;
+      const activo = this.kpiActivo();
+      const semana = tot.filter(u => this.entraSemana(u)).length;
+      const recibidos = global.DB.unidadesTodas().filter(u => u.pedido
+        && (u.estado === 'stock' || u.estado === 'entregada')).length;
+      k.innerHTML = `<div class="pr-kpis">${this.KPIS.map(x => {
+        const n = x.k === 'recibido' ? recibidos : tot.filter(u => this.esDelKpi(u, x.k)).length;
+        const mal = n > 0 && (x.k === 'dibujar' || x.k === 'pedir' || x.k === 'vencidos');
+        const pie = x.k === 'fabricando'
+          ? `<b>${semana}</b> entran esta semana` : (n ? x.pie : x.pieOk);
+        return `<button class="pr-k ${activo === x.k ? 'on' : ''}" data-kpi="${x.k}"
+          title="${activo === x.k ? 'Sacar este filtro' : 'Ver sólo estos'}">
+          <span class="pr-k-t">${x.titulo}</span>
+          <span class="pr-k-v ${mal ? 'alerta' : ''}">${n}</span>
+          <span class="pr-k-p">${pie}</span></button>`;
+      }).join('')}</div>`;
+      k.querySelectorAll('[data-kpi]').forEach(b => b.onclick = () => this.tocarKpi(b.dataset.kpi));
     },
 
     pintarLista(cont, us) {
       if (!us.length) { cont.innerHTML = UI.vacio('No hay muebles con ese filtro.'); return; }
       const gs = this.grupos(us);
+      // Si quedaron pocos, se abren solos: filtraste justamente para verlos.
+      if (us.length <= 30 || gs.length === 1) gs.forEach(g => this._abiertos.add(g.k));
       cont.innerHTML = gs.map(g => this.htmlGrupo(g)).join('') + `
         <div class="hint" style="margin-top:10px">Es la misma lista apilada de tres maneras:
           <b>por proveedor</b> para saber qué tiene cada taller, <b>por orden</b> para saber qué
@@ -344,12 +460,56 @@
           background:var(--panel)}
         .pr-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
         @media(max-width:900px){.pr-kpis{grid-template-columns:1fr 1fr}}
-        .pr-k{border:1px solid var(--line);border-radius:11px;padding:9px 12px;background:var(--panel)}
-        .pr-k-t{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
-          font-weight:700}
-        .pr-k-v{font-size:19px;font-weight:800;color:var(--navy);margin-top:1px}
+        /* El costado con los talleres, igual que las categorías en Inventario. */
+        .pr-cols{display:grid;grid-template-columns:196px minmax(0,1fr);gap:14px;align-items:start;
+          max-width:100%}
+        .pr-cols.sin-i{grid-template-columns:30px minmax(0,1fr)}
+        .pr-cols>#pr-tabla{min-width:0}
+        @media(max-width:1080px){.pr-cols,.pr-cols.sin-i{grid-template-columns:1fr}}
+        .pr-lat{position:sticky;top:104px;display:flex;flex-direction:column;border:1px solid var(--line);
+          border-radius:12px;background:var(--panel);padding:9px 4px 9px 10px}
+        .pr-lat.cerrada{align-items:center;padding:9px 3px;gap:12px}
+        .pr-lat-h{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;
+          text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:6px}
+        .pr-lat-h span{flex:1}
+        .pr-lat-b{border:1px solid var(--line);background:var(--panel);border-radius:7px;width:24px;
+          height:22px;display:grid;place-items:center;cursor:pointer;color:var(--muted);padding:0;
+          margin-right:6px}
+        .pr-lat-b svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.3}
+        .pr-lat-b:hover{border-color:var(--brand);color:var(--brand)}
+        .pr-lat.cerrada .pr-lat-b{margin:0}
+        .pr-lat-r{writing-mode:vertical-rl;font-size:11.5px;color:var(--muted);white-space:nowrap;
+          overflow:hidden;text-overflow:ellipsis;max-height:260px}
+        .pr-t-todos,.pr-t-h{display:flex;align-items:center;gap:6px;width:100%;border:0;
+          background:none;padding:4px 6px;cursor:pointer;font:inherit;text-align:left;
+          border-radius:7px;color:var(--ink-soft);font-size:12.5px}
+        .pr-t-todos{font-weight:700;color:var(--navy);margin-bottom:2px}
+        .pr-t-c{margin-left:auto;font-size:11px;color:var(--muted);flex:none;font-weight:600}
+        .pr-t-todos.on,.pr-t-h.on{background:var(--brand-soft);color:var(--brand-ink);font-weight:700}
+        .pr-t-h:hover{background:var(--panel-2)}
+        .pr-t-h.vacio{color:var(--muted)}
+        .pr-t-n{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .pr-t-mal{font-size:10px;font-weight:800;background:var(--crit);color:#fff;border-radius:999px;
+          padding:0 5px;line-height:15px;flex:none}
+        .pr-t-al{font-size:10px;font-weight:700;background:var(--warn-bg);color:var(--warn);
+          border-radius:999px;padding:0 6px;line-height:15px;flex:none}
+        .pr-t-sep{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+          color:var(--muted);margin:8px 0 2px;padding-left:6px}
+        .pr-kpis{grid-template-columns:repeat(6,1fr)}
+        @media(max-width:1400px){.pr-kpis{grid-template-columns:repeat(3,1fr)}}
+        @media(max-width:760px){.pr-kpis{grid-template-columns:1fr 1fr}}
+        /* Cada número es un botón: apretarlo deja la lista con eso. */
+        .pr-k{border:1px solid var(--line);border-radius:11px;padding:9px 12px;
+          background:var(--panel);display:block;width:100%;text-align:left;cursor:pointer;
+          font:inherit}
+        .pr-k:hover{border-color:var(--brand)}
+        .pr-k.on{border-color:var(--brand);background:var(--brand-soft);box-shadow:inset 0 0 0 1px var(--brand)}
+        .pr-k-t{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;
+          color:var(--muted);font-weight:700}
+        .pr-k.on .pr-k-t{color:var(--brand-ink)}
+        .pr-k-v{display:block;font-size:19px;font-weight:800;color:var(--navy);margin-top:1px}
         .pr-k-v.alerta{color:var(--crit)}
-        .pr-k-p{font-size:11px;color:var(--muted)}
+        .pr-k-p{display:block;font-size:11px;color:var(--muted)}
         .pr-k-p b{color:var(--ink-soft)}
         .seg.urg.on{background:var(--crit);border-color:var(--crit)}
         /* Cada montón se abre solo. Cerrado sigue diciendo qué tiene adentro. */
