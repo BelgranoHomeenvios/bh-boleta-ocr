@@ -1,0 +1,1638 @@
+<meta charset="utf-8">
+<title>Belgrano Soft · Producción v3 — el plano, el pedido abierto y la recepción</title>
+<style>
+:root{
+  --bg:#f4f6f8; --panel:#fff; --panel-2:#fafbfc; --ink:#0f1a2a; --ink-soft:#5b6675;
+  --line:#d9e0e8; --line-soft:#eef1f5; --navy:#16324f; --brand:#1e5fce;
+  --brand-soft:#e7eefb; --brand-ink:#1a51b0; --ok:#15803d; --ok-bg:#e6f4ea;
+  --warn:#b45309; --warn-bg:#fff7e6; --crit:#b42318; --crit-bg:#fdecea; --muted:#8a94a3;
+  --viol:#6b21a8; --viol-bg:#f3e8ff;
+  --shadow:0 1px 2px rgba(15,26,42,.06),0 1px 3px rgba(15,26,42,.04);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);line-height:1.5;
+  font-family:'Public Sans',-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  font-variant-numeric:tabular-nums}
+h1,h2,h3{margin:0;letter-spacing:-.01em}
+button{font:inherit}
+input,select{font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);
+  border-radius:8px;background:var(--panel);color:var(--ink)}
+
+.top{background:var(--navy);color:#fff;padding:11px 20px;position:sticky;top:0;z-index:30}
+.top h1{font-size:15px;font-weight:800}
+.top p{margin:2px 0 0;font-size:12px;opacity:.75}
+.opts{display:flex;gap:6px;margin-top:11px;flex-wrap:wrap}
+.opt{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);color:rgba(255,255,255,.8);
+  border-radius:9px;padding:7px 13px;font-size:12.5px;font-weight:650;cursor:pointer;text-align:left}
+.opt:hover{background:rgba(255,255,255,.18);color:#fff}
+.opt.on{background:#fff;color:var(--navy);border-color:#fff}
+.opt small{display:block;font-size:10.5px;font-weight:500;opacity:.75}
+.opt.on small{opacity:.6}
+
+.wrap{padding:18px 20px 60px;max-width:1400px;margin:0 auto}
+.idea{background:var(--brand-soft);border:1px solid #cfe0fb;border-radius:12px;padding:13px 15px;
+  font-size:13px;margin-bottom:6px}
+.idea b{color:var(--brand-ink)}
+.pros{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0 18px}
+@media(max-width:820px){.pros{grid-template-columns:1fr}}
+.pro,.con{border-radius:11px;padding:11px 14px;font-size:12.5px;border:1px solid}
+.pro{background:var(--ok-bg);border-color:#cfe8d8;color:#14532d}
+.con{background:var(--warn-bg);border-color:#f3e2c0;color:#7c4a05}
+.pro b,.con b{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;
+  margin-bottom:3px;opacity:.75}
+
+/* ---- el modelo ---- */
+.modelo{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;
+  margin-bottom:22px;box-shadow:var(--shadow)}
+.modelo h2{font-size:16px;color:var(--navy);margin-bottom:4px}
+.modelo .sub{font-size:12.5px;color:var(--ink-soft);margin-bottom:16px}
+.ciclo{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:900px){.ciclo{grid-template-columns:1fr 1fr}}
+.paso{border:1px solid var(--line);border-radius:11px;padding:12px 13px;background:var(--panel-2);
+  position:relative}
+.paso>b{display:block;font-size:13px;color:var(--navy);margin-bottom:3px}
+.paso small b{color:var(--navy)}
+.paso small{font-size:11.5px;color:var(--ink-soft);line-height:1.45;display:block}
+.paso .est{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+  border-radius:999px;padding:2px 8px;display:inline-block;margin-bottom:6px}
+.e-prod{background:var(--viol-bg);color:var(--viol)}
+.e-dep{background:var(--ok-bg);color:var(--ok)}
+.e-res{background:var(--warn-bg);color:var(--warn)}
+.e-ent{background:#eef1f5;color:var(--muted)}
+.cruza{margin-top:14px;font-size:12.5px;color:var(--ink-soft);border-top:1px dashed var(--line);
+  padding-top:12px}
+.cruza b{color:var(--navy)}
+
+/* ---- el marco de la app ---- */
+.app{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;
+  box-shadow:var(--shadow)}
+.appbar{background:var(--navy);color:#fff;height:38px;display:flex;align-items:center;gap:9px;
+  padding:0 14px;font-size:11.5px;font-weight:650}
+.appbar span{opacity:.55}
+.appbar .on{opacity:1;background:rgba(255,255,255,.16);padding:3px 9px;border-radius:999px}
+.subbar{display:flex;gap:14px;padding:0 16px;border-bottom:1px solid var(--line);background:var(--panel);
+  font-size:12px;font-weight:600;color:var(--ink-soft)}
+.subbar div{padding:9px 0}
+.subbar .on{color:var(--navy);border-bottom:2px solid var(--brand)}
+.body{padding:16px;background:var(--bg)}
+.kick{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--brand)}
+.h1{font-size:19px;font-weight:800;color:var(--navy);margin:1px 0 1px}
+.sub{font-size:11.5px;color:var(--muted);margin-bottom:12px}
+
+.bar{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.bar input{flex:1;min-width:180px}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:8px 12px;
+  font-size:12.5px;font-weight:650;color:var(--ink-soft);cursor:pointer;white-space:nowrap}
+.btn.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}
+.segm{display:inline-flex;gap:6px;flex-wrap:wrap}
+.seg{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 13px;
+  font-size:12.5px;font-weight:650;color:var(--ink-soft);cursor:pointer}
+.seg .n{opacity:.6;margin-left:5px}
+.seg.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.seg.on .n{opacity:.7}
+
+table{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--panel)}
+th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+  padding:9px 10px;border-bottom:1px solid var(--line);font-weight:700;white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid var(--line-soft);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;
+  box-shadow:var(--shadow)}
+.pill{font-size:10px;font-weight:700;border-radius:999px;padding:2px 8px;white-space:nowrap}
+.p-ok{background:var(--ok-bg);color:var(--ok)}
+.p-prod{background:var(--viol-bg);color:var(--viol)}
+.p-res{background:var(--warn-bg);color:var(--warn)}
+.p-ent{background:#eef1f5;color:var(--muted)}
+.num{text-align:right}
+.mut{color:var(--muted)}
+.nom{font-weight:700;color:var(--navy)}
+.ser{font-size:11px;color:var(--muted)}
+.grupo td{background:var(--panel-2);font-weight:700;color:var(--navy);font-size:11.5px;
+  text-transform:uppercase;letter-spacing:.04em;border-top:1px solid var(--line)}
+.mini{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:7px;
+  background:var(--panel-2);border:1px solid var(--line-soft);color:var(--muted);vertical-align:middle}
+.mini svg{width:30px;height:22px;stroke:currentColor;fill:none;stroke-width:2}
+.chip{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px;
+  background:var(--panel-2);border:1px solid var(--line);color:var(--ink-soft)}
+.bres{border:1px solid var(--brand);background:var(--brand-soft);color:var(--brand-ink);
+  border-radius:7px;padding:3px 10px;font-size:11.5px;font-weight:700;cursor:pointer}
+.bres:hover{background:var(--brand);color:#fff}
+.b-x{border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:3px 8px;
+  font-size:11.5px;color:var(--muted);cursor:pointer}
+
+/* A · tablero */
+.tot{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+@media(max-width:820px){.tot{grid-template-columns:1fr 1fr}}
+.tot-c{border:1px solid var(--line);border-radius:11px;padding:11px 13px;background:var(--panel)}
+.tot-t{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700}
+.tot-v{font-size:22px;font-weight:800;color:var(--navy);margin-top:2px}
+.tot-p{font-size:11px;color:var(--muted)}
+.exp{background:var(--panel-2)}
+.exp td{padding:0}
+.exp .in{padding:10px 14px 12px}
+
+/* C · buscador */
+.busq{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;
+  box-shadow:var(--shadow);margin-bottom:14px}
+.busq input{width:100%;font-size:15px;padding:11px 14px}
+.res{display:flex;flex-direction:column;gap:10px}
+.rg{border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden}
+.rg-h{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--panel-2);
+  border-bottom:1px solid var(--line)}
+.rg-h b{font-size:13.5px;color:var(--navy)}
+.rg-h .sp{flex:1}
+.rg-b{padding:4px 0}
+.uni{display:flex;align-items:center;gap:11px;padding:8px 14px;border-bottom:1px solid var(--line-soft)}
+.uni:last-child{border-bottom:0}
+.uni .sp{flex:1}
+.hint{font-size:11.5px;color:var(--muted)}
+.nota{font-size:12.5px;color:var(--ink-soft);background:var(--panel);border:1px solid var(--line);
+  border-left:3px solid var(--brand);border-radius:10px;padding:12px 15px;margin-top:20px}
+.nota b{color:var(--navy)}
+.hide{display:none}
+.scroll{overflow-x:auto}
+
+.p-ped{background:var(--brand-soft);color:var(--brand-ink)}
+.p-fal{background:var(--crit-bg);color:var(--crit)}
+.p-urg{background:var(--crit);color:#fff}
+.tarde{color:var(--crit);font-weight:700}
+.chk{width:15px;height:15px;accent-color:var(--brand);margin:0;vertical-align:-2px}
+.av{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;
+  border-radius:8px;background:var(--navy);color:#fff;font-size:11.5px;font-weight:800;flex:none}
+.gr{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:10px;
+  overflow:hidden;box-shadow:var(--shadow)}
+.gr-h{display:flex;align-items:center;gap:11px;padding:10px 14px;background:var(--panel-2);
+  border-bottom:1px solid var(--line)}
+.gr-h b{font-size:13.5px;color:var(--navy)}
+.gr-h .sp{flex:1}
+.dos{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:980px){.dos{grid-template-columns:1fr}}
+.cb rect{fill:#000}
+
+/* ---- el plano, igual al que usa hoy ---- */
+.plano{background:#fff;border:1px solid #111;display:grid;grid-template-columns:1fr 132px;
+  font-family:Georgia,'Times New Roman',serif;color:#111;max-width:520px;
+  box-shadow:0 2px 12px rgba(15,26,42,.12)}
+.plano .lbl{font-size:8.5px;letter-spacing:.02em;color:#333;font-family:inherit}
+.pl-top{display:grid;grid-template-columns:64px 1fr 56px 1fr;border-bottom:1px solid #111}
+.pl-top>div{border-right:1px solid #111;padding:4px 6px;font-size:9px;display:flex;
+  align-items:center}
+.pl-top>div:last-child{border-right:0}
+.pl-top b{font-size:11px;font-weight:700}
+.pl-dib{position:relative;height:215px;display:grid;place-items:center;border-bottom:1px solid #111}
+.pl-dib svg{width:92%;height:88%;stroke:#111;fill:none;stroke-width:1.1}
+.pl-dib text{fill:#111;stroke:none;font-size:8.5px;font-family:Arial,sans-serif}
+.pl-dib .hz{stroke:#111;stroke-width:.6}
+.pl-marcas{display:grid;grid-template-columns:repeat(4,1fr)}
+.pl-marcas>div{border-right:1px solid #111;padding:3px 5px;min-height:26px}
+.pl-marcas>div:last-child{border-right:0}
+.pl-marcas span{display:block;font-size:7.5px;color:#333}
+.pl-marcas b{font-size:10px}
+.pl-der{border-left:1px solid #111;display:flex;flex-direction:column}
+.pl-der .f{border-bottom:1px solid #111;padding:3px 6px;min-height:30px}
+.pl-der .f:last-child{border-bottom:0}
+.pl-der .f span{display:block;font-size:8px;color:#333;text-align:center}
+.pl-der .f b{display:block;font-size:11px;text-align:center;line-height:1.2}
+.pl-der .obs{flex:1;min-height:52px}
+.pl-der .ch{min-height:22px}
+.pl-der .ch span{text-align:left;font-size:7px}
+.pl-cod{font-size:9.5px;letter-spacing:.06em;text-align:center;font-family:Arial,sans-serif}
+.marca{position:absolute;top:6px;right:8px;border:2px solid #b42318;color:#b42318;
+  font-weight:800;font-size:11px;letter-spacing:.08em;padding:1px 8px;transform:rotate(-6deg);
+  background:rgba(255,255,255,.9);font-family:Arial,sans-serif}
+.copia{position:absolute;bottom:5px;left:8px;font-size:8px;letter-spacing:.16em;color:#8a94a3;
+  font-weight:700;font-family:Arial,sans-serif}
+.llena{background:#fff8d6}
+.leyenda{font-size:11.5px;color:var(--ink-soft);margin-top:9px}
+.leyenda i{background:#fff8d6;font-style:normal;padding:0 4px;border-radius:3px;
+  border:1px solid #e8dca0}
+
+.rem{background:#fff;border:1px solid #c8ced6;border-radius:6px;overflow:hidden;
+  box-shadow:0 2px 10px rgba(15,26,42,.10)}
+.rem-h{padding:12px 15px;border-bottom:2px solid #111;display:flex;align-items:flex-start;gap:10px}
+.rem-h h4{margin:0;font-size:15px;color:#111}
+.rem-h .meta{font-size:11.5px;color:#555;margin-top:2px}
+.rem-h .sp{flex:1}
+.rem table{font-size:12px}
+.rem th{padding:7px 10px;color:#555} .rem td{padding:7px 10px}
+.rem-f{padding:11px 15px;border-top:1px solid #e3e7ec;display:flex;gap:26px;font-size:11px;color:#555}
+.rem-f div{flex:1;border-top:1px solid #111;padding-top:4px;margin-top:26px;text-align:center}
+.paso-n{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px dashed var(--line)}
+.paso-n:last-child{border-bottom:0}
+.paso-n .n{flex:none;width:24px;height:24px;border-radius:50%;background:var(--brand);color:#fff;
+  display:grid;place-items:center;font-size:12px;font-weight:800}
+.paso-n>div>b{display:block;font-size:13.5px;color:var(--navy);margin-bottom:2px}
+.paso-n small{font-size:12.5px;color:var(--ink-soft);display:block;line-height:1.5}
+.paso-n small b{color:var(--navy)}
+.ok-lista{list-style:none;padding:0;margin:0;font-size:13px}
+.ok-lista li{padding:7px 0 7px 26px;position:relative;border-bottom:1px solid var(--line-soft);
+  color:var(--ink-soft)}
+.ok-lista li:last-child{border-bottom:0}
+.ok-lista li:before{content:'✓';position:absolute;left:4px;color:var(--ok);font-weight:800}
+.ok-lista b{color:var(--navy)}
+.pregs{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--brand);
+  border-radius:12px;padding:16px 18px;margin-top:22px}
+.pregs h3{font-size:14px;color:var(--navy);margin-bottom:8px}
+.pregs ol{margin:0;padding-left:20px;font-size:13px;color:var(--ink-soft)}
+.pregs li{margin-bottom:9px} .pregs b{color:var(--navy)}
+.esc{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line-soft);
+  font-size:12.5px}
+.esc:last-child{border-bottom:0}
+.esc .sp{flex:1}
+.est-ped{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;
+  border-radius:999px;padding:3px 10px}
+.ep-ab{background:var(--brand-soft);color:var(--brand-ink)}
+.ep-ce{background:#eef1f5;color:var(--ink-soft)}
+.ep-en{background:var(--viol-bg);color:var(--viol)}
+.linea{display:flex;gap:0;align-items:stretch;margin:14px 0}
+.linea .et{flex:1;border:1px solid var(--line);border-right:0;padding:11px 13px;background:var(--panel)}
+.linea .et:last-child{border-right:1px solid var(--line)}
+.linea .et b{display:block;font-size:12.5px;color:var(--navy)}
+.linea .et small{font-size:11.5px;color:var(--muted)}
+.linea .et.on{background:var(--brand-soft);border-color:#cfe0fb}
+.hist{font-size:12px;color:var(--ink-soft)}
+.hist div{padding:6px 0;border-bottom:1px solid var(--line-soft);display:flex;gap:10px}
+.hist div:last-child{border-bottom:0}
+.hist .f{color:var(--muted);flex:0 0 82px}
+.cola{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:980px){.cola{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.cola{grid-template-columns:1fr}}
+.cc{border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden}
+.cc-h{padding:9px 12px;border-bottom:1px solid var(--line);background:var(--panel-2);
+  font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--navy);
+  display:flex;align-items:center;gap:7px}
+.cc-h .n{margin-left:auto;background:var(--navy);color:#fff;border-radius:999px;padding:0 7px;
+  font-size:10.5px;line-height:16px}
+.cc-h.rojo{background:var(--crit-bg);color:var(--crit)} .cc-h.rojo .n{background:var(--crit)}
+.cc-b{padding:6px 10px 10px}
+.ct{border-bottom:1px solid var(--line-soft);padding:7px 0;font-size:12px}
+.ct:last-child{border-bottom:0}
+.ct b{display:block;color:var(--navy);font-size:12.5px}
+.ct small{color:var(--muted);font-size:11px}
+.cc-q{padding:8px 12px;font-size:11.5px;color:var(--muted);border-top:1px solid var(--line-soft)}
+.sem{display:grid;grid-template-columns:118px repeat(5,1fr);gap:0;font-size:12px;
+  border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
+.sem>div{border-right:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);
+  padding:8px 9px;min-height:46px}
+.sem .hd{background:var(--panel-2);font-weight:700;color:var(--navy);font-size:11px;
+  text-transform:uppercase;letter-spacing:.04em;min-height:0}
+.sem .pr{background:var(--panel-2);font-weight:700;color:var(--navy)}
+.cap{display:block;font-size:10.5px;color:var(--muted);font-weight:500;text-transform:none;
+  letter-spacing:0}
+.blq{border-radius:6px;padding:2px 7px;font-size:11px;font-weight:650;display:inline-block;
+  margin:1px 0}
+.bl-ok{background:var(--ok-bg);color:var(--ok)}
+.bl-full{background:var(--warn-bg);color:var(--warn)}
+.bl-over{background:var(--crit-bg);color:var(--crit)}
+.tl{position:relative;padding-left:18px}
+.tl:before{content:'';position:absolute;left:5px;top:4px;bottom:4px;width:2px;background:var(--line)}
+.tl-i{position:relative;padding:7px 0 7px 4px;font-size:12.5px;color:var(--ink-soft)}
+.tl-i:before{content:'';position:absolute;left:-17px;top:12px;width:9px;height:9px;border-radius:50%;
+  background:var(--brand);border:2px solid var(--panel)}
+.tl-i b{color:var(--navy)}
+.tl-i .f{font-size:11px;color:var(--muted);display:block}
+.tl-i.ok:before{background:var(--ok)} .tl-i.mal:before{background:var(--crit)}
+.modo{display:inline-block;font-size:10.5px;font-weight:700;border-radius:6px;padding:1px 8px}
+.m-dib{background:var(--brand-soft);color:var(--brand-ink)}
+.m-pla{background:#f3e8ff;color:#6b21a8}
+
+.tipo{display:inline-block;font-size:10px;font-weight:700;border-radius:999px;padding:1px 8px;
+  border:1px solid var(--line);background:var(--panel-2);color:var(--muted)}
+.tipo.med{background:var(--brand-soft);border-color:#cfe0fb;color:var(--brand-ink)}
+.croquis{border:1px solid var(--line);border-radius:9px;background:var(--panel-2);height:150px;
+  display:grid;place-items:center;color:var(--muted);font-size:12px;overflow:hidden}
+.croquis svg{width:86%;height:82%;stroke:var(--ink-soft);fill:none;stroke-width:1.2}
+.croquis.mano svg{stroke:#3b5bdb;stroke-width:1.8;stroke-linecap:round}
+.cara{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+@media(max-width:760px){.cara{grid-template-columns:1fr}}
+.cara h5{margin:0 0 5px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--muted);font-weight:700}
+.hist b{color:var(--navy)}
+</style>
+
+<div class="top">
+  <h1>Producción v3 — tu plano, el pedido que se va llenando, y la recepción</h1>
+  <p>El pedido se abre, se le van agregando muebles —con dibujo o en la planilla— y cuando está,
+    se cierra y se manda. Cuando vuelve, se tilda y el remito se arma solo.</p>
+  <div class="opts">
+    <button class="opt on" data-o="h">Tu plano<small>Qué completa el sistema</small></button>
+    <button class="opt" data-o="d">De dónde sale<small>Estándar vs a medida</small></button>
+    <button class="opt" data-o="x">A medida<small>Dibujar, verificar, recién ahí pedir</small></button>
+    <button class="opt" data-o="p">El pedido abierto<small>Se llena, se cierra, se manda</small></button>
+    <button class="opt" data-o="c">La carpeta de Toni<small>Lo que tiene en el taller</small></button>
+    <button class="opt" data-o="r">La recepción<small>Trajo 5 de 8, y cómo llegaron</small></button>
+    <button class="opt" data-o="q">A reparar<small>No entra al depósito así</small></button>
+    <button class="opt" data-o="e">Dos rubros<small>Y el enlace en fábrica</small></button>
+    <button class="opt" data-o="w">Cómo se pide cada mueble<small>Lo dice el producto</small></button>
+    <button class="opt" data-o="k">Cola de trabajo<small>Qué hay que hacer hoy</small></button>
+    <button class="opt" data-o="n">Planificación<small>Qué entra cada semana</small></button>
+    <button class="opt" data-o="g">Control de calidad<small>Cómo entrega cada uno</small></button>
+    <button class="opt" data-o="t">Historial<small>Todo lo que le pasó</small></button>
+    <button class="opt" data-o="a">La auditoría<small>Pasar el lector</small></button>
+  </div>
+</div>
+
+<div class="wrap">
+
+<!-- ============ EL PLANO ============ -->
+<section data-p="h">
+  <div class="idea"><b>El plano es tuyo, no lo cambio.</b> Lo que hace el sistema es
+    <b>completarlo solo</b>: lo amarillo es lo que hoy escribís a mano cada vez. El dibujo, el
+    nombre, el código y las medidas ya están cargados en la variante desde el catálogo.</div>
+
+  <div class="dos">
+    <div>
+      <div class="kick" style="margin-bottom:7px">Original · para el proveedor</div>
+      <div class="plano">
+  <div>
+    <div class="pl-top">
+      <div class="lbl">MATERIAL</div><div><b>NEGRO Y PARAÍSO</b></div>
+      <div class="lbl">CANTIDAD</div><div><b>1 UNIDADES</b></div>
+    </div>
+    <div class="pl-dib"><svg viewBox="0 0 330 190">
+  <path d="M52 62 L268 62 L296 44 L80 44 Z"/>
+  <path d="M52 62 L52 128 L268 128 L268 62"/>
+  <path d="M268 128 L296 110 L296 44"/>
+  <path d="M52 92 L268 92 M52 112 L268 112"/>
+  <ellipse cx="96" cy="55" rx="5" ry="2.4"/><ellipse cx="150" cy="55" rx="5" ry="2.4"/>
+  <ellipse cx="204" cy="55" rx="5" ry="2.4"/><ellipse cx="258" cy="55" rx="5" ry="2.4"/>
+  <ellipse cx="123" cy="59" rx="5" ry="2.4"/><ellipse cx="177" cy="59" rx="5" ry="2.4"/>
+  <ellipse cx="231" cy="59" rx="5" ry="2.4"/>
+  <path class="hz" d="M60 74h58M60 80h58M60 86h58M132 74h58M132 80h58M132 86h58M204 74h56M204 80h56M204 86h56"/>
+  <path class="hz" d="M60 98h200M60 104h200M60 110h200"/>
+  <text x="76" y="84">CAJÓN</text><text x="148" y="84">CAJÓN</text><text x="220" y="84">CAJÓN</text>
+  <text x="140" y="108">CARRITO</text>
+  <path class="hz" d="M40 62v66M36 62h8M36 128h8"/><text x="14" y="98">0.60</text>
+  <path class="hz" d="M306 44v22M302 44h8M302 66h8"/><text x="300" y="80">0.15</text>
+  <path class="hz" d="M46 140 L70 128"/><text x="10" y="152">LAQUEADO</text><text x="16" y="163">NEGRO</text>
+  <text x="108" y="178">PARA COLCHON DE 90X190</text>
+</svg><span class="marca">URGENTE</span></div>
+    <div class="pl-marcas">
+      <div><span>VERIF.</span></div>
+      <div class="llena"><span>ORDEN</span>
+        <b>5660</b></div>
+      <div><span>PROD.</span></div>
+      <div class=""><span>STOCK</span>
+        <b></b></div>
+    </div>
+  </div>
+  <div class="pl-der">
+    <div class="f llena"><span>PEDIDO</span><b>P-000124</b></div>
+    <div class="f llena"><span>PROVEEDOR</span><b>1 TONY</b></div>
+    <div class="f"><span>NOMBRE</span><b>CAMA<br>HOUSTON</b></div>
+    <div class="f"><span>CÓDIGO</span><b style="font-size:9.5px">S-CA-HO-09-I-NP</b></div>
+    <div class="f obs"><span>OBSERVACIONES</span></div>
+    
+    <div class="f ch"><span>FECHA DE COMPRA</span></div>
+    <div class="f ch"><span>FECHA DE PRODUCCIÓN</span></div>
+    <div class="f ch"><span>FIRMA</span></div>
+  </div>
+</div>
+      <div class="leyenda">Se completa solo: <i>PEDIDO</i> con el número del pedido,
+        <i>PROVEEDOR</i>, y en las casillas de abajo <i>ORDEN</i> con el número de venta —o
+        <i>STOCK</i> tildado si se fabrica sin vender—. <b>URGENTE</b> deja de escribirse a mano.</div>
+    </div>
+    <div>
+      <div class="kick" style="margin-bottom:7px">Copia · queda acá y se le pega al mueble</div>
+      <div class="plano">
+  <div>
+    <div class="pl-top">
+      <div class="lbl">MATERIAL</div><div><b>NEGRO Y PARAÍSO</b></div>
+      <div class="lbl">CANTIDAD</div><div><b>1 UNIDADES</b></div>
+    </div>
+    <div class="pl-dib"><svg viewBox="0 0 330 190">
+  <path d="M52 62 L268 62 L296 44 L80 44 Z"/>
+  <path d="M52 62 L52 128 L268 128 L268 62"/>
+  <path d="M268 128 L296 110 L296 44"/>
+  <path d="M52 92 L268 92 M52 112 L268 112"/>
+  <ellipse cx="96" cy="55" rx="5" ry="2.4"/><ellipse cx="150" cy="55" rx="5" ry="2.4"/>
+  <ellipse cx="204" cy="55" rx="5" ry="2.4"/><ellipse cx="258" cy="55" rx="5" ry="2.4"/>
+  <ellipse cx="123" cy="59" rx="5" ry="2.4"/><ellipse cx="177" cy="59" rx="5" ry="2.4"/>
+  <ellipse cx="231" cy="59" rx="5" ry="2.4"/>
+  <path class="hz" d="M60 74h58M60 80h58M60 86h58M132 74h58M132 80h58M132 86h58M204 74h56M204 80h56M204 86h56"/>
+  <path class="hz" d="M60 98h200M60 104h200M60 110h200"/>
+  <text x="76" y="84">CAJÓN</text><text x="148" y="84">CAJÓN</text><text x="220" y="84">CAJÓN</text>
+  <text x="140" y="108">CARRITO</text>
+  <path class="hz" d="M40 62v66M36 62h8M36 128h8"/><text x="14" y="98">0.60</text>
+  <path class="hz" d="M306 44v22M302 44h8M302 66h8"/><text x="300" y="80">0.15</text>
+  <path class="hz" d="M46 140 L70 128"/><text x="10" y="152">LAQUEADO</text><text x="16" y="163">NEGRO</text>
+  <text x="108" y="178">PARA COLCHON DE 90X190</text>
+</svg><span class="copia">COPIA · BELGRANO HOME</span></div>
+    <div class="pl-marcas">
+      <div><span>VERIF.</span></div>
+      <div class=""><span>ORDEN</span>
+        <b></b></div>
+      <div><span>PROD.</span></div>
+      <div class="llena"><span>STOCK</span>
+        <b>✓</b></div>
+    </div>
+  </div>
+  <div class="pl-der">
+    <div class="f llena"><span>PEDIDO</span><b>P-000124</b></div>
+    <div class="f llena"><span>PROVEEDOR</span><b>1 TONY</b></div>
+    <div class="f"><span>NOMBRE</span><b>CAMA<br>HOUSTON</b></div>
+    <div class="f"><span>CÓDIGO</span><b style="font-size:9.5px">S-CA-HO-09-I-NP</b></div>
+    <div class="f obs"><span>OBSERVACIONES</span></div>
+    <div class="f" style="padding:5px 4px"><svg class="cb" viewBox="0 0 118 26" width="118" height="26"><rect x="0" y="0" width="1" height="26"/><rect x="2" y="0" width="2" height="26"/><rect x="7" y="0" width="1" height="26"/><rect x="9" y="0" width="1" height="26"/><rect x="11" y="0" width="1" height="26"/><rect x="13" y="0" width="1" height="26"/><rect x="15" y="0" width="1" height="26"/><rect x="19" y="0" width="2" height="26"/><rect x="22" y="0" width="1" height="26"/><rect x="25" y="0" width="1" height="26"/><rect x="27" y="0" width="1" height="26"/><rect x="29" y="0" width="3" height="26"/><rect x="33" y="0" width="1" height="26"/><rect x="36" y="0" width="3" height="26"/><rect x="42" y="0" width="2" height="26"/><rect x="45" y="0" width="1" height="26"/><rect x="47" y="0" width="1" height="26"/><rect x="49" y="0" width="3" height="26"/><rect x="55" y="0" width="1" height="26"/><rect x="57" y="0" width="2" height="26"/><rect x="62" y="0" width="1" height="26"/><rect x="64" y="0" width="1" height="26"/><rect x="66" y="0" width="3" height="26"/><rect x="72" y="0" width="1" height="26"/><rect x="76" y="0" width="3" height="26"/><rect x="82" y="0" width="1" height="26"/><rect x="84" y="0" width="2" height="26"/><rect x="89" y="0" width="2" height="26"/><rect x="92" y="0" width="1" height="26"/><rect x="94" y="0" width="3" height="26"/><rect x="100" y="0" width="3" height="26"/><rect x="104" y="0" width="1" height="26"/><rect x="106" y="0" width="1" height="26"/><rect x="109" y="0" width="1" height="26"/><rect x="111" y="0" width="2" height="26"/><rect x="114" y="0" width="1" height="26"/></svg><div class="pl-cod">BH-000187</div></div>
+    <div class="f ch"><span>FECHA DE COMPRA</span></div>
+    <div class="f ch"><span>FECHA DE PRODUCCIÓN</span></div>
+    <div class="f ch"><span>FIRMA</span></div>
+  </div>
+</div>
+      <div class="leyenda">La copia lleva además el <b>código de barras con el número de serie</b>.
+        Es la que se pega al mueble cuando llega y la que se escanea en la auditoría.</div>
+    </div>
+  </div>
+
+  <div class="card" style="padding:16px 18px;margin-top:14px">
+    <div class="kick" style="margin-bottom:9px">De dónde sale cada casillero</div>
+    <div class="scroll"><table>
+      <tr><th>Casillero del plano</th><th>Lo llena</th><th>De dónde sale</th></tr>
+      <tr><td class="nom">MATERIAL</td><td class="mut">el sistema</td>
+        <td>La terminación de la variante: <b>NEGRO Y PARAÍSO</b></td></tr>
+      <tr><td class="nom">CANTIDAD</td><td class="mut">el sistema</td>
+        <td>Cuántas iguales van en este pedido. Una hoja por mueble, o una con la cantidad</td></tr>
+      <tr><td class="nom">PEDIDO</td><td class="mut">el sistema</td>
+        <td>El número propio del pedido: <b>P-000124</b> — su serie, como las unidades</td></tr>
+      <tr><td class="nom">PROVEEDOR</td><td class="mut">el sistema</td>
+        <td>A quién se le está dando</td></tr>
+      <tr><td class="nom">NOMBRE · CÓDIGO</td><td class="mut">el catálogo</td>
+        <td>El mueble y el código de la variante</td></tr>
+      <tr><td class="nom">ORDEN / STOCK</td><td class="mut">el sistema</td>
+        <td>El número de venta, o <b>STOCK</b> tildado. Es lo que hoy escribís</td></tr>
+      <tr><td class="nom">OBSERVACIONES</td><td class="mut">vos</td>
+        <td>Se escribe al armar el pedido y sale impreso; queda guardado en la unidad</td></tr>
+      <tr><td class="nom">VERIF. · PROD.</td><td class="mut">a mano, el taller</td>
+        <td>Se deja en blanco: lo firma el proveedor, como ahora</td></tr>
+      <tr><td class="nom">FECHA DE COMPRA<br>FECHA DE PRODUCCIÓN · FIRMA</td>
+        <td class="mut">a mano</td><td>Igual que hoy. Al recibir, la fecha real se carga en el sistema</td></tr>
+      <tr><td class="nom">Código de barras</td><td class="mut">el sistema</td>
+        <td><b>Sólo en la copia.</b> Es el número de serie de esa unidad</td></tr>
+    </table></div>
+  </div>
+</section>
+
+<!-- ============ DE DÓNDE SALE EL DIBUJO ============ -->
+<section data-p="d" class="hide">
+  <div class="idea"><b>El dibujo ya está antes de vender.</b> En el mueble hay dos imágenes: la
+    <b>de venta</b> —la del catálogo— y la <b>de producción</b> —este plano—. Cuando se vende una
+    variante estándar, Producción ya sabe con qué plano hay que pedirla.</div>
+
+  <div class="card" style="padding:18px 20px;margin-bottom:14px">
+    <div class="paso-n"><span class="n">1</span><div>
+      <b>Estándar: el plano es de la variante</b>
+      <small>CAMA HOUSTON · Negro y Paraíso · <b>S-CA-HO-09-I-NP</b> tiene <b>su</b> plano. La misma
+        cama en blanco es otro. Se carga una vez y sirve para siempre.</small></div></div>
+    <div class="paso-n"><span class="n">2</span><div>
+      <b>Se vende → salta en Producción con el plano puesto</b>
+      <small>La unidad nace <i>a pedir</i> y ya trae la hoja armada. Lo único que se completa es el
+        número de orden y a quién se le va a dar.</small></div></div>
+    <div class="paso-n"><span class="n">3</span><div>
+      <b>A medida: el plano es de esa unidad</b>
+      <small>No se parece a ninguna otra: hay que <b>dibujarlo para esa venta</b>. La unidad queda
+        marcada <b>falta el plano</b> y no se puede pedir hasta que se cargue — que es la forma de
+        que no se escape.</small></div></div>
+    <div class="paso-n"><span class="n">4</span><div>
+      <b>El plano queda pegado a la pieza para siempre</b>
+      <small>Se ve en la ficha de la unidad, en Inventario. Cuando el mueble está en el depósito y
+        alguien pregunta "¿este cuál era?", el plano está ahí.</small></div></div>
+  </div>
+
+  <div class="dos">
+    <div class="card" style="padding:16px 18px">
+      <div class="kick" style="margin-bottom:9px">En el mueble (Catálogo · variantes)</div>
+      <table>
+        <tr><th>Variante</th><th>Venta</th><th>Producción</th><th></th></tr>
+        <tr><td class="nom">0.90 · Negro · Paraíso</td><td class="mut">foto</td>
+          <td class="mut">plano</td><td><span class="pill p-ok">lista</span></td></tr>
+        <tr><td class="nom">0.90 · Blanco · Paraíso</td><td class="mut">foto</td>
+          <td class="mut">plano</td><td><span class="pill p-ok">lista</span></td></tr>
+        <tr><td class="nom">1.40 · Negro · Nogal</td><td class="mut">foto</td>
+          <td class="tarde">falta</td><td><span class="pill p-fal">no se puede pedir</span></td></tr>
+      </table>
+    </div>
+    <div class="card" style="padding:16px 18px">
+      <div class="kick" style="margin-bottom:9px">A medida (el plano vive en la unidad)</div>
+      <table>
+        <tr><th>Unidad</th><th>Venta</th><th>Plano</th><th></th></tr>
+        <tr><td class="nom">— · MESA DE LUZ NÓRDICA</td><td class="mut">5744 · 2 de 3</td>
+          <td class="tarde">falta</td><td><span class="pill p-fal">a dibujar</span></td></tr>
+        <tr><td class="nom">— · PLACARD OLIVER 2.35</td><td class="mut">5660 · 6 de 6</td>
+          <td class="mut">plano propio</td><td><span class="pill p-ok">lista</span></td></tr>
+      </table>
+      <div class="hint" style="margin-top:9px">Un mueble a medida <b>no</b> hereda el plano del
+        modelo: se dibuja para esa venta y queda en esa unidad.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ A MEDIDA ============ -->
+<section data-p="x" class="hide">
+  <div class="idea"><b>El mueble a medida no se puede pedir hasta que esté dibujado y
+    verificado.</b> Se dibuja, alguien más chequea que el dibujo coincida con lo que vendió el
+    vendedor, y recién ahí se le puede asignar proveedor. Así un error de dibujo no llega a la
+    fábrica.</div>
+
+  <div class="linea">
+    <div class="et"><b>Se vende a medida</b><small>con el croquis del vendedor</small></div>
+    <div class="et on"><b>A dibujar</b><small>Adrián sube el plano</small></div>
+    <div class="et"><b>A verificar</b><small>otro compara los dos</small></div>
+    <div class="et"><b>Listo para pedir</b><small>recién ahí se elige proveedor</small></div>
+  </div>
+
+  <div class="app">
+    <div class="appbar"><span>Belgrano Soft</span><span>Ventas</span><span class="on">Producción</span>
+      <span>Compras</span><span>Inventario</span></div>
+    <div class="subbar"><div>Resumen</div><div>A fabricar</div><div class="on">A dibujar</div>
+      <div>Pedidos</div><div>Talleres</div><div>Historial</div></div>
+    <div class="body">
+      <div class="kick">Producción · A medida</div><div class="h1">Pendientes de dibujo</div>
+      <div class="sub">7 muebles a medida esperando plano · 3 esperando verificación</div>
+
+      <div class="bar">
+        <input placeholder="Buscar mueble, venta o cliente…">
+        <div class="segm">
+          <button class="seg on">A dibujar <span class="n">7</span></button>
+          <button class="seg on">A verificar <span class="n">3</span></button>
+          <button class="seg">Listos <span class="n">12</span></button>
+        </div>
+        <div style="flex:1"></div>
+        <span class="hint">lo dibuja <b>Adrián</b> · lo verifica <b>otro</b></span>
+      </div>
+
+      <div class="gr" style="border-color:var(--crit)">
+        <div class="gr-h" style="background:var(--crit-bg)">
+          <span class="tipo med">a medida</span>
+          <b>PLACARD OLIVER 2.35</b>
+          <span class="mut">Blanca · Paraíso · orden 5660 · 6 de 6</span>
+          <div class="sp"></div>
+          <span class="pill p-fal">a dibujar</span>
+          <span class="tarde">vendido hace 9 días</span>
+          <button class="btn pri">Subir el plano</button></div>
+        <div style="padding:14px">
+          <div class="cara">
+            <div>
+              <h5>Lo que dibujó el vendedor</h5>
+              <div class="croquis mano"><svg viewBox="0 0 240 120">
+  <path d="M24 92 L206 92 M24 92 L24 40 L206 40 L206 92"/>
+  <path d="M24 66 L206 66 M115 40 L115 92"/>
+  <path d="M30 100 L200 100" stroke-dasharray="3 3"/>
+  <path d="M20 34 L20 20 M210 34 L210 20 M20 27 L210 27"/>
+  <text x="98" y="18" style="fill:#3b5bdb;font-size:11px;stroke:none">2.35</text>
+  <text x="230" y="70" style="fill:#3b5bdb;font-size:11px;stroke:none">2.10</text>
+</svg></div>
+              <div class="hint" style="margin-top:6px">Croquis de la venta · <b>Lucía</b> · 25/7 ·
+                "2.35 de ancho, alto hasta el techo 2.10, tres puertas"</div>
+            </div>
+            <div>
+              <h5>El plano de Producción</h5>
+              <div class="croquis"><span>Todavía no lo subió</span></div>
+              <div class="hint" style="margin-top:6px">Lo carga <b>Adrián</b> con el formato de
+                siempre. Hasta que no esté, el mueble no se puede pedir.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="gr" style="border-color:#f3e2c0">
+        <div class="gr-h" style="background:var(--warn-bg)">
+          <span class="tipo med">a medida</span>
+          <b>MESA DE LUZ NÓRDICA 0.52</b>
+          <span class="mut">Natural · Nogal · orden 5744 · 2 de 3</span>
+          <div class="sp"></div>
+          <span class="pill p-res">a verificar</span>
+          <span class="hint">lo dibujó Adrián el 1/8</span></div>
+        <div style="padding:14px">
+          <div class="cara">
+            <div><h5>Croquis del vendedor</h5>
+              <div class="croquis mano"><svg viewBox="0 0 240 120">
+  <path d="M24 92 L206 92 M24 92 L24 40 L206 40 L206 92"/>
+  <path d="M24 66 L206 66 M115 40 L115 92"/>
+  <path d="M30 100 L200 100" stroke-dasharray="3 3"/>
+  <path d="M20 34 L20 20 M210 34 L210 20 M20 27 L210 27"/>
+  <text x="98" y="18" style="fill:#3b5bdb;font-size:11px;stroke:none">2.35</text>
+  <text x="230" y="70" style="fill:#3b5bdb;font-size:11px;stroke:none">2.10</text>
+</svg></div>
+              <div class="hint" style="margin-top:6px"><b>Martín</b> · 28/7</div></div>
+            <div><h5>Plano de Adrián</h5>
+              <div class="croquis"><svg viewBox="0 0 240 120">
+  <path d="M28 90 L204 90 L204 38 L28 38 Z"/>
+  <path d="M28 64 L204 64 M116 38 L116 90"/>
+  <path d="M204 38 L218 28 L218 80 L204 90"/>
+  <path d="M28 38 L42 28 L218 28"/>
+  <path d="M24 96 L208 96 M24 93 L24 99 M208 93 L208 99"/>
+  <text x="104" y="112" style="fill:#5b6675;font-size:10px;stroke:none">2.35</text>
+</svg></div>
+              <div class="hint" style="margin-top:6px">Subido el 1/8 · S-ML-NO-052-NN</div></div>
+          </div>
+          <div class="card" style="margin-top:12px;padding:12px 14px;background:var(--panel-2)">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <b style="font-size:13px;color:var(--navy)">¿El plano dice lo mismo que el croquis?</b>
+              <span class="hint">Lo mira alguien distinto de quien dibujó: si Adrián se equivocó y
+                además se chequea solo, el error igual llega a la fábrica.</span>
+              <div style="flex:1"></div>
+              <button class="btn">No coincide · devolver</button>
+              <button class="btn pri">Verificado</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="gr">
+        <div class="gr-h"><span class="tipo med">a medida</span>
+          <b>PLACARD AMBERES 1.85</b>
+          <span class="mut">Negra · Blanco · STOCK</span>
+          <div class="sp"></div>
+          <span class="pill p-ok">verificado</span>
+          <span class="hint">Adrián dibujó · <b>Sofía</b> verificó el 2/8</span>
+          <button class="btn pri">Asignar proveedor</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dos" style="margin-top:14px">
+    <div class="card" style="padding:16px 18px">
+      <div class="kick" style="margin-bottom:9px">Por qué dos personas</div>
+      <ul class="ok-lista">
+        <li>El vendedor dibuja lo que le pidió el cliente — es lo que se vendió.</li>
+        <li>Adrián dibuja el plano de fábrica — es lo que se va a construir.</li>
+        <li>Si los dos son la misma persona o el que chequea es el que dibujó,
+          <b>el error se arrastra hasta el mueble hecho</b>.</li>
+        <li>El que verifica <b>no puede ser el que dibujó</b>: el sistema no se lo permite.</li>
+        <li>Queda registrado <b>quién dibujó, quién verificó y cuándo</b>.</li>
+      </ul>
+    </div>
+    <div class="card" style="padding:16px 18px">
+      <div class="kick" style="margin-bottom:9px">Qué desbloquea cada paso</div>
+      <table>
+        <tr><th>Estado</th><th>Se puede</th><th>No se puede</th></tr>
+        <tr><td><span class="pill p-fal">a dibujar</span></td><td class="mut">subir el plano</td>
+          <td class="tarde">pedir a fábrica</td></tr>
+        <tr><td><span class="pill p-res">a verificar</span></td><td class="mut">aprobar o devolver</td>
+          <td class="tarde">pedir a fábrica</td></tr>
+        <tr><td><span class="pill p-ok">verificado</span></td>
+          <td class="mut">asignar proveedor y armar el pedido</td><td class="mut">—</td></tr>
+      </table>
+      <div class="hint" style="margin-top:9px">Un mueble <b>estándar</b> no pasa por acá: ya tiene su
+        plano en la variante y se puede pedir apenas se confirma la venta.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ EL PEDIDO ABIERTO ============ -->
+<section data-p="p" class="hide">
+  <div class="idea"><b>El pedido se va llenando.</b> Se abre uno para Tony y se le van agregando
+    muebles a medida que se venden —hoy tres respaldos, mañana dos camas—. Cuando está, se
+    <b>cierra</b> y ahí se manda. Si te olvidaste de algo, se <b>reabre</b>. Todo queda registrado.</div>
+
+  <div class="linea">
+    <div class="et on"><b>Abierto</b><small>se le agregan muebles</small></div>
+    <div class="et"><b>Cerrado</b><small>ya no se toca, se manda</small></div>
+    <div class="et"><b>Entregado</b><small>lo tiene en el taller</small></div>
+    <div class="et"><b>Recibido</b><small>vino todo</small></div>
+  </div>
+
+  <div class="app">
+    <div class="appbar"><span>Belgrano Soft</span><span>Ventas</span><span class="on">Producción</span>
+      <span>Compras</span><span>Inventario</span></div>
+    <div class="subbar"><div>Resumen</div><div>A fabricar</div><div class="on">Pedidos</div>
+      <div>Talleres</div><div>Stock a pedir</div><div>Historial</div></div>
+    <div class="body">
+      <div class="kick">Producción · Pedido</div><div class="h1">P-000124 · 1 Tony</div>
+      <div class="sub">Abierto el 28/7 · 16 muebles · lo va armando Martín</div>
+
+      <div class="bar">
+        <span class="est-ped ep-ab">● Abierto</span>
+        <span class="hint">se le pueden seguir agregando muebles</span>
+        <div style="flex:1"></div>
+        <button class="btn">Editar</button>
+        <button class="btn">Imprimir borrador</button>
+        <button class="btn pri">Cerrar el pedido y mandarlo</button>
+      </div>
+
+      <div class="gr">
+        <div class="gr-h"><b>Con dibujo</b><span class="pill p-ped">11 muebles</span>
+          <div class="sp"></div><span class="hint">una hoja por mueble</span>
+          <button class="btn">Ver los planos</button></div>
+        <div class="scroll"><table>
+          <tr><th>Mueble</th><th>Tipo</th><th>Terminación</th><th>Pedido</th><th>Agregado</th><th>Plano</th><th></th></tr>
+          <tr><td class="nom">CAMA HOUSTON 0.90</td><td><span class="tipo">estándar</span></td>
+            <td>Negro · Paraíso</td><td class="mut">5660</td><td class="mut">28/7</td><td class="mut">S-CA-HO-09-I-NP</td>
+            <td><span class="pill p-urg">urgente</span></td></tr>
+          <tr><td class="nom">CAMA HOUSTON 0.90</td><td><span class="tipo">estándar</span></td>
+            <td>Blanco · Paraíso</td><td class="mut">STOCK</td><td class="mut">28/7</td><td class="mut">S-CA-HO-09-I-BP</td><td></td></tr>
+          <tr style="background:var(--brand-soft)"><td class="nom">PLACARD OLIVER 2.00</td>
+            <td><span class="tipo">estándar</span></td><td>Blanca · Paraíso</td><td class="mut">5744</td>
+            <td class="nom">agregado 2/8</td><td class="mut">S-PL-OL-20-BP</td><td></td></tr>
+          <tr><td colspan="7" class="mut" style="font-size:11.5px">…8 más · <b>2 a medida</b>, ya verificados</td></tr>
+        </table></div>
+      </div>
+
+      <div class="gr">
+        <div class="gr-h"><b>En planilla</b><span class="pill p-ped">5 respaldos</span>
+          <div class="sp"></div><span class="hint">se juntan en una sola planilla</span>
+          <button class="btn">Ver la planilla</button></div>
+        <div class="scroll"><table>
+          <tr><th>Modelo</th><th>Medida</th><th>Tela</th><th>Alto</th><th>Pedido</th><th>Agregado</th></tr>
+          <tr><td class="nom">RESPALDO MILÁN</td><td>1.40</td><td>Pana beige</td><td>1.10</td>
+            <td class="mut">5698</td><td class="mut">29/7</td></tr>
+          <tr><td class="nom">RESPALDO MILÁN</td><td>1.40</td><td>Pana gris</td><td>1.10</td>
+            <td class="mut">STOCK</td><td class="mut">29/7</td></tr>
+          <tr><td class="nom">RESPALDO OSLO</td><td>1.60</td><td>Lino crudo</td><td>1.20</td>
+            <td class="mut">5712</td><td class="mut">30/7</td></tr>
+          <tr style="background:var(--brand-soft)"><td class="nom">RESPALDO OSLO</td><td>2.00</td>
+            <td>Lino crudo</td><td>1.20</td><td class="mut">5751</td>
+            <td class="nom">agregado 2/8</td></tr>
+          <tr><td class="nom">RESPALDO MILÁN</td><td>1.40</td><td>Pana beige</td><td>1.10</td>
+            <td class="mut">STOCK</td><td class="mut">2/8</td></tr>
+        </table></div>
+        <div class="lote-b" style="padding:9px 14px;font-size:12px;color:var(--ink-soft);
+          border-top:1px solid var(--line-soft)">Al cerrar el pedido, esta planilla se manda entera —
+          es la que ya usás para los respaldos, armada sola con lo que se fue vendiendo.</div>
+      </div>
+
+      <div class="dos" style="margin-top:14px">
+        <div class="card" style="padding:16px 18px">
+          <div class="kick" style="margin-bottom:9px">Cerrar, reabrir, editar</div>
+          <ul class="ok-lista">
+            <li><b>Cerrar:</b> se congela, se imprime y se manda. Ya no entra nada más sin reabrirlo.</li>
+            <li><b>Reabrir:</b> si te olvidaste tres muebles, se reabre y se agregan — quedan
+              marcados <i>agregado el 2/8</i> y se reimprime.</li>
+            <li><b>Editar:</b> sacar un mueble, cambiarle la observación o el rango de fechas.</li>
+            <li>Todo con <b>quién y cuándo</b>. Nada se borra sin que quede el rastro.</li>
+          </ul>
+        </div>
+        <div class="card" style="padding:16px 18px">
+          <div class="kick" style="margin-bottom:9px">Historial del pedido</div>
+          <div class="hist">
+            <div><span class="f">28/7 09:12</span><span><b>Martín</b> abrió el pedido para 1 Tony</span></div>
+            <div><span class="f">28/7 09:14</span><span>se agregaron <b>7 muebles</b> de 4 ventas</span></div>
+            <div><span class="f">29/7 17:40</span><span>se agregaron <b>3 respaldos</b> a la planilla</span></div>
+            <div><span class="f">2/8 10:05</span><span><b>Brian</b> marcó <b>urgente</b> la CAMA HOUSTON de la 5660</span></div>
+            <div><span class="f">2/8 10:07</span><span>se agregaron <b>2 muebles</b> — pedido reabierto</span></div>
+            <div><span class="f">3/8 08:30</span><span><b>Martín</b> cerró el pedido · 16 muebles</span></div>
+            <div><span class="f">3/8 08:31</span><span>impreso: 1 remito · 11 planos · 11 copias · 1 planilla</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ LA CARPETA DE TONI ============ -->
+<section data-p="c" class="hide">
+  <div class="idea"><b>Esto es la carpeta física.</b> Todo lo que Toni tiene en el taller, contado,
+    con lo urgente arriba. Y el historial: lo que ya trajo y lo que quedó debiendo.</div>
+
+  <div class="app">
+    <div class="appbar"><span>Belgrano Soft</span><span>Ventas</span><span class="on">Producción</span>
+      <span>Compras</span><span>Inventario</span></div>
+    <div class="subbar"><div>Resumen</div><div>A fabricar</div><div>Pedidos</div>
+      <div class="on">Talleres</div><div>Stock a pedir</div><div>Historial</div></div>
+    <div class="body">
+      <div class="kick">Producción · Taller</div><div class="h1">1 Tony</div>
+      <div class="sub">24 muebles en el taller · 3 urgentes · 3 vencidos</div>
+
+      <div class="tot">
+        <div class="tot-c"><div class="tot-t">En su taller</div><div class="tot-v">24</div>
+          <div class="tot-p">planos que tiene ahora</div></div>
+        <div class="tot-c"><div class="tot-t">Urgentes</div>
+          <div class="tot-v" style="color:var(--crit)">3</div>
+          <div class="tot-p">marcados para que los haga ya</div></div>
+        <div class="tot-c"><div class="tot-t">Vencidos</div>
+          <div class="tot-v" style="color:var(--crit)">3</div>
+          <div class="tot-p">se pasó el rango prometido</div></div>
+        <div class="tot-c"><div class="tot-t">Nos debe</div><div class="tot-v">3</div>
+          <div class="tot-p">de pedidos que trajo a medias</div></div>
+      </div>
+
+      <div class="gr">
+        <div class="gr-h"><span class="av">1</span><b>P-000118</b>
+          <span class="est-ped ep-en">● Entregado el 12/6</span>
+          <span class="tarde">5 recibidos · debe 3</span>
+          <div class="sp"></div>
+          <span class="hint">entraban entre el 22 y el 28/7</span>
+          <button class="btn">Ver</button><button class="btn pri">Recibir</button></div>
+        <div class="scroll"><table>
+          <tr><th>Mueble</th><th>Terminación</th><th>Pedido</th><th>Estado</th><th>Serie</th></tr>
+          <tr><td class="nom">CAMA HOUSTON 0.90</td><td>Negro · Paraíso</td><td class="mut">5660</td>
+            <td><span class="pill p-ok">recibido 28/7</span></td><td class="nom">BH-000187</td></tr>
+          <tr><td class="nom">CAMA HOUSTON 0.90</td><td>Blanco · Paraíso</td><td class="mut">STOCK</td>
+            <td><span class="pill p-ok">recibido 28/7</span></td><td class="nom">BH-000188</td></tr>
+          <tr style="background:var(--crit-bg)"><td class="nom">PLACARD OLIVER 2.00</td>
+            <td>Blanca · Paraíso</td><td class="mut">5660</td>
+            <td><span class="pill p-urg">urgente · debe</span></td><td class="mut">—</td></tr>
+          <tr style="background:var(--crit-bg)"><td class="nom">PLACARD OLIVER 2.00</td>
+            <td>Negra · Blanco</td><td class="mut">5660</td>
+            <td><span class="pill p-fal">debe</span></td><td class="mut">—</td></tr>
+          <tr style="background:var(--crit-bg)"><td class="nom">MESA RATONA NORUEGA</td>
+            <td>Paraíso · Natural</td><td class="mut">STOCK</td>
+            <td><span class="pill p-fal">debe</span></td><td class="mut">—</td></tr>
+        </table></div>
+      </div>
+
+      <div class="gr">
+        <div class="gr-h"><span class="av">2</span><b>P-000124</b>
+          <span class="est-ped ep-ab">● Abierto</span>
+          <span class="pill p-ped">16 muebles</span>
+          <div class="sp"></div>
+          <span class="hint">todavía no se le mandó</span>
+          <button class="btn">Seguir armándolo</button></div>
+      </div>
+
+      <div class="card" style="padding:16px 18px;margin-top:4px;margin-bottom:12px">
+        <div class="kick" style="margin-bottom:9px">Cómo entrega Tony · últimos 6 meses</div>
+        <div class="tot" style="margin-bottom:0">
+          <div class="tot-c"><div class="tot-t">Perfectos</div>
+            <div class="tot-v" style="color:var(--ok)">86%</div>
+            <div class="tot-p">62 de 72 muebles</div></div>
+          <div class="tot-c"><div class="tot-t">Con detalle</div>
+            <div class="tot-v" style="color:var(--warn)">7</div>
+            <div class="tot-p">entraron igual</div></div>
+          <div class="tot-c"><div class="tot-t">A reparar</div>
+            <div class="tot-v" style="color:var(--warn)">2</div>
+            <div class="tot-p">no se pudieron vender</div></div>
+          <div class="tot-c"><div class="tot-t">Devueltos</div>
+            <div class="tot-v" style="color:var(--crit)">1</div>
+            <div class="tot-p">volvieron en la camioneta</div></div>
+        </div>
+        <div class="hint" style="margin-top:9px">Sale solo del control de cada recepción. Es lo que
+          hace falta para saber <b>a quién conviene darle qué</b>, y para hablar con números cuando
+          uno entrega mal seguido.</div>
+      </div>
+
+      <div class="card" style="padding:16px 18px;margin-top:4px">
+        <div class="kick" style="margin-bottom:9px">Historial de Tony</div>
+        <div class="hist">
+          <div><span class="f">28/7</span><span>Recibo <b>R-000092</b> · 5 muebles del P-000118 —
+            3 perfectos, 1 con detalle, 1 a reparar</span></div>
+          <div><span class="f">28/7</span><span><b>1 devuelto</b> · CÓMODA AMBERES 1.20 — medida
+            equivocada, volvió en la camioneta</span></div>
+          <div><span class="f">12/6</span><span>Entregado <b>P-000118</b> · 8 muebles</span></div>
+          <div><span class="f">30/5</span><span>Recibo <b>R-000081</b> · 12 muebles del P-000109 — completo</span></div>
+          <div><span class="f">2/5</span><span>Entregado <b>P-000109</b> · 12 muebles</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ LA RECEPCIÓN ============ -->
+<section data-p="r" class="hide">
+  <div class="idea"><b>Viene Toni con la camioneta.</b> Abrís el pedido, tildás lo que bajó y
+    <b>controlás cada mueble antes de entrarlo</b>: medidas y diseño contra el plano. El sistema
+    arma el <b>recibo de lo que trajo</b>, deja marcado <b>lo que te debe</b>, y a cada mueble
+    recibido le pone su número de serie y su ubicación.</div>
+
+  <div class="app">
+    <div class="appbar"><span>Belgrano Soft</span><span>Ventas</span><span class="on">Producción</span>
+      <span>Compras</span><span>Inventario</span></div>
+    <div class="subbar"><div>Resumen</div><div>A fabricar</div><div>Pedidos</div>
+      <div class="on">Talleres</div><div>Stock a pedir</div><div>Historial</div></div>
+    <div class="body">
+      <div class="kick">Producción · Recepción</div><div class="h1">P-000118 · 1 Tony</div>
+      <div class="sub">8 muebles pedidos · tildá o escaneá lo que bajó del camión</div>
+
+      <div class="bar">
+        <input placeholder="Escaneá el código de barras de la copia…" style="flex:1">
+        <select><option>Depósito · planta baja</option><option>Depósito · 1er piso</option>
+          <option>Local 2020</option></select>
+      </div>
+
+      <div class="card" style="margin-bottom:12px">
+        <div class="esc" style="background:var(--ok-bg)">
+          <span class="pill p-ok">recibido</span><b class="nom">CAMA HOUSTON 0.90</b>
+          <span class="mut">Negro · Paraíso · orden 5660</span>
+          <div class="sp"></div><span class="nom">BH-000187</span>
+          <span class="mut">Depósito · planta baja</span></div>
+        <div class="esc" style="background:var(--ok-bg)">
+          <span class="pill p-ok">recibido</span><b class="nom">CAMA HOUSTON 0.90</b>
+          <span class="mut">Blanco · Paraíso · STOCK</span>
+          <div class="sp"></div><span class="nom">BH-000188</span>
+          <span class="mut">Depósito · planta baja</span></div>
+        <div class="esc"><input type="checkbox" class="chk"><b class="nom">PLACARD OLIVER 2.00</b>
+          <span class="mut">Blanca · Paraíso · orden 5660</span>
+          <div class="sp"></div><span class="pill p-urg">urgente</span>
+          <span class="mut">sin etiqueta</span></div>
+        <div class="esc"><input type="checkbox" class="chk"><b class="nom">PLACARD OLIVER 2.00</b>
+          <span class="mut">Negra · Blanco · orden 5660</span>
+          <div class="sp"></div><span class="mut">sin etiqueta</span></div>
+        <div class="esc"><input type="checkbox" class="chk"><b class="nom">MESA RATONA NORUEGA</b>
+          <span class="mut">Paraíso · Natural · STOCK</span>
+          <div class="sp"></div><span class="mut">sin etiqueta</span></div>
+      </div>
+
+      <div class="card" style="padding:14px 16px;margin-bottom:12px">
+        <div class="kick" style="margin-bottom:8px">Al tildar uno, se controla antes de entrarlo</div>
+        <div class="esc" style="border-bottom:0;padding:0;gap:14px;flex-wrap:wrap">
+          <b class="nom">CAMA HOUSTON 0.90 · Negro</b>
+          <span class="mut">se comparan medidas y diseño contra el plano</span>
+          <div class="sp"></div>
+          <div style="display:flex;gap:7px;flex-wrap:wrap">
+            <button class="btn on">Perfecto</button>
+            <button class="btn">Con detalle</button>
+            <button class="btn">A reparar</button>
+            <button class="btn">Se devuelve</button>
+          </div>
+        </div>
+        <div class="scroll" style="margin-top:12px"><table>
+          <tr><th>Cómo llegó</th><th>¿Entra al depósito?</th><th>Qué pasa</th></tr>
+          <tr><td><span class="pill p-ok">Perfecto</span></td><td class="mut">sí</td>
+            <td>Queda en Stock, libre o lista para entregar. Es el camino normal.</td></tr>
+          <tr><td><span class="pill p-res">Con detalle</span></td><td class="mut">sí, con comentario</td>
+            <td>Adrián decide que <b>se puede vivir con eso</b>: entra al inventario pero con la
+              observación y las fotos pegadas a la unidad. El que la vende o la entrega la ve antes.</td></tr>
+          <tr><td><span class="pill p-res">A reparar</span></td><td class="tarde">todavía no</td>
+            <td><b>Se queda en Producción</b>, en el taller de reparación, con las fotos del detalle.
+              Recién cuando se arregla entra al inventario y la orden queda lista.</td></tr>
+          <tr><td><span class="pill p-fal">Se devuelve</span></td><td class="tarde">no</td>
+            <td>Se sube de nuevo a la camioneta. <b>Vuelve al pedido como pendiente</b> — el
+              proveedor sigue debiéndola.</td></tr>
+        </table></div>
+        <div class="hint" style="margin-top:9px">Las <b>fotos del detalle</b> se sacan en el momento
+          y quedan pegadas a la unidad: le sirven al que después la va a reparar —para saber qué le
+          vio Adrián— y a nosotros si el cliente reclama tres meses más tarde.</div>
+      </div>
+
+      <div class="card" style="padding:14px 16px;margin-bottom:12px;border-color:#f3e2c0;
+        background:var(--warn-bg)">
+        <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
+          <div style="flex:1;min-width:260px">
+            <b style="font-size:13px;color:#7c4a05">Con detalle: lo decide el que recibe</b>
+            <div class="hint" style="color:#7c4a05;margin-top:3px">Adrián escribe qué le vio, saca
+              las fotos, y elige: <b>entra igual</b> —el detalle no molesta— o <b>va a reparar</b> —
+              no sale así—. Es la misma decisión que toma hoy mirando el mueble, pero queda escrita.</div>
+          </div>
+          <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
+            <button class="btn">Entra igual, con la observación</button>
+            <button class="btn on">Va a reparar</button></div>
+        </div>
+      </div>
+
+      <div class="bar">
+        <span class="hint"><b>5 de 8</b> tildados · 3 perfectos · 1 con detalle · 1 a reparar ·
+          quedan 3 debiendo</span>
+        <div style="flex:1"></div>
+        <button class="btn">Guardar sin cerrar</button>
+        <button class="btn pri">Recibir los 5 y armar el recibo</button>
+      </div>
+
+      <div class="dos" style="margin-top:16px">
+        <div>
+          <div class="kick" style="margin-bottom:7px">El recibo que sale solo</div>
+          <div class="rem">
+            <div class="rem-h"><div><h4>Recibo R-000092</h4>
+              <div class="meta">del pedido <b>P-000118</b> · <b>1 Tony</b> · 3/8/2026</div></div>
+              <div class="sp"></div>
+              <div style="text-align:center"><svg class="cb" viewBox="0 0 110 26" width="110" height="26"><rect x="0" y="0" width="2" height="26"/><rect x="3" y="0" width="1" height="26"/><rect x="6" y="0" width="1" height="26"/><rect x="8" y="0" width="2" height="26"/><rect x="11" y="0" width="1" height="26"/><rect x="13" y="0" width="2" height="26"/><rect x="16" y="0" width="1" height="26"/><rect x="18" y="0" width="3" height="26"/><rect x="22" y="0" width="1" height="26"/><rect x="24" y="0" width="1" height="26"/><rect x="26" y="0" width="1" height="26"/><rect x="29" y="0" width="2" height="26"/><rect x="33" y="0" width="3" height="26"/><rect x="37" y="0" width="1" height="26"/><rect x="39" y="0" width="2" height="26"/><rect x="44" y="0" width="1" height="26"/><rect x="47" y="0" width="1" height="26"/><rect x="50" y="0" width="3" height="26"/><rect x="54" y="0" width="1" height="26"/><rect x="57" y="0" width="1" height="26"/><rect x="59" y="0" width="2" height="26"/><rect x="63" y="0" width="1" height="26"/><rect x="67" y="0" width="1" height="26"/><rect x="71" y="0" width="1" height="26"/><rect x="75" y="0" width="3" height="26"/><rect x="81" y="0" width="1" height="26"/><rect x="85" y="0" width="1" height="26"/><rect x="87" y="0" width="3" height="26"/><rect x="93" y="0" width="1" height="26"/><rect x="97" y="0" width="1" height="26"/><rect x="100" y="0" width="2" height="26"/><rect x="103" y="0" width="1" height="26"/><rect x="107" y="0" width="1" height="26"/></svg>
+                <div class="pl-cod">R-000092</div></div></div>
+            <table>
+              <tr><th>Mueble</th><th>Pedido</th><th>Serie</th></tr>
+              <tr><td class="nom">CAMA HOUSTON 0.90 · Negro</td><td class="mut">5660</td>
+                <td class="nom">BH-000187</td></tr>
+              <tr><td class="nom">CAMA HOUSTON 0.90 · Blanco</td><td class="mut">STOCK</td>
+                <td class="nom">BH-000188</td></tr>
+              <tr><td colspan="3" class="mut" style="font-size:11.5px">…3 más · <b>5 muebles</b></td></tr>
+            </table>
+            <div class="rem-f" style="border-top:1px dashed #c8ced6;background:#fdecea">
+              <div style="border-color:var(--crit);color:var(--crit)">Quedan debiendo 3 muebles ·
+                2 son urgentes</div></div>
+          </div>
+        </div>
+        <div>
+          <div class="card" style="padding:16px 18px">
+            <div class="kick" style="margin-bottom:9px">Lo que pasa al recibir</div>
+            <ul class="ok-lista">
+              <li>La unidad pasa a <b>Stock</b> y aparece en Inventario con su ubicación.</li>
+              <li>Se le asigna el <b>número de serie</b> y se imprime la copia con su código.</li>
+              <li>Si tenía venta, queda <b>lista para entregar</b> y Logística la ve.</li>
+              <li>Lo que no vino <b>sigue en el pedido</b>, marcado como <i>debe</i>.</li>
+              <li>El recibo queda en el <b>historial de Tony</b> para siempre.</li>
+            </ul>
+          </div>
+          <div class="card" style="padding:14px 16px;margin-top:12px">
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn pri">Imprimir todo</button>
+              <button class="btn">Sólo el remito</button>
+              <button class="btn">Sólo los planos</button>
+              <button class="btn">Sólo las copias</button>
+            </div>
+            <div class="hint" style="margin-top:8px">Se puede reimprimir siempre: si se perdió una
+              hoja, si volvió el mueble sin la copia, o si el pedido se reabrió.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ REPARACIÓN ============ -->
+<section data-p="q" class="hide">
+  <div class="idea"><b>El que llegó con algo no entra al depósito.</b> Se queda en Producción, en el
+    taller de reparación, con las fotos que le sacó Adrián. Cuando se arregla, ahí sí sube a
+    Inventario y la orden le aparece a Logística como <b>lista para entregar</b>.</div>
+
+  <div class="linea">
+    <div class="et"><b>Llegó</b><small>control de Adrián</small></div>
+    <div class="et on"><b>A reparar</b><small>en Producción, no en el depósito</small></div>
+    <div class="et"><b>Reparado</b><small>alguien lo arregló y lo firma</small></div>
+    <div class="et"><b>Stock</b><small>entra al inventario</small></div>
+    <div class="et"><b>Lista para entregar</b><small>Logística la ve</small></div>
+  </div>
+
+  <div class="app">
+    <div class="appbar"><span>Belgrano Soft</span><span>Ventas</span><span class="on">Producción</span>
+      <span>Compras</span><span>Inventario</span></div>
+    <div class="subbar"><div>Resumen</div><div>A fabricar</div><div>Pedidos</div>
+      <div class="on">A reparar</div><div>Talleres</div><div>Historial</div></div>
+    <div class="body">
+      <div class="kick">Producción · Taller</div><div class="h1">A reparar</div>
+      <div class="sub">4 muebles esperando arreglo · 2 con venta atrás</div>
+
+      <div class="gr" style="border-color:var(--crit)">
+        <div class="gr-h" style="background:var(--crit-bg)">
+          <span class="tipo">estándar</span>
+          <b>PLACARD OLIVER 2.00</b>
+          <span class="mut">Blanca · Paraíso · orden 5660 · 4 de 6</span>
+          <div class="sp"></div>
+          <span class="pill p-fal">traba la entrega</span>
+          <span class="hint">llegó el 28/7 de 1 Tony</span></div>
+        <div style="padding:14px">
+          <div class="dos">
+            <div>
+              <h5 style="margin:0 0 5px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;
+                color:var(--muted);font-weight:700">Lo que le vio Adrián</h5>
+              <div class="card" style="padding:11px 13px;font-size:12.5px;color:var(--ink-soft)">
+                "Vino con el frente rayado del lado derecho y una bisagra floja. Se puede pulir
+                acá, no hace falta devolverlo."<br>
+                <span class="hint">Adrián · 28/7 11:40</span></div>
+              <div style="display:flex;gap:8px;margin-top:9px">
+                <div class="croquis" style="height:88px;flex:1"><span>foto 1</span></div>
+                <div class="croquis" style="height:88px;flex:1"><span>foto 2</span></div>
+              </div>
+            </div>
+            <div>
+              <h5 style="margin:0 0 5px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;
+                color:var(--muted);font-weight:700">Cuando esté</h5>
+              <ul class="ok-lista">
+                <li>Sube a <b>Inventario</b> con su serie y su ubicación.</li>
+                <li>La orden <b>5660</b> pasa a tener 4 de 6 listos.</li>
+                <li>Queda registrado <b>quién lo reparó</b> y cuándo.</li>
+                <li>El detalle y las fotos <b>no se borran</b>: quedan en la unidad.</li>
+              </ul>
+              <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+                <div style="flex:1"></div>
+                <button class="btn">Devolver al proveedor</button>
+                <button class="btn pri">Reparado · subir a inventario</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="gr">
+        <div class="gr-h"><span class="tipo med">a medida</span>
+          <b>MESA DE LUZ NÓRDICA 0.52</b>
+          <span class="mut">Natural · Nogal · STOCK</span>
+          <div class="sp"></div>
+          <span class="pill p-res">a reparar</span>
+          <span class="hint">"pata despegada" · Adrián · 2/8</span>
+          <button class="btn">Ver</button></div>
+      </div>
+
+      <div class="nota" style="margin-top:12px">Mientras está acá, la unidad <b>no está en
+        Inventario</b>: no se puede vender ni entregar, y no cuenta como stock. Pero tampoco
+        desapareció — se ve acá, y en la orden de venta figura como <i>a reparar</i>, así el
+        vendedor sabe por qué esa venta todavía no sale.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DOS RUBROS ============ -->
+<section data-p="e" class="hide">
+  <div class="idea"><b>El mueble que pasa por dos manos.</b> La cama la hace el carpintero y las
+    patas el herrero: son <b>dos pedidos distintos, a dos proveedores distintos</b>, pero es
+    <b>una sola unidad</b>. Cuando las dos partes se juntan, se marca <b>enlazado en fábrica</b> y
+    recién ahí el mueble está completo.</div>
+
+  <div class="linea">
+    <div class="et"><b>Se vende</b><small>nace la unidad</small></div>
+    <div class="et on"><b>Dos pedidos</b><small>carpintería y herrería, en paralelo</small></div>
+    <div class="et"><b>Llegan las partes</b><small>cada una por su lado</small></div>
+    <div class="et"><b>Enlazado</b><small>ya es un mueble</small></div>
+    <div class="et"><b>Stock</b><small>entra al depósito</small></div>
+  </div>
+
+  <div class="app">
+    <div class="appbar"><span>Belgrano Soft</span><span>Ventas</span><span class="on">Producción</span>
+      <span>Compras</span><span>Inventario</span></div>
+    <div class="subbar"><div>Resumen</div><div class="on">A fabricar</div><div>Pedidos</div>
+      <div>Talleres</div><div>Stock a pedir</div><div>Historial</div></div>
+    <div class="body">
+      <div class="kick">Producción · Unidad</div><div class="h1">MESA DE LUZ NÓRDICA · 0.45</div>
+      <div class="sub">Natural · Nogal · orden 5744 · <b>dos rubros</b></div>
+
+      <div class="gr">
+        <div class="gr-h"><span class="av">C</span><b>Carpintería · el mueble</b>
+          <span class="pill p-ok">recibido 28/7</span>
+          <div class="sp"></div>
+          <span class="mut">1 Tony · pedido P-000118 · plano</span></div>
+      </div>
+      <div class="gr">
+        <div class="gr-h"><span class="av" style="background:#8b5cf6">H</span><b>Herrería · las patas</b>
+          <span class="pill p-prod">en fábrica</span>
+          <div class="sp"></div>
+          <span class="mut">3 Luciano · pedido P-000131 · planilla</span>
+          <span>entra entre el 8 y el 14/8</span></div>
+      </div>
+
+      <div class="card" style="padding:14px 16px;background:var(--warn-bg);border-color:#f3e2c0">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <b style="color:#7c4a05;font-size:13px">Todavía no está enlazado</b>
+          <span class="hint" style="color:#7c4a05">Llegó el mueble pero faltan las patas. No cuenta
+            como disponible ni se puede entregar.</span>
+          <div style="flex:1"></div>
+          <button class="btn">Marcar enlazado en fábrica</button>
+        </div>
+      </div>
+
+      <div class="dos" style="margin-top:14px">
+        <div class="card" style="padding:16px 18px">
+          <div class="kick" style="margin-bottom:9px">Cómo funciona</div>
+          <ul class="ok-lista">
+            <li>La unidad es <b>una sola</b>, con un solo número de serie.</li>
+            <li>Tiene <b>un pedido por rubro</b>: cada uno con su proveedor, su fecha y su plano o
+              planilla.</li>
+            <li>En el taller de cada proveedor aparece <b>sólo su parte</b>.</li>
+            <li>Mientras falte una parte, la unidad <b>no entra al depósito</b>.</li>
+            <li>Cuando se juntan, alguien marca <b>enlazado</b> — con quién y cuándo — y ahí sí pasa
+              a Stock con su etiqueta.</li>
+          </ul>
+        </div>
+        <div class="card" style="padding:16px 18px">
+          <div class="kick" style="margin-bottom:9px">Qué se ve en cada lado</div>
+          <table>
+            <tr><th>Dónde</th><th>Qué muestra</th></tr>
+            <tr><td class="nom">Taller de Tony</td><td>la mesa, sin las patas</td></tr>
+            <tr><td class="nom">Taller de Luciano</td><td>las patas, sin la mesa</td></tr>
+            <tr><td class="nom">A fabricar</td><td>la unidad, con <b>2 de 2 rubros</b> y cuál falta</td></tr>
+            <tr><td class="nom">Orden 5744</td><td>un mueble, no dos</td></tr>
+            <tr><td class="nom">Inventario</td><td>nada todavía: entra cuando se enlaza</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ============ CÓMO SE PIDE CADA MUEBLE ============ -->
+<section data-p="w" class="hide">
+  <div class="idea"><b>Cada mueble se pide como dice su ficha.</b> En el producto ya está cargado
+    <b>por qué rubros pasa</b> y <b>cómo se le pide a cada uno</b>: con dibujo o con planilla.
+    Producción no lo decide: lo lee de ahí y arma el pedido en consecuencia.</div>
+
+  <div class="dos">
+    <div class="card" style="padding:16px 18px">
+      <div class="kick" style="margin-bottom:9px">Lo que dice el producto</div>
+      <div class="scroll"><table>
+        <tr><th>Mueble</th><th>Rubro</th><th>Se pide con</th></tr>
+        <tr><td class="nom" rowspan="1">CAMA HOUSTON</td><td>Carpintería</td>
+          <td><span class="modo m-dib">dibujo</span></td></tr>
+        <tr><td class="nom">RESPALDO MILÁN</td><td>Tapicería</td>
+          <td><span class="modo m-pla">planilla</span></td></tr>
+        <tr><td class="nom" rowspan="2">MESA DE LUZ NÓRDICA</td><td>Carpintería</td>
+          <td><span class="modo m-dib">dibujo</span></td></tr>
+        <tr><td>Herrería</td><td><span class="modo m-pla">planilla</span></td></tr>
+        <tr><td class="nom">MUEBLE TV TASOS</td><td>Carpintería</td>
+          <td><span class="modo m-dib">dibujo</span></td></tr>
+        <tr><td class="nom">MUEBLE TV TASOS</td><td>Herrería</td>
+          <td><span class="modo m-pla">planilla</span></td></tr>
+      </table></div>
+      <div class="hint" style="margin-top:9px">Esto ya existe en el mueble —rubro A y rubro B, con su
+        modo—. Acá sólo se usa.</div>
+    </div>
+    <div class="card" style="padding:16px 18px">
+      <div class="kick" style="margin-bottom:9px">Qué hace Producción con eso</div>
+      <ul class="ok-lista">
+        <li>Un mueble de <b>un solo rubro</b> genera <b>un pedido</b>.</li>
+        <li>Uno de <b>dos rubros</b> genera <b>dos</b>, cada uno a su proveedor, y hay que
+          <b>enlazarlos</b> después.</li>
+        <li>El rubro <b>dibujo</b> imprime una hoja por mueble, con el plano.</li>
+        <li>El rubro <b>planilla</b> suma una fila a la planilla de ese pedido — las columnas son
+          las de esa categoría.</li>
+        <li>Un mismo pedido puede tener <b>las dos cosas</b>: hojas y planilla, como el de Tony.</li>
+        <li>Si el mueble no tiene el rubro cargado, <b>no se puede pedir</b>: hay que completarlo en
+          el catálogo primero.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="nota" style="margin-top:14px"><b>Las columnas de la planilla salen de la categoría.</b>
+    Un respaldo se pide por <i>modelo, medida, tela y alto</i>; una mesa de luz por <i>medida y
+    terminación</i>. Es la misma tabla que ya definiste en el mueble para el costeo — no hay que
+    cargarla dos veces.</div>
+</section>
+
+<!-- ============ COLA DE TRABAJO ============ -->
+<section data-p="k" class="hide">
+  <div class="idea"><b>Lo que hay que hacer hoy, por etapa.</b> No es una lista de muebles: es una
+    lista de <b>tareas</b>, cada una del que le toca. Si una columna está vacía, ese paso está al
+    día.</div>
+
+  <div class="app">
+    <div class="appbar"><span>Belgrano Soft</span><span>Ventas</span><span class="on">Producción</span>
+      <span>Compras</span><span>Inventario</span></div>
+    <div class="subbar"><div>Resumen</div><div class="on">Cola de trabajo</div><div>A fabricar</div>
+      <div>Pedidos</div><div>Talleres</div><div>Historial</div></div>
+    <div class="body">
+      <div class="kick">Producción</div><div class="h1">Cola de trabajo</div>
+      <div class="sub">Martes 3 de agosto · 23 cosas para hacer · 6 urgentes</div>
+
+      <div class="cola">
+        <div class="cc"><div class="cc-h rojo">A dibujar <span class="n">7</span></div>
+          <div class="cc-b">
+            <div class="ct"><b>PLACARD OLIVER 2.35</b>
+              <small>5660 · vendido hace 9 días</small></div>
+            <div class="ct"><b>MESA DE LUZ NÓRDICA 0.52</b><small>5744 · hace 4 días</small></div>
+            <div class="ct"><b>PLACARD AMBERES 1.85</b><small>STOCK · hace 2 días</small></div>
+            <div class="ct"><small>…4 más</small></div>
+          </div>
+          <div class="cc-q">Lo hace <b>Adrián</b></div></div>
+
+        <div class="cc"><div class="cc-h">A verificar <span class="n">3</span></div>
+          <div class="cc-b">
+            <div class="ct"><b>MESA DE LUZ NÓRDICA 0.52</b><small>dibujó Adrián · 1/8</small></div>
+            <div class="ct"><b>RACK OSLO 2.10</b><small>dibujó Adrián · 2/8</small></div>
+            <div class="ct"><small>…1 más</small></div>
+          </div>
+          <div class="cc-q">Lo mira <b>otro</b>, nunca el que dibujó</div></div>
+
+        <div class="cc"><div class="cc-h rojo">Sin proveedor <span class="n">18</span></div>
+          <div class="cc-b">
+            <div class="ct"><b>CÓMODA AMBERES 1.20</b><small>6 iguales de 6 ventas</small></div>
+            <div class="ct"><b>PLACARD OLIVER 2.00</b><small>5 iguales</small></div>
+            <div class="ct"><small>…7 muebles más</small></div>
+          </div>
+          <div class="cc-q">Armar el pedido y elegir taller</div></div>
+
+        <div class="cc"><div class="cc-h">Pedidos abiertos <span class="n">2</span></div>
+          <div class="cc-b">
+            <div class="ct"><b>P-000124 · 1 Tony</b><small>16 muebles · abierto hace 6 días</small></div>
+            <div class="ct"><b>P-000129 · 3 Luciano</b><small>4 muebles · abierto ayer</small></div>
+          </div>
+          <div class="cc-q">Cerrarlos e imprimirlos</div></div>
+
+        <div class="cc"><div class="cc-h rojo">Vencidos <span class="n">6</span></div>
+          <div class="cc-b">
+            <div class="ct"><b>P-000118 · 1 Tony</b><small>3 muebles · 6 días tarde</small></div>
+            <div class="ct"><b>P-000121 · 7 Raúl</b><small>3 muebles · 2 días tarde</small></div>
+          </div>
+          <div class="cc-q">Llamar y repactar la fecha</div></div>
+
+        <div class="cc"><div class="cc-h">Llegan esta semana <span class="n">12</span></div>
+          <div class="cc-b">
+            <div class="ct"><b>1 Tony</b><small>8 muebles · entre el 3 y el 9/8</small></div>
+            <div class="ct"><b>5 Enrique</b><small>4 muebles · entre el 4 y el 11/8</small></div>
+          </div>
+          <div class="cc-q">Preparar lugar en el depósito</div></div>
+
+        <div class="cc"><div class="cc-h rojo">A reparar <span class="n">4</span></div>
+          <div class="cc-b">
+            <div class="ct"><b>PLACARD OLIVER 2.00</b><small>5660 · traba la entrega</small></div>
+            <div class="ct"><b>MESA DE LUZ NÓRDICA</b><small>STOCK · pata despegada</small></div>
+            <div class="ct"><small>…2 más</small></div>
+          </div>
+          <div class="cc-q">No están en el depósito hasta que se arreglen</div></div>
+
+        <div class="cc"><div class="cc-h">A enlazar <span class="n">2</span></div>
+          <div class="cc-b">
+            <div class="ct"><b>MESA DE LUZ NÓRDICA</b><small>llegó el mueble, faltan las patas</small></div>
+            <div class="ct"><b>MUEBLE TV TASOS</b><small>llegaron las patas, falta el mueble</small></div>
+          </div>
+          <div class="cc-q">Cuando estén las dos partes</div></div>
+      </div>
+
+      <div class="nota" style="margin-top:14px"><b>Cada tarjeta lleva a su pantalla.</b> La cola no es
+        otro lugar donde cargar cosas: es el índice de lo que está trabado, para no tener que
+        recorrer todo buscando qué falta.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PLANIFICACIÓN ============ -->
+<section data-p="n" class="hide">
+  <div class="idea"><b>Cuánto le puedo dar a cada uno.</b> La planificación es el calendario de lo
+    comprometido: qué semana entra qué, por taller. Sirve para dos cosas — <b>no prometerle al
+    cliente una fecha imposible</b>, y <b>no cargarle a un proveedor más de lo que hace</b>.</div>
+
+  <div class="app">
+    <div class="appbar"><span>Belgrano Soft</span><span>Ventas</span><span class="on">Producción</span>
+      <span>Compras</span><span>Inventario</span></div>
+    <div class="subbar"><div>Resumen</div><div>Cola de trabajo</div><div class="on">Planificación</div>
+      <div>Pedidos</div><div>Talleres</div><div>Historial</div></div>
+    <div class="body">
+      <div class="kick">Producción</div><div class="h1">Planificación</div>
+      <div class="sub">Agosto · lo comprometido por taller, semana por semana</div>
+
+      <div class="sem">
+        <div class="hd">Taller</div>
+        <div class="hd">3 al 9</div><div class="hd">10 al 16</div><div class="hd">17 al 23</div>
+        <div class="hd">24 al 30</div><div class="hd">31 al 6/9</div>
+
+        <div class="pr">1 Tony <span class="cap">hace ~10 por semana</span></div>
+        <div><span class="blq bl-over">14 muebles</span><br><span class="hint">se pasa de 10</span></div>
+        <div><span class="blq bl-ok">6</span></div>
+        <div><span class="blq bl-full">10</span></div>
+        <div><span class="blq bl-ok">4</span></div>
+        <div><span class="hint">libre</span></div>
+
+        <div class="pr">3 Luciano <span class="cap">~6 por semana</span></div>
+        <div><span class="blq bl-ok">3</span></div>
+        <div><span class="blq bl-full">6</span></div>
+        <div><span class="blq bl-ok">2</span></div>
+        <div><span class="hint">libre</span></div>
+        <div><span class="hint">libre</span></div>
+
+        <div class="pr">5 Enrique <span class="cap">~8 por semana</span></div>
+        <div><span class="blq bl-ok">4</span></div>
+        <div><span class="blq bl-ok">5</span></div>
+        <div><span class="blq bl-ok">5</span></div>
+        <div><span class="blq bl-ok">3</span></div>
+        <div><span class="hint">libre</span></div>
+
+        <div class="pr">7 Raúl <span class="cap">~12 por semana</span></div>
+        <div><span class="blq bl-ok">7</span></div>
+        <div><span class="blq bl-ok">9</span></div>
+        <div><span class="blq bl-ok">3</span></div>
+        <div><span class="hint">libre</span></div>
+        <div><span class="hint">libre</span></div>
+      </div>
+
+      <div class="dos" style="margin-top:14px">
+        <div class="card" style="padding:16px 18px">
+          <div class="kick" style="margin-bottom:9px">Lo que avisa</div>
+          <ul class="ok-lista">
+            <li><b>Tony está sobrecargado</b> esta semana: 14 comprometidos y hace 10. O se le corre
+              la fecha, o parte va a otro.</li>
+            <li>Al armar un pedido, muestra <b>en qué semana cae</b> según los días del mueble y qué
+              tan lleno está ese taller.</li>
+            <li>Cuando el vendedor pregunta <b>"¿para cuándo lo tengo?"</b>, la fecha sale de acá y
+              no de un cálculo suelto.</li>
+            <li>Lo que se atrasa <b>empuja</b>: se ve qué otras entregas se corren.</li>
+          </ul>
+        </div>
+        <div class="card" style="padding:16px 18px">
+          <div class="kick" style="margin-bottom:9px">De dónde salen los números</div>
+          <ul class="ok-lista">
+            <li>El <b>rango comprometido</b> de cada pedido — la semana en que cae.</li>
+            <li>Los <b>días de fábrica</b> de cada mueble, que ya están en el catálogo.</li>
+            <li>La <b>capacidad</b> de cada taller: cuántos entrega por semana. Se carga a mano al
+              principio y después se corrige sola con lo que <b>realmente</b> entregó.</li>
+          </ul>
+          <div class="hint" style="margin-top:9px">La capacidad no hace falta que sea exacta: alcanza
+            con que avise cuando le estás dando el doble de lo que puede.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CONTROL DE CALIDAD ============ -->
+<section data-p="g" class="hide">
+  <div class="idea"><b>El control de calidad no es una pantalla aparte: se llena solo</b> con lo que
+    Adrián marca en cada recepción. Esta es la lectura — quién entrega bien, qué mueble da problemas
+    y qué detalle se repite.</div>
+
+  <div class="app">
+    <div class="appbar"><span>Belgrano Soft</span><span>Ventas</span><span class="on">Producción</span>
+      <span>Compras</span><span>Inventario</span></div>
+    <div class="subbar"><div>Resumen</div><div>Cola de trabajo</div><div>Planificación</div>
+      <div class="on">Control de calidad</div><div>Talleres</div><div>Historial</div></div>
+    <div class="body">
+      <div class="kick">Producción</div><div class="h1">Control de calidad</div>
+      <div class="sub">Últimos 6 meses · 284 muebles recibidos</div>
+
+      <div class="tot">
+        <div class="tot-c"><div class="tot-t">Llegaron perfectos</div>
+          <div class="tot-v" style="color:var(--ok)">88%</div>
+          <div class="tot-p">250 de 284</div></div>
+        <div class="tot-c"><div class="tot-t">Con detalle</div>
+          <div class="tot-v" style="color:var(--warn)">21</div>
+          <div class="tot-p">entraron igual, con nota</div></div>
+        <div class="tot-c"><div class="tot-t">A reparar</div>
+          <div class="tot-v" style="color:var(--warn)">9</div>
+          <div class="tot-p">3 todavía sin arreglar</div></div>
+        <div class="tot-c"><div class="tot-t">Devueltos</div>
+          <div class="tot-v" style="color:var(--crit)">4</div>
+          <div class="tot-p">volvieron en la camioneta</div></div>
+      </div>
+
+      <div class="dos">
+        <div class="card" style="padding:16px 18px">
+          <div class="kick" style="margin-bottom:9px">Por taller</div>
+          <div class="scroll"><table>
+            <tr><th>Taller</th><th class="num">Recibidos</th><th class="num">Perfectos</th>
+              <th class="num">A reparar</th><th class="num">Devueltos</th></tr>
+            <tr><td class="nom">7 Raúl</td><td class="num">96</td>
+              <td class="num" style="color:var(--ok)">94%</td><td class="num">2</td>
+              <td class="num">0</td></tr>
+            <tr><td class="nom">1 Tony</td><td class="num">72</td>
+              <td class="num" style="color:var(--ok)">86%</td><td class="num">2</td>
+              <td class="num">1</td></tr>
+            <tr><td class="nom">5 Enrique</td><td class="num">64</td>
+              <td class="num" style="color:var(--ok)">88%</td><td class="num">2</td>
+              <td class="num">1</td></tr>
+            <tr style="background:var(--crit-bg)"><td class="nom">3 Luciano</td><td class="num">52</td>
+              <td class="num tarde">79%</td><td class="num">3</td><td class="num">2</td></tr>
+          </table></div>
+          <div class="hint" style="margin-top:9px">Luciano viene entregando peor. No es una opinión:
+            son 11 muebles con algo en 52.</div>
+        </div>
+        <div class="card" style="padding:16px 18px">
+          <div class="kick" style="margin-bottom:9px">Qué se repite</div>
+          <div class="scroll"><table>
+            <tr><th>Detalle</th><th class="num">Veces</th><th>Sobre todo en</th></tr>
+            <tr><td class="nom">Frente rayado</td><td class="num">9</td><td class="mut">placards</td></tr>
+            <tr><td class="nom">Bisagra floja</td><td class="num">6</td><td class="mut">placards</td></tr>
+            <tr><td class="nom">Medida equivocada</td><td class="num">4</td>
+              <td class="mut">a medida</td></tr>
+            <tr><td class="nom">Color que no coincide</td><td class="num">3</td>
+              <td class="mut">laqueados</td></tr>
+            <tr><td class="nom">Cajón que no corre</td><td class="num">3</td><td class="mut">cómodas</td></tr>
+          </table></div>
+          <div class="hint" style="margin-top:9px">Sale de lo que se escribe en el control. Cuatro
+            medidas equivocadas en muebles a medida es lo que justifica la doble verificación del
+            dibujo.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ HISTORIAL ============ -->
+<section data-p="t" class="hide">
+  <div class="idea"><b>Todo lo que le pasó a una pieza, en una línea.</b> El historial no es un log
+    técnico: es la respuesta a "¿qué pasó con esta cama?" cuando el cliente llama o cuando no cierra
+    el conteo.</div>
+
+  <div class="app">
+    <div class="appbar"><span>Belgrano Soft</span><span>Ventas</span><span class="on">Producción</span>
+      <span>Compras</span><span>Inventario</span></div>
+    <div class="subbar"><div>Resumen</div><div>Cola de trabajo</div><div>Planificación</div>
+      <div>Control de calidad</div><div>Talleres</div><div class="on">Historial</div></div>
+    <div class="body">
+      <div class="kick">Producción</div><div class="h1">Historial</div>
+      <div class="sub">Buscá por número de serie, pedido, orden de venta o proveedor</div>
+
+      <div class="bar">
+        <input placeholder="BH-000187, P-000118, 5660, Tony…" value="BH-000187" style="flex:1">
+        <button class="btn on">Todo</button><button class="btn">Sólo lo que cambió de estado</button>
+      </div>
+
+      <div class="card" style="padding:16px 20px">
+        <div style="display:flex;align-items:center;gap:11px;margin-bottom:12px;flex-wrap:wrap">
+          <b class="nom" style="font-size:15px">BH-000187</b>
+          <span class="tipo">estándar</span>
+          <span class="mut">CAMA HOUSTON 0.90 · Negro · Paraíso</span>
+          <div class="sp" style="flex:1"></div>
+          <span class="pill p-ok">En stock · Depósito planta baja</span>
+        </div>
+        <div class="tl">
+          <div class="tl-i"><span class="f">25/7 · 10:12 · Lucía</span>
+            <b>Se vendió</b> en la orden 5660 · 1 de 6</div>
+          <div class="tl-i"><span class="f">25/7 · 18:40 · Paula (Administración)</span>
+            <b>Orden confirmada</b> — seña de $180.000 acreditada</div>
+          <div class="tl-i"><span class="f">25/7 · 18:40 · sistema</span>
+            Nace la unidad <b>a pedir</b>, con el plano S-CA-HO-09-I-NP</div>
+          <div class="tl-i"><span class="f">28/7 · 09:14 · Martín</span>
+            Agregada al pedido <b>P-000118</b> · 1 Tony</div>
+          <div class="tl-i"><span class="f">28/7 · 09:20 · Brian</span>
+            Marcada <b>urgente</b></div>
+          <div class="tl-i"><span class="f">28/7 · 09:31 · Martín</span>
+            <b>Pedido cerrado</b> e impreso · entra entre el 22 y el 28/7</div>
+          <div class="tl-i ok"><span class="f">28/7 · 14:05 · Adrián</span>
+            <b>Recibida</b> · control: <b>perfecta</b> · se le asignó la serie BH-000187</div>
+          <div class="tl-i"><span class="f">28/7 · 14:06 · sistema</span>
+            Entra a Inventario · Depósito planta baja · queda <b>lista para entregar</b></div>
+          <div class="tl-i"><span class="f">2/8 · 11:22 · Sofía</span>
+            Movida a <b>Depósito · 2do piso</b> (conteo)</div>
+        </div>
+      </div>
+
+      <div class="dos" style="margin-top:14px">
+        <div class="card" style="padding:16px 18px">
+          <div class="kick" style="margin-bottom:9px">Qué queda registrado</div>
+          <ul class="ok-lista">
+            <li>Cada <b>cambio de estado</b>, con quién y cuándo.</li>
+            <li>Los pedidos: abierto, cerrado, reabierto, impreso.</li>
+            <li>El control de recepción y las <b>fotos</b> del detalle.</li>
+            <li>Las reparaciones: quién la arregló y cuándo volvió.</li>
+            <li>Los movimientos de ubicación y los ajustes de conteo.</li>
+            <li>El precio del proveedor y quién lo confirmó o lo cambió.</li>
+          </ul>
+        </div>
+        <div class="card" style="padding:16px 18px">
+          <div class="kick" style="margin-bottom:9px">Para qué sirve de verdad</div>
+          <ul class="ok-lista">
+            <li>Reclamo a los 3 meses: <b>quién la hizo y cómo llegó</b>.</li>
+            <li>No cierra el conteo: dónde estaba la última vez y quién la tocó.</li>
+            <li>El cliente dice que se la prometieron antes: <b>qué fecha se comprometió</b>.</li>
+            <li>Discusión con el proveedor: cuándo se le dio y cuándo trajo.</li>
+          </ul>
+          <div class="hint" style="margin-top:9px"><b>Nada se borra.</b> Si algo se anula o se
+            corrige, queda el registro de que se anuló y de quién lo hizo.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ AUDITORÍA ============ -->
+<section data-p="a" class="hide">
+  <div class="idea"><b>La copia pegada al mueble es lo que hace posible el conteo.</b> Se pasa el
+    lector por el sector y el sistema te dice: esto está y coincide, esto está pero la app lo tenía
+    en otro lado, esto la app dice que está y no apareció, y esto está pero sin identificar.</div>
+
+  <div class="app">
+    <div class="appbar"><span>Belgrano Soft</span><span>Ventas</span><span>Producción</span>
+      <span class="on">Inventario</span><span>Logística</span></div>
+    <div class="subbar"><div>Unidades</div><div>Movimientos</div><div>Ubicaciones</div>
+      <div class="on">Conteos</div><div>Ajustes</div></div>
+    <div class="body">
+      <div class="kick">Inventario · Conteo</div><div class="h1">Depósito · 2do piso</div>
+      <div class="sub">Empezado hoy 11:20 · 38 escaneados de 41 esperados</div>
+
+      <div class="bar">
+        <input placeholder="Escaneá el código de barras…" style="flex:1">
+        <span class="pill p-ok" style="font-size:12px;padding:6px 12px">38 escaneados</span>
+      </div>
+
+      <div class="tot">
+        <div class="tot-c"><div class="tot-t">Coinciden</div>
+          <div class="tot-v" style="color:var(--ok)">35</div>
+          <div class="tot-p">están donde la app decía</div></div>
+        <div class="tot-c"><div class="tot-t">En otro lado</div>
+          <div class="tot-v" style="color:var(--warn)">3</div>
+          <div class="tot-p">se corrige la ubicación</div></div>
+        <div class="tot-c"><div class="tot-t">No aparecieron</div>
+          <div class="tot-v" style="color:var(--crit)">3</div>
+          <div class="tot-p">la app las tiene acá</div></div>
+        <div class="tot-c"><div class="tot-t">Sin identificar</div>
+          <div class="tot-v" style="color:var(--crit)">2</div>
+          <div class="tot-p">están pero sin la copia pegada</div></div>
+      </div>
+
+      <div class="card">
+        <div class="esc" style="background:var(--warn-bg)">
+          <span class="pill p-res">estaba en otro lado</span>
+          <b class="nom">BH-000122</b><span class="mut">CÓMODA AMBERES 55 · 1.20</span>
+          <div class="sp"></div><span class="mut">la app decía <b>Local 2020</b></span>
+          <button class="btn">Mover acá</button></div>
+        <div class="esc" style="background:var(--crit-bg)">
+          <span class="pill p-fal">no apareció</span>
+          <b class="nom">BH-000140</b><span class="mut">MESA DE LUZ AMBERES · 0.45</span>
+          <div class="sp"></div><button class="btn">Marcar a confirmar</button></div>
+        <div class="esc" style="background:var(--crit-bg)">
+          <span class="pill p-fal">sin identificar</span>
+          <b class="mut">sin etiqueta</b>
+          <span class="mut">está físicamente pero no tiene la copia pegada</span>
+          <div class="sp"></div><button class="btn pri">Identificar y etiquetar</button></div>
+      </div>
+
+      <div class="nota" style="margin-top:14px"><b>El que no aparece no se borra:</b> queda marcado
+        <i>a confirmar</i> —la marca que ya existe en Inventario— para que alguien lo resuelva. Y el
+        que está sin etiqueta se identifica ahí mismo: se elige qué mueble es, se le da número de
+        serie y se imprime la copia para pegarle.</div>
+    </div>
+  </div>
+</section>
+
+<div class="pregs">
+  <h3>Lo que me queda por saber</h3>
+  <ol>
+    <li><b>El plano en A4:</b> ¿va uno por hoja o entran dos? Y si son tres camas iguales de la
+      misma venta, ¿le das <b>tres hojas</b> o <b>una que diga 3 UNIDADES</b>?</li>
+    <li><b>Los rubros con planilla</b> (respaldos): ¿la planilla que le mandás lleva las mismas
+      columnas que me mostraste, o cambia según el proveedor?</li>
+    <li><b>El enlace:</b> ¿lo hace la fábrica o llega cada parte por separado al depósito y lo
+      arman ahí? Cambia dónde va el botón.</li>
+    <li><b>El croquis del vendedor:</b> ¿hoy queda en algún lado —una foto, un papel— o es sólo lo
+      que escribe en la venta? Si no existe, el que verifica no tiene con qué comparar.</li>
+    <li><b>Si no coincide y se devuelve:</b> ¿vuelve a Adrián para que lo redibuje, o hay que ir a
+      preguntarle al vendedor? Cambia a dónde vuelve.</li>
+    <li><b>El pedido cerrado, ¿se manda desde el sistema</b> (mail / WhatsApp) o se imprime y se
+      entrega en mano como ahora?</li>
+  </ol>
+</div>
+
+</div>
+
+<script>
+document.querySelectorAll('.opt').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.opt').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('[data-p]').forEach(s =>
+    s.classList.toggle('hide', s.dataset.p !== b.dataset.o));
+  window.scrollTo(0, 0);
+});
+</script>
