@@ -1,0 +1,678 @@
+<meta charset="utf-8">
+<title>Belgrano Soft · Producción v2 — una sola pantalla, tres agrupaciones</title>
+<style>
+:root{
+  --bg:#f4f6f8; --panel:#fff; --panel-2:#fafbfc; --ink:#0f1a2a; --ink-soft:#5b6675;
+  --line:#d9e0e8; --line-soft:#eef1f5; --navy:#16324f; --brand:#1e5fce;
+  --brand-soft:#e7eefb; --brand-ink:#1a51b0; --ok:#15803d; --ok-bg:#e6f4ea;
+  --warn:#b45309; --warn-bg:#fff7e6; --crit:#b42318; --crit-bg:#fdecea; --muted:#8a94a3;
+  --viol:#6b21a8; --viol-bg:#f3e8ff;
+  --shadow:0 1px 2px rgba(15,26,42,.06),0 1px 3px rgba(15,26,42,.04);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);line-height:1.5;
+  font-family:'Public Sans',-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  font-variant-numeric:tabular-nums}
+h1,h2,h3{margin:0;letter-spacing:-.01em}
+button{font:inherit}
+input,select{font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);
+  border-radius:8px;background:var(--panel);color:var(--ink)}
+
+.top{background:var(--navy);color:#fff;padding:11px 20px;position:sticky;top:0;z-index:30}
+.top h1{font-size:15px;font-weight:800}
+.top p{margin:2px 0 0;font-size:12px;opacity:.75}
+.opts{display:flex;gap:6px;margin-top:11px;flex-wrap:wrap}
+.opt{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);color:rgba(255,255,255,.8);
+  border-radius:9px;padding:7px 13px;font-size:12.5px;font-weight:650;cursor:pointer;text-align:left}
+.opt:hover{background:rgba(255,255,255,.18);color:#fff}
+.opt.on{background:#fff;color:var(--navy);border-color:#fff}
+.opt small{display:block;font-size:10.5px;font-weight:500;opacity:.75}
+.opt.on small{opacity:.6}
+
+.wrap{padding:18px 20px 60px;max-width:1400px;margin:0 auto}
+.idea{background:var(--brand-soft);border:1px solid #cfe0fb;border-radius:12px;padding:13px 15px;
+  font-size:13px;margin-bottom:6px}
+.idea b{color:var(--brand-ink)}
+.pros{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0 18px}
+@media(max-width:820px){.pros{grid-template-columns:1fr}}
+.pro,.con{border-radius:11px;padding:11px 14px;font-size:12.5px;border:1px solid}
+.pro{background:var(--ok-bg);border-color:#cfe8d8;color:#14532d}
+.con{background:var(--warn-bg);border-color:#f3e2c0;color:#7c4a05}
+.pro b,.con b{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;
+  margin-bottom:3px;opacity:.75}
+
+/* ---- el modelo ---- */
+.modelo{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;
+  margin-bottom:22px;box-shadow:var(--shadow)}
+.modelo h2{font-size:16px;color:var(--navy);margin-bottom:4px}
+.modelo .sub{font-size:12.5px;color:var(--ink-soft);margin-bottom:16px}
+.ciclo{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:900px){.ciclo{grid-template-columns:1fr 1fr}}
+.paso{border:1px solid var(--line);border-radius:11px;padding:12px 13px;background:var(--panel-2);
+  position:relative}
+.paso>b{display:block;font-size:13px;color:var(--navy);margin-bottom:3px}
+.paso small b{color:var(--navy)}
+.paso small{font-size:11.5px;color:var(--ink-soft);line-height:1.45;display:block}
+.paso .est{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+  border-radius:999px;padding:2px 8px;display:inline-block;margin-bottom:6px}
+.e-prod{background:var(--viol-bg);color:var(--viol)}
+.e-dep{background:var(--ok-bg);color:var(--ok)}
+.e-res{background:var(--warn-bg);color:var(--warn)}
+.e-ent{background:#eef1f5;color:var(--muted)}
+.cruza{margin-top:14px;font-size:12.5px;color:var(--ink-soft);border-top:1px dashed var(--line);
+  padding-top:12px}
+.cruza b{color:var(--navy)}
+
+/* ---- el marco de la app ---- */
+.app{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;
+  box-shadow:var(--shadow)}
+.appbar{background:var(--navy);color:#fff;height:38px;display:flex;align-items:center;gap:9px;
+  padding:0 14px;font-size:11.5px;font-weight:650}
+.appbar span{opacity:.55}
+.appbar .on{opacity:1;background:rgba(255,255,255,.16);padding:3px 9px;border-radius:999px}
+.subbar{display:flex;gap:14px;padding:0 16px;border-bottom:1px solid var(--line);background:var(--panel);
+  font-size:12px;font-weight:600;color:var(--ink-soft)}
+.subbar div{padding:9px 0}
+.subbar .on{color:var(--navy);border-bottom:2px solid var(--brand)}
+.body{padding:16px;background:var(--bg)}
+.kick{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--brand)}
+.h1{font-size:19px;font-weight:800;color:var(--navy);margin:1px 0 1px}
+.sub{font-size:11.5px;color:var(--muted);margin-bottom:12px}
+
+.bar{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.bar input{flex:1;min-width:180px}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:8px 12px;
+  font-size:12.5px;font-weight:650;color:var(--ink-soft);cursor:pointer;white-space:nowrap}
+.btn.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}
+.segm{display:inline-flex;gap:6px;flex-wrap:wrap}
+.seg{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 13px;
+  font-size:12.5px;font-weight:650;color:var(--ink-soft);cursor:pointer}
+.seg .n{opacity:.6;margin-left:5px}
+.seg.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.seg.on .n{opacity:.7}
+
+table{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--panel)}
+th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+  padding:9px 10px;border-bottom:1px solid var(--line);font-weight:700;white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid var(--line-soft);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;
+  box-shadow:var(--shadow)}
+.pill{font-size:10px;font-weight:700;border-radius:999px;padding:2px 8px;white-space:nowrap}
+.p-ok{background:var(--ok-bg);color:var(--ok)}
+.p-prod{background:var(--viol-bg);color:var(--viol)}
+.p-res{background:var(--warn-bg);color:var(--warn)}
+.p-ent{background:#eef1f5;color:var(--muted)}
+.num{text-align:right}
+.mut{color:var(--muted)}
+.nom{font-weight:700;color:var(--navy)}
+.ser{font-size:11px;color:var(--muted)}
+.grupo td{background:var(--panel-2);font-weight:700;color:var(--navy);font-size:11.5px;
+  text-transform:uppercase;letter-spacing:.04em;border-top:1px solid var(--line)}
+.mini{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:7px;
+  background:var(--panel-2);border:1px solid var(--line-soft);color:var(--muted);vertical-align:middle}
+.mini svg{width:30px;height:22px;stroke:currentColor;fill:none;stroke-width:2}
+.chip{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px;
+  background:var(--panel-2);border:1px solid var(--line);color:var(--ink-soft)}
+.bres{border:1px solid var(--brand);background:var(--brand-soft);color:var(--brand-ink);
+  border-radius:7px;padding:3px 10px;font-size:11.5px;font-weight:700;cursor:pointer}
+.bres:hover{background:var(--brand);color:#fff}
+.b-x{border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:3px 8px;
+  font-size:11.5px;color:var(--muted);cursor:pointer}
+
+/* A · tablero */
+.tot{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+@media(max-width:820px){.tot{grid-template-columns:1fr 1fr}}
+.tot-c{border:1px solid var(--line);border-radius:11px;padding:11px 13px;background:var(--panel)}
+.tot-t{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700}
+.tot-v{font-size:22px;font-weight:800;color:var(--navy);margin-top:2px}
+.tot-p{font-size:11px;color:var(--muted)}
+.exp{background:var(--panel-2)}
+.exp td{padding:0}
+.exp .in{padding:10px 14px 12px}
+
+/* C · buscador */
+.busq{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;
+  box-shadow:var(--shadow);margin-bottom:14px}
+.busq input{width:100%;font-size:15px;padding:11px 14px}
+.res{display:flex;flex-direction:column;gap:10px}
+.rg{border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden}
+.rg-h{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--panel-2);
+  border-bottom:1px solid var(--line)}
+.rg-h b{font-size:13.5px;color:var(--navy)}
+.rg-h .sp{flex:1}
+.rg-b{padding:4px 0}
+.uni{display:flex;align-items:center;gap:11px;padding:8px 14px;border-bottom:1px solid var(--line-soft)}
+.uni:last-child{border-bottom:0}
+.uni .sp{flex:1}
+.hint{font-size:11.5px;color:var(--muted)}
+.nota{font-size:12.5px;color:var(--ink-soft);background:var(--panel);border:1px solid var(--line);
+  border-left:3px solid var(--brand);border-radius:10px;padding:12px 15px;margin-top:20px}
+.nota b{color:var(--navy)}
+.hide{display:none}
+.scroll{overflow-x:auto}
+
+.e-ped{background:var(--brand-soft);color:var(--brand-ink)}
+.e-conf{background:var(--warn-bg);color:var(--warn)}
+.e-rec{background:var(--ok-bg);color:var(--ok)}
+.p-ped{background:var(--brand-soft);color:var(--brand-ink)}
+.p-fal{background:var(--crit-bg);color:var(--crit)}
+.p-urg{background:var(--crit);color:#fff}
+.tarde{color:var(--crit);font-weight:700}
+.hoy{color:var(--warn);font-weight:700}
+.chk{width:15px;height:15px;accent-color:var(--brand);margin:0;vertical-align:-2px}
+.gr{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:10px;
+  overflow:hidden;box-shadow:var(--shadow)}
+.gr-h{display:flex;align-items:center;gap:11px;padding:10px 14px;background:var(--panel-2);
+  border-bottom:1px solid var(--line)}
+.gr-h b{font-size:13.5px;color:var(--navy)}
+.gr-h .sp{flex:1}
+.gr-b{padding:0}
+.av{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;
+  border-radius:8px;background:var(--navy);color:#fff;font-size:11.5px;font-weight:800;flex:none}
+.barra{height:7px;border-radius:99px;background:var(--line-soft);display:flex;overflow:hidden;
+  width:130px;flex:none}
+.barra i{display:block}
+.b-ok{background:var(--ok)} .b-prod{background:#8b5cf6} .b-ped{background:var(--brand)}
+.b-fal{background:var(--crit)}
+.ley{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin:0 0 12px}
+.ley span{display:inline-flex;align-items:center;gap:5px}
+.ley i{width:9px;height:9px;border-radius:3px;display:inline-block}
+.dib{display:inline-grid;place-items:center;width:30px;height:24px;border-radius:6px;
+  background:var(--panel-2);border:1px solid var(--line);color:var(--brand);cursor:pointer}
+.dib svg{width:20px;height:16px;stroke:currentColor;fill:none;stroke-width:1.6}
+.dib.no{color:var(--muted);border-style:dashed}
+.rango{display:inline-flex;align-items:center;gap:5px;background:var(--panel-2);
+  border:1px solid var(--line);border-radius:7px;padding:2px 8px;font-size:11.5px;color:var(--ink-soft)}
+.rango b{color:var(--navy)}
+.paso-n{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px dashed var(--line)}
+.paso-n:last-child{border-bottom:0}
+.paso-n .n{flex:none;width:24px;height:24px;border-radius:50%;background:var(--brand);color:#fff;
+  display:grid;place-items:center;font-size:12px;font-weight:800}
+.paso-n>div>b{display:block;font-size:13.5px;color:var(--navy);margin-bottom:2px}
+.paso-n small b{color:var(--navy)}
+.paso-n small{font-size:12.5px;color:var(--ink-soft);display:block;line-height:1.5}
+.hoja{background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px 18px;
+  box-shadow:var(--shadow);max-width:560px}
+.hoja h4{margin:0 0 2px;font-size:14px;color:var(--navy)}
+.hoja .meta{font-size:11.5px;color:var(--muted);margin-bottom:12px}
+.hoja table{font-size:12px}
+.hoja th{padding:6px 8px} .hoja td{padding:6px 8px}
+.sinprec{margin-top:11px;font-size:11.5px;color:var(--warn);background:var(--warn-bg);
+  border:1px solid #f3e2c0;border-radius:8px;padding:8px 11px}
+.dos{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:900px){.dos{grid-template-columns:1fr}}
+.pregs{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--brand);
+  border-radius:12px;padding:16px 18px;margin-top:22px}
+.pregs h3{font-size:14px;color:var(--navy);margin-bottom:8px}
+.pregs ol{margin:0;padding-left:20px;font-size:13px;color:var(--ink-soft)}
+.pregs li{margin-bottom:9px} .pregs b{color:var(--navy)}
+.ok-lista{list-style:none;padding:0;margin:0;font-size:13px}
+.ok-lista li{padding:7px 0 7px 26px;position:relative;border-bottom:1px solid var(--line-soft);
+  color:var(--ink-soft)}
+.ok-lista li:last-child{border-bottom:0}
+.ok-lista li:before{content:'✓';position:absolute;left:4px;color:var(--ok);font-weight:800}
+.ok-lista b{color:var(--navy)}
+</style>
+
+<div class="top">
+  <h1>Producción v2 — una sola pantalla, tres maneras de agruparla</h1>
+  <p>Lo que me dijiste: por proveedor y por orden de venta son las dos claves. Agrupar por mueble es
+    para armar el pedido, y se puede desarmar. Al proveedor le va el dibujo o la tabla, sin precio.</p>
+  <div class="opts">
+    <button class="opt on" data-o="p">Por proveedor<small>Qué tiene cada taller</small></button>
+    <button class="opt" data-o="v">Por orden de venta<small>Lo urgente arriba</small></button>
+    <button class="opt" data-o="m">Por mueble<small>Para armar el pedido</small></button>
+    <button class="opt" data-o="a">Armar un pedido<small>Y partirlo en dos proveedores</small></button>
+    <button class="opt" data-o="d">Lo que se le manda<small>Dibujo o tabla, sin precio</small></button>
+    <button class="opt" data-o="s">Stock a pedir<small>Lo que va sin venta</small></button>
+  </div>
+</div>
+
+<div class="wrap">
+
+<div class="idea" style="margin-bottom:14px"><b>Es una sola pantalla.</b> Arriba, los mismos filtros
+  siempre; el desplegable de <b>agrupar por</b> cambia cómo se apilan las mismas filas. No son tres
+  solapas distintas: es la misma lista mirada de tres maneras, y se pasa de una a otra sin perder lo
+  filtrado.</div>
+
+<!-- ============ POR PROVEEDOR ============ -->
+<section data-p="p">
+  <div class="app">
+    <div class="appbar"><span>Belgrano Soft</span><span>Ventas</span><span class="on">Producción</span>
+      <span>Compras</span><span>Inventario</span></div>
+    <div class="subbar"><div>Resumen</div><div class="on">A fabricar</div><div>Pedidos</div>
+      <div>Stock a pedir</div><div>Dibujos y tablas</div><div>Historial</div></div>
+    <div class="body">
+      <div class="kick">Producción</div><div class="h1">A fabricar</div>
+      <div class="sub">101 muebles en el circuito · 18 sin pedir · 6 atrasados</div>
+
+      <div class="bar">
+        <input placeholder="Buscar modelo, medida, proveedor o número de venta…">
+        <select><option>Agrupar por proveedor</option><option>Agrupar por orden de venta</option>
+          <option>Agrupar por mueble</option></select>
+        <button class="btn on">Ocultar lo listo</button>
+      </div>
+      <div class="bar" style="margin-bottom:14px">
+        <div class="segm">
+          <button class="seg">Todo <span class="n">101</span></button>
+          <button class="seg on">Sin pedir <span class="n">18</span></button>
+          <button class="seg on">En fábrica <span class="n">83</span></button>
+          <button class="seg">Listo <span class="n">37</span></button>
+        </div>
+        <div style="flex:1"></div>
+        <button class="btn">Urgentes <span class="pill p-urg" style="margin-left:5px">6</span></button>
+      </div>
+
+      <div class="gr" style="border-color:var(--crit)">
+        <div class="gr-h" style="background:var(--crit-bg)"><span class="av" style="background:var(--crit)">!</span>
+          <b>Sin proveedor todavía</b><span class="pill p-fal">18 muebles</span>
+          <div class="sp"></div>
+          <span class="hint">vendidos y confirmados — falta decidir quién los hace</span>
+          <button class="btn pri">Armar pedido</button></div>
+      </div>
+
+      <div class="gr">
+        <div class="gr-h"><span class="av">T</span><b>1 Tony</b>
+          <span class="pill p-prod">24 muebles</span><span class="tarde">3 atrasados</span>
+          <div class="sp"></div>
+          <span class="hint">3 pedidos abiertos</span>
+          <button class="btn">Ver el taller de Tony</button></div>
+        <div class="scroll"><table>
+          <tr><th style="width:26px"></th><th>Modelo</th><th>Medida</th><th>Estructura</th>
+            <th>Frente</th><th>Plano</th><th>Venta</th><th>Pedido</th><th>Entra entre</th><th></th></tr>
+          <tr><td><input type="checkbox" class="chk"></td><td class="nom">PLACARD OLIVER</td>
+            <td>2.00</td><td>Blanca</td><td>Paraíso</td><td><span class="dib" title="Ver el dibujo"><svg viewBox="0 0 20 16"><rect x="1" y="1" width="18" height="14" rx="1.5"/><path d="M1 11l5-4 4 3 3-2 6 4"/></svg></span></td>
+            <td class="mut">5660 · 1 de 6</td><td class="mut">P-118 · 12/6</td>
+            <td class="tarde">22 y 28/7 · vencido</td><td><span class="pill p-urg">urgente</span></td></tr>
+          <tr><td><input type="checkbox" class="chk"></td><td class="nom">PLACARD OLIVER</td>
+            <td>2.00</td><td>Negra</td><td>Blanco</td><td><span class="dib" title="Ver el dibujo"><svg viewBox="0 0 20 16"><rect x="1" y="1" width="18" height="14" rx="1.5"/><path d="M1 11l5-4 4 3 3-2 6 4"/></svg></span></td>
+            <td class="mut">5660 · 2 de 6</td><td class="mut">P-118 · 12/6</td>
+            <td class="tarde">22 y 28/7 · vencido</td><td><span class="pill p-urg">urgente</span></td></tr>
+          <tr><td><input type="checkbox" class="chk"></td><td class="nom">CÓMODA AMBERES 55</td>
+            <td>1.20</td><td>Blanca</td><td>Blanco</td><td><span class="dib" title="Ver la tabla"><svg viewBox="0 0 20 16"><rect x="1" y="1" width="18" height="14" rx="1.5"/><path d="M1 6h18M1 11h18M7 1v14"/></svg></span></td>
+            <td class="mut">stock</td><td class="mut">P-121 · 2/7</td>
+            <td class="hoy">3 y 9/8 · esta semana</td><td></td></tr>
+          <tr><td><input type="checkbox" class="chk"></td><td class="nom">CÓMODA AMBERES 55</td>
+            <td>1.40</td><td>Negra</td><td>Paraíso</td><td><span class="dib" title="Ver la tabla"><svg viewBox="0 0 20 16"><rect x="1" y="1" width="18" height="14" rx="1.5"/><path d="M1 6h18M1 11h18M7 1v14"/></svg></span></td>
+            <td class="mut">5712 · 1 de 2</td><td class="mut">P-121 · 2/7</td>
+            <td>3 y 9/8</td><td></td></tr>
+          <tr><td colspan="10" class="mut" style="font-size:11.5px">…20 más</td></tr>
+        </table></div>
+      </div>
+
+      <div class="gr">
+        <div class="gr-h"><span class="av">R</span><b>7 Raúl</b>
+          <span class="pill p-prod">19 muebles</span>
+          <div class="sp"></div><span class="hint">lo primero entra entre el 8 y el 14/8</span>
+          <button class="btn">Ver el taller de Raúl</button></div>
+      </div>
+      <div class="gr">
+        <div class="gr-h"><span class="av">E</span><b>5 Enrique</b>
+          <span class="pill p-prod">14 muebles</span>
+          <div class="sp"></div><span class="hint">lo primero entra entre el 11 y el 18/8</span>
+          <button class="btn">Ver el taller de Enrique</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="pros">
+    <div class="pro"><b>Lo que resuelve</b>Ves el taller de cada uno: qué le diste, qué te debe y
+      qué se le venció. Y desde acá se filtra por proveedor sin cambiar de pantalla.</div>
+    <div class="con"><b>Fijate</b>La fecha es un <b>rango</b> —"entra entre el 3 y el 9/8"—, como me
+      dijiste. Rojo cuando se pasó del final del rango.</div>
+  </div>
+</section>
+
+<!-- ============ POR ORDEN DE VENTA ============ -->
+<section data-p="v" class="hide">
+  <div class="app">
+    <div class="appbar"><span>Belgrano Soft</span><span>Ventas</span><span class="on">Producción</span>
+      <span>Compras</span><span>Inventario</span></div>
+    <div class="subbar"><div>Resumen</div><div class="on">A fabricar</div><div>Pedidos</div>
+      <div>Stock a pedir</div><div>Dibujos y tablas</div><div>Historial</div></div>
+    <div class="body">
+      <div class="kick">Producción</div><div class="h1">A fabricar</div>
+      <div class="sub">37 ventas con muebles pendientes · ordenadas por lo que vence primero</div>
+
+      <div class="bar">
+        <input placeholder="Buscar…">
+        <select><option>Agrupar por orden de venta</option><option>Agrupar por proveedor</option>
+          <option>Agrupar por mueble</option></select>
+        <select><option>Ordenar por urgencia</option><option>Por fecha de venta</option>
+          <option>Por plazo prometido</option></select>
+        <button class="btn on">Ocultar lo listo</button>
+      </div>
+      <div class="ley">
+        <span><i class="b-ok"></i> listo</span><span><i class="b-prod"></i> en fábrica</span>
+        <span><i class="b-ped"></i> pedido</span><span><i class="b-fal"></i> sin pedir</span>
+      </div>
+
+      <div class="gr" style="border-color:var(--crit)">
+        <div class="gr-h" style="background:var(--crit-bg)"><span class="pill p-urg">urgente</span>
+          <b>5660 · Bibiana</b>
+          <span class="barra"><i class="b-ok" style="width:50%"></i><i class="b-prod" style="width:33%"></i><i class="b-fal" style="width:17%"></i></span>
+          <span class="hint">3 listos · 2 en fábrica · 1 sin pedir</span>
+          <div class="sp"></div>
+          <span class="tarde">prometida el 30/7 · 6 días</span></div>
+        <div class="gr-b"><div class="scroll"><table>
+          <tr><th style="width:26px"></th><th>Mueble</th><th>Medida</th><th>Terminación</th>
+            <th>Plano</th><th>Estado</th><th>Proveedor</th><th>Entra entre</th><th></th></tr>
+          <tr><td><input type="checkbox" class="chk"></td><td class="nom">PLACARD OLIVER</td>
+            <td>2.00</td><td>Blanca · Paraíso</td><td><span class="dib" title="Ver el dibujo"><svg viewBox="0 0 20 16"><rect x="1" y="1" width="18" height="14" rx="1.5"/><path d="M1 11l5-4 4 3 3-2 6 4"/></svg></span></td><td><span class="pill p-prod">En fábrica</span></td>
+            <td>1 Tony</td><td class="tarde">22 y 28/7</td><td><button class="b-x">Ver</button></td></tr>
+          <tr><td><input type="checkbox" class="chk"></td><td class="nom">PLACARD OLIVER</td>
+            <td>2.00</td><td>Negra · Blanco</td><td><span class="dib" title="Ver el dibujo"><svg viewBox="0 0 20 16"><rect x="1" y="1" width="18" height="14" rx="1.5"/><path d="M1 11l5-4 4 3 3-2 6 4"/></svg></span></td><td><span class="pill p-prod">En fábrica</span></td>
+            <td>1 Tony</td><td class="tarde">22 y 28/7</td><td><button class="b-x">Ver</button></td></tr>
+          <tr style="background:var(--crit-bg)"><td><input type="checkbox" class="chk" checked></td>
+            <td class="nom">MESA DE LUZ NÓRDICA</td><td>0.45</td>
+            <td>Natural · Nogal <span class="chip">a medida</span></td><td><span class="dib no" title="Falta cargar el dibujo"><svg viewBox="0 0 20 16"><rect x="1" y="1" width="18" height="14" rx="1.5"/><path d="M10 5v4M10 11.5v.5"/></svg></span></td>
+            <td><span class="pill p-fal">Sin pedir</span></td><td class="mut">—</td><td class="mut">—</td>
+            <td><button class="bres">Pedir</button></td></tr>
+          <tr class="mut"><td colspan="9" style="font-size:11.5px">3 listos escondidos —
+            <a href="#" style="color:var(--brand)">mostrarlos</a></td></tr>
+        </table></div></div>
+      </div>
+
+      <div class="gr">
+        <div class="gr-h"><b>5712 · Andrea</b>
+          <span class="barra"><i class="b-prod" style="width:100%"></i></span>
+          <span class="hint">2 en fábrica</span>
+          <div class="sp"></div><span>entra entre el 3 y el 9/8</span></div>
+      </div>
+      <div class="gr">
+        <div class="gr-h"><b>5744 · Huego</b>
+          <span class="barra"><i class="b-fal" style="width:100%"></i></span>
+          <span class="pill p-fal">3 sin pedir</span>
+          <div class="sp"></div><span class="hint">vendida hace 2 días</span>
+          <button class="btn pri">Armar pedido</button></div>
+      </div>
+      <div class="gr" style="border-color:#f3e2c0">
+        <div class="gr-h" style="background:var(--warn-bg)"><b>5788 · Camila</b>
+          <span class="pill p-res">sin confirmar</span>
+          <div class="sp"></div>
+          <span class="hint">Administración todavía no la bajó — no se puede pedir</span>
+          <button class="btn">Ver la venta</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="pros">
+    <div class="pro"><b>Lo que resuelve</b>Lo urgente sube solo y queda marcado. Lo que ya está
+      listo se esconde con un botón: se mira sólo lo que falta.</div>
+    <div class="con"><b>Fijate</b>Adentro de la venta, cada mueble muestra <b>en qué parte del
+      circuito está y quién lo tiene</b>. Es la misma fila que en la vista por proveedor.</div>
+  </div>
+</section>
+
+<!-- ============ POR MUEBLE ============ -->
+<section data-p="m" class="hide">
+  <div class="idea"><b>Agrupar por mueble no es para mirar: es para pedir.</b> Junta lo igual de
+    ventas distintas para que veas que tenés seis iguales, pero <b>no obliga a pedirlas juntas</b>.</div>
+  <div class="app">
+    <div class="appbar"><span>Belgrano Soft</span><span>Ventas</span><span class="on">Producción</span>
+      <span>Compras</span><span>Inventario</span></div>
+    <div class="subbar"><div>Resumen</div><div class="on">A fabricar</div><div>Pedidos</div>
+      <div>Stock a pedir</div><div>Dibujos y tablas</div><div>Historial</div></div>
+    <div class="body">
+      <div class="kick">Producción</div><div class="h1">A fabricar</div>
+      <div class="sub">18 muebles sin pedir, juntados por variante</div>
+      <div class="bar">
+        <input placeholder="Buscar…">
+        <select><option>Agrupar por mueble</option><option>Agrupar por proveedor</option>
+          <option>Agrupar por orden de venta</option></select>
+        <div style="flex:1"></div>
+        <button class="btn pri">Armar pedido con lo tildado (3)</button>
+      </div>
+
+      <div class="gr">
+        <div class="gr-h"><input type="checkbox" class="chk">
+          <b>CÓMODA AMBERES 55 · 1.20 · Blanca · Blanco</b><span class="dib" title="Ver la tabla"><svg viewBox="0 0 20 16"><rect x="1" y="1" width="18" height="14" rx="1.5"/><path d="M1 6h18M1 11h18M7 1v14"/></svg></span>
+          <span class="pill p-fal">6 sin pedir</span>
+          <div class="sp"></div>
+          <span class="hint">se fabrica en 32 días · 2 libres en depósito</span></div>
+        <div class="scroll"><table>
+          <tr><th style="width:26px"></th><th>Venta</th><th>Cliente</th><th>Vendida</th>
+            <th>Prometida</th><th></th></tr>
+          <tr style="background:var(--brand-soft)"><td><input type="checkbox" class="chk" checked></td>
+            <td class="nom">5660 · 3 de 6</td><td>Bibiana</td><td class="mut">12/6</td>
+            <td class="tarde">30/7</td><td><span class="pill p-urg">urgente</span></td></tr>
+          <tr style="background:var(--brand-soft)"><td><input type="checkbox" class="chk" checked></td>
+            <td class="nom">5698 · 1 de 1</td><td>Marta</td><td class="mut">28/6</td>
+            <td>14/8</td><td></td></tr>
+          <tr style="background:var(--brand-soft)"><td><input type="checkbox" class="chk" checked></td>
+            <td class="nom">5701 · 2 de 4</td><td>Julián</td><td class="mut">29/6</td>
+            <td>16/8</td><td></td></tr>
+          <tr><td><input type="checkbox" class="chk"></td><td class="nom">5744 · 3 de 3</td>
+            <td>Huego</td><td class="mut">1/8</td><td>2/9</td><td></td></tr>
+          <tr><td><input type="checkbox" class="chk"></td><td class="nom">5751 · 1 de 1</td>
+            <td>Andrea</td><td class="mut">1/8</td><td>4/9</td><td></td></tr>
+          <tr><td><input type="checkbox" class="chk"></td><td class="nom">5762 · 1 de 2</td>
+            <td>Nadia</td><td class="mut">2/8</td><td>5/9</td><td></td></tr>
+        </table></div>
+        <div class="lote-b" style="padding:9px 14px;font-size:12px;color:var(--brand-ink);
+          background:var(--brand-soft);border-top:1px solid #cfe0fb">
+          Tildaste <b>3 de 6</b> — las tres más urgentes. Las otras tres quedan a pedir y se las
+          podés dar a otro proveedor.</div>
+      </div>
+
+      <div class="gr">
+        <div class="gr-h"><input type="checkbox" class="chk">
+          <b>PLACARD OLIVER · 2.00 · Blanca · Paraíso</b><span class="dib" title="Ver el dibujo"><svg viewBox="0 0 20 16"><rect x="1" y="1" width="18" height="14" rx="1.5"/><path d="M1 11l5-4 4 3 3-2 6 4"/></svg></span>
+          <span class="pill p-fal">5 sin pedir</span>
+          <div class="sp"></div><span class="hint">de cuatro ventas distintas</span></div>
+      </div>
+      <div class="gr">
+        <div class="gr-h"><input type="checkbox" class="chk">
+          <b>MESA DE LUZ NÓRDICA · 0.45 · Natural · Nogal</b><span class="dib no" title="Falta cargar el dibujo"><svg viewBox="0 0 20 16"><rect x="1" y="1" width="18" height="14" rx="1.5"/><path d="M10 5v4M10 11.5v.5"/></svg></span>
+          <span class="chip">a medida</span>
+          <span class="pill p-fal">1 sin pedir</span>
+          <div class="sp"></div>
+          <span class="tarde">falta cargarle el dibujo</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ARMAR UN PEDIDO ============ -->
+<section data-p="a" class="hide">
+  <div class="idea"><b>Seis cómodas iguales, dos proveedores.</b> Esto es lo que me pediste: que se
+    junten <b>pero se puedan desarmar</b>. Se elige de a cuáles, se le da un proveedor y un rango de
+    fechas, y las que sobran quedan a pedir para el pedido siguiente.</div>
+
+  <div class="card" style="padding:18px 20px;margin-bottom:14px">
+    <div class="paso-n"><span class="n">1</span><div>
+      <b>Ves que hay seis iguales</b>
+      <small>Vendiste seis Cómoda Amberes 1.20 Blanca en un fin de semana, en seis ventas distintas.
+        El sistema te las junta: no las descubrís de casualidad.</small></div></div>
+    <div class="paso-n"><span class="n">2</span><div>
+      <b>Tildás las que le vas a dar a este proveedor</b>
+      <small>Mirando <b>la fecha de venta y la prometida</b>, elegís tres —las que vencen antes— y
+        dejás las otras tres. No hay obligación de pedirlas todas juntas.</small></div></div>
+    <div class="paso-n"><span class="n">3</span><div>
+      <b>Elegís proveedor y el rango en que tienen que entrar</b>
+      <small>La fecha no es un día: es <b>entre tal y tal</b>. Una semana de margen, como trabajás.</small></div></div>
+    <div class="paso-n"><span class="n">4</span><div>
+      <b>Se arma la hoja de pedido</b>
+      <small>Con el <b>dibujo</b> de cada mueble o la <b>tabla</b>, según el proveedor y el producto.
+        <b>Sin precio</b>: el precio lo pone él y después vos lo confirmás o lo cambiás.</small></div></div>
+    <div class="paso-n"><span class="n">5</span><div>
+      <b>Las tres que quedaron siguen a pedir</b>
+      <small>Aparecen igual que antes, listas para el próximo pedido a otro taller.</small></div></div>
+  </div>
+
+  <div class="card" style="padding:16px 18px">
+    <div class="kick" style="margin-bottom:8px">Así se ve el paso 3</div>
+    <div class="dos">
+      <div>
+        <table>
+          <tr><th>Van en este pedido</th><th>Venta</th><th>Prometida</th></tr>
+          <tr><td class="nom">CÓMODA AMBERES 55 · 1.20 · Blanca</td><td class="mut">5660 · 3 de 6</td>
+            <td class="tarde">30/7</td></tr>
+          <tr><td class="nom">CÓMODA AMBERES 55 · 1.20 · Blanca</td><td class="mut">5698</td><td>14/8</td></tr>
+          <tr><td class="nom">CÓMODA AMBERES 55 · 1.20 · Blanca</td><td class="mut">5701 · 2 de 4</td><td>16/8</td></tr>
+        </table>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:11px">
+        <label style="font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;
+          letter-spacing:.05em">Proveedor
+          <select style="width:100%;margin-top:4px"><option>1 Tony</option><option>3 Luciano</option>
+            <option>5 Enrique</option><option>7 Raúl</option></select></label>
+        <div>
+          <div style="font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;
+            letter-spacing:.05em;margin-bottom:4px">Tiene que entrar entre</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input value="3/8" style="width:90px"><span class="mut">y</span>
+            <input value="9/8" style="width:90px">
+            <span class="hint">32 días de fábrica</span></div>
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;
+            letter-spacing:.05em;margin-bottom:4px">Qué se le manda</div>
+          <div style="display:flex;gap:8px">
+            <button class="btn">Dibujo</button><button class="btn on">Tabla</button>
+            <button class="btn">Las dos</button></div>
+          <div class="hint" style="margin-top:5px">Tony trabaja con dibujo; para la Amberes ya está
+            la tabla cargada.</div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <div style="flex:1"></div>
+          <button class="btn">Cancelar</button>
+          <button class="btn pri">Crear el pedido</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DIBUJOS Y TABLAS ============ -->
+<section data-p="d" class="hide">
+  <div class="idea"><b>Lo que se le manda al proveedor.</b> Cada variante tiene su <b>dibujo</b> y/o
+    su <b>tabla</b>, cargados en el mueble (en Producción, la solapa que ya tiene el plano). Al armar
+    el pedido se juntan todos y sale una sola hoja. <b>Sin precios.</b></div>
+  <div class="dos">
+    <div>
+      <div class="hoja">
+        <h4>Pedido P-124 · 1 Tony</h4>
+        <div class="meta">Belgrano Home · 3/8/2026 · tiene que entrar entre el <b>3 y el 9/8</b></div>
+        <table>
+          <tr><th>Cant.</th><th>Mueble</th><th>Medida</th><th>Estructura</th><th>Frente</th><th>Plano</th></tr>
+          <tr><td class="num">3</td><td class="nom">CÓMODA AMBERES 55</td><td>1.20</td>
+            <td>Blanca</td><td>Blanco</td><td><span class="dib" title="Ver la tabla"><svg viewBox="0 0 20 16"><rect x="1" y="1" width="18" height="14" rx="1.5"/><path d="M1 6h18M1 11h18M7 1v14"/></svg></span></td></tr>
+          <tr><td class="num">2</td><td class="nom">PLACARD OLIVER</td><td>2.00</td>
+            <td>Blanca</td><td>Paraíso</td><td><span class="dib" title="Ver el dibujo"><svg viewBox="0 0 20 16"><rect x="1" y="1" width="18" height="14" rx="1.5"/><path d="M1 11l5-4 4 3 3-2 6 4"/></svg></span></td></tr>
+          <tr><td class="num">1</td><td class="nom">MESA RATONA NORUEGA</td><td>0.80×0.50</td>
+            <td>Paraíso</td><td>Natural</td><td><span class="dib" title="Ver el dibujo"><svg viewBox="0 0 20 16"><rect x="1" y="1" width="18" height="14" rx="1.5"/><path d="M1 11l5-4 4 3 3-2 6 4"/></svg></span></td></tr>
+        </table>
+        <div class="sinprec"><b>Sin precios.</b> Los pone Tony cuando contesta; ahí los cargamos y
+          Dirección los <b>confirma o los modifica</b>. Recién con el precio confirmado, Compras
+          arma la orden de compra.</div>
+      </div>
+      <div class="hint" style="margin-top:8px">Se imprime, se manda por WhatsApp o las dos cosas.
+        Los dibujos van adjuntos, uno por mueble.</div>
+    </div>
+    <div>
+      <div class="card" style="padding:16px 18px">
+        <div class="kick" style="margin-bottom:9px">Dónde vive el dibujo</div>
+        <ul class="ok-lista">
+          <li>El dibujo y la tabla son <b>de la variante</b>, no del mueble: la 1.20 blanca y la 1.40
+            negra son planos distintos.</li>
+          <li>Se cargan una vez, en el mueble, y sirven <b>para todos los pedidos</b> de esa variante.</li>
+          <li>Si una variante <b>no tiene dibujo</b>, la fila queda marcada en la lista de a fabricar:
+            no se puede pedir a ciegas.</li>
+          <li>El mueble <b>a medida</b> es la excepción: su dibujo es único, se carga en esa unidad
+            y no se reusa.</li>
+          <li>Qué se le manda a cada proveedor —dibujo, tabla o las dos— queda <b>guardado por
+            proveedor</b>, así no lo elegís cada vez.</li>
+        </ul>
+      </div>
+      <div class="card" style="padding:16px 18px;margin-top:12px">
+        <div class="kick" style="margin-bottom:9px">El precio, después</div>
+        <ul class="ok-lista">
+          <li>El pedido sale <b>sin precio</b>.</li>
+          <li>Cuando el proveedor contesta, se carga <b>precio por mueble</b>.</li>
+          <li>Queda <b>a confirmar</b> hasta que alguien lo aprueba o lo cambia — con registro de
+            quién.</li>
+          <li>Ese precio confirmado es el que alimenta el <b>costo</b> del mueble y lo que después
+            paga Tesorería.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STOCK A PEDIR ============ -->
+<section data-p="s" class="hide">
+  <div class="idea"><b>Lo que falta: pedir para stock.</b> No todo lo que se fabrica está vendido.
+    Acá va lo que está <b>debajo del mínimo</b>, sin número de orden: la fila dice <i>stock</i> en
+    vez de una venta, pero se pide igual y por el mismo camino.</div>
+  <div class="app">
+    <div class="appbar"><span>Belgrano Soft</span><span>Ventas</span><span class="on">Producción</span>
+      <span>Compras</span><span>Inventario</span></div>
+    <div class="subbar"><div>Resumen</div><div>A fabricar</div><div>Pedidos</div>
+      <div class="on">Stock a pedir</div><div>Dibujos y tablas</div><div>Historial</div></div>
+    <div class="body">
+      <div class="kick">Producción</div><div class="h1">Stock a pedir</div>
+      <div class="sub">14 variantes debajo del mínimo · 31 muebles sugeridos</div>
+      <div class="bar">
+        <input placeholder="Buscar…">
+        <div class="segm"><button class="seg on">Debajo del mínimo <span class="n">14</span></button>
+          <button class="seg">Sin stock <span class="n">6</span></button>
+          <button class="seg">Se vende rápido <span class="n">9</span></button></div>
+        <div style="flex:1"></div>
+        <button class="btn pri">Armar pedido de stock (2)</button>
+      </div>
+      <div class="scroll"><div class="card"><table>
+        <tr><th style="width:26px"></th><th>Mueble</th><th>Medida</th><th>Terminación</th>
+          <th>Plano</th><th class="num">Mínimo</th><th class="num">Hay</th><th class="num">En camino</th>
+          <th class="num">Falta</th><th class="num">Sugerido</th><th>Se vendieron</th></tr>
+        <tr style="background:var(--crit-bg)"><td><input type="checkbox" class="chk" checked></td>
+          <td class="nom">CÓMODA AMBERES 55</td><td>1.20</td><td>Blanca · Blanco</td><td><span class="dib" title="Ver la tabla"><svg viewBox="0 0 20 16"><rect x="1" y="1" width="18" height="14" rx="1.5"/><path d="M1 6h18M1 11h18M7 1v14"/></svg></span></td>
+          <td class="num">6</td><td class="num tarde">0</td><td class="num">2</td>
+          <td class="num tarde">4</td><td class="num nom">6</td>
+          <td class="mut">9 en 30 días</td></tr>
+        <tr style="background:var(--crit-bg)"><td><input type="checkbox" class="chk" checked></td>
+          <td class="nom">MESA DE LUZ AMBERES</td><td>0.45</td><td>Negra · Blanco</td><td><span class="dib" title="Ver la tabla"><svg viewBox="0 0 20 16"><rect x="1" y="1" width="18" height="14" rx="1.5"/><path d="M1 6h18M1 11h18M7 1v14"/></svg></span></td>
+          <td class="num">8</td><td class="num tarde">1</td><td class="num">0</td>
+          <td class="num tarde">7</td><td class="num nom">8</td>
+          <td class="mut">12 en 30 días</td></tr>
+        <tr><td><input type="checkbox" class="chk"></td><td class="nom">PLACARD OLIVER</td>
+          <td>1.80</td><td>Blanca · Blanco</td><td><span class="dib" title="Ver el dibujo"><svg viewBox="0 0 20 16"><rect x="1" y="1" width="18" height="14" rx="1.5"/><path d="M1 11l5-4 4 3 3-2 6 4"/></svg></span></td>
+          <td class="num">4</td><td class="num hoy">2</td><td class="num">1</td>
+          <td class="num">1</td><td class="num nom">2</td><td class="mut">3 en 30 días</td></tr>
+        <tr><td><input type="checkbox" class="chk"></td><td class="nom">RACK BERGEN 1.60</td>
+          <td>1.60</td><td>Negra · Blanco</td><td><span class="dib" title="Ver el dibujo"><svg viewBox="0 0 20 16"><rect x="1" y="1" width="18" height="14" rx="1.5"/><path d="M1 11l5-4 4 3 3-2 6 4"/></svg></span></td>
+          <td class="num">3</td><td class="num hoy">1</td><td class="num">0</td>
+          <td class="num">2</td><td class="num nom">3</td><td class="mut">4 en 30 días</td></tr>
+      </table></div></div>
+      <div class="nota" style="margin-top:14px"><b>Cómo sale el sugerido:</b> mínimo − (lo que hay
+        libre + lo que ya viene en camino), redondeado a lo que convenga pedir. Si en los últimos 30
+        días se vendieron más que el mínimo, el sistema lo avisa: <i>el mínimo te quedó corto</i>.
+        Estas unidades nacen <b>sin orden de venta</b> — en Inventario se leen como <i>a pedir para
+        stock</i> y, cuando llegan, quedan libres para vender.</div>
+    </div>
+  </div>
+</section>
+
+<div class="pregs">
+  <h3>Lo que me queda por saber</h3>
+  <ol>
+    <li><b>Los gráficos que me vas a mandar.</b> Con eso armo la hoja de pedido igual a la que usás
+      hoy, en vez de inventarla.</li>
+    <li><b>Un mueble, ¿pasa por dos manos?</b> (carpintería lo hace, herrería le pone las patas).
+      Es lo único del modelo que todavía no sé y que no se puede agregar después sin tocar todo.</li>
+    <li><b>La confirmación de la orden</b> queda registrada: <b>quién</b> la confirmó y <b>cuándo</b>.
+      ¿Alcanza con eso o querés que además deje el motivo cuando la rebota?</li>
+    <li><b>El pedido, ¿lleva número?</b> En los mockups le puse <b>P-124</b>. ¿Usás alguna numeración
+      hoy o la invento yo, como con las series?</li>
+  </ol>
+</div>
+
+</div>
+
+<script>
+document.querySelectorAll('.opt').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.opt').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('[data-p]').forEach(s =>
+    s.classList.toggle('hide', s.dataset.p !== b.dataset.o));
+  window.scrollTo(0, 0);
+});
+</script>
