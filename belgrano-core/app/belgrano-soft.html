@@ -1176,13 +1176,15 @@ tr:hover td{background:var(--panel-2)}
       const enCurso = this.aFabricar().filter(u => u.proveedor);
       const m = new Map();
       enCurso.forEach(u => {
-        if (!m.has(u.proveedor)) m.set(u.proveedor, { nombre: u.proveedor, n: 0, vencidas: 0 });
-        const x = m.get(u.proveedor); x.n++; if (this.vencida(u)) x.vencidas++;
+        const et = u.provId ? this.provLabel(u.provId) : u.proveedor;
+        if (!m.has(et)) m.set(et, { id: u.provId || null, nombre: et, n: 0, vencidas: 0 });
+        const x = m.get(et); x.n++; if (this.vencida(u)) x.vencidas++;
       });
-      // Los que están en la lista de proveedores pero hoy no tienen trabajo.
+      // Los que están en la lista pero hoy no tienen trabajo. Se compara por id,
+      // no por nombre: dos proveedores pueden llamarse igual.
       this.proveedores().forEach(p => {
-        const clave = [...m.keys()].find(k => sinTilde(k).includes(sinTilde(p.nombre)));
-        if (!clave) m.set(p.nombre, { nombre: p.nombre, n: 0, vencidas: 0, libre: true });
+        const et = this.provLabel(p.id);
+        if (!m.has(et)) m.set(et, { id: p.id, nombre: et, n: 0, vencidas: 0, libre: true });
       });
       return [...m.values()].sort((a, b) => b.n - a.n || a.nombre.localeCompare(b.nombre, 'es'));
     },
@@ -1249,7 +1251,7 @@ tr:hover td{background:var(--panel-2)}
     unidadesTodas() {
       if (this._unis) return this._unis;
       const UBI = ['dep-pb', 'dep-1', 'dep-2', 'loc-2020', 'loc-2299'];
-      const PROV = ['1Tony', '3Luciano', '5Enrique', '6Matías', '7Raúl'];
+      const PROV = [1, 3, 5, 6, 7];   // ids, no nombres: el nombre se lee del id
       const out = [];
       let n = 0;
       // Los tres tipos, repartidos siempre igual: la mayoría estándar, alguno
@@ -1282,7 +1284,8 @@ tr:hover td{background:var(--panel-2)}
         for (let j = 0; j < enStock; j++) {
           n++;
           out.push({ ...base, id: n, serie: this.serieDe(n), estado: 'stock',
-            ubicacion: UBI[n % UBI.length], proveedor: PROV[n % PROV.length],
+            ubicacion: UBI[n % UBI.length], provId: PROV[n % PROV.length],
+            proveedor: this.provLabel(PROV[n % PROV.length]),
             pedido: this.numPedido(100 + (n % 8)),
             llega: '', listo: `${(n % 28) + 1}/7`,
             orden: j === 0 && i % 3 === 0 ? `#S00${200 + i}` : null,
@@ -1292,7 +1295,8 @@ tr:hover td{background:var(--panel-2)}
         for (let j = 0; j < enProd; j++) {
           n++;
           out.push({ ...base, id: n, serie: this.serieDe(n), estado: 'produccion',
-            ubicacion: '', proveedor: PROV[n % PROV.length],
+            ubicacion: '', provId: PROV[n % PROV.length],
+            proveedor: this.provLabel(PROV[n % PROV.length]),
             llega: `${(n % 28) + 1}/8`, listo: '',
             desde: n % 7 === 0 ? `${(n % 20) + 5}/7` : `${(n % 20) + 1}/8`,
             hasta: n % 7 === 0 ? `${(n % 20) + 12}/7` : `${(n % 20) + 8}/8`,
@@ -1314,7 +1318,8 @@ tr:hover td{background:var(--panel-2)}
         for (let j = 0; j < salidas; j++) {
           n++;
           out.push({ ...base, id: n, serie: this.serieDe(n), estado: 'entregada',
-            ubicacion: '', proveedor: PROV[n % PROV.length],
+            ubicacion: '', provId: PROV[n % PROV.length],
+            proveedor: this.provLabel(PROV[n % PROV.length]),
             pedido: this.numPedido(90 + (n % 8)),
             llega: '', listo: `${(n % 28) + 1}/5`, orden: `#S00${100 + n}`,
             fechaVenta: `${(n % 28) + 1}/5`, fechaEntrega: `${(n % 28) + 1}/6`,
@@ -1503,21 +1508,33 @@ tr:hover td{background:var(--panel-2)}
     // capacidad = cuántas unidades entrega por semana. No es prioridad: es
     // cuánto le cabe.
     PROV_BASE: [
-      { nombre: 'Tony', rubro: 'carpinteria', capacidad: 12 },
-      { nombre: 'Andrés', rubro: 'carpinteria', capacidad: 8 },
-      { nombre: 'Luciano', rubro: 'carpinteria', capacidad: 10 },
-      { nombre: 'Sergio', rubro: 'carpinteria', capacidad: 6 },
-      { nombre: 'Marcelo', rubro: 'carpinteria', capacidad: 9 },
-      { nombre: 'Herrería Sur', rubro: 'herreria', capacidad: 15 },
-      { nombre: 'Carla', rubro: 'herreria', capacidad: 10 },
-      { nombre: 'Laqueados Vera', rubro: 'laqueado', capacidad: 20 },
+      { id: 1, nombre: 'Tony', rubro: 'carpinteria', capacidad: 12, direccion: 'Av. San Martín 2210' },
+      { id: 2, nombre: 'Andrés', rubro: 'carpinteria', capacidad: 8, direccion: 'Rivadavia 880' },
+      { id: 3, nombre: 'Luciano', rubro: 'carpinteria', capacidad: 10, direccion: 'Belgrano 1450' },
+      { id: 4, nombre: 'Sergio', rubro: 'carpinteria', capacidad: 6, direccion: 'Mitre 340' },
+      { id: 5, nombre: 'Enrique', rubro: 'carpinteria', capacidad: 9, direccion: 'Sarmiento 76' },
+      { id: 6, nombre: 'Matías', rubro: 'carpinteria', capacidad: 9, direccion: 'Alsina 2100' },
+      { id: 7, nombre: 'Raúl', rubro: 'carpinteria', capacidad: 12, direccion: 'Güemes 515' },
+      { id: 8, nombre: 'Herrería Sur', rubro: 'herreria', capacidad: 15, direccion: 'Ruta 8 km 42' },
+      { id: 9, nombre: 'Carla', rubro: 'herreria', capacidad: 10, direccion: 'Lavalle 990' },
+      { id: 10, nombre: 'Laqueados Vera', rubro: 'laqueado', capacidad: 20, direccion: 'Colón 1330' },
     ],
+    // El id es el que manda: puede haber dos Vicente distintos, cada uno con su
+    // domicilio y su rubro, y el sistema no los confunde.
+    proveedor(id) { return this.proveedores().find(p => p.id === Number(id)) || null; },
+    // Cómo se lo lee en pantalla: el número adelante, como se lo nombra en la casa.
+    provLabel(id) {
+      const p = this.proveedor(id);
+      return p ? `${p.id}${p.nombre}` : '';
+    },
     proveedores(rubro) {
       let guardados = [];
       try { guardados = JSON.parse(localStorage.getItem(this.PROV_KEY)) || []; } catch {}
       const out = this.PROV_BASE.map(x => ({ ...x }));
+      let prox = out.reduce((mx, x) => Math.max(mx, x.id || 0), 0);
       guardados.forEach(g => {
-        if (!out.some(x => sinTilde(x.nombre) === sinTilde(g.nombre))) out.push({ ...g });
+        if (out.some(x => x.id && x.id === g.id)) return;
+        out.push({ ...g, id: g.id || ++prox });
       });
       const lista = out.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
       return rubro ? lista.filter(x => x.rubro === rubro) : lista;
@@ -1531,11 +1548,12 @@ tr:hover td{background:var(--panel-2)}
     crearProveedor(nombre, rubro, capacidad) {
       const n = String(nombre || '').trim();
       if (!n) return null;
-      const ya = this.proveedores().find(x => sinTilde(x.nombre) === sinTilde(n));
-      if (ya) return ya;
+      // Dos proveedores pueden llamarse igual: lo que no se repite es el id.
       let guardados = [];
       try { guardados = JSON.parse(localStorage.getItem(this.PROV_KEY)) || []; } catch {}
-      const nuevo = { nombre: n, rubro: rubro || 'carpinteria', capacidad: Number(capacidad) || 0 };
+      const prox = this.proveedores().reduce((mx, x) => Math.max(mx, x.id || 0), 0) + 1;
+      const nuevo = { id: prox, nombre: n, rubro: rubro || 'carpinteria',
+        capacidad: Number(capacidad) || 0, direccion: '' };
       guardados.push(nuevo);
       try { localStorage.setItem(this.PROV_KEY, JSON.stringify(guardados)); } catch {}
       return nuevo;
