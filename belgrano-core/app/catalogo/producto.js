@@ -150,16 +150,18 @@
             <div class="sp"></div>
             ${ed ? '' : '<span class="pill soft">Sólo lectura</span>'}
           </div>
-          <div class="pd-tit">
-            <h1>${UI.esc(p.nombre)}</h1>
-            <span class="pd-cod tnum">${UI.esc(p.sku || '')}</span>
-            <div class="sp"></div>
-            <span class="pill ${p.publicado ? 'ok' : 'warn'}" id="pd-pub-pill">${
-              p.publicado ? 'Visible para los vendedores' : 'Oculto — no se puede vender'}</span>
+          <div class="pd-fijo">
+            <div class="pd-tit">
+              <h1>${UI.esc(p.nombre)}</h1>
+              <span class="pd-cod tnum">${UI.esc(p.sku || '')}</span>
+              <div class="sp"></div>
+              <span class="pill ${p.publicado ? 'ok' : 'warn'}" id="pd-pub-pill">${
+                p.publicado ? 'Visible para los vendedores' : 'Oculto — no se puede vender'}</span>
+            </div>
+            <div class="pd-tabs">${this.solapas().map(t =>
+              `<button class="pd-tab ${this._tab === t.k ? 'on' : ''}" data-tab="${t.k}"
+                aria-current="${this._tab === t.k}">${UI.esc(t.label)}</button>`).join('')}</div>
           </div>
-          <div class="pd-tabs">${this.solapas().map(t =>
-            `<button class="pd-tab ${this._tab === t.k ? 'on' : ''}" data-tab="${t.k}"
-              aria-current="${this._tab === t.k}">${UI.esc(t.label)}</button>`).join('')}</div>
           ${this['tab' + this._tab.charAt(0).toUpperCase() + this._tab.slice(1)]()}
           <div id="pd-panel"></div>
         </div>
@@ -2776,12 +2778,14 @@
         /* Solapas: adelante lo que se mira siempre, atrás lo que se consulta. */
         /* Con siete solapas no entran a lo ancho: antes que partirse en dos
            renglones, la barra scrollea. */
-        .pd-tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0 0 12px;
-          overflow-x:auto;scrollbar-width:none;
-          /* Quedan a la vista todo el scroll: son largas y uno se pierde de
-             en qué solapa está. Se pegan abajo de la barra de módulo. */
-          position:sticky;top:95px;z-index:20;background:var(--bg);
-          padding-top:4px;margin-left:-4px;padding-left:4px;margin-right:-4px;padding-right:4px}
+        /* El nombre del mueble y sus solapas quedan a la vista todo el scroll:
+           con seis solapas y pantallas largas uno se pierde de qué mueble está
+           mirando y en qué parte. Se pegan abajo de la barra de módulo. */
+        .pd-fijo{position:sticky;top:95px;z-index:20;background:var(--bg);
+          margin:0 -4px 12px;padding:4px 4px 0}
+        .pd-fijo .pd-tit{margin-bottom:7px}
+        .pd-tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0;
+          overflow-x:auto;scrollbar-width:none}
         .pd-tabs::-webkit-scrollbar{display:none}
         .pd-tab{flex:none;white-space:nowrap;border:0;background:none;font:inherit;font-size:13px;
           font-weight:650;color:var(--muted);cursor:pointer;padding:9px 12px;

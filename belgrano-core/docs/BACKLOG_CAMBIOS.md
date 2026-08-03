@@ -989,6 +989,22 @@ al **costado derecho**, no arriba, y se pueden **marcar varias a la vez**.
 - ✅ 406. **limpiar** deja de ser un botón con caja al lado del título: es un
   enlace chico, y ya no choca con la flecha de plegar el costado.
 
+### Lote 36 — APLICADO (Un filtro por propiedad, y el nombre del mueble fijo)
+
+- ✅ 407. **Cada propiedad principal genera su propio grupo de filtro** —
+  *MEDIDAS DEL FRENTE*, *ESTRUCTURA*, *FRENTE*—, en vez de amontonar todo en
+  "Terminación". Los grupos salen solos de las propiedades que tienen cargadas
+  los muebles: si mañana aparece TELA, aparece su lista sin tocar nada.
+- ✅ 408. Adentro de una propiedad, marcar dos **suma**; entre propiedades
+  distintas, **cruza** — estructura blanca **y** frente negro.
+- ✅ 409. Las propiedades cuyo **rol de costeo** es estructura, frente,
+  terminación o material llevan su **redondelito de color**; la medida no.
+- ✅ 410. Un grupo largo —las medidas son doce— muestra **las seis primeras y un
+  "ver N más"**. Lo marcado siempre queda a la vista.
+- ✅ 411. En el mueble, **el nombre queda fijo junto con las solapas** al hacer
+  scroll: con seis solapas y pantallas largas uno se perdía de qué mueble estaba
+  mirando.
+
 > Falta decidir si el filtro guarda lo último usado por rol.
 
 ### Lote 13 — APLICADO (Inventario y solapa Otros)

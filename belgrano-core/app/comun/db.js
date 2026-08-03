@@ -566,6 +566,16 @@
             hasta: pr.length ? Math.max(...pr) : 0,
             stock: vs.reduce((a, v) => a + (Number(v.stock) || 0), 0),
             terminaciones: [...new Set(vs.map(v => v.estructura).filter(Boolean))],
+            // Los valores de cada propiedad principal, para que el catálogo
+            // pueda filtrar por estructura, por frente o por medida sin
+            // amontonarlo todo en una sola lista.
+            props: (p.propiedades && p.propiedades.length
+              ? p.propiedades : ['medida', 'estructura', 'frente'])
+              .reduce((a, k) => {
+                const vals = [...new Set(vs.map(v => v[k]).filter(Boolean))];
+                if (vals.length) a[k] = vals;
+                return a;
+              }, {}),
             // La foto del catálogo es la primera de venta que se cargó en
             // Documentos: se ve el mueble sin tener que abrirlo.
             foto: ((p.archivos || []).find(a => a.tipo === 'venta') || {}).url || '',

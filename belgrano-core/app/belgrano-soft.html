@@ -779,6 +779,16 @@ tr:hover td{background:var(--panel-2)}
             hasta: pr.length ? Math.max(...pr) : 0,
             stock: vs.reduce((a, v) => a + (Number(v.stock) || 0), 0),
             terminaciones: [...new Set(vs.map(v => v.estructura).filter(Boolean))],
+            // Los valores de cada propiedad principal, para que el catálogo
+            // pueda filtrar por estructura, por frente o por medida sin
+            // amontonarlo todo en una sola lista.
+            props: (p.propiedades && p.propiedades.length
+              ? p.propiedades : ['medida', 'estructura', 'frente'])
+              .reduce((a, k) => {
+                const vals = [...new Set(vs.map(v => v[k]).filter(Boolean))];
+                if (vals.length) a[k] = vals;
+                return a;
+              }, {}),
             // La foto del catálogo es la primera de venta que se cargó en
             // Documentos: se ve el mueble sin tener que abrirlo.
             foto: ((p.archivos || []).find(a => a.tipo === 'venta') || {}).url || '',
@@ -2174,6 +2184,7 @@ tr:hover td{background:var(--panel-2)}
           .cat-f .cat-f-h{padding-right:22px}
           .cat-c .cat-f-h{padding-left:22px}
           .cat-c-sub{margin-top:-10px;padding-left:22px}
+          .lnk-mas{margin-top:3px;align-self:flex-start}
           /* Los enlaces del costado son texto, no botones con caja. */
           .cat-c .lnk,.cat-f .lnk{border:0;background:none;padding:0;font:inherit;font-size:11px;
             font-weight:600;color:var(--brand);cursor:pointer;text-transform:none;letter-spacing:0}
@@ -2264,7 +2275,13 @@ tr:hover td{background:var(--panel-2)}
     // distintas. El árbol dice DÓNDE estoy mirando; los filtros, QUÉ de todo
     // eso quiero ver. Marcar dos ambientes es normal —racks y aparadores para
     // el mismo living— y eso el árbol solo no lo puede hacer.
-    _f: { ambiente: [], tipo: [], term: [], disp: [], pub: [] },
+    // Ambiente y categoría son del mueble; el resto son sus propiedades
+    // principales —estructura, frente, medida— y cada una filtra por su
+    // cuenta, no todas amontonadas en una lista.
+    _f: { ambiente: [], tipo: [] },
+    _fp: {},
+    selProp(k) { return this._fp[k] || []; },
+    _verMas: new Set(),
 
     // Todos los productos del catálogo, sin filtrar: es contra esto que se
     // cuentan las opciones de cada filtro.
@@ -2292,15 +2309,13 @@ tr:hover td{background:var(--panel-2)}
       const amb = this.ambienteDe(p.categoria_id);
       if (salvo !== 'ambiente' && f.ambiente.length && !f.ambiente.includes(amb && amb.id)) return false;
       if (salvo !== 'tipo' && f.tipo.length && !f.tipo.includes(p.categoria_id)) return false;
-      if (salvo !== 'term' && f.term.length
-        && !(p.terminaciones || []).some(t => f.term.includes(this.normTerm(t)))) return false;
-      if (salvo !== 'disp' && f.disp.length) {
-        const k = (p.stock || 0) > 0 ? 'stock' : 'pedido';
-        if (!f.disp.includes(k)) return false;
-      }
-      if (salvo !== 'pub' && f.pub.length) {
-        const k = p.publicado_tn ? 'tn' : 'interno';
-        if (!f.pub.includes(k)) return false;
+      // Cada propiedad principal filtra aparte: marcar Blanca en ESTRUCTURA y
+      // Negro en FRENTE tiene que buscar los que tienen las dos cosas.
+      for (const k of Object.keys(this._fp)) {
+        const sel = this._fp[k];
+        if (!sel.length || salvo === 'prop:' + k) continue;
+        const vals = ((p.props || {})[k] || []).map(v => this.normTerm(v));
+        if (!vals.some(v => sel.includes(v))) return false;
       }
       return true;
     },
@@ -2318,30 +2333,56 @@ tr:hover td{background:var(--panel-2)}
         return m;
       };
       const cAmb = cuenta('ambiente', p => (this.ambienteDe(p.categoria_id) || {}).id);
-      const cTipo = cuenta('tipo', p => p.categoria_id);
-      // Se cuenta por la clave normalizada, para que no salgan dos renglones
-      // por la misma terminación escrita distinto.
-      const cTerm = cuenta('term', p => [...new Set((p.terminaciones || []).map(t => this.normTerm(t)))]);
-      const nomTerm = new Map();
-      todo.forEach(p => (p.terminaciones || []).forEach(t => {
-        const k = this.normTerm(t);
-        if (!nomTerm.has(k)) nomTerm.set(k, t);
-      }));
-      const cDisp = cuenta('disp', p => ((p.stock || 0) > 0 ? 'stock' : 'pedido'));
-      const cPub = cuenta('pub', p => (p.publicado_tn ? 'tn' : 'interno'));
       const nom = id => (this.arbol.find(c => c.id === id) || {}).nombre || '—';
       const ord = (m, etiqueta) => [...m.entries()]
         .map(([k, n]) => ({ k, n, label: etiqueta(k) }))
         .sort((a, b) => b.n - a.n || String(a.label).localeCompare(String(b.label)));
 
-      return [
-        { k: 'ambiente', titulo: 'Ambiente', ops: ord(cAmb, nom) },
-        { k: 'term', titulo: 'Terminación', ops: ord(cTerm, k => nomTerm.get(k) || k), color: true },
-      ].filter(g => g.ops.length > 1 || this._f[g.k].length);
+      // Una lista por propiedad principal. Se cuenta por el valor normalizado
+      // —"Blanca" y "BLANCA" son la misma— y se muestra como está cargado.
+      const claves = [];
+      todo.forEach(p => Object.keys(p.props || {}).forEach(k => {
+        if (!claves.includes(k)) claves.push(k);
+      }));
+      const grupos = claves.map(k => {
+        const nombres = new Map();
+        todo.forEach(p => ((p.props || {})[k] || []).forEach(v => {
+          const nk = this.normTerm(v);
+          if (!nombres.has(nk)) nombres.set(nk, v);
+        }));
+        const c = cuenta('prop:' + k, p =>
+          [...new Set(((p.props || {})[k] || []).map(v => this.normTerm(v)))]);
+        const prop = global.DB.propiedad(k);
+        const rol = global.DB.rolDe(k);
+        return {
+          k: 'prop:' + k, prop: k,
+          titulo: (prop && prop.nombre) || k,
+          ops: ord(c, x => nombres.get(x) || x),
+          color: ['estructura', 'frente', 'terminacion', 'material'].includes(rol),
+        };
+      });
+
+      return [{ k: 'ambiente', titulo: 'Ambiente', ops: ord(cAmb, nom) }, ...grupos]
+        .filter(g => g.ops.length > 1 || this.marcadosDe(g.k).length);
     },
 
+    // Un grupo puede ser del mueble (_f) o de una propiedad (_fp).
+    marcadosDe(k) {
+      return k.startsWith('prop:') ? this.selProp(k.slice(5)) : (this._f[k] || []);
+    },
+    ponerMarca(k, v, on) {
+      if (k.startsWith('prop:')) {
+        const pk = k.slice(5);
+        const sel = this.selProp(pk);
+        this._fp[pk] = on ? [...sel, v] : sel.filter(x => x !== v);
+        if (!this._fp[pk].length) delete this._fp[pk];
+      } else {
+        this._f[k] = on ? [...(this._f[k] || []), v] : (this._f[k] || []).filter(x => x !== v);
+      }
+    },
     marcados() {
-      return Object.values(this._f).reduce((a, x) => a + x.length, 0);
+      return Object.values(this._f).reduce((a, x) => a + x.length, 0)
+        + Object.values(this._fp).reduce((a, x) => a + x.length, 0);
     },
 
     // Los filtros de estado — cómo está el mueble hoy, no qué es. Viven en el
@@ -2437,30 +2478,46 @@ tr:hover td{background:var(--panel-2)}
           <span>Filtros</span>
           ${this.marcados() ? '<button class="lnk" id="cat-limpiar">limpiar</button>' : ''}
         </div>
-        ${gs.map(g => `<div class="cat-g">
+        ${gs.map(g => {
+          const sel = this.marcadosDe(g.k);
+          // Con muchas opciones —las medidas son doce— la columna se hace
+          // interminable: se muestran las primeras y el resto a pedido. Las
+          // marcadas van siempre a la vista.
+          const abierto = this._verMas.has(g.k);
+          const tope = 6;
+          const ops = abierto ? g.ops
+            : [...g.ops.slice(0, tope), ...g.ops.slice(tope).filter(o => sel.includes(o.k))];
+          const ocultas = g.ops.length - ops.length;
+          return `<div class="cat-g">
           <div class="cat-g-t">${UI.esc(g.titulo)}</div>
-          ${g.ops.map(o => `<label class="cat-o ${this._f[g.k].includes(o.k) ? 'on' : ''}">
-            <input type="checkbox" data-f="${g.k}" data-v="${UI.esc(String(o.k))}"
-              ${this._f[g.k].includes(o.k) ? 'checked' : ''}>
+          ${ops.map(o => `<label class="cat-o ${sel.includes(o.k) ? 'on' : ''}">
+            <input type="checkbox" data-f="${UI.esc(g.k)}" data-v="${UI.esc(String(o.k))}"
+              ${sel.includes(o.k) ? 'checked' : ''}>
             ${g.color ? `<span class="pt" style="background:${global.DB.colorDe(o.label)}"></span>` : ''}
             <span class="cat-o-n">${UI.esc(o.label)}</span>
             <span class="cat-o-c tnum">${o.n}</span>
           </label>`).join('')}
-        </div>`).join('')}
+          ${ocultas > 0 || abierto ? `<button class="lnk lnk-mas" data-vermas="${UI.esc(g.k)}">${
+            abierto ? 'ver menos' : `ver ${ocultas} más`}</button>` : ''}
+        </div>`; }).join('')}
       </aside>`;
     },
 
     engancharFiltros() {
       document.querySelectorAll('[data-f]').forEach(i => i.onchange = () => {
-        const g = i.dataset.f;
         // Las claves numéricas del árbol vuelven del DOM como texto.
         const v = /^\d+$/.test(i.dataset.v) ? Number(i.dataset.v) : i.dataset.v;
-        this._f[g] = i.checked ? [...this._f[g], v] : this._f[g].filter(x => x !== v);
+        this.ponerMarca(i.dataset.f, v, i.checked);
+        this.pintar();
+      });
+      document.querySelectorAll('[data-vermas]').forEach(b => b.onclick = () => {
+        const k = b.dataset.vermas;
+        if (this._verMas.has(k)) this._verMas.delete(k); else this._verMas.add(k);
         this.pintar();
       });
       const l = document.getElementById('cat-limpiar');
       if (l) l.onclick = () => {
-        Object.keys(this._f).forEach(k => { this._f[k] = []; });
+        this._f.ambiente = []; this._fp = {};
         this.pintar();
       };
     },
@@ -3260,16 +3317,18 @@ tr:hover td{background:var(--panel-2)}
             <div class="sp"></div>
             ${ed ? '' : '<span class="pill soft">Sólo lectura</span>'}
           </div>
-          <div class="pd-tit">
-            <h1>${UI.esc(p.nombre)}</h1>
-            <span class="pd-cod tnum">${UI.esc(p.sku || '')}</span>
-            <div class="sp"></div>
-            <span class="pill ${p.publicado ? 'ok' : 'warn'}" id="pd-pub-pill">${
-              p.publicado ? 'Visible para los vendedores' : 'Oculto — no se puede vender'}</span>
+          <div class="pd-fijo">
+            <div class="pd-tit">
+              <h1>${UI.esc(p.nombre)}</h1>
+              <span class="pd-cod tnum">${UI.esc(p.sku || '')}</span>
+              <div class="sp"></div>
+              <span class="pill ${p.publicado ? 'ok' : 'warn'}" id="pd-pub-pill">${
+                p.publicado ? 'Visible para los vendedores' : 'Oculto — no se puede vender'}</span>
+            </div>
+            <div class="pd-tabs">${this.solapas().map(t =>
+              `<button class="pd-tab ${this._tab === t.k ? 'on' : ''}" data-tab="${t.k}"
+                aria-current="${this._tab === t.k}">${UI.esc(t.label)}</button>`).join('')}</div>
           </div>
-          <div class="pd-tabs">${this.solapas().map(t =>
-            `<button class="pd-tab ${this._tab === t.k ? 'on' : ''}" data-tab="${t.k}"
-              aria-current="${this._tab === t.k}">${UI.esc(t.label)}</button>`).join('')}</div>
           ${this['tab' + this._tab.charAt(0).toUpperCase() + this._tab.slice(1)]()}
           <div id="pd-panel"></div>
         </div>
@@ -5886,12 +5945,14 @@ tr:hover td{background:var(--panel-2)}
         /* Solapas: adelante lo que se mira siempre, atrás lo que se consulta. */
         /* Con siete solapas no entran a lo ancho: antes que partirse en dos
            renglones, la barra scrollea. */
-        .pd-tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0 0 12px;
-          overflow-x:auto;scrollbar-width:none;
-          /* Quedan a la vista todo el scroll: son largas y uno se pierde de
-             en qué solapa está. Se pegan abajo de la barra de módulo. */
-          position:sticky;top:95px;z-index:20;background:var(--bg);
-          padding-top:4px;margin-left:-4px;padding-left:4px;margin-right:-4px;padding-right:4px}
+        /* El nombre del mueble y sus solapas quedan a la vista todo el scroll:
+           con seis solapas y pantallas largas uno se pierde de qué mueble está
+           mirando y en qué parte. Se pegan abajo de la barra de módulo. */
+        .pd-fijo{position:sticky;top:95px;z-index:20;background:var(--bg);
+          margin:0 -4px 12px;padding:4px 4px 0}
+        .pd-fijo .pd-tit{margin-bottom:7px}
+        .pd-tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0;
+          overflow-x:auto;scrollbar-width:none}
         .pd-tabs::-webkit-scrollbar{display:none}
         .pd-tab{flex:none;white-space:nowrap;border:0;background:none;font:inherit;font-size:13px;
           font-weight:650;color:var(--muted);cursor:pointer;padding:9px 12px;
