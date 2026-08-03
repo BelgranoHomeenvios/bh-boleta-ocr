@@ -913,6 +913,28 @@ costado de la C, y el listado de la B como segunda vista.
 - ✅ 384. El buscador ya no vuelve a la base: filtra lo que hay, y se combina
   con las categorías y los filtros.
 
+### Lote 31 — APLICADO (Opción A: variables a la izquierda, categorías a la derecha)
+
+De las tres propuestas se eligió la **A**, con dos cambios: las categorías van
+al **costado derecho**, no arriba, y se pueden **marcar varias a la vez**.
+
+- ✅ 385. **Izquierda: las variables y sus opciones** —ambiente, terminación,
+  disponibilidad, publicación—, cada una con su cuenta.
+- ✅ 386. **Derecha: las categorías**, con tilde, la opción *Todas* arriba y
+  cuántos muebles tiene cada una. Se marcan varias: cómodas **y** mesas de luz.
+  La lista scrollea sola, así que da igual que sean 5 o 60.
+- ✅ 387. Se va la fila de botones de arriba: con 22 categorías no entraba ni se
+  leía. Quedan dos botones —**Filtrar** y **Categorías**— cada uno con la
+  cantidad de cosas marcadas.
+
+**Cuando la pantalla no da**
+- ✅ 388. Abajo de 1180px las tres columnas no entran, así que el costado que se
+  abre **se muestra encima, como un cajón**, y el otro se cierra: no tiene
+  sentido tapar los muebles dos veces.
+- ✅ 389. El cajón se cierra con la flecha, tocando afuera, o volviendo a
+  apretar el botón. Y si se agranda o achica la ventana, la pantalla se
+  reacomoda sola.
+
 > Falta decidir **qué información va en cada vista** —ésta es la primera pasada—
 > y si el filtro guarda lo último usado por rol.
 

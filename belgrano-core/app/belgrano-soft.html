@@ -1982,12 +1982,19 @@ tr:hover td{background:var(--panel-2)}
 (function (global) {
   const VISTA_KEY = 'bh_catalogo_vista';
   const FILTROS_KEY = 'bh_catalogo_filtros';
+  const CATS_KEY = 'bh_catalogo_cats';
   const Catalogo = {
     arbol: [],           // categorías cargadas
     ruta: [],            // breadcrumb: [{id,nombre}] hasta la categoría actual
     texto: '',           // búsqueda libre
     vista: (() => { try { return localStorage.getItem(VISTA_KEY) || 'bloques'; } catch { return 'bloques'; } })(),
     verFiltros: (() => { try { return localStorage.getItem(FILTROS_KEY) !== '0'; } catch { return true; } })(),
+    verCats: (() => { try { return localStorage.getItem(CATS_KEY) !== '0'; } catch { return true; } })(),
+    // Abajo de este ancho los dos costados no entran al mismo tiempo que los
+    // muebles: se abren encima, de a uno.
+    chico() {
+      try { return window.matchMedia('(max-width:1180px)').matches; } catch { return false; }
+    },
     _prods: null,        // últimos productos pintados (para re-render al cambiar de vista)
 
     async render(mount = 'view') {
@@ -2007,6 +2014,7 @@ tr:hover td{background:var(--panel-2)}
             <input id="cat-q" placeholder="Buscar por nombre o código…" value="${UI.esc(this.texto)}">
           </div>
           <button class="btn" id="cat-verf" aria-pressed="true">Filtrar<span id="cat-fn"></span></button>
+          <button class="btn" id="cat-verc" aria-pressed="true">Categorías<span id="cat-cn"></span></button>
           <select id="cat-orden" class="cat-ord" title="Cómo se ordenan">
             <option value="cat">Por categoría</option>
             <option value="nombre">Por nombre</option>
@@ -2058,9 +2066,40 @@ tr:hover td{background:var(--panel-2)}
             font:inherit;font-size:12.5px;font-weight:650;color:var(--ink-soft);cursor:pointer;transition:.12s}
           .amb:hover{border-color:var(--brand);color:var(--navy)}
           .amb.on{background:var(--navy);border-color:var(--navy);color:#fff}
-          .cat-cols{display:grid;grid-template-columns:212px minmax(0,1fr);gap:18px;align-items:start}
-          @media(max-width:900px){.cat-cols{grid-template-columns:1fr}}
-          .cat-f{position:sticky;top:104px;display:flex;flex-direction:column;gap:14px}
+          .cat-cols{display:grid;grid-template-columns:206px minmax(0,1fr) 210px;gap:18px;align-items:start}
+          .cat-cols.sin-f{grid-template-columns:minmax(0,1fr) 210px}
+          .cat-cols.sin-c{grid-template-columns:206px minmax(0,1fr)}
+          .cat-cols.sin-f.sin-c{grid-template-columns:1fr}
+          @media(max-width:1100px){.cat-cols,.cat-cols.sin-f,.cat-cols.sin-c{grid-template-columns:1fr}}
+          .cat-f,.cat-c{position:sticky;top:104px;display:flex;flex-direction:column;gap:14px}
+          /* La lista de categorías scrollea sola: son veinte y pico y no
+             tienen que empujar la pantalla. */
+          .cat-lc{display:flex;flex-direction:column;max-height:min(60vh,520px);overflow:auto;
+            padding-right:4px}
+          .cat-lc::-webkit-scrollbar{width:6px}
+          .cat-lc::-webkit-scrollbar-thumb{background:var(--line);border-radius:9px}
+          /* Con la pantalla chica el costado se abre encima. Se cierra con la
+             flecha, tocando afuera, o volviendo a apretar el botón. */
+          .cat-back{position:fixed;inset:0;background:rgba(12,22,44,.35);z-index:40}
+          .cat-cajon{position:fixed;top:0;right:0;bottom:0;width:min(330px,88vw);z-index:41;
+            background:var(--panel);border-left:1px solid var(--line);display:flex;
+            flex-direction:column;box-shadow:-8px 0 24px rgba(15,26,42,.14)}
+          .cat-cajon-h{display:flex;align-items:center;gap:8px;padding:11px 14px;
+            border-bottom:1px solid var(--line);font-size:13.5px;color:var(--navy)}
+          .cat-cajon-h .lx{border:0;background:none;cursor:pointer;font-size:19px;line-height:1;
+            color:var(--muted);padding:2px 6px;border-radius:7px}
+          .cat-cajon-h .lx:hover{background:var(--panel-2);color:var(--navy)}
+          .cat-cajon-b{padding:14px;overflow:auto;flex:1}
+          .cat-cajon .cat-f,.cat-cajon .cat-c{position:static;top:auto}
+          /* Adentro del cajón el título ya está arriba: no se repite. */
+          .cat-cajon .cat-f-h>span{display:none}
+          .cat-cajon .cat-f-h{margin-top:-6px}
+          .cat-cajon .cat-lc{max-height:none}
+          .cat-bar .btn.on{background:var(--navy);border-color:var(--navy);color:#fff}
+          #cat-cn{margin-left:6px;font-size:11px;background:var(--brand);color:#fff;border-radius:999px;
+            padding:1px 6px}
+          #cat-cn:empty{display:none}
+          .btn.on #cat-fn,.btn.on #cat-cn{background:#fff;color:var(--navy)}
           .cat-f-h{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;
             text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
           .cat-f-h .lnk{margin-left:auto;font-size:11.5px;text-transform:none;letter-spacing:0}
@@ -2100,13 +2139,25 @@ tr:hover td{background:var(--panel-2)}
       const so = document.getElementById('cat-orden');
       so.value = this.orden;
       so.onchange = () => { this.orden = so.value; this.pintar(); };
-      // El costado se puede esconder: con el catálogo filtrado uno quiere la
-      // pantalla entera para mirar muebles.
+      // Los costados se pueden esconder: con el catálogo filtrado uno quiere
+      // la pantalla entera para mirar muebles.
       document.getElementById('cat-verf').onclick = () => {
         this.verFiltros = !this.verFiltros;
+        if (this.verFiltros && this.chico()) this.verCats = false;
         try { localStorage.setItem(FILTROS_KEY, this.verFiltros ? '1' : '0'); } catch {}
         this.pintar();
       };
+      document.getElementById('cat-verc').onclick = () => {
+        this.verCats = !this.verCats;
+        if (this.verCats && this.chico()) this.verFiltros = false;
+        try { localStorage.setItem(CATS_KEY, this.verCats ? '1' : '0'); } catch {}
+        this.pintar();
+      };
+      // Al agrandar o achicar la ventana cambia si los costados entran.
+      if (!this._resize) {
+        this._resize = () => { const c = this.chico(); if (c !== this._eraChico) this.pintar(); };
+        window.addEventListener('resize', this._resize);
+      }
 
       if (global.DB.modo() === 'demo') {
         v.insertAdjacentHTML('afterbegin',
@@ -2263,25 +2314,43 @@ tr:hover td{background:var(--panel-2)}
     // Las categorías de mueble, arriba y en una fila. Así se piensa el
     // catálogo: todas las mesas de luz, todas las cómodas — no por ambiente ni
     // por fecha de alta. Cada una dice cuántos muebles tiene.
-    crumb() {
-      const c = document.getElementById('cat-crumb');
-      if (!c) return;
+    // Las categorías van a la derecha, en una lista con tilde: se marcan
+    // varias a la vez —cómodas y mesas de luz— y cada una dice cuántos
+    // muebles tiene. A la izquierda quedan las variables y sus opciones.
+    htmlCats() {
       const g = this.grupoTipos();
+      if (!g.length) return '';
       const sel = this._f.tipo;
-      c.innerHTML = `<div class="cat-amb">
-        <button class="amb ${sel.length ? '' : 'on'}" data-tipo="">Ver todo
-          <span class="amb-n">${(this._todo || []).filter(p => this.pasa(p, 'tipo')).length}</span></button>
-        ${g.map(o => `<button class="amb ${sel.includes(o.k) ? 'on' : ''}" data-tipo="${o.k}">
-          ${UI.esc(o.label)} <span class="amb-n">${o.n}</span></button>`).join('')}
-      </div>`;
-      c.querySelectorAll('[data-tipo]').forEach(b => b.onclick = () => {
-        const v = b.dataset.tipo;
-        if (!v) this._f.tipo = [];
-        else {
-          const id = Number(v);
-          this._f.tipo = sel.includes(id) ? sel.filter(x => x !== id) : [...sel, id];
-        }
-        this.pintar();
+      const todos = (this._todo || []).filter(p => this.pasa(p, 'tipo')).length;
+      return `<aside class="cat-c">
+        <div class="cat-f-h"><span>Categorías</span>
+          ${sel.length ? `<button class="lnk" data-tipo="">ver todas</button>` : ''}</div>
+        <div class="cat-lc">
+          <label class="cat-o ${sel.length ? '' : 'on'}">
+            <input type="checkbox" data-tipo="" ${sel.length ? '' : 'checked'}>
+            <span class="cat-o-n">Todas</span>
+            <span class="cat-o-c tnum">${todos}</span></label>
+          ${g.map(o => `<label class="cat-o ${sel.includes(o.k) ? 'on' : ''}">
+            <input type="checkbox" data-tipo="${o.k}" ${sel.includes(o.k) ? 'checked' : ''}>
+            <span class="cat-o-n">${UI.esc(o.label)}</span>
+            <span class="cat-o-c tnum">${o.n}</span></label>`).join('')}
+        </div>
+      </aside>`;
+    },
+
+    engancharCats() {
+      document.querySelectorAll('[data-tipo]').forEach(el => {
+        const usar = () => {
+          const v = el.dataset.tipo;
+          if (!v) this._f.tipo = [];
+          else {
+            const id = Number(v);
+            this._f.tipo = this._f.tipo.includes(id)
+              ? this._f.tipo.filter(x => x !== id) : [...this._f.tipo, id];
+          }
+          this.pintar();
+        };
+        if (el.tagName === 'INPUT') el.onchange = usar; else el.onclick = usar;
       });
     },
 
@@ -2310,7 +2379,6 @@ tr:hover td{background:var(--panel-2)}
         cont.innerHTML = `<div class="banner warn">No se pudo leer: ${UI.esc(e.message || e)}</div>`;
         return;
       }
-      this.crumb();
 
       // Lo que se ve es: lo que cuelga de donde estoy parado, filtrado, y si
       // hay texto, lo que coincide en todo el catálogo.
@@ -2336,16 +2404,50 @@ tr:hover td{background:var(--panel-2)}
         .filter(this.texto ? enTexto : bajo(actual))
         .filter(p => this.pasa(p));
 
+      // Tres columnas: las variables a la izquierda, los muebles en el medio
+      // y las categorías a la derecha. Si la pantalla no da para las tres, el
+      // costado que esté abierto se muestra encima, como un cajón, y el otro
+      // se cierra: no tiene sentido tapar los muebles dos veces.
+      const chico = this.chico();
+      this._eraChico = chico;
       const fh = this.verFiltros ? this.htmlFiltros() : '';
-      cont.innerHTML = fh
-        ? `<div class="cat-cols">${fh}<div class="cat-res" id="cat-res"></div></div>`
-        : '<div class="cat-res" id="cat-res"></div>';
+      const ch = this.verCats ? this.htmlCats() : '';
+      const cajon = chico && (fh || ch);
+      cont.innerHTML = `<div class="cat-cols ${fh && !chico ? '' : 'sin-f'} ${ch && !chico ? '' : 'sin-c'}">
+        ${chico ? '' : fh}
+        <div class="cat-res" id="cat-res"></div>
+        ${chico ? '' : ch}
+      </div>
+      ${cajon ? `<div class="cat-back" id="cat-back"></div>
+        <aside class="cat-cajon">
+          <div class="cat-cajon-h">
+            <button class="lx" id="cat-cerrar" title="Cerrar">›</button>
+            <b>${fh ? 'Filtrar muebles' : 'Categorías'}</b>
+          </div>
+          <div class="cat-cajon-b">${fh || ch}</div>
+        </aside>` : ''}`;
+      this.engancharCats();
+      const cerrar = () => {
+        this.verFiltros = false; this.verCats = false;
+        try { localStorage.setItem(FILTROS_KEY, '0'); localStorage.setItem(CATS_KEY, '0'); } catch {}
+        this.pintar();
+      };
+      const bk = document.getElementById('cat-back'); if (bk) bk.onclick = cerrar;
+      const cc = document.getElementById('cat-cerrar'); if (cc) cc.onclick = cerrar;
+
       const bf = document.getElementById('cat-verf');
       if (bf) {
         bf.setAttribute('aria-pressed', String(this.verFiltros));
-        bf.classList.toggle('primary', this.verFiltros && !!this.marcados());
+        bf.classList.toggle('on', this.verFiltros);
         const n = document.getElementById('cat-fn');
         if (n) n.textContent = this.marcados() || '';
+      }
+      const bc = document.getElementById('cat-verc');
+      if (bc) {
+        bc.setAttribute('aria-pressed', String(this.verCats));
+        bc.classList.toggle('on', this.verCats);
+        const n2 = document.getElementById('cat-cn');
+        if (n2) n2.textContent = this._f.tipo.length || '';
       }
       this.pintarProductos(document.getElementById('cat-res') || cont, this.texto
         ? 'No hay muebles para esa búsqueda.'
