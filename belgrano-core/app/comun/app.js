@@ -53,7 +53,7 @@
 
     produccion: { label: 'Producción', icon: '🏭', subs: [
       S('resumen', 'Resumen', resumen('produccion')),
-      S('ordenes', 'Órdenes', m => global.Produccion.render(m)),
+      S('fabricar', 'A fabricar', m => global.Produccion.render(m)),
       S('cola', 'Cola de trabajo', skel('Cola de trabajo')),
       S('planificacion', 'Planificación', skel('Planificación')),
       S('sectores', 'Sectores', skel('Sectores')),

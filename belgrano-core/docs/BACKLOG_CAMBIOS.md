@@ -1225,6 +1225,33 @@ al **costado derecho**, no arriba, y se pueden **marcar varias a la vez**.
 - ✅ 467. El desplegable se dibuja **fuera de la tabla** (pegado a la pantalla):
   la tabla se corre de costado y lo recortaría.
 
+### Lote 45 — APLICADO (Producción: el modelo y "A fabricar")
+
+**El modelo**
+- ✅ 468. **Tres tipos de mueble**: estándar, **modificado** —el mismo con una
+  cota cambiada, que guarda qué decía el catálogo y qué se pidió— y a medida.
+- ✅ 469. **El plano** tiene estado: *listo · a dibujar · a editar · a verificar ·
+  verificado*. `planoListo()` es la regla dura: **sin plano resuelto no se
+  puede pedir**.
+- ✅ 470. El **pedido** tiene su propia serie —`P-000124`— y cuatro estados:
+  abierto, cerrado, entregado, recibido.
+- ✅ 471. La fecha comprometida es un **rango** (`desde`/`hasta`), no un día.
+  `diasHasta()` cuenta lo que falta y `vencida()` marca lo que se pasó del
+  final. No se puede usar `diasDesde` para esto: ésa asume que lo que cae
+  adelante es del año pasado, y acá es justamente lo que todavía no llegó.
+- ✅ 472. `aFabricar()` es lo que Producción tiene entre manos: lo que falta
+  pedir y lo que se está haciendo. Lo guardado no aparece.
+
+**La pantalla**
+- ✅ 473. **Una sola lista con tres agrupaciones** —proveedor, orden de venta,
+  mueble—: la misma lista apilada distinto, no tres pantallas.
+- ✅ 474. Arriba: **Falta dibujar · Sin pedir · En fábrica · Vencidos**, y los
+  chips de estado con su cuenta más el de vencidos.
+- ✅ 475. **Lo que no tiene proveedor va primero**: es el trabajo del día.
+  Después lo vencido. Cada montón se pliega y cerrado sigue diciendo qué tiene.
+- ✅ 476. El renglón nunca lee "estándar" si no lo es: el modificado muestra
+  **qué cambió y qué decía el catálogo**, y el que no tiene plano lo dice.
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·

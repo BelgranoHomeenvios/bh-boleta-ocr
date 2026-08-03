@@ -687,8 +687,92 @@
     // suya para que el vendedor sepa qué está vendiendo.
     TIPOS_UNIDAD: [
       { k: 'estandar', label: 'Estándar' },
-      { k: 'medida', label: 'A medida' },
+      { k: 'modificado', label: 'Modificado', pill: 'warn' },
+      { k: 'medida', label: 'A medida', pill: 'soft' },
     ],
+    tipoUnidad(k) { return this.TIPOS_UNIDAD.find(x => x.k === k) || this.TIPOS_UNIDAD[0]; },
+
+    // ---- Producción: el plano ---------------------------------------------
+    // El dibujo no lo genera el sistema: son los PDF que ya están hechos. Lo
+    // que el sistema sabe es DE QUIÉN es cada uno y si está listo para pedir.
+    //   estándar   → el de la variante, ya cargado
+    //   modificado → el mismo, pero si cambia una cota hay que editarlo
+    //   a medida   → propio de esa unidad, se dibuja de cero
+    PLANO_ESTADOS: [
+      { k: 'ok', label: 'Listo', pill: 'ok', pie: 'El plano de la variante, ya cargado.' },
+      { k: 'a_dibujar', label: 'A dibujar', pill: 'crit',
+        pie: 'Es a medida: hay que dibujarlo de cero.' },
+      { k: 'a_editar', label: 'A editar', pill: 'warn',
+        pie: 'Cambia una cota: se edita el plano en blanco que ya existe.' },
+      { k: 'a_verificar', label: 'A verificar', pill: 'warn',
+        pie: 'Está dibujado. Falta que otro lo compare con el croquis de la venta.' },
+      { k: 'verificado', label: 'Verificado', pill: 'ok',
+        pie: 'Alguien distinto del que dibujó lo dio por bueno.' },
+    ],
+    planoEstado(k) { return this.PLANO_ESTADOS.find(x => x.k === k) || this.PLANO_ESTADOS[0]; },
+    // Con el plano sin resolver no se puede pedir: es lo que evita que salga a
+    // fábrica un mueble mal dibujado.
+    planoListo(u) {
+      const e = u.planoEstado || (u.tipo === 'medida' ? 'a_dibujar' : 'ok');
+      return e === 'ok' || e === 'verificado';
+    },
+
+    // ---- Producción: el pedido --------------------------------------------
+    // El pedido tiene su propia serie, igual que las unidades. Se abre, se le
+    // van agregando muebles, y cuando está se cierra para mandarlo.
+    SERIE_PEDIDO: { prefijo: 'P', digitos: 6 },
+    numPedido(n) {
+      return `${this.SERIE_PEDIDO.prefijo}-${String(n).padStart(this.SERIE_PEDIDO.digitos, '0')}`;
+    },
+    ESTADOS_PEDIDO: [
+      { k: 'abierto', label: 'Abierto', pill: 'soft',
+        pie: 'Se le siguen agregando muebles. Todavía no se le mandó.' },
+      { k: 'cerrado', label: 'Cerrado', pill: 'warn',
+        pie: 'Congelado y listo para imprimir. Para agregarle algo hay que reabrirlo.' },
+      { k: 'entregado', label: 'Entregado', pill: 'viol',
+        pie: 'Lo tiene en el taller.' },
+      { k: 'recibido', label: 'Recibido', pill: 'ok',
+        pie: 'Vino todo lo que se pidió.' },
+    ],
+    estadoPedido(k) { return this.ESTADOS_PEDIDO.find(x => x.k === k) || this.ESTADOS_PEDIDO[0]; },
+
+    // ---- Producción: cómo se lee lo que hay que fabricar -------------------
+    // Cuatro lecturas que suman el total de lo que Producción tiene entre manos.
+    VISTAS_FAB: [
+      { k: 'dibujar', label: 'A dibujar', pill: 'crit' },
+      { k: 'pedir', label: 'Sin pedir', pill: 'warn' },
+      { k: 'fabricando', label: 'En fábrica', pill: 'viol' },
+      { k: 'recibido', label: 'Recibido', pill: 'ok' },
+    ],
+    vistaFab(u) {
+      if (u.estado === 'stock' || u.estado === 'entregada') return 'recibido';
+      if (u.estado === 'produccion') return 'fabricando';
+      return this.planoListo(u) ? 'pedir' : 'dibujar';
+    },
+    // Lo que Producción tiene entre manos: ni lo entregado ni lo que ya está
+    // guardado hace rato. Es la lista de trabajo, no el archivo.
+    aFabricar() {
+      return this.unidadesTodas().filter(u => u.estado === 'pedir' || u.estado === 'produccion');
+    },
+    // Cuántos días faltan para una fecha "9/8". Negativo = ya pasó.
+    // No se puede usar diasDesde: ésa asume que lo que cae adelante es del año
+    // pasado, y acá lo que cae adelante es justamente lo que todavía no llegó.
+    diasHasta(fecha) {
+      const m = /^(\d{1,2})\/(\d{1,2})$/.exec(String(fecha || '').trim());
+      if (!m) return null;
+      const hoy = new Date();
+      const cero = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+      let d = new Date(hoy.getFullYear(), Number(m[2]) - 1, Number(m[1]));
+      // Una fecha ocho meses para atrás es del año que viene, no de éste.
+      if ((cero - d) / 86400000 > 240) d = new Date(hoy.getFullYear() + 1, Number(m[2]) - 1, Number(m[1]));
+      return Math.round((d - cero) / 86400000);
+    },
+    // Está vencido cuando pasó el final del rango comprometido.
+    vencida(u) {
+      if (u.estado !== 'produccion' || !u.hasta) return false;
+      const d = this.diasHasta(u.hasta);
+      return d != null && d < 0;
+    },
 
     // La etiqueta que se ve en pantalla combina las dos cosas, igual que en la
     // planilla de siempre: "Reservada · lista", "Reservada · en fábrica".
@@ -722,6 +806,20 @@
       const PROV = ['1Tony', '3Luciano', '5Enrique', '6Matías', '7Raúl'];
       const out = [];
       let n = 0;
+      // Los tres tipos, repartidos siempre igual: la mayoría estándar, alguno
+      // con una cota cambiada, y alguno que hay que dibujar de cero.
+      const tipoDe = (i, j) => {
+        if (i % 5 === 0 && j === 0) {
+          return { tipo: 'medida', detalle: 'A medida',
+            planoEstado: i % 10 === 0 ? 'a_dibujar' : 'a_verificar' };
+        }
+        if (i % 7 === 0 && j === 0) {
+          return { tipo: 'modificado', detalle: 'Profundidad 0.40 en vez de 0.45',
+            cambios: [{ propiedad: 'Profundidad', deCatalogo: '0.45', pedido: '0.40' }],
+            planoEstado: 'a_editar' };
+        }
+        return { tipo: 'estandar', detalle: '', planoEstado: 'ok' };
+      };
       DEMO.variantes.forEach((v, i) => {
         const prod = DEMO.productos.find(p => p.id === v.producto_id) || {};
         // Cuántas de cada una: pocas, y repartidas siempre igual.
@@ -749,10 +847,13 @@
           out.push({ ...base, id: n, serie: '—', estado: 'produccion',
             ubicacion: '', proveedor: PROV[n % PROV.length],
             llega: `${(n % 28) + 1}/8`, listo: '',
+            desde: n % 7 === 0 ? `${(n % 20) + 5}/7` : `${(n % 20) + 1}/8`,
+            hasta: n % 7 === 0 ? `${(n % 20) + 12}/7` : `${(n % 20) + 8}/8`,
+            pedido: this.numPedido(110 + (n % 6)),
             orden: j === 0 && i % 4 === 0 ? `#S00${240 + i}` : null,
             fechaVenta: j === 0 && i % 4 === 0 ? `${(n % 28) + 1}/7` : '',
-            tipo: i % 5 === 0 ? 'medida' : 'estandar',
-            detalle: i % 5 === 0 ? 'A medida' : '' });
+            ...(() => { const tp = tipoDe(i, j);
+              return { ...tp, planoEstado: tp.tipo === 'estandar' ? 'ok' : 'verificado' }; })() });
         }
         // Vendidas que todavía no se le pidieron a nadie: nacen con la venta.
         const aPedir = [0, 0, 1, 0, 0, 1, 0, 0][i % 8];
@@ -761,8 +862,7 @@
           out.push({ ...base, id: n, serie: '—', estado: 'pedir',
             ubicacion: '', proveedor: '', llega: '', listo: '',
             orden: `#S00${260 + i}`, fechaVenta: `${(n % 28) + 1}/7`,
-            tipo: i % 3 === 0 ? 'medida' : 'estandar',
-            detalle: i % 3 === 0 ? 'A medida' : '' });
+            ...tipoDe(i, j) });
         }
         for (let j = 0; j < salidas; j++) {
           n++;
