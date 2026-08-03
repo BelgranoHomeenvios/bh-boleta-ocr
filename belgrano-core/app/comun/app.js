@@ -70,7 +70,7 @@
 
     compras: { label: 'Compras', icon: '🛒', subs: [
       S('resumen', 'Resumen', resumen('compras')),
-      S('oc', 'Órdenes de compra', skel('Órdenes de compra')),
+      S('oc', 'Órdenes de compra', m => global.ComprasOC.render(m)),
       S('recepciones', 'Recepciones a conformar', m => global.ComprasRecepciones.render(m)),
       S('proveedores', 'Proveedores', skel('Proveedores')),
       S('comparador', 'Comparador', skel('Comparador de precios')),

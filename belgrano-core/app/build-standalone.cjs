@@ -21,7 +21,8 @@ const scripts = [
   'modulos/prod-pedidos.js',
   'modulos/prod-taller.js',
   'modulos/prod-vendidos.js',
-  'compras/recepciones.js', 'modulos/esqueletos.js',
+  'compras/recepciones.js',
+  'compras/ordenes.js', 'modulos/esqueletos.js',
   'comun/app.js',
 ];
 

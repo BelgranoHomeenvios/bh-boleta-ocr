@@ -991,6 +991,97 @@
     recepcion(num) { return this.recepciones().find(r => r.numero === num) || null; },
     aConformar() { return this.recepciones().filter(r => r.estadoCompras === 'pendiente'); },
 
+    // ---- Órdenes de compra ------------------------------------------------
+    // Lo que NO son muebles: los insumos con los que trabajamos —placas,
+    // herrajes, telas, pintura—. El mueble se pide en Producción; acá se
+    // compra lo que hace falta para hacerlo o para el local.
+    SERIE_OC: { prefijo: 'OC', digitos: 5 },
+    numOC(n) { return `${this.SERIE_OC.prefijo}-${String(n).padStart(this.SERIE_OC.digitos, '0')}`; },
+    ESTADOS_OC: [
+      { k: 'borrador', label: 'Borrador', pill: 'soft', pie: 'Se está armando. Todavía no se mandó.' },
+      { k: 'enviada', label: 'Enviada', pill: 'warn', pie: 'Se le pidió al proveedor.' },
+      { k: 'recibida', label: 'Recibida', pill: 'ok', pie: 'Llegó todo lo que se pidió.' },
+      { k: 'anulada', label: 'Anulada', pill: 'crit', pie: 'Se dio de baja.' },
+    ],
+    estadoOC(k) { return this.ESTADOS_OC.find(x => x.k === k) || this.ESTADOS_OC[0]; },
+    // Los insumos de siempre, con su unidad y su último precio conocido.
+    INSUMOS: [
+      { k: 'mdf18', nombre: 'Placa MDF 18 mm', unidad: 'placa', precio: 42000, rubro: 'carpinteria' },
+      { k: 'mdf12', nombre: 'Placa MDF 12 mm', unidad: 'placa', precio: 31000, rubro: 'carpinteria' },
+      { k: 'melamina', nombre: 'Melamina blanca 18 mm', unidad: 'placa', precio: 48000, rubro: 'carpinteria' },
+      { k: 'guia', nombre: 'Guía telescópica 45 cm', unidad: 'par', precio: 6800, rubro: 'carpinteria' },
+      { k: 'bisagra', nombre: 'Bisagra cazoleta con freno', unidad: 'unidad', precio: 1900, rubro: 'carpinteria' },
+      { k: 'tirador', nombre: 'Tirador de aluminio', unidad: 'unidad', precio: 3400, rubro: 'carpinteria' },
+      { k: 'laca', nombre: 'Laca poliuretánica', unidad: 'litro', precio: 15800, rubro: 'laqueado' },
+      { k: 'lija', nombre: 'Lija al agua 220', unidad: 'pliego', precio: 850, rubro: 'laqueado' },
+      { k: 'pana', nombre: 'Pana antimanchas', unidad: 'metro', precio: 12400, rubro: 'tapiceria' },
+      { k: 'espuma', nombre: 'Espuma alta densidad', unidad: 'plancha', precio: 27500, rubro: 'tapiceria' },
+      { k: 'cano', nombre: 'Caño estructural 20×20', unidad: 'metro', precio: 4900, rubro: 'herreria' },
+      { k: 'pata', nombre: 'Pata de hierro pintada', unidad: 'unidad', precio: 5600, rubro: 'herreria' },
+    ],
+    insumo(k) { return this.INSUMOS.find(x => x.k === k) || null; },
+    _ocs: null,
+    ordenesCompra() {
+      if (this._ocs) return this._ocs;
+      // Unas cuantas de ejemplo, para ver la pantalla con algo adentro.
+      const it = (k, cant, precio) => {
+        const i = this.insumo(k);
+        return { insumo: k, nombre: i.nombre, unidad: i.unidad, cant, precio: precio || i.precio };
+      };
+      this._ocs = [
+        { numero: this.numOC(41), proveedor: 'Maderera del Oeste', provId: null,
+          estado: 'enviada', fecha: '28/7', entrega: '8/8', quien: 'Jony',
+          items: [it('mdf18', 30), it('mdf12', 12), it('melamina', 18)],
+          nota: 'Descargan por el portón de atrás.' },
+        { numero: this.numOC(42), proveedor: 'Herrajes Vitale', provId: null,
+          estado: 'enviada', fecha: '30/7', entrega: '6/8', quien: 'Jony',
+          items: [it('guia', 60), it('bisagra', 200), it('tirador', 80)] },
+        { numero: this.numOC(43), proveedor: 'Pinturería Norte', provId: null,
+          estado: 'recibida', fecha: '18/7', entrega: '25/7', quien: 'Jony',
+          items: [it('laca', 40), it('lija', 300)] },
+        { numero: this.numOC(44), proveedor: 'Textiles Suárez', provId: null,
+          estado: 'borrador', fecha: this.hoyCorto(), entrega: '', quien: 'Jony',
+          items: [it('pana', 25), it('espuma', 8)] },
+      ];
+      return this._ocs;
+    },
+    oc(num) { return this.ordenesCompra().find(o => o.numero === num) || null; },
+    totalOC(o) {
+      return (o.items || []).reduce((a, x) => a + (Number(x.cant) || 0) * (Number(x.precio) || 0), 0);
+    },
+    proximaOC() {
+      const n = this.ordenesCompra().reduce((mx, o) =>
+        Math.max(mx, parseInt(String(o.numero).replace(/\D/g, ''), 10) || 0), 0);
+      return this.numOC(n + 1);
+    },
+    crearOC({ proveedor, entrega = '', quien = '' }) {
+      const o = { numero: this.proximaOC(), proveedor, provId: null, estado: 'borrador',
+        fecha: this.hoyCorto(), entrega, quien: quien || 'yo', items: [] };
+      this.ordenesCompra().unshift(o);
+      return o;
+    },
+    agregarAOC(num, insumoK, cant) {
+      const o = this.oc(num); if (!o || o.estado !== 'borrador') return null;
+      const i = this.insumo(insumoK); if (!i) return null;
+      const ya = o.items.find(x => x.insumo === insumoK);
+      if (ya) ya.cant = Number(ya.cant) + (Number(cant) || 1);
+      else o.items.push({ insumo: insumoK, nombre: i.nombre, unidad: i.unidad,
+        cant: Number(cant) || 1, precio: i.precio });
+      return o;
+    },
+    sacarDeOC(num, insumoK) {
+      const o = this.oc(num); if (!o || o.estado !== 'borrador') return null;
+      o.items = o.items.filter(x => x.insumo !== insumoK);
+      return o;
+    },
+    cambiarOC(num, estado, quien = '') {
+      const o = this.oc(num); if (!o) return null;
+      o.estado = estado;
+      if (estado === 'enviada') { o.enviadaPor = quien || 'yo'; o.enviadaEl = this.hoyCorto(); }
+      if (estado === 'recibida') { o.recibidaPor = quien || 'yo'; o.recibidaEl = this.hoyCorto(); }
+      return o;
+    },
+
     // ---- Lista de precios del proveedor -----------------------------------
     // Lo que nos cobra cada taller por cada variante. Se actualiza sola a
     // medida que van viniendo: cuando Compras conforma un precio distinto,
