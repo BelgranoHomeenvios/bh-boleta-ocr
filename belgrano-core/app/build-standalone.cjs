@@ -14,6 +14,7 @@ const css = read('comun/estilos.css');
 const scripts = [
   'comun/db.js', 'comun/ui.js', 'comun/widgets.js', 'comun/motor.js',
   'catalogo/catalogo.js', 'catalogo/producto.js', 'catalogo/planillas.js',
+  'inventario/unidades.js',
   'ventas/presupuesto.js', 'ventas/cotizaciones.js', 'ventas/ordenes.js', 'ventas/orden-detalle.js', 'ventas/ventas-panel.js', 'ventas/clientes.js',
   'modulos/inicio.js', 'modulos/pendientes.js',
   'modulos/precios.js', 'modulos/resumen.js', 'modulos/produccion.js', 'modulos/esqueletos.js',

@@ -1018,6 +1018,50 @@ al **costado derecho**, no arriba, y se pueden **marcar varias a la vez**.
 
 > Falta decidir si el filtro guarda lo último usado por rol.
 
+## Inventario
+
+### Lote 37 — APLICADO (El modelo de unidades y la pantalla de Unidades)
+
+**El modelo** — la unidad es la pieza, no el modelo
+- ✅ 414. **Tres estados**: *en producción* (la está haciendo el proveedor; no
+  llegó pero **se puede reservar**), *en stock* (llegó, tiene etiqueta y
+  ubicación) y *entregada* (salió, queda el histórico).
+- ✅ 415. **Reservada no es un estado, es tener dueño.** Puede estar reservada
+  en stock —lista para el flete— o reservada en producción —vendida sobre
+  pedido, con su fecha—. Es lo que la planilla resuelve hoy con *5Listo* y
+  *6Dibujado*.
+- ✅ 416. **Tres marcas más**: *a reparar*, *a confirmar* y *en reclamo*. No
+  reemplazan al estado: una unidad a reparar **sigue contando en el conteo
+  físico** —está ahí— pero no se puede vender. Así el depósito siempre suma
+  bien y queda definido **disponible = en stock, sin dueño y sin marcas**.
+- ✅ 417. **Ubicación** aparte del estado: depósito planta baja, 1er piso, 2do
+  piso, local 2020, local 2299. El estado dice *en stock*; la ubicación, en cuál.
+- ✅ 418. **Estándar o a medida**: la que se hizo a medida no se parece a la foto
+  del catálogo, así que lleva **su propia foto** para que el vendedor sepa qué
+  está vendiendo.
+
+**El stock deja de vivir adentro del mueble**
+- ✅ 419. En el mueble el stock ya **no se carga**: se cuenta de las unidades.
+  Una sola fuente — antes había dos números que podían decir cosas distintas.
+  El mínimo deseado sigue siendo del mueble.
+
+**La pantalla** — Inventario → Unidades
+- ✅ 420. **Una fila por unidad**, agrupadas por modelo, con el renglón a la
+  mitad de alto: se trabaja mirando muchas a la vez.
+- ✅ 421. **Filtros por estado** con su cuenta: todo · disponible · en stock · en
+  producción · reservadas · entregadas · con marca. Y **categorías al costado**,
+  varias a la vez.
+- ✅ 422. **Buscador** que entiende número, modelo, medida y color en cualquier
+  orden — *"tasos 1.60"*, *"borges 100 pb"*—, que es la vista de venta metida
+  adentro de la lista.
+- ✅ 423. **Reservar la unidad exacta** desde el renglón: si está en stock, queda
+  apartada; si está en producción, queda **vendida sobre pedido** con su fecha.
+  Y **Liberar** para devolverla.
+- ✅ 424. La **foto** es un botón chico al lado del número, no una columna: se
+  carga cuando hace falta, y las *a medida* la piden.
+- ✅ 425. El número y la acción quedan **fijos a los costados** cuando la tabla
+  es más ancha que la pantalla.
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·

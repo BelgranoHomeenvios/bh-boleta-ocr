@@ -77,7 +77,7 @@
 
     inventario: { label: 'Inventario', icon: '📦', subs: [
       S('resumen', 'Resumen', resumen('inventario')),
-      S('stock', 'Stock', skel('Stock')),
+      S('unidades', 'Unidades', m => global.Unidades.render(m)),
       S('movimientos', 'Movimientos', skel('Movimientos')),
       S('ubicaciones', 'Ubicaciones', skel('Ubicaciones')),
       S('reservas', 'Reservas', skel('Reservas')),

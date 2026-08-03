@@ -352,19 +352,18 @@
         const v = this.vars.find(x => x.id === id);
         return v ? this.nombreVar(v) : '—';
       };
-      const est = k => global.DB.ESTADOS_UNIDAD.find(x => x.k === k) || { label: k, pill: 'soft' };
 
       return `<section class="pd-m ${on ? 'on' : ''}" style="margin-top:9px">
         <button class="pd-mh" data-mod="inventario" aria-expanded="${on}">
-          <span class="pd-mt">Ver inventario</span>
-          <span class="pd-mr">${cuenta('stock')} en depósito · ${cuenta('entrando')} por entrar ·
-            ${cuenta('vendido')} ya salieron</span>
+          <span class="pd-mt">Ver unidades</span>
+          <span class="pd-mr">${cuenta('stock')} en stock · ${cuenta('produccion')} en producción ·
+            ${cuenta('entregada')} entregadas</span>
           <span class="pd-mg">${on ? '▴' : '▾'}</span>
         </button>
         ${on ? `<div class="pd-mb">
           <div class="hint" style="margin-bottom:10px">Todas las unidades de
-            <b>${UI.esc(this.p.nombre)}</b>, sin importar la medida. Cada una es distinta y lleva su
-            código.</div>
+            <b>${UI.esc(this.p.nombre)}</b>, sin importar la medida. Se cargan y se reservan en
+            <b>Inventario</b>; acá se miran.</div>
           <div class="segm" style="margin-bottom:11px">
             <button class="seg ${this._fInv === 'todo' ? 'on' : ''}" data-finv="todo">Todo
               <b>${us.length}</b></button>
@@ -374,21 +373,24 @@
           <div class="inv-tabla">
             <div class="uni-h">
               <span>N° de serie</span><span>Etiqueta</span><span>Variante</span>
-              <span>Estado</span><span>Desde</span>
+              <span>Estado</span><span>Dónde</span>
             </div>
-            ${lista.map(u => `<div class="uni-r ${u.estado !== 'stock' ? 'off' : ''}">
+            ${lista.map(u => {
+              const e = global.DB.etiquetaUnidad(u);
+              return `<div class="uni-r ${u.estado !== 'stock' ? 'off' : ''}">
               <div class="tnum"><b>${UI.esc(u.serie)}</b></div>
               <div>${u.serie === '—' ? '<span class="muted">sin etiqueta todavía</span>'
                 : UI.barras(u.serie, 26, 1.15)}</div>
               <div>${UI.esc(nom(u.varianteId))}</div>
-              <div><span class="pill ${est(u.estado).pill}">${UI.esc(est(u.estado).label)}${
-                u.orden ? ` · ${UI.esc(u.orden)}` : ''}</span></div>
-              <div class="muted">${UI.esc(u.desde)}</div>
-            </div>`).join('') || UI.vacio('Ninguna unidad en ese estado.')}
+              <div><span class="pill ${e.pill}">${UI.esc(e.label)}</span>${
+                u.orden ? ` <span class="muted">${UI.esc(u.orden)}</span>` : ''}</div>
+              <div class="muted">${UI.esc(global.DB.ubicacionLabel(u.ubicacion)
+                || (u.estado === 'produccion' ? `llega ${u.fechaProv}` : '—'))}</div>
+            </div>`; }).join('') || UI.vacio('Ninguna unidad en ese estado.')}
           </div>
-          <div class="hint" style="margin-top:9px"><b>Por entrar</b> es lo pedido al proveedor que
-            todavía no llegó: ya está comprometido pero no se puede entregar, y todavía no tiene
-            etiqueta —la recibe cuando entra al depósito—.</div>
+          <div class="hint" style="margin-top:9px"><b>En producción</b> es lo pedido al proveedor que
+            todavía no llegó: ya existe y se puede reservar, pero no se puede entregar y todavía no
+            tiene etiqueta —la recibe cuando entra—.</div>
         </div>` : ''}
       </section>`;
     },
@@ -457,7 +459,7 @@
       const modo = p.rastreo || 'serie';
       const elegido = this.RASTREO.find(x => x.k === modo) || this.RASTREO[0];
       const conMin = this.vars.filter(v => (v.minStock || 0) > 0);
-      const faltan = conMin.filter(v => (v.stock || 0) < v.minStock);
+      const faltan = conMin.filter(v => global.DB.stockDeVariante(v.id) < v.minStock);
       const lista = this.ordenadas();
       const her = global.DB.plazoDe(this.p, this.cats());
 
@@ -483,7 +485,8 @@
           </div>
           ${lista.map(v => {
             const min = Number(v.minStock) || 0;
-            const falta = min > 0 && (v.stock || 0) < min;
+            const stk = global.DB.stockDeVariante(v.id);
+            const falta = min > 0 && stk < min;
             return `<div class="inv-r ${v.activa === false ? 'off' : ''}">
               <div><b>${UI.esc(this.nombreVar(v))}</b></div>
               <div class="fx"><input class="pn tnum izq" data-sku="${v.id}"
@@ -492,8 +495,8 @@
                   title="Volver al automático">↺</button>` : ''}</div>
               <div><input class="pn tnum izq" data-barras="${v.id}" value="${UI.esc(v.barras || '')}"
                 placeholder="13 números" ${ed ? '' : 'readonly'}></div>
-              <div class="num"><input class="pn" inputmode="numeric" data-stock="${v.id}"
-                value="${v.stock || 0}" ${ed ? '' : 'readonly'}></div>
+              <div class="num"><span class="cv-fijo" title="Sale de las unidades cargadas en
+                Inventario">${global.DB.stockDeVariante(v.id) || 0}</span></div>
               <div class="num"><input class="pn" inputmode="numeric" data-min="${v.id}"
                 value="${min || ''}" placeholder="—" ${ed ? '' : 'readonly'}></div>
               <div class="num fx"><input class="pn ${v.dias ? '' : 'bloq'}" inputmode="numeric"
@@ -501,13 +504,14 @@
                   title="${v.dias ? 'Propia de esta variante' : `Heredada: ${her.dias} días`}"
                   ${ed ? '' : 'readonly'}><span class="uni">d</span></div>
               <div>${falta
-                ? `<span class="pill warn">faltan ${min - (v.stock || 0)}</span>`
+                ? `<span class="pill warn">faltan ${min - stk}</span>`
                 : (min ? '<span class="pill ok">cubierto</span>' : '')}</div>
             </div>`;
           }).join('')}
         </div>
-        <div class="hint" style="margin-top:9px">Todo se repone cuando se vende. El <b>mínimo deseado</b>
-          es aparte: lo que querés tener siempre en el depósito, aunque nadie lo haya pedido. El
+        <div class="hint" style="margin-top:9px">El <b>stock</b> no se carga acá: se cuenta de las
+          unidades que viven en <b>Inventario</b>, que es donde se dan de alta y se reservan. El
+          <b>mínimo deseado</b> es aparte: lo que querés tener siempre, aunque nadie lo haya pedido. El
           <b>SKU</b> sale solo del código del mueble y de la variante. La <b>demora</b> en gris es la
           del mueble: se escribe encima cuando esta variante sale antes —porque siempre hay alguna
           hecha— y es lo que va a ver el vendedor al cotizarla.</div>

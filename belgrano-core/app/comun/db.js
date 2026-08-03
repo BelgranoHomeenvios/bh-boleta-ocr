@@ -564,7 +564,7 @@
             variantes: vs.length,
             desde: pr.length ? Math.min(...pr) : 0,
             hasta: pr.length ? Math.max(...pr) : 0,
-            stock: vs.reduce((a, v) => a + (Number(v.stock) || 0), 0),
+            stock: this.stockDeProducto(p.id),
             terminaciones: [...new Set(vs.map(v => v.estructura).filter(Boolean))],
             // Los valores de cada propiedad principal, para que el catálogo
             // pueda filtrar por estructura, por frente o por medida sin
@@ -624,49 +624,140 @@
       return this.serieDe(n);
     },
 
-    // Con rastreo por número de serie, el stock no es un número: son unidades
-    // concretas, cada una con su código. Esto es lo que después va a permitir
-    // saber cuál salió en qué orden.
-    unidades(productoId) {
-      const vs = DEMO.variantes.filter(v => v.producto_id === Number(productoId));
+    // DÓNDE está la unidad en su vida. Son tres, no más: lo que se está
+    // fabricando ya existe —se puede reservar—, lo que llegó, y lo que salió.
+    ESTADOS_UNIDAD: [
+      { k: 'produccion', label: 'En producción', pill: 'viol',
+        pie: 'La está haciendo el proveedor. Todavía no llegó, pero se puede reservar.' },
+      { k: 'stock', label: 'En stock', pill: 'ok',
+        pie: 'Llegó, tiene etiqueta y está en su ubicación.' },
+      { k: 'entregada', label: 'Entregada', pill: 'soft',
+        pie: 'Ya salió. Queda el histórico para los reclamos.' },
+    ],
+    estadoUnidad(k) { return this.ESTADOS_UNIDAD.find(x => x.k === k) || this.ESTADOS_UNIDAD[1]; },
+
+    // CÓMO está. No reemplaza al estado: una unidad a reparar sigue estando
+    // físicamente y tiene que contar en el inventario, sólo que no se vende.
+    MARCAS_UNIDAD: [
+      { k: 'reparar', label: 'A reparar', pill: 'warn',
+        pie: 'Está, pero no se puede vender hasta que se arregle.' },
+      { k: 'confirmar', label: 'A confirmar', pill: 'soft',
+        pie: 'El conteo no la encontró. Queda marcada hasta que alguien la resuelva.' },
+      { k: 'reclamo', label: 'En reclamo', pill: 'crit',
+        pie: 'Se entregó y el cliente abrió un reclamo.' },
+    ],
+    marcaUnidad(k) { return this.MARCAS_UNIDAD.find(x => x.k === k) || null; },
+
+    // Dónde está guardada. El estado dice "en stock"; esto dice en cuál.
+    UBICACIONES: [
+      { k: 'dep-pb', label: 'Depósito · planta baja' },
+      { k: 'dep-1', label: 'Depósito · 1er piso' },
+      { k: 'dep-2', label: 'Depósito · 2do piso' },
+      { k: 'loc-2020', label: 'Local 2020' },
+      { k: 'loc-2299', label: 'Local 2299' },
+    ],
+    ubicacion(k) { return this.UBICACIONES.find(x => x.k === k) || null; },
+    ubicacionLabel(k) { const u = this.ubicacion(k); return u ? u.label : ''; },
+
+    // Cómo se pidió: del catálogo tal cual, o hecha a medida para esa venta.
+    // La que es a medida no se parece a la foto del catálogo, así que lleva la
+    // suya para que el vendedor sepa qué está vendiendo.
+    TIPOS_UNIDAD: [
+      { k: 'estandar', label: 'Estándar' },
+      { k: 'medida', label: 'A medida' },
+    ],
+
+    // La etiqueta que se ve en pantalla combina las dos cosas, igual que en la
+    // planilla de siempre: "Reservada · lista", "Reservada · en fábrica".
+    etiquetaUnidad(u) {
+      const m = this.marcaUnidad(u.marca);
+      if (m && u.marca === 'reclamo') return { label: 'Entregada · en reclamo', pill: 'crit' };
+      if (m) return { label: m.label, pill: m.pill };
+      const e = this.estadoUnidad(u.estado);
+      if (u.orden) {
+        return u.estado === 'produccion'
+          ? { label: 'Reservada · en fábrica', pill: 'warn' }
+          : { label: 'Reservada · lista', pill: 'warn' };
+      }
+      return { label: e.label, pill: e.pill };
+    },
+    // Lo que se puede vender hoy: llegó, no tiene dueño y no tiene marcas.
+    disponible(u) { return u.estado === 'stock' && !u.orden && !u.marca; },
+    // Lo que existe físicamente, que es lo que tiene que dar el conteo.
+    enPiso(u) { return u.estado === 'stock'; },
+
+    // Las unidades. En demo se arman una vez a partir de las variantes, con
+    // números fijos —nada de azar— para que la pantalla sea siempre la misma.
+    unidadesTodas() {
+      if (this._unis) return this._unis;
+      const UBI = ['dep-pb', 'dep-1', 'dep-2', 'loc-2020', 'loc-2299'];
+      const PROV = ['1Tony', '3Luciano', '5Enrique', '6Matías', '7Raúl'];
       const out = [];
       let n = 0;
-      vs.forEach(v => {
-        const hay = Math.max(0, Number(v.stock) || 0);
-        for (let i = 0; i < hay; i++) {
+      DEMO.variantes.forEach((v, i) => {
+        const prod = DEMO.productos.find(p => p.id === v.producto_id) || {};
+        // Cuántas de cada una: pocas, y repartidas siempre igual.
+        const enStock = [2, 0, 1, 0, 3, 1, 0, 2][i % 8];
+        const enProd = [0, 1, 0, 2, 1, 0, 1, 0][i % 8];
+        const salidas = [1, 0, 2, 0, 1, 0, 0, 1][i % 8];
+        const base = {
+          productoId: v.producto_id, varianteId: v.id,
+          modelo: prod.nombre || '', medida: v.medida || '',
+          color: [v.estructura, v.frente].filter(Boolean).join(' · '),
+          tipo: 'estandar', detalle: '', foto: '', marca: null,
+        };
+        for (let j = 0; j < enStock; j++) {
           n++;
-          out.push({
-            serie: this.serieDe(v.id * 40 + n),
-            varianteId: v.id, estado: 'stock', desde: '12/07',
-          });
+          out.push({ ...base, id: n, serie: this.serieDe(n), estado: 'stock',
+            ubicacion: UBI[n % UBI.length], proveedor: PROV[n % PROV.length],
+            fechaProv: `${(n % 28) + 1}/7`, orden: j === 0 && i % 3 === 0 ? `#S00${200 + i}` : null,
+            fechaVenta: j === 0 && i % 3 === 0 ? `${(n % 28) + 1}/6` : '',
+            marca: i % 11 === 0 && j === 0 ? 'reparar' : null });
+        }
+        for (let j = 0; j < enProd; j++) {
+          n++;
+          out.push({ ...base, id: n, serie: '—', estado: 'produccion',
+            ubicacion: '', proveedor: PROV[n % PROV.length],
+            fechaProv: `${(n % 28) + 1}/8`,
+            orden: j === 0 && i % 4 === 0 ? `#S00${240 + i}` : null,
+            fechaVenta: j === 0 && i % 4 === 0 ? `${(n % 28) + 1}/7` : '',
+            tipo: i % 5 === 0 ? 'medida' : 'estandar',
+            detalle: i % 5 === 0 ? 'A medida' : '' });
+        }
+        for (let j = 0; j < salidas; j++) {
+          n++;
+          out.push({ ...base, id: n, serie: this.serieDe(n), estado: 'entregada',
+            ubicacion: '', proveedor: PROV[n % PROV.length],
+            fechaProv: `${(n % 28) + 1}/5`, orden: `#S00${100 + n}`,
+            fechaVenta: `${(n % 28) + 1}/5`, fechaEntrega: `${(n % 28) + 1}/6`,
+            marca: n % 17 === 0 ? 'reclamo' : null });
         }
       });
-      // Las que ya salieron quedan en el histórico: es lo que permite
-      // contestar "¿cuál se le entregó a ese cliente?".
-      vs.slice(0, 2).forEach((v, i) => {
-        out.push({
-          serie: this.serieDe(v.id * 40 + 900 + i),
-          varianteId: v.id, estado: 'vendido', orden: `#S000${19 + i}`, desde: '28/07',
-        });
-      });
-      // Y lo pedido al proveedor que todavía no llegó: es stock comprometido
-      // que no se puede entregar, pero hay que poder verlo.
-      vs.slice(0, 2).forEach((v, i) => {
-        out.push({
-          serie: '—', barras: '—',
-          varianteId: v.id, estado: 'entrando', orden: `#C0${41 + i}`, desde: '05/08',
-        });
-      });
+      this._unis = out;
       return out;
     },
-
-    // Los tres estados de una unidad. "Por entrar" es lo pedido al proveedor
-    // que todavía no llegó: ya está comprometido pero no se puede entregar.
-    ESTADOS_UNIDAD: [
-      { k: 'stock', label: 'En depósito', pill: 'ok' },
-      { k: 'entrando', label: 'Por entrar', pill: 'warn' },
-      { k: 'vendido', label: 'Ya salió', pill: 'soft' },
-    ],
+    unidad(id) { return this.unidadesTodas().find(u => u.id === Number(id)) || null; },
+    // El stock ya no se carga a mano en el mueble: se cuenta de las unidades.
+    // Una sola fuente — si no, hay dos números que dicen cosas distintas.
+    stockDeVariante(varianteId) {
+      return this.unidadesTodas().filter(u => u.varianteId === Number(varianteId) && this.enPiso(u)).length;
+    },
+    libresDeVariante(varianteId) {
+      return this.unidadesTodas().filter(u => u.varianteId === Number(varianteId) && this.disponible(u)).length;
+    },
+    stockDeProducto(productoId) {
+      return this.unidades(productoId).filter(u => this.enPiso(u)).length;
+    },
+    guardarUnidad(u) {
+      const i = this.unidadesTodas().findIndex(x => x.id === u.id);
+      if (i >= 0) this._unis[i] = { ...this._unis[i], ...u };
+      return this._unis[i] || null;
+    },
+    // Con rastreo por número de serie, el stock no es un número: son unidades
+    // concretas. Esto es lo que permite saber cuál salió en qué orden.
+    unidades(productoId) {
+      return this.unidadesTodas().filter(u => u.productoId === Number(productoId));
+    },
 
     // ---- Cómo una propiedad se convierte en costo -------------------------
     // Acá está la bisagra con la lista de precios. Una propiedad no es sólo un
