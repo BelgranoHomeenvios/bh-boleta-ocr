@@ -569,6 +569,11 @@
             // La foto del catálogo es la primera de venta que se cargó en
             // Documentos: se ve el mueble sin tener que abrirlo.
             foto: ((p.archivos || []).find(a => a.tipo === 'venta') || {}).url || '',
+            // Para filtrar por estado: cuántas variantes tienen mínimo
+            // deseado y cuántas están por debajo.
+            conMinimo: vs.filter(v => (Number(v.minStock) || 0) > 0).length,
+            bajoMinimo: vs.filter(v => (Number(v.minStock) || 0) > 0
+              && (Number(v.stock) || 0) < Number(v.minStock)).length,
           };
         });
       }

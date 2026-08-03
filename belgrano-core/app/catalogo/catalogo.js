@@ -37,28 +37,29 @@
           <div class="cat-busca">
             <input id="cat-q" placeholder="Buscar por nombre o código…" value="${UI.esc(this.texto)}">
           </div>
-          <button class="btn" id="cat-verf" aria-pressed="true">Filtrar<span id="cat-fn"></span></button>
-          <button class="btn" id="cat-verc" aria-pressed="true">Categorías<span id="cat-cn"></span></button>
+          <button class="btn" id="cat-verf">Filtrar<span id="cat-fn"></span></button>
           <select id="cat-orden" class="cat-ord" title="Cómo se ordenan">
             <option value="cat">Por categoría</option>
             <option value="nombre">Por nombre</option>
             <option value="precio">Por precio</option>
           </select>
           <div class="vista-tog" role="group" aria-label="Formato de vista">
-            <button id="v-bloques" title="Con foto">Fotos</button>
-            <button id="v-lista"   title="Listado">Listado</button>
+            <button id="v-bloques" title="Ver con fotos" aria-label="Ver con fotos">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="1" width="6" height="6" rx="1.4"/><rect x="9" y="1" width="6" height="6" rx="1.4"/><rect x="1" y="9" width="6" height="6" rx="1.4"/><rect x="9" y="9" width="6" height="6" rx="1.4"/></svg></button>
+            <button id="v-lista" title="Ver como listado" aria-label="Ver como listado">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="2" width="14" height="2" rx="1"/><rect x="1" y="7" width="14" height="2" rx="1"/><rect x="1" y="12" width="14" height="2" rx="1"/></svg></button>
           </div>
         </div>
         <div id="cat-crumb"></div>
-        <div class="row" style="align-items:center;margin:2px 0 6px">
-          <div class="sp"></div><span class="hint" id="cat-cuenta"></span>
-        </div>
         <div id="cat-lista">${UI.spinner()}</div>
         <style>
-          .vista-tog{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
-          .vista-tog button{border:0;background:transparent;padding:8px 13px;cursor:pointer;font:inherit;
-            font-size:12.5px;font-weight:650;color:var(--muted);line-height:1.6}
+          .vista-tog{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;
+            background:var(--panel)}
+          .vista-tog button{border:0;background:transparent;padding:6px 9px;cursor:pointer;
+            color:var(--muted);line-height:0;display:grid;place-items:center}
           .vista-tog button+button{border-left:1px solid var(--line)}
+          .vista-tog button svg{width:15px;height:15px;fill:currentColor}
+          .vista-tog button:hover{color:var(--navy)}
           .vista-tog button.on{background:var(--brand-soft);color:var(--brand-ink)}
 
           /* Filtros al costado y resultados al lado: el vendedor filtra sin
@@ -90,12 +91,36 @@
             font:inherit;font-size:12.5px;font-weight:650;color:var(--ink-soft);cursor:pointer;transition:.12s}
           .amb:hover{border-color:var(--brand);color:var(--navy)}
           .amb.on{background:var(--navy);border-color:var(--navy);color:#fff}
-          .cat-cols{display:grid;grid-template-columns:206px minmax(0,1fr) 210px;gap:18px;align-items:start}
-          .cat-cols.sin-f{grid-template-columns:minmax(0,1fr) 210px}
-          .cat-cols.sin-c{grid-template-columns:206px minmax(0,1fr)}
-          .cat-cols.sin-f.sin-c{grid-template-columns:1fr}
-          @media(max-width:1100px){.cat-cols,.cat-cols.sin-f,.cat-cols.sin-c{grid-template-columns:1fr}}
+          /* Plegar un costado tiene que servir para algo: entra una tarjeta
+             más por fila. Por eso el número de columnas de la grilla depende
+             de cuántos costados estén abiertos. */
+          .cat-cols{display:grid;grid-template-columns:206px minmax(0,1fr) 210px;gap:18px;
+            align-items:start;--cols:4}
+          .cat-cols.sin-f{grid-template-columns:26px minmax(0,1fr) 210px;--cols:5}
+          .cat-cols.sin-c{grid-template-columns:206px minmax(0,1fr) 26px;--cols:5}
+          .cat-cols.sin-f.sin-c{grid-template-columns:26px minmax(0,1fr) 26px;--cols:6}
+          @media(max-width:1180px){.cat-cols,.cat-cols.sin-f,.cat-cols.sin-c,
+            .cat-cols.sin-f.sin-c{grid-template-columns:1fr;--cols:3}}
+          /* La flecha que pliega cada costado, sobre el borde de adentro. */
+          .cat-fl{border:1px solid var(--line);background:var(--panel);border-radius:8px;
+            width:24px;height:34px;cursor:pointer;color:var(--muted);font-size:15px;line-height:1;
+            display:grid;place-items:center;padding:0}
+          .cat-fl:hover{border-color:var(--brand);color:var(--brand)}
+          .cat-fl.dentro{position:absolute;top:-2px}
+          .cat-fl.izq.dentro{right:-10px} .cat-fl.der.dentro{left:-10px}
+          .cat-f,.cat-c{position:relative}
           .cat-f,.cat-c{position:sticky;top:104px;display:flex;flex-direction:column;gap:14px}
+          /* El pop-up de Filtrar: una fila de opciones por grupo, se elige una. */
+          .mdl-back{position:fixed;inset:0;background:rgba(12,22,44,.4);z-index:50;display:grid;
+            place-items:center;padding:20px}
+          .mdl-caja{max-width:520px;width:100%;max-height:86vh;overflow:auto}
+          .fx-g{margin-top:14px}
+          .fx-t{font-size:11.5px;font-weight:700;color:var(--ink-soft);margin-bottom:6px}
+          .fx-ops{display:flex;gap:6px;flex-wrap:wrap}
+          .fx-o{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 12px;
+            font:inherit;font-size:12.5px;font-weight:650;color:var(--ink-soft);cursor:pointer}
+          .fx-o:hover{border-color:var(--brand);color:var(--navy)}
+          .fx-o.on{background:var(--brand);border-color:var(--brand);color:#fff}
           /* La lista de categorías scrollea sola: son veinte y pico y no
              tienen que empujar la pantalla. */
           .cat-lc{display:flex;flex-direction:column;max-height:min(60vh,520px);overflow:auto;
@@ -143,7 +168,7 @@
           /* Cuatro por fila, que es donde el mueble se ve y la fila no queda
              desierta. Abajo de 1180 el costado ya se fue a un cajón, así que
              el ancho alcanza igual. */
-          .grid-prod{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+          .grid-prod{display:grid;grid-template-columns:repeat(var(--cols,4),minmax(0,1fr));gap:12px}
           @media(max-width:1000px){.grid-prod{grid-template-columns:repeat(3,minmax(0,1fr))}}
           @media(max-width:760px){.grid-prod{grid-template-columns:repeat(2,minmax(0,1fr))}}
           @media(max-width:460px){.grid-prod{grid-template-columns:1fr}}
@@ -174,18 +199,7 @@
       so.onchange = () => { this.orden = so.value; this.pintar(); };
       // Los costados se pueden esconder: con el catálogo filtrado uno quiere
       // la pantalla entera para mirar muebles.
-      document.getElementById('cat-verf').onclick = () => {
-        this.verFiltros = !this.verFiltros;
-        if (this.verFiltros && this.chico()) this.verCats = false;
-        try { localStorage.setItem(FILTROS_KEY, this.verFiltros ? '1' : '0'); } catch {}
-        this.pintar();
-      };
-      document.getElementById('cat-verc').onclick = () => {
-        this.verCats = !this.verCats;
-        if (this.verCats && this.chico()) this.verFiltros = false;
-        try { localStorage.setItem(CATS_KEY, this.verCats ? '1' : '0'); } catch {}
-        this.pintar();
-      };
+      document.getElementById('cat-verf').onclick = () => this.modalFiltros();
       // Al agrandar o achicar la ventana cambia si los costados entran.
       if (!this._resize) {
         this._resize = () => { const c = this.chico(); if (c !== this._eraChico) this.pintar(); };
@@ -272,7 +286,7 @@
       const todo = this._todo || [];
       const cuenta = (salvo, fn) => {
         const m = new Map();
-        todo.filter(p => this.pasa(p, salvo)).forEach(p => {
+        todo.filter(p => this.pasa(p, salvo) && this.pasaX(p)).forEach(p => {
           [].concat(fn(p) || []).filter(x => x != null).forEach(k => m.set(k, (m.get(k) || 0) + 1));
         });
         return m;
@@ -297,10 +311,6 @@
       return [
         { k: 'ambiente', titulo: 'Ambiente', ops: ord(cAmb, nom) },
         { k: 'term', titulo: 'Terminación', ops: ord(cTerm, k => nomTerm.get(k) || k), color: true },
-        { k: 'disp', titulo: 'Disponibilidad',
-          ops: ord(cDisp, k => (k === 'stock' ? 'Con stock' : 'A pedido')) },
-        { k: 'pub', titulo: 'Publicación',
-          ops: ord(cPub, k => (k === 'tn' ? 'En Tienda Nube' : 'Sólo interno')) },
       ].filter(g => g.ops.length > 1 || this._f[g.k].length);
     },
 
@@ -308,10 +318,95 @@
       return Object.values(this._f).reduce((a, x) => a + x.length, 0);
     },
 
+    // Los filtros de estado — cómo está el mueble hoy, no qué es. Viven en el
+    // pop-up de Filtrar porque son los que uno usa de a ratos: "mostrame lo
+    // que está bajo el mínimo", "lo que entrego en 15 días".
+    FX: [
+      { k: 'stock', titulo: 'Disponibilidad', ops: [
+        ['todos', 'Todos'], ['hay', 'Con stock'], ['sin', 'Sin stock'] ] },
+      { k: 'minimo', titulo: 'Stock mínimo', ops: [
+        ['todos', 'Todos'], ['bajo', 'Por debajo del mínimo'], ['con', 'Con mínimo definido'],
+        ['sin', 'Sin mínimo'] ] },
+      { k: 'entrega', titulo: 'Demora de entrega', ops: [
+        ['todos', 'Todos'], ['15', 'Hasta 15 días'], ['30', 'Hasta 30 días'], ['mas', 'Más de 30'] ] },
+      { k: 'pub', titulo: 'Publicación', ops: [
+        ['todos', 'Todos'], ['tn', 'En Tienda Nube'], ['interno', 'Sólo interno'] ] },
+    ],
+    _fx: { stock: 'todos', minimo: 'todos', entrega: 'todos', pub: 'todos' },
+    marcadosX() { return Object.values(this._fx).filter(v => v !== 'todos').length; },
+
+    diasDe(p) {
+      const cat = this.arbol.find(c => c.id === p.categoria_id);
+      return global.DB.plazoDe(p, cat ? [cat] : []).dias;
+    },
+
+    pasaX(p) {
+      const f = this._fx;
+      const st = Number(p.stock) || 0;
+      if (f.stock === 'hay' && !st) return false;
+      if (f.stock === 'sin' && st) return false;
+      if (f.minimo === 'bajo' && !(p.bajoMinimo > 0)) return false;
+      if (f.minimo === 'con' && !(p.conMinimo > 0)) return false;
+      if (f.minimo === 'sin' && p.conMinimo > 0) return false;
+      if (f.entrega !== 'todos') {
+        const d = this.diasDe(p);
+        if (f.entrega === '15' && d > 15) return false;
+        if (f.entrega === '30' && d > 30) return false;
+        if (f.entrega === 'mas' && d <= 30) return false;
+      }
+      if (f.pub === 'tn' && !p.publicado_tn) return false;
+      if (f.pub === 'interno' && p.publicado_tn) return false;
+      return true;
+    },
+
+    // El pop-up. Cada grupo es una fila de opciones y se elige una sola.
+    modalFiltros() {
+      const antes = { ...this._fx };
+      document.body.insertAdjacentHTML('beforeend', `
+        <div class="mdl-back" id="mdl">
+          <div class="card pad mdl-caja">
+            <h3 class="h-title" style="font-size:18px">Filtrar muebles</h3>
+            <p class="h-sub">Por cómo está el mueble hoy. Lo que <b>es</b> —ambiente, terminación,
+              categoría— se elige en los costados.</p>
+            ${this.FX.map(g => `<div class="fx-g">
+              <div class="fx-t">${UI.esc(g.titulo)}</div>
+              <div class="fx-ops">${g.ops.map(([k, l]) =>
+                `<button class="fx-o ${this._fx[g.k] === k ? 'on' : ''}"
+                  data-fx="${g.k}|${k}">${UI.esc(l)}</button>`).join('')}</div>
+            </div>`).join('')}
+            <div class="row" style="margin-top:18px;gap:10px">
+              <button class="btn" id="mf-borrar">Borrar filtros</button>
+              <div class="sp"></div>
+              <button class="btn" id="mf-x">Cancelar</button>
+              <button class="btn primary" id="mf-ok">Filtrar</button>
+            </div>
+          </div>
+        </div>`);
+      const cerrar = () => { const m = document.getElementById('mdl'); if (m) m.remove(); };
+      const pintar = () => document.querySelectorAll('[data-fx]').forEach(b => {
+        const [g, k] = b.dataset.fx.split('|');
+        b.classList.toggle('on', this._fx[g] === k);
+      });
+      document.querySelectorAll('[data-fx]').forEach(b => b.onclick = () => {
+        const [g, k] = b.dataset.fx.split('|');
+        this._fx[g] = k; pintar();
+      });
+      document.getElementById('mf-borrar').onclick = () => {
+        Object.keys(this._fx).forEach(k => { this._fx[k] = 'todos'; }); pintar();
+      };
+      document.getElementById('mf-x').onclick = () => { this._fx = antes; cerrar(); };
+      document.getElementById('mdl').onclick = e => {
+        if (e.target.id === 'mdl') { this._fx = antes; cerrar(); }
+      };
+      document.getElementById('mf-ok').onclick = () => { cerrar(); this.pintar(); };
+    },
+
     htmlFiltros() {
       const gs = this.grupos();
       if (!gs.length) return '';
       return `<aside class="cat-f">
+        ${this.chico() ? '' : `<button class="cat-fl izq dentro" data-plegar="f"
+          title="Ocultar los filtros" aria-label="Ocultar los filtros">‹</button>`}
         <div class="cat-f-h">
           <span>Filtros</span>
           ${this.marcados() ? `<button class="lnk" id="cat-limpiar">limpiar ${this.marcados()}</button>` : ''}
@@ -354,10 +449,13 @@
       const g = this.grupoTipos();
       if (!g.length) return '';
       const sel = this._f.tipo;
+      const flechaCat = this.chico() ? '' : `<button class="cat-fl der dentro" data-plegar="c"
+        title="Ocultar las categorías" aria-label="Ocultar las categorías">›</button>`;
       const todos = (this._todo || []).filter(p => this.pasa(p, 'tipo')).length;
       return `<aside class="cat-c">
         <div class="cat-f-h"><span>Categorías</span>
           ${sel.length ? `<button class="lnk" data-tipo="">ver todas</button>` : ''}</div>
+        ${flechaCat}
         <div class="cat-lc">
           <label class="cat-o ${sel.length ? '' : 'on'}">
             <input type="checkbox" data-tipo="" ${sel.length ? '' : 'checked'}>
@@ -393,7 +491,7 @@
     // resto de los filtros.
     grupoTipos() {
       const m = new Map();
-      (this._todo || []).filter(p => this.pasa(p, 'tipo')).forEach(p => {
+      (this._todo || []).filter(p => this.pasa(p, 'tipo') && this.pasaX(p)).forEach(p => {
         m.set(p.categoria_id, (m.get(p.categoria_id) || 0) + 1);
       });
       const nom = id => (this.arbol.find(c => c.id === id) || {}).nombre || '—';
@@ -435,7 +533,7 @@
 
       this._prods = (this._todo || [])
         .filter(this.texto ? enTexto : bajo(actual))
-        .filter(p => this.pasa(p));
+        .filter(p => this.pasa(p) && this.pasaX(p));
 
       // Tres columnas: las variables a la izquierda, los muebles en el medio
       // y las categorías a la derecha. Si la pantalla no da para las tres, el
@@ -446,10 +544,14 @@
       const fh = this.verFiltros ? this.htmlFiltros() : '';
       const ch = this.verCats ? this.htmlCats() : '';
       const cajon = chico && (fh || ch);
+      const flecha = (id, abierto, lado) => `<button class="cat-fl ${lado}" data-plegar="${id}"
+        title="${abierto ? 'Ocultar' : 'Mostrar'} ${id === 'f' ? 'los filtros' : 'las categorías'}"
+        aria-label="${abierto ? 'Ocultar' : 'Mostrar'} ${id === 'f' ? 'los filtros' : 'las categorías'}"
+        >${lado === 'izq' ? (abierto ? '‹' : '›') : (abierto ? '›' : '‹')}</button>`;
       cont.innerHTML = `<div class="cat-cols ${fh && !chico ? '' : 'sin-f'} ${ch && !chico ? '' : 'sin-c'}">
-        ${chico ? '' : fh}
+        ${chico ? '' : (fh || flecha('f', false, 'izq'))}
         <div class="cat-res" id="cat-res"></div>
-        ${chico ? '' : ch}
+        ${chico ? '' : (ch || flecha('c', false, 'der'))}
       </div>
       ${cajon ? `<div class="cat-back" id="cat-back"></div>
         <aside class="cat-cajon">
@@ -467,20 +569,24 @@
       };
       const bk = document.getElementById('cat-back'); if (bk) bk.onclick = cerrar;
       const cc = document.getElementById('cat-cerrar'); if (cc) cc.onclick = cerrar;
+      // Cada costado se pliega con su flecha. Al plegarlo entra una tarjeta
+      // más por fila, que es para lo que se pliega.
+      document.querySelectorAll('[data-plegar]').forEach(b => b.onclick = () => {
+        if (b.dataset.plegar === 'f') {
+          this.verFiltros = !this.verFiltros;
+          try { localStorage.setItem(FILTROS_KEY, this.verFiltros ? '1' : '0'); } catch {}
+        } else {
+          this.verCats = !this.verCats;
+          try { localStorage.setItem(CATS_KEY, this.verCats ? '1' : '0'); } catch {}
+        }
+        this.pintar();
+      });
 
       const bf = document.getElementById('cat-verf');
       if (bf) {
-        bf.setAttribute('aria-pressed', String(this.verFiltros));
-        bf.classList.toggle('on', this.verFiltros);
+        bf.classList.toggle('on', !!this.marcadosX());
         const n = document.getElementById('cat-fn');
-        if (n) n.textContent = this.marcados() || '';
-      }
-      const bc = document.getElementById('cat-verc');
-      if (bc) {
-        bc.setAttribute('aria-pressed', String(this.verCats));
-        bc.classList.toggle('on', this.verCats);
-        const n2 = document.getElementById('cat-cn');
-        if (n2) n2.textContent = this._f.tipo.length || '';
+        if (n) n.textContent = this.marcadosX() || '';
       }
       this.pintarProductos(document.getElementById('cat-res') || cont, this.texto
         ? 'No hay muebles para esa búsqueda.'

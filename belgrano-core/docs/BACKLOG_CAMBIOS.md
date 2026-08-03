@@ -947,6 +947,22 @@ al **costado derecho**, no arriba, y se pueden **marcar varias a la vez**.
 - ✅ 393. La foto es la **primera imagen de venta cargada en Documentos**: se ve
   el mueble sin abrirlo. Si todavía no tiene, sigue el dibujo de referencia.
 
+### Lote 33 — APLICADO (La barra, las flechas y el pop-up de filtrar)
+
+- ✅ 394. **Fotos / Listado** pasa a ser un par de **íconos chicos**, sin texto.
+- ✅ 395. Se va el botón **Categorías** y se va el renglón **12 muebles**: ni uno
+  ni otro aportaban.
+- ✅ 396. Cada costado se pliega con **una flecha sobre su borde**, y al plegarlo
+  **entra una tarjeta más por fila** —4 con los dos abiertos, 5 con uno, 6 con
+  ninguno—. Por default los dos vienen abiertos, y la elección se recuerda.
+- ✅ 397. **Filtrar ya no esconde el costado: abre un pop-up.** Es para filtrar
+  por **cómo está** el mueble hoy —disponibilidad, **stock mínimo** (por debajo
+  del mínimo, con mínimo definido, sin mínimo), **demora de entrega** (hasta 15,
+  hasta 30, más de 30) y publicación—. El botón muestra cuántos hay puestos.
+- ✅ 398. Queda una división clara: **los costados dicen qué ES el mueble**
+  —categoría, ambiente, terminación— y **el pop-up, cómo ESTÁ**. Disponibilidad
+  y Publicación se mudaron del costado al pop-up.
+
 > Falta decidir **qué información va en el listado** —la tarjeta ya está— y si
 > el filtro guarda lo último usado por rol.
 
