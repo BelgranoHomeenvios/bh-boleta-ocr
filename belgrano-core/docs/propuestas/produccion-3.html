@@ -300,6 +300,14 @@ tr:last-child td{border-bottom:0}
 .rap button{border:1px dashed var(--line);background:var(--panel);border-radius:999px;
   padding:3px 11px;font-size:11.5px;color:var(--ink-soft);cursor:pointer}
 .rap button:hover{border-style:solid;border-color:var(--brand);color:var(--brand)}
+.dif-ok{color:var(--ok);font-weight:700}
+.dif-mal{color:var(--crit);font-weight:700}
+.lin-edit{display:flex;gap:6px;align-items:center}
+.lin-edit input{width:96px;font:inherit;font-size:12px;padding:3px 7px;border:1px solid var(--line);
+  border-radius:6px;text-align:right;background:var(--panel);color:var(--ink)}
+.tot-fila{background:var(--panel-2);font-weight:700}
+.tot-fila td{color:var(--navy)}
+
 .cola{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 @media(max-width:980px){.cola{grid-template-columns:1fr 1fr}}
 @media(max-width:600px){.cola{grid-template-columns:1fr}}
@@ -369,6 +377,7 @@ tr:last-child td{border-bottom:0}
     <button class="opt" data-o="c">La carpeta de Toni<small>Lo que tiene en el taller</small></button>
     <button class="opt" data-o="r">La recepción<small>Trajo 5 de 8, y cómo llegaron</small></button>
     <button class="opt" data-o="q">A reparar<small>No entra al depósito así</small></button>
+    <button class="opt" data-o="j">Pasa a Compras<small>Jony conforma el total</small></button>
     <button class="opt" data-o="e">Dos rubros<small>Y el enlace en fábrica</small></button>
     <button class="opt" data-o="w">Cómo se pide cada mueble<small>Lo dice el producto</small></button>
     <button class="opt" data-o="k">Cola de trabajo<small>Qué hay que hacer hoy</small></button>
@@ -1256,6 +1265,122 @@ tr:last-child td{border-bottom:0}
         Inventario</b>: no se puede vender ni entregar, y no cuenta como stock. Pero tampoco
         desapareció — se ve acá, y en la orden de venta figura como <i>a reparar</i>, así el
         vendedor sabe por qué esa venta todavía no sale.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PASA A COMPRAS ============ -->
+<section data-p="j" class="hide">
+  <div class="idea"><b>Adrián recibe, Jony paga.</b> Apenas se cierra una recepción, a Compras le
+    aparece <b>ese proveedor con lo que acaba de traer</b>: los muebles que Adrián registró, cómo
+    llegaron, y el precio que teníamos en la lista. Jony compara ese total contra el papel que trajo
+    el proveedor — y si no da, lo corrige ahí mismo.</div>
+
+  <div class="linea">
+    <div class="et"><b>Adrián recibe</b><small>tilda y controla</small></div>
+    <div class="et on"><b>Le aparece a Jony</b><small>con la lista de precios</small></div>
+    <div class="et"><b>Se compara el total</b><small>contra el remito del proveedor</small></div>
+    <div class="et"><b>Conformado</b><small>listo para pagar</small></div>
+  </div>
+
+  <div class="app">
+    <div class="appbar"><span>Belgrano Soft</span><span>Ventas</span><span>Producción</span>
+      <span class="on">Compras</span><span>Tesorería</span></div>
+    <div class="subbar"><div>Resumen</div><div class="on">Recepciones a conformar</div>
+      <div>Órdenes de compra</div><div>Lista de precios</div><div>Proveedores</div></div>
+    <div class="body">
+      <div class="kick">Compras</div><div class="h1">Recepción R-000092 · 1 Tony</div>
+      <div class="sub">Recibida por <b>Adrián</b> hoy 14:05 · 5 muebles del pedido P-000118</div>
+
+      <div class="scroll"><div class="card"><table>
+        <tr><th>Mueble</th><th>Terminación</th><th>Cómo llegó</th><th class="num">De lista</th>
+          <th class="num">A pagar</th><th></th></tr>
+        <tr><td class="nom">CAMA HOUSTON 0.90</td><td>Negro · Paraíso</td>
+          <td><span class="pill p-ok">perfecta</span></td>
+          <td class="num mut">$186.000</td>
+          <td class="num"><span class="lin-edit"><input value="186.000"></span></td>
+          <td class="mut">—</td></tr>
+        <tr><td class="nom">CAMA HOUSTON 0.90</td><td>Blanco · Paraíso</td>
+          <td><span class="pill p-ok">perfecta</span></td>
+          <td class="num mut">$186.000</td>
+          <td class="num"><span class="lin-edit"><input value="186.000"></span></td>
+          <td class="mut">—</td></tr>
+        <tr style="background:#fff7e6"><td class="nom">MESA RATONA NORUEGA</td>
+          <td>Paraíso · Natural</td>
+          <td><span class="pill p-res">con detalle</span>
+            <span class="hint">"veta marcada en la tapa"</span></td>
+          <td class="num mut">$142.000</td>
+          <td class="num"><span class="lin-edit"><input value="128.000"
+            style="border-color:#f3e2c0;background:#fff"></span></td>
+          <td><span class="dif-mal">−$14.000</span></td></tr>
+        <tr style="background:var(--crit-bg)"><td class="nom">PLACARD OLIVER 2.00</td>
+          <td>Blanca · Paraíso</td>
+          <td><span class="pill p-fal">a reparar</span>
+            <span class="hint">"frente rayado"</span></td>
+          <td class="num mut">$412.000</td>
+          <td class="num"><span class="lin-edit"><input value="412.000"></span></td>
+          <td class="hint">se paga igual, la reparación va aparte</td></tr>
+        <tr><td class="nom">CÓMODA AMBERES 55 · 1.20</td><td>Blanca · Blanco</td>
+          <td><span class="pill p-ok">perfecta</span></td>
+          <td class="num mut">$198.000</td>
+          <td class="num"><span class="lin-edit"><input value="215.000"
+            style="border-color:#cfe0fb;background:#fff"></span></td>
+          <td><span class="dif-mal">+$17.000</span>
+            <button class="btn" style="padding:2px 8px;font-size:11px">Actualizar la lista</button></td></tr>
+        <tr class="tot-fila"><td colspan="3">Total de lo recibido</td>
+          <td class="num">$1.124.000</td><td class="num">$1.127.000</td>
+          <td><span class="dif-mal">+$3.000</span></td></tr>
+      </table></div></div>
+
+      <div class="card" style="padding:14px 16px;margin-top:12px">
+        <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+          <label class="fld" style="margin:0"><span class="lbl">Total del remito de Tony</span>
+            <input value="1.127.000" style="width:150px;text-align:right"></label>
+          <div>
+            <div class="lbl" style="font-size:10.5px;font-weight:700;text-transform:uppercase;
+              letter-spacing:.05em;color:var(--muted)">Diferencia</div>
+            <div style="font-size:19px;font-weight:800;margin-top:2px" class="dif-ok">$0 · coincide</div>
+          </div>
+          <div style="flex:1"></div>
+          <button class="btn">Guardar sin conformar</button>
+          <button class="btn pri">Conformar y pasar a pagar</button>
+        </div>
+        <div class="hint" style="margin-top:9px">Mientras la diferencia no sea cero, el botón de
+          conformar queda apagado: <b>o se corrige una línea, o se explica por qué no da</b>.</div>
+      </div>
+
+      <div class="dos" style="margin-top:14px">
+        <div class="card" style="padding:16px 18px">
+          <div class="kick" style="margin-bottom:9px">Las dos formas de corregir un precio</div>
+          <ul class="ok-lista">
+            <li><b>Sólo en esta orden:</b> "esta vez me la cobró más barata por la veta". No toca la
+              lista — queda como excepción de esa recepción, con el motivo.</li>
+            <li><b>Actualizar la lista:</b> "de ahora en más la cómoda vale $215.000". Cambia el
+              precio del proveedor <b>desde hoy</b>, y las próximas recepciones ya vienen con ese.</li>
+            <li>Las dos quedan con <b>quién, cuándo y de cuánto a cuánto</b>.</li>
+            <li>Así la <b>lista de precios se mantiene sola</b>: se actualiza a medida que van
+              viniendo los proveedores, que es cuando te enterás del precio nuevo.</li>
+          </ul>
+        </div>
+        <div class="card" style="padding:16px 18px">
+          <div class="kick" style="margin-bottom:9px">Qué se lleva de Producción</div>
+          <ul class="ok-lista">
+            <li>Los muebles <b>que efectivamente llegaron</b> — no los que quedaron debiendo.</li>
+            <li><b>Cómo llegó cada uno</b> y el comentario de Adrián: es el argumento para discutir
+              un precio.</li>
+            <li>Los <b>devueltos no aparecen</b>: no se pagan.</li>
+            <li>El <b>a reparar se paga igual</b> —el mueble está— pero queda marcado: si la
+              reparación cuesta, se descuenta en la próxima o se reclama.</li>
+            <li>El pedido y la orden de venta de cada pieza, para saber a qué venta se le imputa
+              el costo.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="nota" style="margin-top:14px"><b>Y con esto se cierra el círculo del costo:</b> el
+        precio que conforma Jony es el que alimenta el <b>costo real</b> del mueble en el catálogo.
+        Hoy el costo es un número cargado a mano; a partir de acá es <b>lo que realmente pagaste la
+        última vez</b>, y el markup deja de ser una estimación.</div>
     </div>
   </div>
 </section>
