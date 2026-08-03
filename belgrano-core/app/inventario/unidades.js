@@ -19,6 +19,15 @@
     async render(mount = 'view') {
       this._mount = mount;
       const v = document.getElementById(mount);
+      // Con una unidad abierta, la pantalla es la ficha de esa pieza.
+      if (this.abierta) {
+        v.innerHTML = UI.spinner() + this.estilos();
+        if (!this.arbol) { try { this.arbol = await global.DB.arbolCategorias(); } catch { this.arbol = []; } }
+        if (!this.prods) this.prods = await global.DB.productos({ limite: 500 }).catch(() => []);
+        v.innerHTML = this.htmlFicha(this.abierta) + this.estilos();
+        this.engancharFicha(this.abierta);
+        return;
+      }
       v.innerHTML = `
         <div class="row" style="margin-bottom:14px;align-items:flex-start">
           <div>
@@ -518,7 +527,7 @@
       cont.querySelectorAll('[data-plegarcat]').forEach(b => b.onclick = () => {
         this.plegar(Number(b.dataset.plegarcat)); this.pintar();
       });
-      cont.querySelectorAll('[data-ver]').forEach(b => b.onclick = () => this.ficha(Number(b.dataset.ver)));
+      cont.querySelectorAll('[data-ver]').forEach(b => b.onclick = () => this.verUnidad(b.dataset.ver));
       cont.querySelectorAll('[data-pedir]').forEach(b => b.onclick = () => this.pedir(Number(b.dataset.pedir)));
       cont.querySelectorAll('[data-foto]').forEach(b => b.onclick = () => this.modalFoto(Number(b.dataset.foto)));
       cont.querySelectorAll('[data-nota]').forEach(b => b.onclick = () => this.modalNota(Number(b.dataset.nota)));
@@ -638,10 +647,10 @@
       const bt = document.getElementById('un-tipo');
       if (bt) bt.onclick = () => {
         global.DB.guardarUnidad({ id, tipo: u.tipo === 'medida' ? 'estandar' : 'medida' });
-        cerrar(); this.pintar(); this.modalFoto(id);
+        cerrar(); this.refrescar(); this.modalFoto(id);
       };
       const q = document.getElementById('un-quitar');
-      if (q) q.onclick = () => { global.DB.guardarUnidad({ id, foto: '' }); cerrar(); this.pintar(); };
+      if (q) q.onclick = () => { global.DB.guardarUnidad({ id, foto: '' }); cerrar(); this.refrescar(); };
       const sub = document.getElementById('un-subir');
       if (sub) {
         const file = document.getElementById('un-file');
@@ -651,71 +660,176 @@
           const r = new FileReader();
           r.onload = () => {
             global.DB.guardarUnidad({ id, foto: r.result });
-            cerrar(); this.pintar();
+            cerrar(); this.refrescar();
           };
           r.readAsDataURL(f);
         };
       }
     },
 
-    // Reservar es asignarle un dueño. Cuando Ventas esté enganchado, la orden
-    // sale de ahí; por ahora se escribe, que es lo que hoy se hace a mano.
-    // La ficha de una unidad: todo lo que se sabe de esa pieza, y de dónde
-    // sale cada dato. Es una consulta — para reservarla hay que ir a la venta.
-    ficha(id) {
-      const u = global.DB.unidad(id); if (!u) return;
-      const v = global.DB.vistaUnidad(u);
-      const e = global.DB.VISTAS_UNIDAD.find(x => x.k === v) || {};
-      const pos = global.DB.posEnOrden(u);
+    // ---- La ficha de una unidad -------------------------------------------
+    // No es un pop-up: es una pantalla. Acá vive todo lo que se sabe de ESA
+    // pieza —de dónde vino, hace cuánto está, con qué etiqueta— y es donde
+    // vamos a ir colgando lo que falte. Se reserva desde la venta, no de acá.
+    abierta: null,
+    verUnidad(id) { this.abierta = Number(id); this.render(this._mount); },
+    // Repinta lo que se esté mirando: la lista o la ficha.
+    refrescar() { if (this.abierta) this.render(this._mount); else this.pintar(); },
+    volver() { this.abierta = null; this.render(this._mount); },
+
+    // La variante de la unidad, que es de donde salen las propiedades.
+    varDe(u) {
+      return (global.DB.variantesTodas() || []).find(x => x.id === u.varianteId) || null;
+    },
+    prodDe(u) { return (this.prods || []).find(p => p.id === u.productoId) || null; },
+
+    // El SKU es el de la variante; si no lo tiene, el del mueble.
+    skuDe(u) {
+      const v = this.varDe(u), p = this.prodDe(u);
+      return (v && v.sku) || (p && p.sku) || '—';
+    },
+
+    htmlFicha(id) {
+      const u = global.DB.unidad(id);
+      if (!u) return UI.vacio('No se encontró esa unidad.');
+      const v = this.varDe(u) || {}; const prod = this.prodDe(u) || {};
+      const cat = this.catDe(u);
+      const vista = global.DB.vistaUnidad(u);
+      const e = global.DB.VISTAS_UNIDAD.find(x => x.k === vista) || {};
       const m = global.DB.marcaUnidad(u.marca);
-      const dato = (t, val) => val ? `<div class="fi-r"><span>${t}</span><b>${UI.esc(val)}</b></div>` : '';
-      document.body.insertAdjacentHTML('beforeend', `
-        <div class="un-back" id="un-mdl">
-          <div class="card pad" style="max-width:480px;width:100%">
-            <div class="row" style="align-items:flex-start">
-              <div>
-                <h3 class="h-title" style="font-size:17px">${UI.esc(u.serie === '—' ? 'Sin etiqueta' : u.serie)}</h3>
-                <p class="h-sub">${UI.esc(u.modelo)} · ${UI.esc(u.medida)} · ${UI.esc(u.color)}</p>
+      const pos = global.DB.posEnOrden(u);
+      const ed = global.App && global.App.puede && global.App.puede('editarCatalogo');
+      const verCostos = global.App && global.App.puede && global.App.puede('verCostos');
+      const dias = global.DB.diasDesde(u.listo);
+      const claves = this.clavesCat(cat ? cat.id : 0);
+      const dato = (t, val) => `<div class="fi-r"><span>${t}</span><b>${
+        val ? UI.esc(val) : '<i class="muted">—</i>'}</b></div>`;
+      const card = (t, cuerpo, extra = '') => `<div class="card pad fk-c">
+        <div class="fk-t">${t}${extra}</div>${cuerpo}</div>`;
+
+      // Cuántas iguales quedan libres: es lo primero que pregunta el vendedor.
+      const libres = global.DB.libresDeVariante(u.varianteId);
+      const costo = this.costoDe(u);
+
+      return `
+        <div class="fk-bar">
+          <button class="lnk" id="fk-volver">‹ Unidades</button>
+          <span class="muted">${UI.esc(cat ? cat.nombre : 'Sin categoría')}</span>
+        </div>
+        <div class="row fk-h">
+          <div>
+            <div class="kick">Unidad</div>
+            <h1 class="h-title">${UI.esc(u.serie === '—' ? 'Sin etiqueta todavía' : u.serie)}</h1>
+            <div class="h-sub">${UI.esc(u.modelo)} · ${UI.esc([u.medida, u.color].filter(Boolean).join(' · '))}</div>
+          </div>
+          <div class="sp"></div>
+          <span class="pill ${e.pill}">${UI.esc(e.label || '')}</span>
+        </div>
+        ${m ? `<div class="banner warn" style="margin-top:10px"><b>${UI.esc(m.label)}</b> —
+          ${UI.esc(m.pie)}</div>` : ''}
+
+        <div class="fk-kpis">
+          <div class="un-k"><div class="un-k-t">Hace cuánto está</div>
+            <div class="un-k-v ${dias != null && dias > 90 ? 'alerta' : ''}">${dias == null
+              ? '—' : `${dias} <small>días</small>`}</div>
+            <div class="un-k-p">${dias == null ? 'todavía no llegó'
+              : dias > 90 ? 'hace rato que no sale' : `desde el ${UI.esc(u.listo)}`}</div></div>
+          <div class="un-k"><div class="un-k-t">Iguales libres</div>
+            <div class="un-k-v">${libres}</div>
+            <div class="un-k-p">de esta misma variante</div></div>
+          ${verCostos ? `<div class="un-k"><div class="un-k-t">Costo final</div>
+            <div class="un-k-v">${UI.pesos(costo)}</div>
+            <div class="un-k-p">lo que vale parada acá</div></div>` : ''}
+          ${verCostos && v.precio ? `<div class="un-k"><div class="un-k-t">Precio efectivo</div>
+            <div class="un-k-v">${UI.pesos(v.precio)}</div>
+            <div class="un-k-p">de lista de esta variante</div></div>` : ''}
+        </div>
+
+        <div class="fk-cols">
+          <div>
+            ${card('Foto de esta unidad', `
+              <div class="fk-foto ${u.foto ? 'hay' : ''}">${u.foto
+                ? `<img src="${UI.esc(u.foto)}" alt="">`
+                : `<span class="muted">${u.tipo === 'medida'
+                  ? 'Es a medida y todavía no tiene foto' : 'Sin foto todavía'}</span>`}</div>
+              ${ed ? '<button class="btn" id="fk-foto" style="margin-top:10px">Cambiar la foto</button>' : ''}
+              ${u.tipo === 'medida' && !u.foto ? `<div class="hint" style="margin-top:8px">Es
+                <b>a medida</b>: no se parece a la del catálogo. Cargale una para que el vendedor
+                sepa qué está vendiendo.</div>` : ''}`)}
+            ${card('Etiqueta', `
+              <div class="fi">
+                ${dato('SKU de la variante', this.skuDe(u))}
+                ${dato('Número de serie', u.serie === '—' ? '' : u.serie)}
               </div>
-              <div class="sp"></div>
-              <span class="pill ${e.pill}">${UI.esc(e.label || '')}</span>
-            </div>
-            ${m ? `<div class="banner warn" style="margin-top:10px">${UI.esc(m.label)} —
-              ${UI.esc(m.pie)}</div>` : ''}
-            <div class="fi" style="margin-top:12px">
+              ${u.serie === '—' ? `<div class="hint" style="margin-top:9px">Todavía no tiene
+                etiqueta: se le pone cuando entra al depósito.</div>`
+                : `<div class="fk-bar-cod">${UI.barras(u.serie, 46, 1.7)}
+                  <div class="fk-cod-t tnum">${UI.esc(u.serie)}</div></div>
+                <div class="hint" style="margin-top:8px">Se escanea cuando entra y cuando sale.
+                  Es el mismo número que va pegado en el mueble.</div>`}`)}
+          </div>
+
+          <div>
+            ${card('Datos generales', `<div class="fi">
+              ${dato('Categoría', cat ? cat.nombre : '')}
+              ${dato('Modelo', u.modelo)}
               ${dato('Tipo', u.tipo === 'medida' ? 'A medida' : 'Estándar')}
               ${dato('Ubicación', global.DB.ubicacionLabel(u.ubicacion))}
+              ${dato('Estado', e.label)}
+            </div>`)}
+
+            ${card('Propiedades principales', `<div class="fi">
+              ${claves.map(k => dato(this.tituloProp(k), this.valorProp(u, k)
+                || (k === 'medida' ? u.medida : ''))).join('')}
+            </div>`)}
+
+            ${card('Propiedades secundarias', `<div class="fi">
+              ${dato('Alto', v.alto || prod.alto ? `${v.alto || prod.alto} m` : '')}
+              ${dato('Profundidad', v.prof || prod.prof ? `${v.prof || prod.prof} m` : '')}
+              ${dato('Peso', v.peso ? `${v.peso} kg` : '')}
+              ${dato('Materiales', prod.materiales)}
+            </div>`)}
+
+            ${card('De dónde vino', `<div class="fi">
               ${dato('Proveedor', u.proveedor)}
-              ${dato('Llega', u.llega)}
+              ${dato('Cuándo llega', u.llega)}
               ${dato('La tengo desde', u.listo)}
-              ${u.orden ? `<div class="fi-r"><span>Orden de venta</span>
-                <b>${UI.esc(u.orden)}${pos ? ` · ${pos.n} de ${pos.de}` : ''}</b></div>` : ''}
+              ${dato('Días en el depósito', dias == null ? '' : String(dias))}
+            </div>
+            ${u.estado === 'pedir' ? `<div class="hint" style="margin-top:9px">Está
+              <b>a pedir</b>: se vendió y todavía no se le pidió a nadie.</div>
+              ${ed ? '<button class="btn primary" id="fk-pedir" style="margin-top:10px">Pedir a fábrica</button>' : ''}`
+              : ''}`)}
+
+            ${card('Venta', u.orden ? `<div class="fi">
+              ${dato('Orden', `${u.orden}${pos ? ` · ${pos.n} de ${pos.de}` : ''}`)}
               ${dato('Vendida el', u.fechaVenta)}
               ${dato('Entregada el', u.fechaEntrega)}
             </div>
-            ${(u.nota || '').trim() ? `<div class="fi-nota"><span>Nota de fábrica</span>
-              <p>${UI.esc(u.nota)}</p></div>` : ''}
-            <div class="hint" style="margin-top:11px">${u.orden
-              ? 'Está atada a esa venta. Para liberarla hay que hacerlo desde la orden.'
-              : 'No tiene dueño. <b>Se reserva desde la venta</b>, no desde acá: así toda reserva queda respaldada por una orden.'}</div>
-            <div class="row" style="margin-top:16px;gap:10px">
-              ${u.estado === 'pedir' && global.App && global.App.puede
-                && global.App.puede('editarCatalogo')
-                ? `<button class="btn primary" id="un-pedir">Pedir a fábrica</button>` : ''}
-              <div class="sp"></div>
-              <button class="btn" id="un-nota">Nota de fábrica</button>
-              <button class="btn" id="un-x">Cerrar</button>
-            </div>
+            <div class="hint" style="margin-top:9px">Está atada a esa venta. Para liberarla hay
+              que hacerlo desde la orden.</div>`
+            : `<div class="hint">No tiene dueño. <b>Se reserva desde la venta</b>, no desde acá:
+              así toda reserva queda respaldada por una orden.</div>`)}
+
+            ${card('Nota de fábrica', `
+              <textarea id="fk-nota" rows="3"
+                placeholder="Vino con el frente cambiado, falta la manija…">${UI.esc(u.nota || '')}</textarea>
+              <div class="row" style="margin-top:9px"><div class="sp"></div>
+                <button class="btn" id="fk-guardar">Guardar la nota</button></div>`)}
           </div>
-        </div>`);
-      const cerrar = () => { const x = document.getElementById('un-mdl'); if (x) x.remove(); };
-      document.getElementById('un-x').onclick = cerrar;
-      document.getElementById('un-mdl').onclick = ev => { if (ev.target.id === 'un-mdl') cerrar(); };
-      document.getElementById('un-nota').onclick = () => { cerrar(); this.modalNota(id); };
-      const bp = document.getElementById('un-pedir');
-      if (bp) bp.onclick = () => { cerrar(); this.pedir(id); };
+        </div>`;
     },
 
+    engancharFicha(id) {
+      const b = document.getElementById('fk-volver'); if (b) b.onclick = () => this.volver();
+      const f = document.getElementById('fk-foto'); if (f) f.onclick = () => this.modalFoto(id);
+      const p = document.getElementById('fk-pedir'); if (p) p.onclick = () => this.pedir(id);
+      const g = document.getElementById('fk-guardar');
+      if (g) g.onclick = () => {
+        global.DB.guardarUnidad({ id, nota: document.getElementById('fk-nota').value.trim() });
+        UI.aviso('Nota guardada', 'ok');
+      };
+    },
 
     // Pedirla es asignarle proveedor y fecha: ahí deja de ser una promesa y
     // pasa a ser una pieza que alguien está haciendo.
@@ -753,7 +867,7 @@
         global.DB.guardarUnidad({ id, estado: 'produccion',
           proveedor: document.getElementById('un-prov').value, llega });
         UI.aviso('Pedida — queda en producción', 'ok');
-        cerrar(); this.pintar();
+        cerrar(); this.refrescar();
       };
     },
 
@@ -939,6 +1053,39 @@
           background:var(--panel-2);display:grid;place-items:center;overflow:hidden}
         .un-prev img{width:100%;height:100%;object-fit:contain}
         .pill.viol{background:#f3e8ff;color:#6b21a8}
+
+        /* La ficha de una unidad: es una pantalla, no un pop-up. Acá vamos a
+           ir colgando lo que falte de esa pieza. */
+        .fk-bar{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:12px}
+        .fk-bar .lnk{border:0;background:none;padding:0;font:inherit;font-size:12.5px;
+          font-weight:650;color:var(--brand);cursor:pointer}
+        .fk-bar .lnk:hover{text-decoration:underline}
+        .fk-h{align-items:flex-start;margin-bottom:14px}
+        .fk-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;
+          margin-bottom:16px}
+        @media(max-width:900px){.fk-kpis{grid-template-columns:1fr 1fr}}
+        .fk-kpis .un-k-v small{font-size:12px;font-weight:650;color:var(--muted)}
+        .fk-cols{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:14px;
+          align-items:start}
+        @media(max-width:1000px){.fk-cols{grid-template-columns:1fr}}
+        .fk-c{margin-bottom:12px}
+        .fk-t{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+          color:var(--muted);margin-bottom:8px}
+        .fk-foto{height:220px;border:1px solid var(--line);border-radius:10px;
+          background:var(--panel-2);display:grid;place-items:center;overflow:hidden;
+          text-align:center;padding:12px}
+        .fk-foto.hay{padding:0}
+        .fk-foto img{width:100%;height:100%;object-fit:contain}
+        .fk-bar-cod{margin-top:11px;border:1px solid var(--line);border-radius:10px;padding:10px;
+          background:#fff;display:grid;place-items:center;gap:4px}
+        .fk-bar-cod .cbar{display:block;max-width:100%}
+        .fk-bar-cod .cbar rect{fill:#000}
+        .fk-cod-t{font-size:12px;letter-spacing:.14em;color:#111}
+        .fk-c textarea{width:100%;font:inherit;font-size:12.5px;padding:8px 10px;
+          border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink);
+          resize:vertical}
+        .fk-c .fi-r span{flex:0 0 150px}
+        .fk-c .fi-r b i{font-style:normal}
       </style>`;
     },
   };

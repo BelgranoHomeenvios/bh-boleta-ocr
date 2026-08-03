@@ -1183,6 +1183,24 @@ al **costado derecho**, no arriba, y se pueden **marcar varias a la vez**.
   esas propiedades ya son **columnas de la tabla**, no hacía falta repetirlas.
   Arriba queda un único módulo, el de **proveedor**, que no es columna de nada.
 
+### Lote 42 — APLICADO (La ficha de la unidad es una pantalla)
+
+- ✅ 456. **Ver más** deja de ser un pop-up: abre una **pantalla** de esa pieza,
+  con un link para volver. Es donde vamos a ir colgando lo que falte.
+- ✅ 457. Arriba, cuatro números: **hace cuánto está** (en días, en rojo si pasó
+  de 90 — es plata parada), **cuántas iguales quedan libres**, y —para quien ve
+  costos— el **costo final** y el **precio de lista** de esa variante.
+- ✅ 458. A la izquierda, la **foto de esa unidad** y la **etiqueta**: SKU de la
+  variante, número de serie y el **código de barras** que se escanea al entrar y
+  al salir.
+- ✅ 459. A la derecha: **datos generales** (categoría, modelo, tipo, ubicación,
+  estado), **propiedades principales** —las de la categoría— y **secundarias**
+  (alto, profundidad, peso, materiales), **de dónde vino** (proveedor, cuándo
+  llega, desde cuándo la tengo, días en el depósito), la **venta** con su orden
+  y *1 de 6*, y la **nota de fábrica** editable ahí mismo.
+- ✅ 460. `DB.diasDesde()` traduce las fechas de la planilla —"20/7", sin año— a
+  cuántos días hace; si la fecha cae en el futuro, era del año pasado.
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·

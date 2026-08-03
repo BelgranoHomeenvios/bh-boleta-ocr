@@ -777,6 +777,16 @@
       return out;
     },
     unidad(id) { return this.unidadesTodas().find(u => u.id === Number(id)) || null; },
+    // Las fechas de la planilla vienen como "20/7", sin año. Cuántos días
+    // hace de eso: si la fecha da en el futuro, era del año pasado.
+    diasDesde(fecha) {
+      const m = /^(\d{1,2})\/(\d{1,2})$/.exec(String(fecha || '').trim());
+      if (!m) return null;
+      const hoy = new Date();
+      let d = new Date(hoy.getFullYear(), Number(m[2]) - 1, Number(m[1]));
+      if (d > hoy) d = new Date(hoy.getFullYear() - 1, Number(m[2]) - 1, Number(m[1]));
+      return Math.max(0, Math.round((hoy - d) / 86400000));
+    },
     // Todas las variantes, para poder leer las propiedades de una unidad.
     variantesTodas() { return DEMO.variantes; },
     // "1 de 6": una orden puede tener seis muebles y ésta es uno de ellos.
