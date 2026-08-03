@@ -973,6 +973,71 @@
     },
     _recs: null,
     recepciones() { if (!this._recs) this._recs = []; return this._recs; },
+    proximaRecepcion() {
+      return this.numRecepcion(this.recepciones().length + 92);
+    },
+    // Recibir un lote deja el papel: qué trajo, cómo llegó cada uno y qué
+    // quedó debiendo. Ese papel es lo que después conforma Compras.
+    registrarRecepcion({ pedido, provId, proveedor, items, quien = '' }) {
+      const r = {
+        numero: this.proximaRecepcion(), pedido, provId, proveedor,
+        fecha: this.hoyCorto(), recibidoPor: quien || 'yo',
+        items: items.map(x => ({ ...x })),
+        estadoCompras: 'pendiente',
+      };
+      this.recepciones().unshift(r);
+      return r;
+    },
+    recepcion(num) { return this.recepciones().find(r => r.numero === num) || null; },
+    aConformar() { return this.recepciones().filter(r => r.estadoCompras === 'pendiente'); },
+
+    // ---- Lista de precios del proveedor -----------------------------------
+    // Lo que nos cobra cada taller por cada variante. Se actualiza sola a
+    // medida que van viniendo: cuando Compras conforma un precio distinto,
+    // puede dejarlo como excepción de esa vez o cambiarlo desde hoy.
+    PRECIOS_KEY: 'bh_precios_prov',
+    _precios: null,
+    listaPrecios() {
+      if (this._precios) return this._precios;
+      let g = [];
+      try { g = JSON.parse(localStorage.getItem(this.PRECIOS_KEY)) || []; } catch {}
+      this._precios = g;
+      return g;
+    },
+    // El precio de lista de una variante para un taller. Si nunca se le compró,
+    // se estima con el costo del catálogo — y se avisa que es una estimación.
+    precioProveedor(provId, varianteId) {
+      const p = this.listaPrecios().find(x => x.provId === Number(provId)
+        && x.varianteId === Number(varianteId));
+      if (p) return { precio: Number(p.precio) || 0, desde: p.desde, estimado: false };
+      const v = (this.variantesTodas() || []).find(x => x.id === Number(varianteId));
+      return { precio: v ? Number(v.costo) || 0 : 0, desde: '', estimado: true };
+    },
+    guardarPrecioProveedor(provId, varianteId, precio, quien = '') {
+      const lista = this.listaPrecios();
+      const i = lista.findIndex(x => x.provId === Number(provId)
+        && x.varianteId === Number(varianteId));
+      const reg = { provId: Number(provId), varianteId: Number(varianteId),
+        precio: Number(precio) || 0, desde: this.hoyCorto(), quien: quien || 'yo' };
+      if (i >= 0) lista[i] = reg; else lista.push(reg);
+      try { localStorage.setItem(this.PRECIOS_KEY, JSON.stringify(lista)); } catch {}
+      return reg;
+    },
+    // Conformar cierra la recepción para Compras: los precios quedan firmes y
+    // de ahí sale lo que hay que pagarle al taller.
+    conformarRecepcion(num, { lineas = [], quien = '' } = {}) {
+      const r = this.recepcion(num); if (!r) return null;
+      lineas.forEach(l => {
+        const it = r.items.find(x => x.unidadId === l.unidadId);
+        if (it) { it.precio = Number(l.precio) || 0; it.motivo = l.motivo || ''; }
+        if (l.aLista) this.guardarPrecioProveedor(r.provId, l.varianteId, l.precio, quien);
+      });
+      r.estadoCompras = 'conformada';
+      r.conformadaPor = quien || 'yo';
+      r.conformadaEl = this.hoyCorto();
+      r.total = r.items.reduce((a, x) => a + (Number(x.precio) || 0), 0);
+      return r;
+    },
     // Recibir una unidad: acá recién nace su número de serie.
     recibirUnidad(id, { calidad = 'perfecto', nota = '', ubicacion = 'dep-pb', quien = '' } = {}) {
       const u = this.unidad(id); if (!u) return null;

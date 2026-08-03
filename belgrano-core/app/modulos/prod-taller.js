@@ -429,17 +429,27 @@
         const tildados = [...document.querySelectorAll('[data-rec]:checked')];
         if (!tildados.length) return UI.aviso('No tildaste ninguno', 'warn');
         let entraron = 0, reparar = 0, devueltos = 0;
+        const items = [];
         tildados.forEach(c => {
           const id = Number(c.dataset.rec);
           const sel = document.querySelector(`[data-cal^="${id}|"].on`);
           const cal = sel ? sel.dataset.cal.split('|')[1] : 'perfecto';
+          const u = global.DB.unidad(id);
           global.DB.recibirUnidad(id, { calidad: cal, ubicacion: ubi, quien: 'yo' });
           if (cal === 'devuelto') devueltos++;
-          else if (cal === 'reparar') reparar++;
-          else entraron++;
+          else { items.push({ unidadId: id, varianteId: u.varianteId, calidad: cal,
+            modelo: u.modelo, medida: u.medida, color: u.color, orden: u.orden,
+            serie: global.DB.unidad(id).serie, nota: u.calidadNota || '' });
+            if (cal === 'reparar') reparar++; else entraron++; }
         });
+        // El papel de lo que trajo: es lo que después conforma Compras.
+        if (items.length) {
+          const u0 = global.DB.unidad(items[0].unidadId);
+          global.DB.registrarRecepcion({ pedido: u0.pedido, provId: u0.provId,
+            proveedor: this.taller, items, quien: 'yo' });
+        }
         UI.aviso(`${entraron} al depósito${reparar ? ` · ${reparar} a reparar` : ''}${
-          devueltos ? ` · ${devueltos} devueltos` : ''}`, 'ok');
+          devueltos ? ` · ${devueltos} devueltos` : ''} — queda para conformar en Compras`, 'ok');
         this.render(this._mount);
       };
     },

@@ -20,7 +20,8 @@ const scripts = [
   'modulos/precios.js', 'modulos/resumen.js', 'modulos/produccion.js',
   'modulos/prod-pedidos.js',
   'modulos/prod-taller.js',
-  'modulos/prod-vendidos.js', 'modulos/esqueletos.js',
+  'modulos/prod-vendidos.js',
+  'compras/recepciones.js', 'modulos/esqueletos.js',
   'comun/app.js',
 ];
 
