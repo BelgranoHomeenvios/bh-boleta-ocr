@@ -181,6 +181,11 @@ tr:last-child td{border-bottom:0}
 .pl-top>div:last-child{border-right:0}
 .pl-top b{font-size:11px;font-weight:700}
 .pl-dib{position:relative;height:215px;display:grid;place-items:center;border-bottom:1px solid #111}
+.tu-pdf{display:grid;place-items:center;gap:4px;text-align:center;padding:16px}
+.tu-pdf span{font-family:Arial,sans-serif;font-size:12px;letter-spacing:.18em;color:#aeb6c0;
+  font-weight:700}
+.tu-pdf small{font-family:Arial,sans-serif;font-size:10px;color:#c2c9d2;max-width:210px;
+  line-height:1.45}
 .pl-dib svg{width:92%;height:88%;stroke:#111;fill:none;stroke-width:1.1}
 .pl-dib text{fill:#111;stroke:none;font-size:8.5px;font-family:Arial,sans-serif}
 .pl-dib .hz{stroke:#111;stroke-width:.6}
@@ -337,9 +342,16 @@ tr:last-child td{border-bottom:0}
 
 <!-- ============ EL PLANO ============ -->
 <section data-p="h">
-  <div class="idea"><b>El plano es tuyo, no lo cambio.</b> Lo que hace el sistema es
-    <b>completarlo solo</b>: lo amarillo es lo que hoy escribís a mano cada vez. El dibujo, el
-    nombre, el código y las medidas ya están cargados en la variante desde el catálogo.</div>
+  <div class="idea"><b>El dibujo es tuyo y no se toca.</b> Los PDF ya están armados: el sistema no
+    dibuja nada. Lo único que cambia es el <b>marco</b> —los casilleros de alrededor—, que se
+    reordena para que entren el <b>código de barras</b> y el <b>SKU</b>, y que se
+    <b>completa solo</b>: lo amarillo es lo que hoy escribís a mano cada vez.</div>
+
+  <div class="nota" style="margin-bottom:14px;border-left-color:var(--warn)">
+    <b>Lo que habría que hacer una vez con tus PDF:</b> vaciar los campos que hoy están escritos
+    —PEDIDO, PROVEEDOR, ORDEN, STOCK— y guardarlos <b>en blanco</b> como imagen de producción de cada
+    variante. De ahí en adelante el sistema los llena en cada venta. Pasame la carpeta de Drive y
+    te digo cuántos son, cuáles tienen campos escritos y cuáles ya están limpios.</div>
 
   <div class="dos">
     <div>
@@ -350,24 +362,8 @@ tr:last-child td{border-bottom:0}
       <div class="lbl">MATERIAL</div><div><b>NEGRO Y PARAÍSO</b></div>
       <div class="lbl">CANTIDAD</div><div><b>1 UNIDADES</b></div>
     </div>
-    <div class="pl-dib"><svg viewBox="0 0 330 190">
-  <path d="M52 62 L268 62 L296 44 L80 44 Z"/>
-  <path d="M52 62 L52 128 L268 128 L268 62"/>
-  <path d="M268 128 L296 110 L296 44"/>
-  <path d="M52 92 L268 92 M52 112 L268 112"/>
-  <ellipse cx="96" cy="55" rx="5" ry="2.4"/><ellipse cx="150" cy="55" rx="5" ry="2.4"/>
-  <ellipse cx="204" cy="55" rx="5" ry="2.4"/><ellipse cx="258" cy="55" rx="5" ry="2.4"/>
-  <ellipse cx="123" cy="59" rx="5" ry="2.4"/><ellipse cx="177" cy="59" rx="5" ry="2.4"/>
-  <ellipse cx="231" cy="59" rx="5" ry="2.4"/>
-  <path class="hz" d="M60 74h58M60 80h58M60 86h58M132 74h58M132 80h58M132 86h58M204 74h56M204 80h56M204 86h56"/>
-  <path class="hz" d="M60 98h200M60 104h200M60 110h200"/>
-  <text x="76" y="84">CAJÓN</text><text x="148" y="84">CAJÓN</text><text x="220" y="84">CAJÓN</text>
-  <text x="140" y="108">CARRITO</text>
-  <path class="hz" d="M40 62v66M36 62h8M36 128h8"/><text x="14" y="98">0.60</text>
-  <path class="hz" d="M306 44v22M302 44h8M302 66h8"/><text x="300" y="80">0.15</text>
-  <path class="hz" d="M46 140 L70 128"/><text x="10" y="152">LAQUEADO</text><text x="16" y="163">NEGRO</text>
-  <text x="108" y="178">PARA COLCHON DE 90X190</text>
-</svg><span class="marca">URGENTE</span></div>
+    <div class="pl-dib"><div class="tu-pdf"><span>TU DIBUJO</span><small>viene del PDF que ya tenés armado ·
+      el sistema no lo toca</small></div><span class="marca">URGENTE</span></div>
     <div class="pl-marcas">
       <div><span>VERIF.</span></div>
       <div class="llena"><span>ORDEN</span>
@@ -401,24 +397,8 @@ tr:last-child td{border-bottom:0}
       <div class="lbl">MATERIAL</div><div><b>NEGRO Y PARAÍSO</b></div>
       <div class="lbl">CANTIDAD</div><div><b>1 UNIDADES</b></div>
     </div>
-    <div class="pl-dib"><svg viewBox="0 0 330 190">
-  <path d="M52 62 L268 62 L296 44 L80 44 Z"/>
-  <path d="M52 62 L52 128 L268 128 L268 62"/>
-  <path d="M268 128 L296 110 L296 44"/>
-  <path d="M52 92 L268 92 M52 112 L268 112"/>
-  <ellipse cx="96" cy="55" rx="5" ry="2.4"/><ellipse cx="150" cy="55" rx="5" ry="2.4"/>
-  <ellipse cx="204" cy="55" rx="5" ry="2.4"/><ellipse cx="258" cy="55" rx="5" ry="2.4"/>
-  <ellipse cx="123" cy="59" rx="5" ry="2.4"/><ellipse cx="177" cy="59" rx="5" ry="2.4"/>
-  <ellipse cx="231" cy="59" rx="5" ry="2.4"/>
-  <path class="hz" d="M60 74h58M60 80h58M60 86h58M132 74h58M132 80h58M132 86h58M204 74h56M204 80h56M204 86h56"/>
-  <path class="hz" d="M60 98h200M60 104h200M60 110h200"/>
-  <text x="76" y="84">CAJÓN</text><text x="148" y="84">CAJÓN</text><text x="220" y="84">CAJÓN</text>
-  <text x="140" y="108">CARRITO</text>
-  <path class="hz" d="M40 62v66M36 62h8M36 128h8"/><text x="14" y="98">0.60</text>
-  <path class="hz" d="M306 44v22M302 44h8M302 66h8"/><text x="300" y="80">0.15</text>
-  <path class="hz" d="M46 140 L70 128"/><text x="10" y="152">LAQUEADO</text><text x="16" y="163">NEGRO</text>
-  <text x="108" y="178">PARA COLCHON DE 90X190</text>
-</svg><span class="copia">COPIA · BELGRANO HOME</span></div>
+    <div class="pl-dib"><div class="tu-pdf"><span>TU DIBUJO</span><small>viene del PDF que ya tenés armado ·
+      el sistema no lo toca</small></div><span class="copia">COPIA · BELGRANO HOME</span></div>
     <div class="pl-marcas">
       <div><span>VERIF.</span></div>
       <div class=""><span>ORDEN</span>

@@ -1,0 +1,642 @@
+<meta charset="utf-8">
+<title>Belgrano Soft · Los tres tipos de mueble — el puente entre la venta y Producción</title>
+<style>
+:root{
+  --bg:#f4f6f8; --panel:#fff; --panel-2:#fafbfc; --ink:#0f1a2a; --ink-soft:#5b6675;
+  --line:#d9e0e8; --line-soft:#eef1f5; --navy:#16324f; --brand:#1e5fce;
+  --brand-soft:#e7eefb; --brand-ink:#1a51b0; --ok:#15803d; --ok-bg:#e6f4ea;
+  --warn:#b45309; --warn-bg:#fff7e6; --crit:#b42318; --crit-bg:#fdecea; --muted:#8a94a3;
+  --viol:#6b21a8; --viol-bg:#f3e8ff;
+  --shadow:0 1px 2px rgba(15,26,42,.06),0 1px 3px rgba(15,26,42,.04);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);line-height:1.5;
+  font-family:'Public Sans',-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  font-variant-numeric:tabular-nums}
+h1,h2,h3{margin:0;letter-spacing:-.01em}
+button{font:inherit}
+input,select{font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);
+  border-radius:8px;background:var(--panel);color:var(--ink)}
+
+.top{background:var(--navy);color:#fff;padding:11px 20px;position:sticky;top:0;z-index:30}
+.top h1{font-size:15px;font-weight:800}
+.top p{margin:2px 0 0;font-size:12px;opacity:.75}
+.opts{display:flex;gap:6px;margin-top:11px;flex-wrap:wrap}
+.opt{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);color:rgba(255,255,255,.8);
+  border-radius:9px;padding:7px 13px;font-size:12.5px;font-weight:650;cursor:pointer;text-align:left}
+.opt:hover{background:rgba(255,255,255,.18);color:#fff}
+.opt.on{background:#fff;color:var(--navy);border-color:#fff}
+.opt small{display:block;font-size:10.5px;font-weight:500;opacity:.75}
+.opt.on small{opacity:.6}
+
+.wrap{padding:18px 20px 60px;max-width:1400px;margin:0 auto}
+.idea{background:var(--brand-soft);border:1px solid #cfe0fb;border-radius:12px;padding:13px 15px;
+  font-size:13px;margin-bottom:6px}
+.idea b{color:var(--brand-ink)}
+.pros{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0 18px}
+@media(max-width:820px){.pros{grid-template-columns:1fr}}
+.pro,.con{border-radius:11px;padding:11px 14px;font-size:12.5px;border:1px solid}
+.pro{background:var(--ok-bg);border-color:#cfe8d8;color:#14532d}
+.con{background:var(--warn-bg);border-color:#f3e2c0;color:#7c4a05}
+.pro b,.con b{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;
+  margin-bottom:3px;opacity:.75}
+
+/* ---- el modelo ---- */
+.modelo{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;
+  margin-bottom:22px;box-shadow:var(--shadow)}
+.modelo h2{font-size:16px;color:var(--navy);margin-bottom:4px}
+.modelo .sub{font-size:12.5px;color:var(--ink-soft);margin-bottom:16px}
+.ciclo{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:900px){.ciclo{grid-template-columns:1fr 1fr}}
+.paso{border:1px solid var(--line);border-radius:11px;padding:12px 13px;background:var(--panel-2);
+  position:relative}
+.paso>b{display:block;font-size:13px;color:var(--navy);margin-bottom:3px}
+.paso small b{color:var(--navy)}
+.paso small{font-size:11.5px;color:var(--ink-soft);line-height:1.45;display:block}
+.paso .est{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+  border-radius:999px;padding:2px 8px;display:inline-block;margin-bottom:6px}
+.e-prod{background:var(--viol-bg);color:var(--viol)}
+.e-dep{background:var(--ok-bg);color:var(--ok)}
+.e-res{background:var(--warn-bg);color:var(--warn)}
+.e-ent{background:#eef1f5;color:var(--muted)}
+.cruza{margin-top:14px;font-size:12.5px;color:var(--ink-soft);border-top:1px dashed var(--line);
+  padding-top:12px}
+.cruza b{color:var(--navy)}
+
+/* ---- el marco de la app ---- */
+.app{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;
+  box-shadow:var(--shadow)}
+.appbar{background:var(--navy);color:#fff;height:38px;display:flex;align-items:center;gap:9px;
+  padding:0 14px;font-size:11.5px;font-weight:650}
+.appbar span{opacity:.55}
+.appbar .on{opacity:1;background:rgba(255,255,255,.16);padding:3px 9px;border-radius:999px}
+.subbar{display:flex;gap:14px;padding:0 16px;border-bottom:1px solid var(--line);background:var(--panel);
+  font-size:12px;font-weight:600;color:var(--ink-soft)}
+.subbar div{padding:9px 0}
+.subbar .on{color:var(--navy);border-bottom:2px solid var(--brand)}
+.body{padding:16px;background:var(--bg)}
+.kick{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--brand)}
+.h1{font-size:19px;font-weight:800;color:var(--navy);margin:1px 0 1px}
+.sub{font-size:11.5px;color:var(--muted);margin-bottom:12px}
+
+.bar{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.bar input{flex:1;min-width:180px}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:8px 12px;
+  font-size:12.5px;font-weight:650;color:var(--ink-soft);cursor:pointer;white-space:nowrap}
+.btn.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}
+.segm{display:inline-flex;gap:6px;flex-wrap:wrap}
+.seg{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 13px;
+  font-size:12.5px;font-weight:650;color:var(--ink-soft);cursor:pointer}
+.seg .n{opacity:.6;margin-left:5px}
+.seg.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.seg.on .n{opacity:.7}
+
+table{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--panel)}
+th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+  padding:9px 10px;border-bottom:1px solid var(--line);font-weight:700;white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid var(--line-soft);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;
+  box-shadow:var(--shadow)}
+.pill{font-size:10px;font-weight:700;border-radius:999px;padding:2px 8px;white-space:nowrap}
+.p-ok{background:var(--ok-bg);color:var(--ok)}
+.p-prod{background:var(--viol-bg);color:var(--viol)}
+.p-res{background:var(--warn-bg);color:var(--warn)}
+.p-ent{background:#eef1f5;color:var(--muted)}
+.num{text-align:right}
+.mut{color:var(--muted)}
+.nom{font-weight:700;color:var(--navy)}
+.ser{font-size:11px;color:var(--muted)}
+.grupo td{background:var(--panel-2);font-weight:700;color:var(--navy);font-size:11.5px;
+  text-transform:uppercase;letter-spacing:.04em;border-top:1px solid var(--line)}
+.mini{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:7px;
+  background:var(--panel-2);border:1px solid var(--line-soft);color:var(--muted);vertical-align:middle}
+.mini svg{width:30px;height:22px;stroke:currentColor;fill:none;stroke-width:2}
+.chip{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px;
+  background:var(--panel-2);border:1px solid var(--line);color:var(--ink-soft)}
+.bres{border:1px solid var(--brand);background:var(--brand-soft);color:var(--brand-ink);
+  border-radius:7px;padding:3px 10px;font-size:11.5px;font-weight:700;cursor:pointer}
+.bres:hover{background:var(--brand);color:#fff}
+.b-x{border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:3px 8px;
+  font-size:11.5px;color:var(--muted);cursor:pointer}
+
+/* A · tablero */
+.tot{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+@media(max-width:820px){.tot{grid-template-columns:1fr 1fr}}
+.tot-c{border:1px solid var(--line);border-radius:11px;padding:11px 13px;background:var(--panel)}
+.tot-t{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700}
+.tot-v{font-size:22px;font-weight:800;color:var(--navy);margin-top:2px}
+.tot-p{font-size:11px;color:var(--muted)}
+.exp{background:var(--panel-2)}
+.exp td{padding:0}
+.exp .in{padding:10px 14px 12px}
+
+/* C · buscador */
+.busq{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;
+  box-shadow:var(--shadow);margin-bottom:14px}
+.busq input{width:100%;font-size:15px;padding:11px 14px}
+.res{display:flex;flex-direction:column;gap:10px}
+.rg{border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden}
+.rg-h{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--panel-2);
+  border-bottom:1px solid var(--line)}
+.rg-h b{font-size:13.5px;color:var(--navy)}
+.rg-h .sp{flex:1}
+.rg-b{padding:4px 0}
+.uni{display:flex;align-items:center;gap:11px;padding:8px 14px;border-bottom:1px solid var(--line-soft)}
+.uni:last-child{border-bottom:0}
+.uni .sp{flex:1}
+.hint{font-size:11.5px;color:var(--muted)}
+.nota{font-size:12.5px;color:var(--ink-soft);background:var(--panel);border:1px solid var(--line);
+  border-left:3px solid var(--brand);border-radius:10px;padding:12px 15px;margin-top:20px}
+.nota b{color:var(--navy)}
+.hide{display:none}
+.scroll{overflow-x:auto}
+
+.p-ped{background:var(--brand-soft);color:var(--brand-ink)}
+.p-fal{background:var(--crit-bg);color:var(--crit)}
+.p-urg{background:var(--crit);color:#fff}
+.tarde{color:var(--crit);font-weight:700}
+.chk{width:15px;height:15px;accent-color:var(--brand);margin:0;vertical-align:-2px}
+.dos{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:980px){.dos{grid-template-columns:1fr}}
+.tres{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:900px){.tres{grid-template-columns:1fr}}
+.tipo{display:inline-block;font-size:10.5px;font-weight:700;border-radius:999px;padding:1px 9px;
+  border:1px solid var(--line);background:var(--panel-2);color:var(--muted);white-space:nowrap}
+.tipo.mod{background:#fff7e6;border-color:#f3e2c0;color:#b45309}
+.tipo.med{background:var(--brand-soft);border-color:#cfe0fb;color:var(--brand-ink)}
+.tt{border:1px solid var(--line);border-radius:13px;background:var(--panel);overflow:hidden;
+  box-shadow:var(--shadow);display:flex;flex-direction:column}
+.tt-h{padding:13px 15px;border-bottom:1px solid var(--line)}
+.tt-h b{display:block;font-size:15px;color:var(--navy);margin:5px 0 2px}
+.tt-h small{font-size:12px;color:var(--ink-soft);display:block;line-height:1.45}
+.tt.mod .tt-h{background:#fff7e6} .tt.med .tt-h{background:var(--brand-soft)}
+.tt-b{padding:11px 15px 13px;font-size:12.5px;flex:1}
+.tt-b div{padding:6px 0;border-bottom:1px solid var(--line-soft);display:flex;gap:8px;
+  align-items:flex-start}
+.tt-b div:last-child{border-bottom:0}
+.tt-b .q{flex:0 0 106px;color:var(--muted);font-size:11.5px}
+.tt-b .a{color:var(--ink-soft)}
+.tt-b .a b{color:var(--navy)}
+.si{color:var(--ok);font-weight:800} .no{color:var(--crit);font-weight:800}
+.gr{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:10px;
+  overflow:hidden;box-shadow:var(--shadow)}
+.gr-h{display:flex;align-items:center;gap:11px;padding:10px 14px;background:var(--panel-2);
+  border-bottom:1px solid var(--line)}
+.gr-h b{font-size:13.5px;color:var(--navy)}
+.gr-h .sp{flex:1}
+.ok-lista{list-style:none;padding:0;margin:0;font-size:13px}
+.ok-lista li{padding:7px 0 7px 26px;position:relative;border-bottom:1px solid var(--line-soft);
+  color:var(--ink-soft)}
+.ok-lista li:last-child{border-bottom:0}
+.ok-lista li:before{content:'✓';position:absolute;left:4px;color:var(--ok);font-weight:800}
+.ok-lista b{color:var(--navy)}
+.linea{display:flex;gap:0;align-items:stretch;margin:14px 0}
+.linea .et{flex:1;border:1px solid var(--line);border-right:0;padding:11px 13px;background:var(--panel)}
+.linea .et:last-child{border-right:1px solid var(--line)}
+.linea .et b{display:block;font-size:12.5px;color:var(--navy)}
+.linea .et small{font-size:11.5px;color:var(--muted)}
+.linea .et.on{background:var(--brand-soft);border-color:#cfe0fb}
+.croquis{border:1px solid var(--line);border-radius:9px;background:var(--panel-2);height:140px;
+  display:grid;place-items:center;color:var(--muted);font-size:12px;overflow:hidden}
+.croquis svg{width:86%;height:82%;stroke:#3b5bdb;fill:none;stroke-width:1.8;stroke-linecap:round}
+.fld{display:block;margin-bottom:10px}
+.fld .lbl{display:block;font-size:10.5px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.05em;color:var(--muted);margin-bottom:3px}
+.fld input,.fld select,.fld textarea{width:100%;font:inherit;font-size:13px;padding:7px 10px;
+  border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
+.dif{background:#fff7e6;border:1px solid #f3e2c0;border-radius:8px;padding:2px 8px;
+  font-size:12px;color:#7c4a05;display:inline-block}
+.dif b{color:#5c3703}
+.pregs{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--brand);
+  border-radius:12px;padding:16px 18px;margin-top:22px}
+.pregs h3{font-size:14px;color:var(--navy);margin-bottom:8px}
+.pregs ol{margin:0;padding-left:20px;font-size:13px;color:var(--ink-soft)}
+.pregs li{margin-bottom:9px} .pregs b{color:var(--navy)}
+.nom-op{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+@media(max-width:820px){.nom-op{grid-template-columns:1fr}}
+.nom-c{border:1px solid var(--line);border-radius:11px;padding:12px 14px;background:var(--panel)}
+.nom-c.gana{border-color:var(--brand);background:var(--brand-soft)}
+.nom-c b{display:block;font-size:14px;color:var(--navy);margin-bottom:3px}
+.nom-c small{font-size:12px;color:var(--ink-soft);display:block;line-height:1.45}
+</style>
+
+<div class="top">
+  <h1>Los tres tipos de mueble — de la venta a Producción</h1>
+  <p>Estándar, el que tiene un cambio de cota, y el que hay que dibujar de cero. Cada uno exige
+    cosas distintas en la venta y se ve distinto en Producción.</p>
+  <div class="opts">
+    <button class="opt on" data-o="t">Los tres tipos<small>Y cómo llamarlos</small></button>
+    <button class="opt" data-o="v">En la venta<small>Qué se le pide al vendedor</small></button>
+    <button class="opt" data-o="c">La cotización<small>Si cambia, alguien verifica</small></button>
+    <button class="opt" data-o="p">En Producción<small>Nunca dice "estándar" si no lo es</small></button>
+    <button class="opt" data-o="f">La hoja y el fraccionamiento<small>3 UNIDADES, 6 y 6</small></button>
+  </div>
+</div>
+
+<div class="wrap">
+
+<!-- ============ LOS TRES TIPOS ============ -->
+<section data-p="t">
+  <div class="idea"><b>Hoy hay dos casilleros —estándar y a medida— y son pocos.</b> El que cambia
+    la profundidad de una cómoda no es estándar, pero tampoco es un mueble nuevo: es el mismo
+    dibujo con otra cota. Ese merece su propio casillero, porque exige cosas distintas.</div>
+
+  <div class="tres">
+    <div class="tt">
+      <div class="tt-h"><span class="tipo">estándar</span>
+        <b>Estándar</b>
+        <small>Tal cual está en el catálogo. La variante existe, tiene su precio y su plano.</small></div>
+      <div class="tt-b">
+        <div><span class="q">Dibujo</span><span class="a">El de la variante, ya cargado</span></div>
+        <div><span class="q">Lo dibuja</span><span class="a">Nadie — ya está</span></div>
+        <div><span class="q">Precio</span><span class="a">El de lista</span></div>
+        <div><span class="q">Verificación</span><span class="a">No hace falta</span></div>
+        <div><span class="q">Se puede pedir</span><span class="a si">apenas se confirma la venta</span></div>
+      </div>
+    </div>
+
+    <div class="tt mod">
+      <div class="tt-h"><span class="tipo mod">modificado</span>
+        <b>Modificado</b>
+        <small>El mismo mueble con un cambio que <b>no cambia el dibujo</b>: la profundidad, un
+          ancho de 1.10 en vez de 1.20. Cambia una cota, no la estética.</small></div>
+      <div class="tt-b">
+        <div><span class="q">Dibujo</span><span class="a">El mismo de la variante,
+          <b>con la cota cambiada</b></span></div>
+        <div><span class="q">Lo dibuja</span><span class="a">Nadie — se anota la diferencia</span></div>
+        <div><span class="q">Precio</span><span class="a">El de lista <b>puede cambiar</b></span></div>
+        <div><span class="q">Verificación</span><span class="a"><b>Sí, de la cotización</b></span></div>
+        <div><span class="q">Se puede pedir</span><span class="a">cuando se verificó el precio</span></div>
+      </div>
+    </div>
+
+    <div class="tt med">
+      <div class="tt-h"><span class="tipo med">a medida</span>
+        <b>A medida</b>
+        <small>No existe en el catálogo. Una cómoda con un hueco especial: hay que
+          <b>dibujarlo de cero</b>.</small></div>
+      <div class="tt-b">
+        <div><span class="q">Dibujo</span><span class="a"><b>Propio, de esa unidad</b></span></div>
+        <div><span class="q">Lo dibuja</span><span class="a">El vendedor un croquis, Adrián el plano</span></div>
+        <div><span class="q">Precio</span><span class="a">Se cotiza a mano</span></div>
+        <div><span class="q">Verificación</span><span class="a"><b>Del dibujo y del precio</b></span></div>
+        <div><span class="q">Se puede pedir</span><span class="a no">recién cuando está dibujado y verificado</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="padding:16px 18px;margin-top:14px">
+    <div class="kick" style="margin-bottom:6px">Cómo llamar al del medio</div>
+    <div class="hint">Me pediste que proponga. Los tres candidatos, y por qué me quedo con uno:</div>
+    <div class="nom-op">
+      <div class="nom-c gana"><b>Modificado</b>
+        <small>Corto, se entiende sin explicar, y dice exactamente lo que pasó: es el mueble del
+          catálogo <b>con una modificación</b>. Es la palabra que usaste vos al contármelo.</small></div>
+      <div class="nom-c"><b>Adaptado</b>
+        <small>Suena mejor de cara al cliente, pero es más vago: no queda claro si cambió el mueble
+          o sólo una medida.</small></div>
+      <div class="nom-c"><b>Con observación</b>
+        <small>Es lo que dijiste primero, pero describe <b>cómo se registra</b> —una observación—, no
+          <b>qué es</b>. Y toda venta puede tener observaciones sin ser esto.</small></div>
+    </div>
+    <div class="hint" style="margin-top:10px">Me quedo con <b>Modificado</b> salvo que prefieras
+      otro. En el catálogo, en la venta y en Producción se lee igual.</div>
+  </div>
+
+  <div class="nota" style="margin-top:14px"><b>La regla que los separa:</b> ¿hay que dibujar algo
+    nuevo? Si no —sólo cambia una cota que el carpintero lee del mismo plano— es
+    <b>modificado</b>. Si sí, es <b>a medida</b>. Esa pregunta la contesta el vendedor al cargarlo,
+    y de ahí sale todo lo demás.</div>
+</section>
+
+<!-- ============ EN LA VENTA ============ -->
+<section data-p="v" class="hide">
+  <div class="idea"><b>El papel que hoy dibujás a mano pasa a estar adjunto en la venta.</b> Si el
+    vendedor carga un mueble a medida, <b>tiene que subir el croquis</b> — le queda como pendiente
+    hasta que lo haga. Adrián lo abre desde Producción, lo descarga si le sirve, y lo usa para
+    dibujar el plano.</div>
+
+  <div class="app">
+    <div class="appbar"><span>Belgrano Soft</span><span class="on">Ventas</span><span>Producción</span>
+      <span>Compras</span><span>Inventario</span></div>
+    <div class="subbar"><div>Órdenes</div><div class="on">Nueva venta</div><div>Cotizaciones</div>
+      <div>Clientes</div></div>
+    <div class="body">
+      <div class="kick">Venta 5744 · Huego</div><div class="h1">Cargar un mueble</div>
+      <div class="sub">CÓMODA AMBERES 55 · 1.20 · Blanca · Blanco</div>
+
+      <div class="card" style="padding:16px 18px;margin-bottom:12px">
+        <div class="kick" style="margin-bottom:8px">¿Cómo va este mueble?</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+          <button class="btn">Estándar</button>
+          <button class="btn on">Modificado</button>
+          <button class="btn">A medida</button>
+        </div>
+        <div class="hint">¿Hay que dibujar algo nuevo? Si sólo cambia una medida del mismo mueble,
+          es <b>modificado</b>. Si el mueble no se parece a ninguno del catálogo, es
+          <b>a medida</b>.</div>
+      </div>
+
+      <div class="dos">
+        <div class="card" style="padding:16px 18px">
+          <div class="kick" style="margin-bottom:9px">Las propiedades, editables</div>
+          <label class="fld"><span class="lbl">Medida del frente</span>
+            <input value="1.20"></label>
+          <label class="fld"><span class="lbl">Profundidad</span>
+            <input value="0.40" style="border-color:#f3e2c0;background:#fff7e6"></label>
+          <div class="dif" style="margin:-4px 0 10px">La de catálogo es <b>0.45</b> —
+            se cambió a <b>0.40</b></div>
+          <label class="fld"><span class="lbl">Estructura</span><input value="Blanca"></label>
+          <label class="fld"><span class="lbl">Frente</span><input value="Blanco"></label>
+          <label class="fld"><span class="lbl">Observación para fábrica</span>
+            <textarea rows="2">Profundidad 0.40 en vez de 0.45 — entra en un pasillo angosto.</textarea></label>
+          <div class="hint">Lo que se cambia queda marcado. En la boleta y en Producción se lee
+            <b>qué era y qué se pidió</b>.</div>
+        </div>
+
+        <div>
+          <div class="card" style="padding:16px 18px;margin-bottom:12px">
+            <div class="kick" style="margin-bottom:9px">El croquis del vendedor</div>
+            <div class="croquis"><svg viewBox="0 0 240 120">
+  <path d="M24 92 L206 92 M24 92 L24 40 L206 40 L206 92"/>
+  <path d="M24 66 L206 66 M115 40 L115 92"/>
+  <path d="M20 32 L20 20 M210 32 L210 20 M20 26 L210 26"/>
+  <text x="98" y="17" style="fill:#3b5bdb;font-size:11px;stroke:none">2.35</text>
+</svg></div>
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+              <button class="btn">Sacar foto</button>
+              <button class="btn">Subir archivo</button>
+              <div style="flex:1"></div>
+              <button class="btn">Quitar</button></div>
+            <div class="hint" style="margin-top:8px">En <b>modificado</b> es opcional: con la
+              observación alcanza. En <b>a medida</b> es <b>obligatorio</b>.</div>
+          </div>
+
+          <div class="card" style="padding:14px 16px;background:var(--warn-bg);border-color:#f3e2c0">
+            <b style="font-size:13px;color:#7c4a05">Le queda pendiente al vendedor</b>
+            <div class="hint" style="color:#7c4a05;margin-top:4px">Un mueble a medida sin croquis
+              <b>no deja confirmar la venta</b> y aparece en <i>Mis pendientes</i> hasta que lo suba.
+              Es el papel que hoy queda en el escritorio.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:16px 18px;margin-top:12px">
+        <div class="kick" style="margin-bottom:9px">Cómo queda la línea en la venta</div>
+        <div class="scroll"><table>
+          <tr><th>Mueble</th><th>Tipo</th><th>Cambios</th><th>Croquis</th><th class="num">Cant.</th>
+            <th class="num">Precio</th></tr>
+          <tr><td class="nom">CÓMODA AMBERES 55 · 1.20 · Blanca · Blanco</td>
+            <td><span class="tipo mod">modificado</span></td>
+            <td class="mut">prof. <b>0.40</b> (era 0.45)</td><td class="mut">—</td>
+            <td class="num">1</td><td class="num nom">$412.000</td></tr>
+          <tr><td class="nom">CAMA HOUSTON 0.90 · Negro · Paraíso</td>
+            <td><span class="tipo">estándar</span></td>
+            <td class="mut">—</td><td class="mut">—</td>
+            <td class="num">3</td><td class="num nom">$1.155.000</td></tr>
+          <tr><td class="nom">CÓMODA con hueco para la caja fuerte</td>
+            <td><span class="tipo med">a medida</span></td>
+            <td class="mut">se dibuja</td><td class="tarde">falta</td>
+            <td class="num">1</td><td class="num nom">$680.000</td></tr>
+        </table></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ LA COTIZACIÓN ============ -->
+<section data-p="c" class="hide">
+  <div class="idea"><b>Si cambia una medida, puede cambiar el precio.</b> Y si el vendedor lo cobró
+    como si fuera estándar, lo perdimos. Por eso el <b>modificado</b> y el <b>a medida</b> pasan por
+    una verificación antes de bajar a Producción: alguien mira que esté bien cotizado.</div>
+
+  <div class="linea">
+    <div class="et"><b>El vendedor carga</b><small>con la modificación anotada</small></div>
+    <div class="et on"><b>A verificar el precio</b><small>Administración o Dirección</small></div>
+    <div class="et"><b>Confirmada</b><small>baja a Producción</small></div>
+  </div>
+
+  <div class="app">
+    <div class="appbar"><span>Belgrano Soft</span><span class="on">Ventas</span><span>Producción</span>
+      <span>Compras</span><span>Inventario</span></div>
+    <div class="subbar"><div>Órdenes</div><div class="on">A verificar</div><div>Cotizaciones</div>
+      <div>Clientes</div></div>
+    <div class="body">
+      <div class="kick">Ventas</div><div class="h1">Cotizaciones a verificar</div>
+      <div class="sub">4 ventas con muebles modificados o a medida esperando el visto</div>
+
+      <div class="gr" style="border-color:#f3e2c0">
+        <div class="gr-h" style="background:var(--warn-bg)"><b>5744 · Huego</b>
+          <span class="tipo mod">1 modificado</span><span class="tipo med">1 a medida</span>
+          <div class="sp"></div>
+          <span class="hint">cargada por Martín · hace 2 horas</span></div>
+        <div class="scroll"><table>
+          <tr><th>Mueble</th><th>Qué cambió</th><th class="num">De lista</th>
+            <th class="num">Cobrado</th><th class="num">Dif.</th><th></th></tr>
+          <tr><td class="nom">CÓMODA AMBERES 55 · 1.20</td>
+            <td>profundidad <b>0.40</b> en vez de 0.45</td>
+            <td class="num mut">$412.000</td><td class="num nom">$412.000</td>
+            <td class="num mut">—</td>
+            <td><span class="pill p-res">¿lleva menos material?</span></td></tr>
+          <tr><td class="nom">CÓMODA con hueco para caja fuerte</td>
+            <td>a medida, sin lista</td>
+            <td class="num mut">—</td><td class="num nom">$680.000</td>
+            <td class="num mut">—</td>
+            <td><span class="pill p-fal">cotizado a mano</span></td></tr>
+        </table></div>
+        <div style="padding:12px 14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <span class="hint">Si el precio está mal, se corrige acá y el vendedor se entera.</span>
+          <div style="flex:1"></div>
+          <button class="btn">Corregir el precio</button>
+          <button class="btn">Devolver al vendedor</button>
+          <button class="btn pri">Precio verificado</button></div>
+      </div>
+
+      <div class="dos" style="margin-top:14px">
+        <div class="card" style="padding:16px 18px">
+          <div class="kick" style="margin-bottom:9px">Qué mira el que verifica</div>
+          <ul class="ok-lista">
+            <li>Qué cambió respecto del catálogo, escrito al lado del precio.</li>
+            <li>Si el cambio <b>suma o resta material</b> — una cómoda más chica cuesta menos.</li>
+            <li>Si el precio cobrado sigue teniendo el <b>markup</b> que corresponde.</li>
+            <li>En los a medida, contra qué se cotizó: no hay lista.</li>
+          </ul>
+        </div>
+        <div class="card" style="padding:16px 18px">
+          <div class="kick" style="margin-bottom:9px">Qué no pasa hasta que se verifica</div>
+          <ul class="ok-lista">
+            <li>La venta <b>no baja a Producción</b>: no aparece para pedir.</li>
+            <li>Queda visible en <b>Mis pendientes</b> del que tiene que verificar.</li>
+            <li>Si se corrige el precio, queda registrado <b>quién lo cambió y de cuánto a
+              cuánto</b>.</li>
+            <li>El <b>estándar no pasa por acá</b>: va derecho.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ EN PRODUCCIÓN ============ -->
+<section data-p="p" class="hide">
+  <div class="idea"><b>En Producción nunca dice "estándar" si no lo es.</b> El modificado se lee con
+    su cambio al lado, y la hoja que se imprime lleva la cota corregida y la observación. Es el
+    error que hay que evitar: que salga a fábrica como si fuera el de siempre.</div>
+
+  <div class="app">
+    <div class="appbar"><span>Belgrano Soft</span><span>Ventas</span><span class="on">Producción</span>
+      <span>Compras</span><span>Inventario</span></div>
+    <div class="subbar"><div>Resumen</div><div class="on">A fabricar</div><div>Pedidos</div>
+      <div>Talleres</div><div>Historial</div></div>
+    <div class="body">
+      <div class="kick">Producción</div><div class="h1">A fabricar</div>
+      <div class="sub">18 muebles sin pedir · 1 a medida sin dibujar · 2 modificados</div>
+
+      <div class="scroll"><div class="card"><table>
+        <tr><th>Mueble</th><th>Tipo</th><th>Terminación</th><th>Qué cambia</th><th>Plano</th>
+          <th>Venta</th><th></th></tr>
+        <tr><td class="nom">CAMA HOUSTON 0.90</td><td><span class="tipo">estándar</span></td>
+          <td>Negro · Paraíso</td><td class="mut">—</td><td class="mut">de la variante</td>
+          <td class="mut">5660 · 1 de 6</td><td><button class="btn">Pedir</button></td></tr>
+        <tr style="background:#fff7e6"><td class="nom">CÓMODA AMBERES 55 · 1.20</td>
+          <td><span class="tipo mod">modificado</span></td><td>Blanca · Blanco</td>
+          <td><b>prof. 0.40</b> <span class="mut">(era 0.45)</span></td>
+          <td class="mut">de la variante <b>+ cota</b></td>
+          <td class="mut">5744 · 1 de 3</td><td><button class="btn">Pedir</button></td></tr>
+        <tr style="background:#fff7e6"><td class="nom">PLACARD OLIVER 2.00</td>
+          <td><span class="tipo mod">modificado</span></td><td>Blanca · Paraíso</td>
+          <td><b>alto 2.10</b> <span class="mut">(era 2.35)</span></td>
+          <td class="mut">de la variante <b>+ cota</b></td>
+          <td class="mut">5701 · 2 de 4</td><td><button class="btn">Pedir</button></td></tr>
+        <tr style="background:var(--crit-bg)"><td class="nom">CÓMODA con hueco para caja fuerte</td>
+          <td><span class="tipo med">a medida</span></td><td>Blanca · Blanco</td>
+          <td class="mut">se dibuja de cero</td><td class="tarde">falta el plano</td>
+          <td class="mut">5744 · 3 de 3</td>
+          <td><button class="bres">A dibujar</button></td></tr>
+      </table></div></div>
+
+      <div class="dos" style="margin-top:14px">
+        <div class="card" style="padding:16px 18px">
+          <div class="kick" style="margin-bottom:9px">Qué sale impreso en cada uno</div>
+          <table>
+            <tr><th>Tipo</th><th>La hoja lleva</th></tr>
+            <tr><td><span class="tipo">estándar</span></td>
+              <td>El plano de la variante, tal cual</td></tr>
+            <tr><td><span class="tipo mod">modificado</span></td>
+              <td>El mismo plano, con la <b>cota cambiada marcada</b> y la observación en el
+                casillero de OBSERVACIONES</td></tr>
+            <tr><td><span class="tipo med">a medida</span></td>
+              <td>El plano <b>propio</b> que dibujó Adrián, más el croquis del vendedor adjunto</td></tr>
+          </table>
+        </div>
+        <div class="card" style="padding:16px 18px">
+          <div class="kick" style="margin-bottom:9px">Y dónde más se ve el tipo</div>
+          <ul class="ok-lista">
+            <li>En la <b>unidad</b>, en Inventario: el que la vende sabe que esa cómoda tiene 0.40.</li>
+            <li>En la <b>cola de trabajo</b>: los a medida sin dibujar suben solos.</li>
+            <li>En el <b>pedido y el remito</b> que recibe el proveedor.</li>
+            <li>En el <b>control de calidad</b>: se compara contra la medida pedida, no contra la
+              del catálogo.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ LA HOJA Y EL FRACCIONAMIENTO ============ -->
+<section data-p="f" class="hide">
+  <div class="idea"><b>Una hoja por línea de venta, no por unidad.</b> Tres camas iguales de la misma
+    venta van en <b>un dibujo que dice 3 UNIDADES</b>. Pero al armar el pedido, esas mismas se
+    pueden <b>fraccionar</b>: seis mesas a un taller y seis al otro.</div>
+
+  <div class="dos">
+    <div class="card" style="padding:16px 18px">
+      <div class="kick" style="margin-bottom:9px">La hoja: por línea de venta</div>
+      <table>
+        <tr><th>Situación</th><th>Cuántas hojas</th></tr>
+        <tr><td>3 camas iguales, <b>misma venta</b></td>
+          <td class="nom">1 hoja · CANTIDAD 3 UNIDADES</td></tr>
+        <tr><td>3 camas iguales, <b>tres ventas distintas</b></td>
+          <td class="nom">3 hojas · una por orden</td></tr>
+        <tr><td>2 camas de una venta + 1 para stock</td>
+          <td class="nom">2 hojas · una dice 2 UNIDADES, la otra STOCK</td></tr>
+        <tr><td>1 mueble a medida</td><td class="nom">1 hoja siempre · es única</td></tr>
+      </table>
+      <div class="hint" style="margin-top:9px">El casillero <b>PEDIDO/ORDEN</b> del plano es de una
+        sola venta: por eso la hoja no puede juntar dos órdenes distintas.</div>
+    </div>
+
+    <div class="card" style="padding:16px 18px">
+      <div class="kick" style="margin-bottom:9px">Las copias, en cambio, son por unidad</div>
+      <ul class="ok-lista">
+        <li>El <b>original</b> para el proveedor: 1 hoja que dice 3 UNIDADES.</li>
+        <li>Las <b>copias</b> para nosotros: <b>3</b>, una por mueble — cada una con su código de
+          barras, porque cada una se pega a una pieza distinta.</li>
+        <li>Al recibir, se tildan de a una: pueden venir dos y faltar una.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card" style="padding:16px 18px;margin-top:14px">
+    <div class="kick" style="margin-bottom:9px">Fraccionar al armar el pedido</div>
+    <div class="hint" style="margin-bottom:10px">12 MESA DE LUZ MIAMI para pedir. Se parten en dos
+      talleres sin tocar las ventas.</div>
+    <div class="scroll"><table>
+      <tr><th style="width:26px"></th><th>Mueble</th><th>Venta</th><th class="num">Cant.</th>
+        <th>Prometida</th><th>Va a</th></tr>
+      <tr style="background:var(--brand-soft)"><td><input type="checkbox" class="chk" checked></td>
+        <td class="nom">MESA DE LUZ MIAMI · Blanca</td><td class="mut">5660</td>
+        <td class="num">3</td><td class="tarde">30/7</td><td class="nom">1 Tony</td></tr>
+      <tr style="background:var(--brand-soft)"><td><input type="checkbox" class="chk" checked></td>
+        <td class="nom">MESA DE LUZ MIAMI · Blanca</td><td class="mut">5698</td>
+        <td class="num">2</td><td>14/8</td><td class="nom">1 Tony</td></tr>
+      <tr style="background:var(--brand-soft)"><td><input type="checkbox" class="chk" checked></td>
+        <td class="nom">MESA DE LUZ MIAMI · Blanca</td><td class="mut">STOCK</td>
+        <td class="num">1</td><td class="mut">—</td><td class="nom">1 Tony</td></tr>
+      <tr><td><input type="checkbox" class="chk"></td>
+        <td class="nom">MESA DE LUZ MIAMI · Negra</td><td class="mut">5701</td>
+        <td class="num">4</td><td>16/8</td><td class="mut">sin asignar</td></tr>
+      <tr><td><input type="checkbox" class="chk"></td>
+        <td class="nom">MESA DE LUZ MIAMI · Negra</td><td class="mut">STOCK</td>
+        <td class="num">2</td><td class="mut">—</td><td class="mut">sin asignar</td></tr>
+    </table></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:11px">
+      <span class="hint"><b>6 de 12</b> tildadas para Tony · las otras 6 quedan a pedir</span>
+      <div style="flex:1"></div>
+      <button class="btn pri">Pedirle estas 6 a Tony</button></div>
+    <div class="nota" style="margin-top:12px"><b>Se puede partir hasta adentro de una misma venta:</b>
+      si la 5701 pidió cuatro y sólo querés darle dos a cada uno, se tildan dos. La venta sigue
+      siendo una; lo que se parte es <b>a quién se le pide cada pieza</b>.</div>
+  </div>
+</section>
+
+<div class="pregs">
+  <h3>Lo que decido yo si no me decís otra cosa</h3>
+  <ol>
+    <li>El del medio se llama <b>Modificado</b>. Si preferís <i>Adaptado</i> o cualquier otro, lo
+      cambio en un minuto — es una palabra, no una estructura.</li>
+    <li>En <b>modificado</b> el croquis es <b>opcional</b> (alcanza con la observación) y en
+      <b>a medida</b> es <b>obligatorio</b>: sin croquis no se confirma la venta.</li>
+    <li>La <b>verificación de la cotización</b> la hace Administración, igual que la confirmación de
+      la orden — es la misma persona mirando la misma venta, así que es un solo paso con dos cosas
+      que mirar, no dos pasos.</li>
+    <li>Un <b>modificado no pasa por Adrián</b>: no hay nada que dibujar. Va directo a pedir una vez
+      verificado el precio.</li>
+  </ol>
+  <div class="hint" style="margin-top:10px">Si alguna de estas cuatro está mal, decímela y la doy
+    vuelta antes de escribir código.</div>
+</div>
+
+</div>
+
+<script>
+document.querySelectorAll('.opt').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.opt').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('[data-p]').forEach(s =>
+    s.classList.toggle('hide', s.dataset.p !== b.dataset.o));
+  window.scrollTo(0, 0);
+});
+</script>
