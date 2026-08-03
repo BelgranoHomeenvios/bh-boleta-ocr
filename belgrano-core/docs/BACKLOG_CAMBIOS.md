@@ -1011,6 +1011,11 @@ al **costado derecho**, no arriba, y se pueden **marcar varias a la vez**.
   hay que abrirlo para saber qué está filtrando. Lo que dejás abierto se
   recuerda.
 
+- ✅ 413. En el listado la **foto pasa a la primera columna** —es lo que
+  identifica el mueble de un vistazo— y se van el **estado** y las
+  **terminaciones**: para eso está la vista con fotos. Quedan **foto · producto
+  · tipo · variantes · stock · ⋯**.
+
 > Falta decidir si el filtro guarda lo último usado por rol.
 
 ### Lote 13 — APLICADO (Inventario y solapa Otros)

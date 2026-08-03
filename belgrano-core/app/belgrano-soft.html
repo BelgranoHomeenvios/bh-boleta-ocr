@@ -2867,25 +2867,22 @@ tr:hover td{background:var(--panel-2)}
     // reconocer el mueble de un vistazo. Se entra tocando el renglón; los
     // tres puntitos son para ir derecho a una solapa.
     htmlLista(prods, grupos) {
-      const renglon = p => {
-          const e = this.estado(p);
-          return `<tr data-prod="${p.id}">
+      // La foto va primera: es lo que identifica el mueble de un vistazo. El
+      // estado y las terminaciones no van — para eso está la vista con fotos.
+      const renglon = p => `<tr data-prod="${p.id}">
+            <td class="td-foto"><span class="mini">${p.foto
+              ? `<img src="${UI.esc(p.foto)}" alt="">`
+              : this.silueta(p.categoria_id)}</span></td>
             <td><b>${UI.esc(p.nombre)}</b></td>
             <td class="muted">${UI.esc(this.catDe(p.categoria_id))}</td>
             <td style="text-align:right" class="tnum">${p.variantes}</td>
             <td style="text-align:right" class="tnum">${p.stock || '—'}</td>
-            <td>${this.puntos(p)}</td>
-            <td><span class="pill ${e.pill}">${UI.esc(e.label)}</span></td>
-            <td class="td-foto"><span class="mini">${p.foto
-              ? `<img src="${UI.esc(p.foto)}" alt="">`
-              : this.silueta(p.categoria_id)}</span></td>
             <td class="td-mas"><button class="lx" data-mas="${p.id}"
               title="Abrir en…" aria-label="Abrir en…">⋯</button></td></tr>`;
-      };
       const cuerpo = grupos
         ? grupos.map(g => {
             const cerrada = this.plegada(g.id);
-            return `<tr class="cat-tr-h"><td colspan="8">
+            return `<tr class="cat-tr-h"><td colspan="6">
             <button class="cat-sec-b" data-plegarcat="${g.id}"
               aria-expanded="${!cerrada}" title="${cerrada ? 'Mostrar' : 'Ocultar'} ${UI.esc(g.nombre)}">
               <span class="cat-sec-g">${cerrada ? '▸' : '▾'}</span>
@@ -2896,9 +2893,9 @@ tr:hover td{background:var(--panel-2)}
           </td></tr>${cerrada ? '' : g.items.map(renglon).join('')}`; }).join('')
         : prods.map(renglon).join('');
       return `<div class="card"><table class="cat-tabla">
-        <thead><tr><th>Producto</th><th>Tipo</th>
+        <thead><tr><th class="th-foto"></th><th>Producto</th><th>Tipo</th>
           <th style="text-align:right">Variantes</th><th style="text-align:right">Stock</th>
-          <th>Terminaciones</th><th></th><th class="th-foto"></th><th></th></tr></thead>
+          <th></th></tr></thead>
         <tbody>${cuerpo}</tbody></table></div>`;
     },
 
