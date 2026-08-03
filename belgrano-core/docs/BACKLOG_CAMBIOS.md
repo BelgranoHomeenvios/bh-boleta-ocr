@@ -1210,6 +1210,21 @@ al **costado derecho**, no arriba, y se pueden **marcar varias a la vez**.
   categorías, a la izquierda. El proveedor sigue estando **como dato** en la
   ficha de cada unidad —de dónde vino—, que es distinto de filtrar por él.
 
+### Lote 44 — APLICADO (Cada título de columna es un filtro)
+
+- ✅ 463. **Los títulos se abren**: Estado, N°, Modelo, las propiedades,
+  Ubicación y Nota. Cada uno muestra los valores que hay en esa columna **con su
+  cuenta**, y se marca lo que se busca. Es lo que uno hace en una planilla.
+- ✅ 464. Las opciones se calculan sobre lo que ya está filtrado, **salvo el
+  filtro de esa misma columna**: si no, quedaría una sola opción y no se podría
+  cambiar de valor sin limpiar antes.
+- ✅ 465. Con **más de ocho valores** aparece un buscador adentro del
+  desplegable. El título filtrado queda marcado con su cuenta.
+- ✅ 466. Debajo de la tabla, una línea dice **por qué columnas se está
+  filtrando**, con una cruz para sacar cada una y *limpiar todo*.
+- ✅ 467. El desplegable se dibuja **fuera de la tabla** (pegado a la pantalla):
+  la tabla se corre de costado y lo recortaría.
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·

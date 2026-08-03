@@ -73,6 +73,7 @@
       return global.DB.unidadesTodas().filter(u => {
         if (!this.pasaCat(u)) return false;
         if (!this.pasaProps(u)) return false;
+        if (!this.pasaCol(u)) return false;
         if (!this.pasaFiltro(u)) return false;
         if (!t.length) return true;
         const txt = `${u.serie} ${u.modelo} ${u.medida} ${u.color} ${u.orden || ''}`.toLowerCase();
@@ -97,6 +98,35 @@
       }
       return true;
     },
+    // Cada título de columna es su propio filtro: se abre, se marca lo que se
+    // busca y la tabla queda con eso. Es lo que uno hace en una planilla.
+    fcol: {},              // columna → valores marcados (normalizados)
+    valorCol(u, col) {
+      switch (col.k) {
+        case 'estado': {
+          const v = global.DB.VISTAS_UNIDAD.find(x => x.k === global.DB.vistaUnidad(u));
+          return v ? v.label : '';
+        }
+        case 'serie': return u.serie === '—' ? 'Sin etiqueta' : u.serie;
+        case 'modelo': return u.modelo;
+        case 'ubicacion': return global.DB.ubicacionLabel(u.ubicacion) || 'Sin ubicación';
+        case 'nota': return (u.nota || '').trim() ? 'Con nota' : 'Sin nota';
+        default: return this.valorProp(u, col.k) || (col.k === 'medida' ? u.medida : '');
+      }
+    },
+    pasaCol(u, salvo) {
+      for (const k of Object.keys(this.fcol)) {
+        if (k === salvo) continue;
+        const sel = this.fcol[k]; if (!sel || !sel.length) continue;
+        if (!sel.includes(this.normT(this.valorCol(u, { k })))) return false;
+      }
+      return true;
+    },
+    marcarCol(k, v) {
+      const sel = this.fcol[k] || [];
+      this.fcol[k] = sel.includes(v) ? sel.filter(x => x !== v) : [...sel, v];
+      if (!this.fcol[k].length) delete this.fcol[k];
+    },
     pasaFiltro(u) {
       if (this.filtro === 'todo') return true;
       return global.DB.vistaUnidad(u) === this.filtro;
@@ -105,7 +135,7 @@
       const antes = this.filtro;
       this.filtro = f;
       const n = global.DB.unidadesTodas()
-        .filter(u => this.pasaCat(u) && this.pasaProps(u) && this.pasaFiltro(u)).length;
+        .filter(u => this.pasaCat(u) && this.pasaProps(u) && this.pasaCol(u) && this.pasaFiltro(u)).length;
       this.filtro = antes;
       return n;
     },
@@ -220,7 +250,7 @@
     cuentaCats() {
       const m = new Map();
       global.DB.unidadesTodas().forEach(u => {
-        if (!this.pasaProps(u) || !this.pasaFiltro(u)) return;
+        if (!this.pasaProps(u) || !this.pasaCol(u) || !this.pasaFiltro(u)) return;
         const c = this.catDe(u); if (!c) return;
         m.set(c.id, (m.get(c.id) || 0) + 1);
       });
@@ -414,7 +444,7 @@
       cont.innerHTML = `${grupos.map(g => {
         const claves = this.clavesCat(g.id);
         const on = !this.plegada(g.id);
-        return `<section class="un-sec">
+        return `<section class="un-sec" data-seccat="${g.id}">
           <button class="un-cat" data-plegarcat="${g.id}" aria-expanded="${on}">
             <span class="un-cat-fl">${on ? '▾' : '▸'}</span>
             <h2>${UI.esc(g.nombre)}</h2>
@@ -424,19 +454,34 @@
           ${on ? `<div class="card un-tabla">
             <table>
               <thead><tr>
-                <th>Estado</th><th>N°</th><th class="th-f">Foto</th><th>Modelo</th>
-                ${claves.map(k => `<th>${UI.esc(this.tituloProp(k))}</th>`).join('')}
-                <th>Ubicación</th><th class="th-f">Nota</th><th></th>
+                ${this.cols(claves).map(c => `<th class="${c.chica ? 'th-f' : ''}">${
+                  c.filtra === false ? UI.esc(c.label) : this.thFiltro(c)}</th>`).join('')}
+                <th></th>
               </tr></thead>
               <tbody>${g.items.map(u => this.renglon(u, ed, claves)).join('')}</tbody>
             </table>
           </div>` : ''}
         </section>`;
       }).join('')}
+        ${Object.keys(this.fcol).length ? `<div class="un-fcol">
+          <span>Filtrando por</span>
+          ${Object.keys(this.fcol).map(k => {
+            const col = this.cols(this.clavesProp()).find(x => x.k === k) || { label: k };
+            return `<span class="un-fchip">${UI.esc(col.label)}
+              <b>${this.fcol[k].length}</b>
+              <button data-quita="${UI.esc(k)}" title="Sacar este filtro">✕</button></span>`;
+          }).join('')}
+          <button class="lnk" data-quita="*">limpiar todo</button>
+        </div>` : ''}
         <div class="hint" style="margin-top:9px">Acá se consulta qué hay y con qué número de
           serie. <b>Reservar se reserva desde la venta</b>, atada a su orden. La que es
           <b>a medida</b> lleva su foto para que el vendedor sepa qué está vendiendo.</div>`;
 
+      cont.querySelectorAll('[data-col]').forEach(b => b.onclick = () => {
+        const sec = b.closest('.un-sec');
+        const g = grupos.find(x => String(x.id) === String(sec.dataset.seccat));
+        this.abrirCol(b, b.dataset.col, this.clavesCat(g ? g.id : 0));
+      });
       cont.querySelectorAll('[data-plegarcat]').forEach(b => b.onclick = () => {
         this.plegar(Number(b.dataset.plegarcat)); this.pintar();
       });
@@ -444,6 +489,103 @@
       cont.querySelectorAll('[data-pedir]').forEach(b => b.onclick = () => this.pedir(Number(b.dataset.pedir)));
       cont.querySelectorAll('[data-foto]').forEach(b => b.onclick = () => this.modalFoto(Number(b.dataset.foto)));
       cont.querySelectorAll('[data-nota]').forEach(b => b.onclick = () => this.modalNota(Number(b.dataset.nota)));
+      cont.querySelectorAll('[data-quita]').forEach(b => b.onclick = () => {
+        if (b.dataset.quita === '*') this.fcol = {}; else delete this.fcol[b.dataset.quita];
+        this.pintar();
+      });
+    },
+
+    // Las columnas, en un solo lugar: de acá salen los títulos, los filtros de
+    // cada título y el orden en que se arma cada renglón.
+    cols(claves) {
+      return [
+        { k: 'estado', label: 'Estado' },
+        { k: 'serie', label: 'N°' },
+        { k: 'foto', label: 'Foto', filtra: false, chica: true },
+        { k: 'modelo', label: 'Modelo' },
+        ...(claves || []).map(k => ({ k, label: this.tituloProp(k) })),
+        { k: 'ubicacion', label: 'Ubicación' },
+        { k: 'nota', label: 'Nota', chica: true },
+      ];
+    },
+    // El título es un botón: se abre y se marca lo que se busca en esa columna.
+    thFiltro(c) {
+      const n = (this.fcol[c.k] || []).length;
+      return `<button class="th-b ${n ? 'on' : ''}" data-col="${UI.esc(c.k)}"
+        aria-expanded="false" title="Filtrar por ${UI.esc(c.label.toLowerCase())}">
+        <span>${UI.esc(c.label)}</span>
+        ${n ? `<span class="th-n">${n}</span>` : '<span class="th-fl">▾</span>'}
+      </button>`;
+    },
+    // Los valores que hay en esa columna, con su cuenta — mirando todo lo demás
+    // ya filtrado, pero no la columna misma: si no, siempre quedaría una sola.
+    opcionesCol(c, us) {
+      const m = new Map(); const nom = new Map();
+      us.forEach(u => {
+        if (!this.pasaCol(u, c.k)) return;
+        const val = this.valorCol(u, c); if (!val) return;
+        const nk = this.normT(val);
+        m.set(nk, (m.get(nk) || 0) + 1);
+        if (!nom.has(nk)) nom.set(nk, val);
+      });
+      const ops = [...m.entries()].map(([k, n]) => ({ k, n, label: nom.get(k) }));
+      // Las medidas se leen en orden; el resto, lo que más hay primero.
+      return c.k === 'medida' || c.k === 'serie'
+        ? ops.sort((a, b) => String(a.label).localeCompare(String(b.label), 'es', { numeric: true }))
+        : ops.sort((a, b) => b.n - a.n || String(a.label).localeCompare(String(b.label)));
+    },
+
+    // El desplegable del título. Va pegado al body y no adentro de la tabla:
+    // la tabla se corre de costado y lo recortaría.
+    abrirCol(btn, k, claves) {
+      this.cerrarCol();
+      const c = this.cols(claves).find(x => x.k === k); if (!c) return;
+      // Todo lo que se ve salvo el filtro de esta misma columna.
+      const us = global.DB.unidadesTodas().filter(u => this.pasaCat(u) && this.pasaProps(u)
+        && this.pasaFiltro(u) && this.pasaCol(u, k));
+      const ops = this.opcionesCol(c, us);
+      const sel = this.fcol[k] || [];
+      const r = btn.getBoundingClientRect();
+      const ancho = Math.max(210, Math.min(300, r.width + 120));
+      const izq = Math.min(r.left, window.innerWidth - ancho - 12);
+      document.body.insertAdjacentHTML('beforeend', `
+        <div class="th-back" id="th-back"></div>
+        <div class="th-pop" id="th-pop" style="left:${Math.max(8, izq)}px;top:${r.bottom + 4}px;
+          width:${ancho}px">
+          <div class="th-pop-h"><span>${UI.esc(c.label)}</span>
+            ${sel.length ? '<button class="lnk" id="th-limpia">limpiar</button>' : ''}</div>
+          ${ops.length > 8 ? '<input class="th-q" id="th-q" placeholder="Buscar…">' : ''}
+          <div class="th-pop-b" id="th-ops">${ops.map(o => `
+            <label class="un-o ${sel.includes(o.k) ? 'on' : ''}" data-v="${UI.esc(o.k)}">
+              <input type="checkbox" data-val="${UI.esc(o.k)}" ${sel.includes(o.k) ? 'checked' : ''}>
+              <span class="un-o-n">${UI.esc(o.label)}</span>
+              <span class="un-o-c tnum">${o.n}</span></label>`).join('')
+            || '<div class="muted" style="font-size:12px;padding:4px 0">Nada para filtrar acá.</div>'}
+          </div>
+        </div>`);
+      btn.setAttribute('aria-expanded', 'true');
+      const cerrar = () => { this.cerrarCol(); };
+      document.getElementById('th-back').onclick = cerrar;
+      const q = document.getElementById('th-q');
+      if (q) {
+        q.focus();
+        q.oninput = () => {
+          const t = this.normT(q.value);
+          document.querySelectorAll('#th-ops .un-o').forEach(l => {
+            l.style.display = !t || this.normT(l.textContent).includes(t) ? '' : 'none';
+          });
+        };
+      }
+      document.querySelectorAll('#th-pop [data-val]').forEach(i => i.onchange = () => {
+        this.marcarCol(k, i.dataset.val);
+        this.cerrarCol(); this.pintar();
+      });
+      const l = document.getElementById('th-limpia');
+      if (l) l.onclick = () => { delete this.fcol[k]; this.cerrarCol(); this.pintar(); };
+    },
+    cerrarCol() {
+      ['th-pop', 'th-back'].forEach(id => { const e = document.getElementById(id); if (e) e.remove(); });
+      document.querySelectorAll('[data-col]').forEach(b => b.setAttribute('aria-expanded', 'false'));
     },
 
     // En la pantalla se ve lo que se mira de corrido: cómo está, cuál es, qué
@@ -880,6 +1022,39 @@
           text-overflow:ellipsis;white-space:nowrap}
         .un-sec:has(.un-cat[aria-expanded="false"]){margin-bottom:2px}
         .th-f{width:34px}
+        /* Cada título es un filtro: se abre y se marca lo que se busca. */
+        .th-b{display:flex;align-items:center;gap:4px;border:0;background:none;padding:0;
+          font:inherit;font-size:10px;text-transform:uppercase;letter-spacing:.05em;
+          color:var(--muted);font-weight:700;cursor:pointer;white-space:nowrap}
+        .th-b:hover{color:var(--brand)}
+        .th-b .th-fl{font-size:8px;opacity:.5}
+        .th-b:hover .th-fl{opacity:1}
+        .th-b.on{color:var(--brand)}
+        .th-n{font-size:9px;background:var(--brand);color:#fff;border-radius:999px;padding:0 4px;
+          line-height:13px}
+        .th-back{position:fixed;inset:0;z-index:60}
+        .th-pop{position:fixed;z-index:61;background:var(--panel);border:1px solid var(--line);
+          border-radius:11px;padding:8px 11px;box-shadow:0 12px 30px rgba(12,22,44,.18)}
+        .th-pop-h{display:flex;align-items:baseline;gap:8px;font-size:10.5px;font-weight:700;
+          text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:4px}
+        .th-pop-h span{flex:1}
+        .th-pop .lnk{border:0;background:none;padding:0;font:inherit;font-size:11px;font-weight:600;
+          color:var(--brand);cursor:pointer;text-transform:none;letter-spacing:0}
+        .th-pop-b{max-height:280px;overflow:auto}
+        .th-q{width:100%;padding:5px 8px;font-size:12px;margin-bottom:5px;border:1px solid var(--line);
+          border-radius:8px;background:var(--panel);color:var(--ink)}
+        /* Lo que se está filtrando, a la vista y fácil de sacar. */
+        .un-fcol{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:10px;
+          font-size:11.5px;color:var(--muted)}
+        .un-fchip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);
+          border-radius:999px;padding:2px 5px 2px 9px;background:var(--panel);color:var(--ink-soft);
+          font-size:11.5px}
+        .un-fchip b{color:var(--brand)}
+        .un-fchip button{border:0;background:none;color:var(--muted);cursor:pointer;font-size:11px;
+          padding:0 3px;line-height:1}
+        .un-fchip button:hover{color:var(--crit)}
+        .un-fcol .lnk{border:0;background:none;padding:0;font:inherit;font-size:11.5px;
+          font-weight:600;color:var(--brand);cursor:pointer}
         .td-f{width:34px;padding-left:4px;padding-right:4px}
         .un-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
         @media(max-width:900px){.un-kpis{grid-template-columns:1fr 1fr}}
