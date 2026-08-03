@@ -1046,7 +1046,10 @@ tr:hover td{background:var(--panel-2)}
       return this._peds;
     },
     pedido(num) { return this.pedidosTodos().find(p => p.numero === num) || null; },
-    itemsDePedido(num) { return this.unidadesTodas().filter(u => u.pedido === num); },
+    itemsDePedido(num) {
+      return this.unidadesTodas().filter(u => this.pedidosDeUnidad(u)
+        .some(x => x.pedido === num));
+    },
     // El próximo número: sigue la serie más alta que ya exista.
     proximoPedido() {
       const n = this.pedidosTodos().reduce((mx, p) => {
@@ -1057,27 +1060,61 @@ tr:hover td{background:var(--panel-2)}
     },
     // Abre un pedido vacío para un taller. Todavía no se le mandó nada.
     abrirPedido({ proveedor, rubro = 'carpinteria', modo = 'dibujo', desde = '', hasta = '', quien = '' }) {
+      const prov = this.proveedores().find(x => this.provLabel(x.id) === proveedor
+        || x.nombre === proveedor);
       const p = {
-        numero: this.proximoPedido(), proveedor, rubro, modo, desde, hasta,
+        numero: this.proximoPedido(), proveedor, provId: prov ? prov.id : null,
+        cupo: prov ? Number(prov.capacidad) || 0 : 0, rubro, modo, desde, hasta,
         estado: 'abierto', abiertoPor: quien || 'yo', abiertoEl: this.hoyCorto(),
         historial: [{ f: this.hoyCorto(), t: `${quien || 'Alguien'} abrió el pedido para ${proveedor}` }],
       };
       this.pedidosTodos().unshift(p);
       return p;
     },
-    // Sumar una unidad a un pedido abierto. La unidad se entera de a cuál va.
+    // Sumar una unidad a un pedido. Un mueble de DOS rubros va en dos pedidos
+    // distintos —la cama al carpintero, las patas al herrero— y sigue siendo
+    // una sola unidad: por eso la unidad guarda una lista, no un pedido solo.
     agregarAPedido(num, unidadId, quien = '') {
       const p = this.pedido(num); if (!p || p.estado !== 'abierto') return null;
       const u = this.unidad(unidadId); if (!u) return null;
-      this.guardarUnidad({ id: u.id, pedido: num, proveedor: p.proveedor,
-        agregadoEl: this.hoyCorto() });
+      const lista = [...(u.pedidos || [])].filter(x => x.rubro !== p.rubro);
+      lista.push({ rubro: p.rubro, pedido: num, proveedor: p.proveedor,
+        provId: p.provId || null, agregadoEl: this.hoyCorto() });
+      this.guardarUnidad({ id: u.id, pedidos: lista,
+        // El primero es el que se muestra cuando hay que mostrar uno solo.
+        pedido: lista[0].pedido, proveedor: lista[0].proveedor,
+        provId: lista[0].provId, agregadoEl: this.hoyCorto() });
       p.historial.push({ f: this.hoyCorto(), t: `${quien || 'Alguien'} agregó ${u.modelo}` });
       return p;
     },
     sacarDePedido(num, unidadId) {
       const p = this.pedido(num); if (!p || p.estado !== 'abierto') return null;
-      this.guardarUnidad({ id: unidadId, pedido: '', proveedor: '', agregadoEl: '' });
+      const u = this.unidad(unidadId); if (!u) return null;
+      const lista = (u.pedidos || []).filter(x => x.pedido !== num);
+      this.guardarUnidad({ id: unidadId, pedidos: lista,
+        pedido: lista.length ? lista[0].pedido : '',
+        proveedor: lista.length ? lista[0].proveedor : '',
+        provId: lista.length ? lista[0].provId : null,
+        agregadoEl: lista.length ? lista[0].agregadoEl : '' });
       return p;
+    },
+    // Los pedidos de una unidad, uno por rubro.
+    pedidosDeUnidad(u) {
+      if (u.pedidos && u.pedidos.length) return u.pedidos;
+      return u.pedido ? [{ rubro: this.rubroDe(u), pedido: u.pedido,
+        proveedor: u.proveedor, provId: u.provId }] : [];
+    },
+    // Le faltan rubros: el mueble pasa por dos manos y sólo se pidió una.
+    rubrosFaltantes(u) {
+      const hechos = this.pedidosDeUnidad(u).map(x => x.rubro);
+      return this.rubrosDe(u.productoId).filter(r => !hechos.includes(r));
+    },
+    // Está enlazada cuando llegaron todas sus partes y alguien las unió.
+    necesitaEnlace(u) { return this.rubrosDe(u.productoId).length > 1; },
+    enlazar(u, quien = '') {
+      this.guardarUnidad({ id: u.id, enlazada: true, enlazadaPor: quien,
+        enlazadaEl: this.hoyCorto() });
+      return this.unidad(u.id);
     },
     // Cerrar congela el pedido: ya no entra nada sin reabrirlo. Y ahí las
     // unidades pasan a estar en fábrica, con el rango comprometido.
@@ -1092,6 +1129,20 @@ tr:hover td{background:var(--panel-2)}
         serie: u.serie && u.serie !== '—' ? u.serie : this.tomarSerie(),
       }));
       return p;
+    },
+    // El cupo: cuántos muebles le caben. Cuando se llena, el pedido se cierra
+    // —es lo mismo que los viajes de un flete—.
+    cupoDe(p) {
+      if (p.cupo) return Number(p.cupo);
+      const prov = p.provId ? this.proveedor(p.provId)
+        : this.proveedores().find(x => this.provLabel(x.id) === p.proveedor);
+      return prov ? Number(prov.capacidad) || 0 : 0;
+    },
+    lugarEnPedido(p) {
+      const cupo = this.cupoDe(p);
+      if (!cupo) return null;
+      return { cupo, usado: this.itemsDePedido(p.numero).length,
+        libre: Math.max(0, cupo - this.itemsDePedido(p.numero).length) };
     },
     reabrirPedido(num, quien = '') {
       const p = this.pedido(num); if (!p) return null;
@@ -12748,6 +12799,11 @@ tr:hover td{background:var(--panel-2)}
       });
       cont.querySelectorAll('[data-ver]').forEach(b => b.onclick = () =>
         this.ficha(Number(b.dataset.ver)));
+      // Entrar a la fila abre la ficha entera. Los tildes y los botones no.
+      cont.querySelectorAll('[data-fila]').forEach(tr => tr.onclick = ev => {
+        if (ev.target.closest('input,button')) return;
+        this.ficha(Number(tr.dataset.fila));
+      });
       cont.querySelectorAll('[data-sel]').forEach(c => c.onchange = () => this.contarSel());
       const bf = document.getElementById('pr-fab');
       if (bf) bf.onclick = () => this.modalFabricar();
@@ -12800,8 +12856,8 @@ tr:hover td{background:var(--panel-2)}
 
     // Asignarle un taller es abrirle un pedido —o sumarlo a uno abierto— con
     // el rango en que se comprometió a entregarlo.
-    modalAsignar() {
-      const ids = this.tildados();
+    modalAsignar(unos) {
+      const ids = unos || this.tildados();
       if (!ids.length) return;
       const us = ids.map(id => global.DB.unidad(id)).filter(Boolean);
       const rubros = [...new Set(us.map(u => global.DB.rubroDe(u)))];
@@ -12973,7 +13029,7 @@ tr:hover td{background:var(--panel-2)}
         : `<td>${u.orden ? `<b class="nom">${UI.esc(u.orden)}</b>`
             : `<span class="pr-stock">stock</span>${u.motivoStock
               ? ` <span class="muted">${UI.esc(u.motivoStock)}</span>` : ''}`}</td>`;
-      return `<tr class="${venc ? 'mal' : ''}">
+      return `<tr class="${venc ? 'mal' : ''} clic" data-fila="${u.id}">
         ${sel ? `<td><input type="checkbox" class="chk" data-sel="${u.id}"></td>` : ''}
         ${venta}
         <td><span class="pill ${v.pill}">${UI.esc(v.label || '')}</span></td>
@@ -13000,9 +13056,16 @@ tr:hover td{background:var(--panel-2)}
       const t = global.DB.tipoUnidad(u.tipo);
       const pe = global.DB.planoEstado(u.planoEstado || 'ok');
       const dato = (k, val) => val ? `<div class="fi-r"><span>${k}</span><b>${UI.esc(val)}</b></div>` : '';
+      const peds = global.DB.pedidosDeUnidad(u);
+      const faltan = global.DB.rubrosFaltantes(u);
+      const doble = global.DB.necesitaEnlace(u);
+      const img = (t2, src, pie) => `<div class="pr-doc">
+        <div class="pr-doc-h">${t2}</div>
+        <div class="pr-doc-b">${src ? `<img src="${UI.esc(src)}" alt="">`
+          : `<span class="muted">${pie}</span>`}</div></div>`;
       document.body.insertAdjacentHTML('beforeend', `
         <div class="pr-back" id="pr-mdl">
-          <div class="card pad" style="max-width:470px;width:100%">
+          <div class="card pad pr-ficha">
             <div class="row" style="align-items:flex-start">
               <div>
                 <h3 class="h-title" style="font-size:17px">${UI.esc(u.modelo)}</h3>
@@ -13031,10 +13094,27 @@ tr:hover td{background:var(--panel-2)}
                 : '<div class="fi-r"><span>Orden de venta</span><b>Para stock</b></div>'}
               ${dato('Vendida el', u.fechaVenta)}
             </div>
+            <div class="pr-docs">
+              ${img('Croquis del vendedor', u.croquis, 'no lo adjuntaron en la venta')}
+              ${img('Plano de producción', u.plano,
+                u.tipo === 'estandar' ? 'usa el plano de la variante' : 'todavía no lo subieron')}
+              ${u.foto ? img('Foto de la pieza', u.foto, '') : ''}
+            </div>
+            ${doble ? `<div class="banner ${faltan.length ? 'warn' : ''}" style="margin-top:11px">
+              <b>Pasa por ${global.DB.rubrosDe(u.productoId).length} rubros.</b>
+              ${peds.map(x => `${UI.esc((global.DB.rubro(x.rubro) || {}).label || x.rubro)}:
+                <b>${UI.esc(x.pedido)}</b> (${UI.esc(x.proveedor || '—')})`).join(' · ')}
+              ${faltan.length ? ` — falta pedirle a
+                <b>${faltan.map(r => UI.esc((global.DB.rubro(r) || {}).label || r)).join(', ')}</b>`
+                : (u.enlazada ? ' — <b>enlazado</b>' : ' — falta enlazarlo cuando lleguen las dos partes')}
+            </div>` : ''}
             <div class="hint" style="margin-top:11px">${global.DB.planoListo(u)
               ? 'Se puede pedir: el plano está resuelto.'
               : '<b>No se puede pedir</b> hasta que el plano esté verificado.'}</div>
             <div class="row" style="margin-top:16px;gap:10px">
+              ${u.estado === 'pedir' ? '<button class="btn primary" id="pr-asig1">Asignar taller</button>' : ''}
+              ${doble && !faltan.length && !u.enlazada
+                ? '<button class="btn" id="pr-enlazar">Marcar enlazado</button>' : ''}
               <div class="sp"></div>
               <button class="btn" id="pr-x">Cerrar</button>
             </div>
@@ -13043,6 +13123,12 @@ tr:hover td{background:var(--panel-2)}
       const cerrar = () => { const m = document.getElementById('pr-mdl'); if (m) m.remove(); };
       document.getElementById('pr-x').onclick = cerrar;
       document.getElementById('pr-mdl').onclick = e => { if (e.target.id === 'pr-mdl') cerrar(); };
+      const a1 = document.getElementById('pr-asig1');
+      if (a1) a1.onclick = () => { cerrar(); this._uno = id; this.modalAsignar([id]); };
+      const en = document.getElementById('pr-enlazar');
+      if (en) en.onclick = () => {
+        global.DB.enlazar(u, 'yo'); UI.aviso('Enlazado', 'ok'); cerrar(); this.pintar();
+      };
     },
 
     estilos() {
@@ -13141,6 +13227,16 @@ tr:hover td{background:var(--panel-2)}
         .pr-acc{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;
           border:1px solid var(--line);border-radius:11px;padding:10px 13px;background:var(--panel)}
         .pr-acc .btn[disabled]{opacity:.45;pointer-events:none}
+        .pr-ficha{max-width:640px;width:100%;max-height:88vh;overflow:auto}
+        .pr-docs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+        .pr-doc{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+        .pr-doc-h{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+          color:var(--muted);padding:6px 9px;background:var(--panel-2);
+          border-bottom:1px solid var(--line-soft)}
+        .pr-doc-b{height:150px;display:grid;place-items:center;background:#fff;font-size:11.5px;
+          text-align:center;padding:8px}
+        .pr-doc-b img{width:100%;height:100%;object-fit:contain}
+        .pr-tabla tr.clic{cursor:pointer}
         .pr-stock{font-size:11px;font-weight:700;color:var(--muted);background:var(--panel-2);
           border:1px solid var(--line);border-radius:999px;padding:1px 8px}
         .chk{width:14px;height:14px;accent-color:var(--brand);margin:0}
@@ -13262,13 +13358,23 @@ tr:hover td{background:var(--panel-2)}
           <span class="pill ${e.pill}">${UI.esc(e.label)}</span>
         </div>
 
+        ${(() => { const l = global.DB.lugarEnPedido(p); if (!l) return '';
+          const lleno = l.libre === 0;
+          return `<div class="pd-cupo ${lleno ? 'lleno' : ''}">
+            <span>Cupo de ${UI.esc(p.proveedor)}</span>
+            <div class="pd-barra"><i style="width:${Math.min(100, l.usado / l.cupo * 100)}%"></i></div>
+            <b>${l.usado} de ${l.cupo}</b>
+            <span class="hint">${lleno ? 'está lleno — conviene cerrarlo'
+              : `entran ${l.libre} más`}</span></div>`; })()}
+
         <div class="pd-acc">
           <span class="hint">${UI.esc(e.pie)}</span>
           <div class="sp"></div>
           ${abierto ? `<button class="btn" id="pd-agregar">Agregar muebles</button>
             <button class="btn primary" id="pd-cerrar">Cerrar y mandar</button>`
             : `<button class="btn" id="pd-reabrir">Reabrir</button>
-               <button class="btn" id="pd-imprimir">Imprimir</button>`}
+               <button class="btn" id="pd-imprimir">Imprimir pedido</button>
+               <button class="btn primary" id="pd-ingreso">Registrar ingreso</button>`}
         </div>
 
         ${p.desde && p.hasta ? `<div class="hint" style="margin:10px 0">Tiene que entrar
@@ -13336,8 +13442,12 @@ tr:hover td{background:var(--panel-2)}
         global.DB.reabrirPedido(this.abierto, 'yo');
         UI.aviso('Pedido reabierto', 'ok'); this.render(this._mount);
       };
-      const im = q('pd-imprimir'); if (im) im.onclick = () =>
-        UI.aviso('La impresión sale cuando enganchemos los PDF de Drive', 'warn');
+      const im = q('pd-imprimir'); if (im) im.onclick = () => this.imprimir();
+      const ing = q('pd-ingreso'); if (ing) ing.onclick = () => {
+        const p = global.DB.pedido(this.abierto);
+        global.ProdRecepcion.taller = p.proveedor;
+        global.App.goSub('produccion', 'recepcion');
+      };
       document.querySelectorAll('[data-sacar]').forEach(b => b.onclick = () => {
         global.DB.sacarDePedido(this.abierto, Number(b.dataset.sacar));
         this.render(this._mount);
@@ -13438,13 +13548,66 @@ tr:hover td{background:var(--panel-2)}
           .map(x => Number(x.dataset.add));
         if (!ids.length) return UI.aviso('No tildaste ninguno', 'warn');
         ids.forEach(id => global.DB.agregarAPedido(this.abierto, id, 'yo'));
-        UI.aviso(`${ids.length} agregados`, 'ok');
+        const l = global.DB.lugarEnPedido(global.DB.pedido(this.abierto));
+        UI.aviso(l && l.libre === 0
+          ? `${ids.length} agregados — el cupo quedó lleno`
+          : `${ids.length} agregados`, l && l.libre === 0 ? 'warn' : 'ok');
         cerrar(); this.render(this._mount);
       };
     },
 
+    // Imprimir es una hoja por mueble más el remito. Se abre en una ventana
+    // aparte y se manda a la impresora: los planos van adjuntos.
+    imprimir() {
+      const p = global.DB.pedido(this.abierto);
+      const its = global.DB.itemsDePedido(p.numero);
+      const w = window.open('', '_blank');
+      if (!w) return UI.aviso('El navegador bloqueó la ventana de impresión', 'warn');
+      w.document.write(`<meta charset="utf-8"><title>${p.numero}</title>
+        <style>body{font-family:Georgia,serif;color:#111;padding:24px}
+        h1{font-size:19px;margin:0} .m{font-size:12px;color:#555;margin:2px 0 16px}
+        table{width:100%;border-collapse:collapse;font-size:12px}
+        th{text-align:left;border-bottom:2px solid #111;padding:6px 8px;font-size:10px;
+          text-transform:uppercase;letter-spacing:.05em}
+        td{padding:6px 8px;border-bottom:1px solid #ddd}
+        .f{margin-top:40px;display:flex;gap:40px}
+        .f div{flex:1;border-top:1px solid #111;padding-top:4px;font-size:11px;text-align:center}
+        .hoja{page-break-before:always;border:1px solid #111;padding:0;margin-top:20px}
+        .hoja h2{font-size:15px;margin:0;padding:10px 14px;border-bottom:2px solid #111}
+        .hoja .d{height:300px;display:grid;place-items:center;color:#aaa;font-size:11px;
+          letter-spacing:.16em;border-bottom:1px solid #111}
+        .hoja .p{display:flex;gap:20px;padding:10px 14px;font-size:12px}
+        </style>
+        <h1>Remito de fabricación ${p.numero}</h1>
+        <div class="m">Belgrano Home → <b>${p.proveedor}</b> · ${global.DB.hoyCorto()}<br>
+          Tienen que entrar entre el <b>${p.desde}</b> y el <b>${p.hasta}</b></div>
+        <table><tr><th>#</th><th>Mueble</th><th>Terminación</th><th>Pedido</th><th>N°</th></tr>
+        ${its.map((u, i) => `<tr><td>${i + 1}</td><td>${u.modelo} ${u.medida}</td>
+          <td>${u.color}</td><td>${u.orden || 'STOCK'}</td><td>${u.serie}</td></tr>`).join('')}
+        </table>
+        <div class="f"><div>Entregado por</div><div>Recibido por</div></div>
+        ${its.map(u => `<div class="hoja"><h2>${u.modelo} ${u.medida}</h2>
+          <div class="d">${u.plano ? `<img src="${u.plano}" style="max-width:100%;max-height:290px">`
+            : 'EL PLANO SALE DE LA CARPETA'}</div>
+          <div class="p"><div><b>MATERIAL</b><br>${u.color}</div>
+            <div><b>PEDIDO</b><br>${u.orden || 'STOCK'}</div>
+            <div><b>PROVEEDOR</b><br>${p.proveedor}</div>
+            <div><b>N°</b><br>${u.serie}</div></div></div>`).join('')}`);
+      w.document.close();
+      setTimeout(() => w.print(), 300);
+    },
+
     estilos() {
       return `<style>
+        .pd-cupo{display:flex;align-items:center;gap:11px;margin-bottom:10px;font-size:12.5px;
+          border:1px solid var(--line);border-radius:11px;padding:9px 13px;background:var(--panel)}
+        .pd-cupo.lleno{border-color:var(--warn);background:var(--warn-bg)}
+        .pd-cupo>span:first-child{font-size:11px;font-weight:700;text-transform:uppercase;
+          letter-spacing:.05em;color:var(--muted)}
+        .pd-cupo b{color:var(--navy)}
+        .pd-barra{width:150px;height:7px;border-radius:99px;background:var(--line-soft);overflow:hidden}
+        .pd-barra i{display:block;height:100%;background:var(--brand)}
+        .pd-cupo.lleno .pd-barra i{background:var(--warn)}
         .pd-b{margin-bottom:18px}
         .pd-b-h{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
           color:var(--muted);margin-bottom:6px}
@@ -13983,6 +14146,165 @@ tr:hover td{background:var(--panel-2)}
 
 </script><script>
 // =====================================================================
+//  Belgrano Soft · Producción · Vendidos
+//  Una fila por mueble vendido, con su número de serie y en qué parte del
+//  camino está. Es la vista que contesta lo que pregunta el cliente:
+//  "¿mi cómoda dónde está?" — y la que dice qué traba cada entrega.
+// =====================================================================
+(function (global) {
+  const Vendidos = {
+    _mount: 'view',
+    texto: '',
+    soloPendientes: true,
+
+    async render(mount = 'view') {
+      this._mount = mount;
+      if (!this.prods) this.prods = await global.DB.productos({ limite: 500 }).catch(() => []);
+      const v = document.getElementById(mount);
+      v.innerHTML = `
+        <div class="row" style="margin-bottom:14px;align-items:flex-start">
+          <div><div class="kick">Producción</div><h1 class="h-title">Vendidos</h1>
+            <div class="h-sub" id="vd-sub"></div></div>
+        </div>
+        <div class="pr-bar">
+          <div class="pr-busca"><input id="vd-q" placeholder="Buscar orden, cliente, mueble o número de serie…"
+            value="${UI.esc(this.texto)}"></div>
+          <button class="btn ${this.soloPendientes ? 'primary' : ''}" id="vd-pend">Sólo lo que falta</button>
+        </div>
+        <div id="vd-lista">${UI.spinner()}</div>
+        ${this.estilos()}`;
+      const q = document.getElementById('vd-q');
+      let t; q.oninput = () => { clearTimeout(t); t = setTimeout(() => {
+        this.texto = q.value.trim(); this.pintar(); }, 200); };
+      document.getElementById('vd-pend').onclick = () => {
+        this.soloPendientes = !this.soloPendientes; this.render(this._mount);
+      };
+      this.pintar();
+    },
+
+    // Todo lo vendido, agrupado por orden. Una venta se entrega entera: por eso
+    // lo que importa es el peor de sus muebles, no el promedio.
+    ordenes() {
+      const t = this.texto.toLowerCase().split(/\s+/).filter(Boolean);
+      const m = new Map();
+      global.DB.unidadesTodas().forEach(u => {
+        if (!u.orden) return;
+        if (!m.has(u.orden)) m.set(u.orden, { orden: u.orden, items: [], fecha: u.fechaVenta || '' });
+        m.get(u.orden).items.push(u);
+      });
+      let gs = [...m.values()];
+      gs.forEach(g => {
+        g.listos = g.items.filter(u => u.estado === 'stock' || u.estado === 'entregada').length;
+        g.entregados = g.items.filter(u => u.estado === 'entregada').length;
+        g.falta = g.items.length - g.listos;
+        g.completa = g.falta === 0;
+        const ms = g.items.map(u => global.DB.margenEntrega(u)).filter(x => x != null);
+        g.peor = ms.length ? Math.min(...ms) : 9999;
+        g.traba = g.items.find(u => u.estado === 'pedir') || g.items.find(u => u.estado === 'produccion');
+      });
+      if (this.soloPendientes) gs = gs.filter(g => !g.completa);
+      if (t.length) {
+        gs = gs.filter(g => {
+          const txt = `${g.orden} ${g.items.map(u => `${u.modelo} ${u.serie}`).join(' ')}`.toLowerCase();
+          return t.every(x => txt.includes(x));
+        });
+      }
+      return gs.sort((a, b) => a.peor - b.peor || String(a.orden).localeCompare(b.orden));
+    },
+
+    pintar() {
+      const gs = this.ordenes();
+      const todas = [...new Set(global.DB.unidadesTodas().filter(u => u.orden).map(u => u.orden))];
+      const sub = document.getElementById('vd-sub');
+      if (sub) sub.innerHTML = `${gs.length} de ${todas.length} órdenes${
+        this.soloPendientes ? ' con algo pendiente' : ''}`;
+      const cont = document.getElementById('vd-lista');
+      if (!gs.length) { cont.innerHTML = UI.vacio('No hay órdenes con ese filtro.'); return; }
+      cont.innerHTML = gs.map(g => this.htmlOrden(g)).join('') + `
+        <div class="hint" style="margin-top:10px">Una venta se entrega entera: lo que manda es
+          <b>el mueble que va más atrasado</b>, no el promedio. Por eso las órdenes se ordenan por
+          el peor de los suyos.</div>`;
+      cont.querySelectorAll('[data-abrir]').forEach(b => b.onclick = () => {
+        const s = b.closest('.vd-o'); s.classList.toggle('on');
+        b.setAttribute('aria-expanded', s.classList.contains('on'));
+      });
+    },
+
+    htmlOrden(g) {
+      const tarde = g.peor < 0;
+      return `<section class="vd-o ${g.completa ? 'ok' : ''} ${tarde ? 'mal' : ''}">
+        <button class="vd-h" data-abrir aria-expanded="false">
+          <span class="vd-fl">▸</span>
+          <b>${UI.esc(g.orden)}</b>
+          <span class="vd-barra">${g.items.map(u => `<i class="${this.claseDe(u)}"></i>`).join('')}</span>
+          <span class="muted">${g.listos} de ${g.items.length} listos</span>
+          ${g.completa ? '<span class="pill ok">completa</span>'
+            : `<span class="pill ${tarde ? 'crit' : 'warn'}">${tarde
+              ? `${Math.abs(g.peor)} días tarde` : `en ${g.peor} días`}</span>`}
+          <span class="sp"></span>
+          ${!g.completa && g.traba ? `<span class="hint">traba: ${UI.esc(g.traba.modelo)}</span>` : ''}
+        </button>
+        <div class="vd-b"><table>
+          <thead><tr><th>N°</th><th>Mueble</th><th>Terminación</th><th>Estado</th>
+            <th>Taller</th><th>Falta</th></tr></thead>
+          <tbody>${g.items.map(u => {
+            const e = global.DB.etiquetaUnidad(u);
+            const d = global.DB.margenEntrega(u);
+            return `<tr>
+              <td class="tnum nom">${UI.esc(u.serie)}</td>
+              <td>${UI.esc(u.modelo)} <span class="muted">${UI.esc(u.medida)}</span></td>
+              <td class="muted">${UI.esc(u.color)}</td>
+              <td><span class="pill ${e.pill}">${UI.esc(e.label)}</span></td>
+              <td class="muted">${UI.esc(u.proveedor || '—')}</td>
+              <td class="${d != null && d < 0 ? 'venc' : 'muted'}">${d == null ? '—'
+                : d < 0 ? `${Math.abs(d)} días tarde` : `faltan ${d}`}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table></div>
+      </section>`;
+    },
+    claseDe(u) {
+      if (u.estado === 'entregada') return 'e';
+      if (u.estado === 'stock') return 'l';
+      if (u.estado === 'produccion') return 'f';
+      return 'p';
+    },
+
+    estilos() {
+      return `<style>
+        .vd-o{border:1px solid var(--line);border-radius:12px;background:var(--panel);
+          margin-bottom:9px;overflow:hidden}
+        .vd-o.ok{border-color:#cfe8d8}
+        .vd-o.mal{border-color:#f2c6c0}
+        .vd-h{display:flex;align-items:center;gap:9px;width:100%;border:0;padding:9px 13px;
+          cursor:pointer;font:inherit;text-align:left;background:var(--panel-2)}
+        .vd-o.ok .vd-h{background:var(--ok-bg)}
+        .vd-o.mal .vd-h{background:var(--crit-bg)}
+        .vd-h b{font-size:13.5px;color:var(--navy)}
+        .vd-h .sp{flex:1}
+        .vd-fl{font-size:10px;color:var(--muted);width:10px}
+        .vd-o.on .vd-fl{transform:rotate(90deg)}
+        .vd-barra{display:inline-flex;gap:2px}
+        .vd-barra i{width:13px;height:7px;border-radius:2px;display:block}
+        .vd-barra .l{background:var(--ok)} .vd-barra .e{background:var(--muted)}
+        .vd-barra .f{background:#8b5cf6} .vd-barra .p{background:var(--crit)}
+        .vd-b{display:none;overflow-x:auto}
+        .vd-o.on .vd-b{display:block}
+        .vd-b table{width:100%;border-collapse:collapse;font-size:12.5px}
+        .vd-b th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;
+          color:var(--muted);font-weight:700;padding:7px 9px;border-bottom:1px solid var(--line)}
+        .vd-b td{padding:6px 9px;border-bottom:1px solid var(--line-soft);white-space:nowrap}
+        .vd-b tr:last-child td{border-bottom:0}
+        .vd-b .nom{font-weight:700;color:var(--navy)}
+        .vd-b .venc{color:var(--crit);font-weight:700}
+      </style>`;
+    },
+  };
+  global.ProdVendidos = Vendidos;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script><script>
+// =====================================================================
 //  Belgrano Soft · Esqueletos de módulos
 //  Pantallas base para ver la arquitectura completa. Cada una muestra de
 //  qué se va a encargar y, cuando ayuda, una tabla/vista de ejemplo con
@@ -14136,6 +14458,7 @@ tr:hover td{background:var(--panel-2)}
     produccion: { label: 'Producción', icon: '🏭', subs: [
       S('resumen', 'Resumen', resumen('produccion')),
       S('fabricar', 'A fabricar', m => global.Produccion.render(m)),
+      S('vendidos', 'Vendidos', m => global.ProdVendidos.render(m)),
       S('dibujar', 'A dibujar', m => global.ProdDibujos.render(m)),
       S('pedidos', 'Pedidos', m => global.ProdPedidos.render(m)),
       S('recepcion', 'Recepción', m => global.ProdRecepcion.render(m)),

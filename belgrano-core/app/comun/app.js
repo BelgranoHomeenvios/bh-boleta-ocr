@@ -54,6 +54,7 @@
     produccion: { label: 'Producción', icon: '🏭', subs: [
       S('resumen', 'Resumen', resumen('produccion')),
       S('fabricar', 'A fabricar', m => global.Produccion.render(m)),
+      S('vendidos', 'Vendidos', m => global.ProdVendidos.render(m)),
       S('dibujar', 'A dibujar', m => global.ProdDibujos.render(m)),
       S('pedidos', 'Pedidos', m => global.ProdPedidos.render(m)),
       S('recepcion', 'Recepción', m => global.ProdRecepcion.render(m)),

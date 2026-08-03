@@ -833,7 +833,10 @@
       return this._peds;
     },
     pedido(num) { return this.pedidosTodos().find(p => p.numero === num) || null; },
-    itemsDePedido(num) { return this.unidadesTodas().filter(u => u.pedido === num); },
+    itemsDePedido(num) {
+      return this.unidadesTodas().filter(u => this.pedidosDeUnidad(u)
+        .some(x => x.pedido === num));
+    },
     // El próximo número: sigue la serie más alta que ya exista.
     proximoPedido() {
       const n = this.pedidosTodos().reduce((mx, p) => {
@@ -844,27 +847,61 @@
     },
     // Abre un pedido vacío para un taller. Todavía no se le mandó nada.
     abrirPedido({ proveedor, rubro = 'carpinteria', modo = 'dibujo', desde = '', hasta = '', quien = '' }) {
+      const prov = this.proveedores().find(x => this.provLabel(x.id) === proveedor
+        || x.nombre === proveedor);
       const p = {
-        numero: this.proximoPedido(), proveedor, rubro, modo, desde, hasta,
+        numero: this.proximoPedido(), proveedor, provId: prov ? prov.id : null,
+        cupo: prov ? Number(prov.capacidad) || 0 : 0, rubro, modo, desde, hasta,
         estado: 'abierto', abiertoPor: quien || 'yo', abiertoEl: this.hoyCorto(),
         historial: [{ f: this.hoyCorto(), t: `${quien || 'Alguien'} abrió el pedido para ${proveedor}` }],
       };
       this.pedidosTodos().unshift(p);
       return p;
     },
-    // Sumar una unidad a un pedido abierto. La unidad se entera de a cuál va.
+    // Sumar una unidad a un pedido. Un mueble de DOS rubros va en dos pedidos
+    // distintos —la cama al carpintero, las patas al herrero— y sigue siendo
+    // una sola unidad: por eso la unidad guarda una lista, no un pedido solo.
     agregarAPedido(num, unidadId, quien = '') {
       const p = this.pedido(num); if (!p || p.estado !== 'abierto') return null;
       const u = this.unidad(unidadId); if (!u) return null;
-      this.guardarUnidad({ id: u.id, pedido: num, proveedor: p.proveedor,
-        agregadoEl: this.hoyCorto() });
+      const lista = [...(u.pedidos || [])].filter(x => x.rubro !== p.rubro);
+      lista.push({ rubro: p.rubro, pedido: num, proveedor: p.proveedor,
+        provId: p.provId || null, agregadoEl: this.hoyCorto() });
+      this.guardarUnidad({ id: u.id, pedidos: lista,
+        // El primero es el que se muestra cuando hay que mostrar uno solo.
+        pedido: lista[0].pedido, proveedor: lista[0].proveedor,
+        provId: lista[0].provId, agregadoEl: this.hoyCorto() });
       p.historial.push({ f: this.hoyCorto(), t: `${quien || 'Alguien'} agregó ${u.modelo}` });
       return p;
     },
     sacarDePedido(num, unidadId) {
       const p = this.pedido(num); if (!p || p.estado !== 'abierto') return null;
-      this.guardarUnidad({ id: unidadId, pedido: '', proveedor: '', agregadoEl: '' });
+      const u = this.unidad(unidadId); if (!u) return null;
+      const lista = (u.pedidos || []).filter(x => x.pedido !== num);
+      this.guardarUnidad({ id: unidadId, pedidos: lista,
+        pedido: lista.length ? lista[0].pedido : '',
+        proveedor: lista.length ? lista[0].proveedor : '',
+        provId: lista.length ? lista[0].provId : null,
+        agregadoEl: lista.length ? lista[0].agregadoEl : '' });
       return p;
+    },
+    // Los pedidos de una unidad, uno por rubro.
+    pedidosDeUnidad(u) {
+      if (u.pedidos && u.pedidos.length) return u.pedidos;
+      return u.pedido ? [{ rubro: this.rubroDe(u), pedido: u.pedido,
+        proveedor: u.proveedor, provId: u.provId }] : [];
+    },
+    // Le faltan rubros: el mueble pasa por dos manos y sólo se pidió una.
+    rubrosFaltantes(u) {
+      const hechos = this.pedidosDeUnidad(u).map(x => x.rubro);
+      return this.rubrosDe(u.productoId).filter(r => !hechos.includes(r));
+    },
+    // Está enlazada cuando llegaron todas sus partes y alguien las unió.
+    necesitaEnlace(u) { return this.rubrosDe(u.productoId).length > 1; },
+    enlazar(u, quien = '') {
+      this.guardarUnidad({ id: u.id, enlazada: true, enlazadaPor: quien,
+        enlazadaEl: this.hoyCorto() });
+      return this.unidad(u.id);
     },
     // Cerrar congela el pedido: ya no entra nada sin reabrirlo. Y ahí las
     // unidades pasan a estar en fábrica, con el rango comprometido.
@@ -879,6 +916,20 @@
         serie: u.serie && u.serie !== '—' ? u.serie : this.tomarSerie(),
       }));
       return p;
+    },
+    // El cupo: cuántos muebles le caben. Cuando se llena, el pedido se cierra
+    // —es lo mismo que los viajes de un flete—.
+    cupoDe(p) {
+      if (p.cupo) return Number(p.cupo);
+      const prov = p.provId ? this.proveedor(p.provId)
+        : this.proveedores().find(x => this.provLabel(x.id) === p.proveedor);
+      return prov ? Number(prov.capacidad) || 0 : 0;
+    },
+    lugarEnPedido(p) {
+      const cupo = this.cupoDe(p);
+      if (!cupo) return null;
+      return { cupo, usado: this.itemsDePedido(p.numero).length,
+        libre: Math.max(0, cupo - this.itemsDePedido(p.numero).length) };
     },
     reabrirPedido(num, quien = '') {
       const p = this.pedido(num); if (!p) return null;

@@ -85,13 +85,23 @@
           <span class="pill ${e.pill}">${UI.esc(e.label)}</span>
         </div>
 
+        ${(() => { const l = global.DB.lugarEnPedido(p); if (!l) return '';
+          const lleno = l.libre === 0;
+          return `<div class="pd-cupo ${lleno ? 'lleno' : ''}">
+            <span>Cupo de ${UI.esc(p.proveedor)}</span>
+            <div class="pd-barra"><i style="width:${Math.min(100, l.usado / l.cupo * 100)}%"></i></div>
+            <b>${l.usado} de ${l.cupo}</b>
+            <span class="hint">${lleno ? 'está lleno — conviene cerrarlo'
+              : `entran ${l.libre} más`}</span></div>`; })()}
+
         <div class="pd-acc">
           <span class="hint">${UI.esc(e.pie)}</span>
           <div class="sp"></div>
           ${abierto ? `<button class="btn" id="pd-agregar">Agregar muebles</button>
             <button class="btn primary" id="pd-cerrar">Cerrar y mandar</button>`
             : `<button class="btn" id="pd-reabrir">Reabrir</button>
-               <button class="btn" id="pd-imprimir">Imprimir</button>`}
+               <button class="btn" id="pd-imprimir">Imprimir pedido</button>
+               <button class="btn primary" id="pd-ingreso">Registrar ingreso</button>`}
         </div>
 
         ${p.desde && p.hasta ? `<div class="hint" style="margin:10px 0">Tiene que entrar
@@ -159,8 +169,12 @@
         global.DB.reabrirPedido(this.abierto, 'yo');
         UI.aviso('Pedido reabierto', 'ok'); this.render(this._mount);
       };
-      const im = q('pd-imprimir'); if (im) im.onclick = () =>
-        UI.aviso('La impresión sale cuando enganchemos los PDF de Drive', 'warn');
+      const im = q('pd-imprimir'); if (im) im.onclick = () => this.imprimir();
+      const ing = q('pd-ingreso'); if (ing) ing.onclick = () => {
+        const p = global.DB.pedido(this.abierto);
+        global.ProdRecepcion.taller = p.proveedor;
+        global.App.goSub('produccion', 'recepcion');
+      };
       document.querySelectorAll('[data-sacar]').forEach(b => b.onclick = () => {
         global.DB.sacarDePedido(this.abierto, Number(b.dataset.sacar));
         this.render(this._mount);
@@ -261,13 +275,66 @@
           .map(x => Number(x.dataset.add));
         if (!ids.length) return UI.aviso('No tildaste ninguno', 'warn');
         ids.forEach(id => global.DB.agregarAPedido(this.abierto, id, 'yo'));
-        UI.aviso(`${ids.length} agregados`, 'ok');
+        const l = global.DB.lugarEnPedido(global.DB.pedido(this.abierto));
+        UI.aviso(l && l.libre === 0
+          ? `${ids.length} agregados — el cupo quedó lleno`
+          : `${ids.length} agregados`, l && l.libre === 0 ? 'warn' : 'ok');
         cerrar(); this.render(this._mount);
       };
     },
 
+    // Imprimir es una hoja por mueble más el remito. Se abre en una ventana
+    // aparte y se manda a la impresora: los planos van adjuntos.
+    imprimir() {
+      const p = global.DB.pedido(this.abierto);
+      const its = global.DB.itemsDePedido(p.numero);
+      const w = window.open('', '_blank');
+      if (!w) return UI.aviso('El navegador bloqueó la ventana de impresión', 'warn');
+      w.document.write(`<meta charset="utf-8"><title>${p.numero}</title>
+        <style>body{font-family:Georgia,serif;color:#111;padding:24px}
+        h1{font-size:19px;margin:0} .m{font-size:12px;color:#555;margin:2px 0 16px}
+        table{width:100%;border-collapse:collapse;font-size:12px}
+        th{text-align:left;border-bottom:2px solid #111;padding:6px 8px;font-size:10px;
+          text-transform:uppercase;letter-spacing:.05em}
+        td{padding:6px 8px;border-bottom:1px solid #ddd}
+        .f{margin-top:40px;display:flex;gap:40px}
+        .f div{flex:1;border-top:1px solid #111;padding-top:4px;font-size:11px;text-align:center}
+        .hoja{page-break-before:always;border:1px solid #111;padding:0;margin-top:20px}
+        .hoja h2{font-size:15px;margin:0;padding:10px 14px;border-bottom:2px solid #111}
+        .hoja .d{height:300px;display:grid;place-items:center;color:#aaa;font-size:11px;
+          letter-spacing:.16em;border-bottom:1px solid #111}
+        .hoja .p{display:flex;gap:20px;padding:10px 14px;font-size:12px}
+        </style>
+        <h1>Remito de fabricación ${p.numero}</h1>
+        <div class="m">Belgrano Home → <b>${p.proveedor}</b> · ${global.DB.hoyCorto()}<br>
+          Tienen que entrar entre el <b>${p.desde}</b> y el <b>${p.hasta}</b></div>
+        <table><tr><th>#</th><th>Mueble</th><th>Terminación</th><th>Pedido</th><th>N°</th></tr>
+        ${its.map((u, i) => `<tr><td>${i + 1}</td><td>${u.modelo} ${u.medida}</td>
+          <td>${u.color}</td><td>${u.orden || 'STOCK'}</td><td>${u.serie}</td></tr>`).join('')}
+        </table>
+        <div class="f"><div>Entregado por</div><div>Recibido por</div></div>
+        ${its.map(u => `<div class="hoja"><h2>${u.modelo} ${u.medida}</h2>
+          <div class="d">${u.plano ? `<img src="${u.plano}" style="max-width:100%;max-height:290px">`
+            : 'EL PLANO SALE DE LA CARPETA'}</div>
+          <div class="p"><div><b>MATERIAL</b><br>${u.color}</div>
+            <div><b>PEDIDO</b><br>${u.orden || 'STOCK'}</div>
+            <div><b>PROVEEDOR</b><br>${p.proveedor}</div>
+            <div><b>N°</b><br>${u.serie}</div></div></div>`).join('')}`);
+      w.document.close();
+      setTimeout(() => w.print(), 300);
+    },
+
     estilos() {
       return `<style>
+        .pd-cupo{display:flex;align-items:center;gap:11px;margin-bottom:10px;font-size:12.5px;
+          border:1px solid var(--line);border-radius:11px;padding:9px 13px;background:var(--panel)}
+        .pd-cupo.lleno{border-color:var(--warn);background:var(--warn-bg)}
+        .pd-cupo>span:first-child{font-size:11px;font-weight:700;text-transform:uppercase;
+          letter-spacing:.05em;color:var(--muted)}
+        .pd-cupo b{color:var(--navy)}
+        .pd-barra{width:150px;height:7px;border-radius:99px;background:var(--line-soft);overflow:hidden}
+        .pd-barra i{display:block;height:100%;background:var(--brand)}
+        .pd-cupo.lleno .pd-barra i{background:var(--warn)}
         .pd-b{margin-bottom:18px}
         .pd-b-h{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
           color:var(--muted);margin-bottom:6px}

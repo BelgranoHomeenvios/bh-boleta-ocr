@@ -318,6 +318,11 @@
       });
       cont.querySelectorAll('[data-ver]').forEach(b => b.onclick = () =>
         this.ficha(Number(b.dataset.ver)));
+      // Entrar a la fila abre la ficha entera. Los tildes y los botones no.
+      cont.querySelectorAll('[data-fila]').forEach(tr => tr.onclick = ev => {
+        if (ev.target.closest('input,button')) return;
+        this.ficha(Number(tr.dataset.fila));
+      });
       cont.querySelectorAll('[data-sel]').forEach(c => c.onchange = () => this.contarSel());
       const bf = document.getElementById('pr-fab');
       if (bf) bf.onclick = () => this.modalFabricar();
@@ -370,8 +375,8 @@
 
     // Asignarle un taller es abrirle un pedido —o sumarlo a uno abierto— con
     // el rango en que se comprometió a entregarlo.
-    modalAsignar() {
-      const ids = this.tildados();
+    modalAsignar(unos) {
+      const ids = unos || this.tildados();
       if (!ids.length) return;
       const us = ids.map(id => global.DB.unidad(id)).filter(Boolean);
       const rubros = [...new Set(us.map(u => global.DB.rubroDe(u)))];
@@ -543,7 +548,7 @@
         : `<td>${u.orden ? `<b class="nom">${UI.esc(u.orden)}</b>`
             : `<span class="pr-stock">stock</span>${u.motivoStock
               ? ` <span class="muted">${UI.esc(u.motivoStock)}</span>` : ''}`}</td>`;
-      return `<tr class="${venc ? 'mal' : ''}">
+      return `<tr class="${venc ? 'mal' : ''} clic" data-fila="${u.id}">
         ${sel ? `<td><input type="checkbox" class="chk" data-sel="${u.id}"></td>` : ''}
         ${venta}
         <td><span class="pill ${v.pill}">${UI.esc(v.label || '')}</span></td>
@@ -570,9 +575,16 @@
       const t = global.DB.tipoUnidad(u.tipo);
       const pe = global.DB.planoEstado(u.planoEstado || 'ok');
       const dato = (k, val) => val ? `<div class="fi-r"><span>${k}</span><b>${UI.esc(val)}</b></div>` : '';
+      const peds = global.DB.pedidosDeUnidad(u);
+      const faltan = global.DB.rubrosFaltantes(u);
+      const doble = global.DB.necesitaEnlace(u);
+      const img = (t2, src, pie) => `<div class="pr-doc">
+        <div class="pr-doc-h">${t2}</div>
+        <div class="pr-doc-b">${src ? `<img src="${UI.esc(src)}" alt="">`
+          : `<span class="muted">${pie}</span>`}</div></div>`;
       document.body.insertAdjacentHTML('beforeend', `
         <div class="pr-back" id="pr-mdl">
-          <div class="card pad" style="max-width:470px;width:100%">
+          <div class="card pad pr-ficha">
             <div class="row" style="align-items:flex-start">
               <div>
                 <h3 class="h-title" style="font-size:17px">${UI.esc(u.modelo)}</h3>
@@ -601,10 +613,27 @@
                 : '<div class="fi-r"><span>Orden de venta</span><b>Para stock</b></div>'}
               ${dato('Vendida el', u.fechaVenta)}
             </div>
+            <div class="pr-docs">
+              ${img('Croquis del vendedor', u.croquis, 'no lo adjuntaron en la venta')}
+              ${img('Plano de producción', u.plano,
+                u.tipo === 'estandar' ? 'usa el plano de la variante' : 'todavía no lo subieron')}
+              ${u.foto ? img('Foto de la pieza', u.foto, '') : ''}
+            </div>
+            ${doble ? `<div class="banner ${faltan.length ? 'warn' : ''}" style="margin-top:11px">
+              <b>Pasa por ${global.DB.rubrosDe(u.productoId).length} rubros.</b>
+              ${peds.map(x => `${UI.esc((global.DB.rubro(x.rubro) || {}).label || x.rubro)}:
+                <b>${UI.esc(x.pedido)}</b> (${UI.esc(x.proveedor || '—')})`).join(' · ')}
+              ${faltan.length ? ` — falta pedirle a
+                <b>${faltan.map(r => UI.esc((global.DB.rubro(r) || {}).label || r)).join(', ')}</b>`
+                : (u.enlazada ? ' — <b>enlazado</b>' : ' — falta enlazarlo cuando lleguen las dos partes')}
+            </div>` : ''}
             <div class="hint" style="margin-top:11px">${global.DB.planoListo(u)
               ? 'Se puede pedir: el plano está resuelto.'
               : '<b>No se puede pedir</b> hasta que el plano esté verificado.'}</div>
             <div class="row" style="margin-top:16px;gap:10px">
+              ${u.estado === 'pedir' ? '<button class="btn primary" id="pr-asig1">Asignar taller</button>' : ''}
+              ${doble && !faltan.length && !u.enlazada
+                ? '<button class="btn" id="pr-enlazar">Marcar enlazado</button>' : ''}
               <div class="sp"></div>
               <button class="btn" id="pr-x">Cerrar</button>
             </div>
@@ -613,6 +642,12 @@
       const cerrar = () => { const m = document.getElementById('pr-mdl'); if (m) m.remove(); };
       document.getElementById('pr-x').onclick = cerrar;
       document.getElementById('pr-mdl').onclick = e => { if (e.target.id === 'pr-mdl') cerrar(); };
+      const a1 = document.getElementById('pr-asig1');
+      if (a1) a1.onclick = () => { cerrar(); this._uno = id; this.modalAsignar([id]); };
+      const en = document.getElementById('pr-enlazar');
+      if (en) en.onclick = () => {
+        global.DB.enlazar(u, 'yo'); UI.aviso('Enlazado', 'ok'); cerrar(); this.pintar();
+      };
     },
 
     estilos() {
@@ -711,6 +746,16 @@
         .pr-acc{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;
           border:1px solid var(--line);border-radius:11px;padding:10px 13px;background:var(--panel)}
         .pr-acc .btn[disabled]{opacity:.45;pointer-events:none}
+        .pr-ficha{max-width:640px;width:100%;max-height:88vh;overflow:auto}
+        .pr-docs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+        .pr-doc{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+        .pr-doc-h{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+          color:var(--muted);padding:6px 9px;background:var(--panel-2);
+          border-bottom:1px solid var(--line-soft)}
+        .pr-doc-b{height:150px;display:grid;place-items:center;background:#fff;font-size:11.5px;
+          text-align:center;padding:8px}
+        .pr-doc-b img{width:100%;height:100%;object-fit:contain}
+        .pr-tabla tr.clic{cursor:pointer}
         .pr-stock{font-size:11px;font-weight:700;color:var(--muted);background:var(--panel-2);
           border:1px solid var(--line);border-radius:999px;padding:1px 8px}
         .chk{width:14px;height:14px;accent-color:var(--brand);margin:0}
