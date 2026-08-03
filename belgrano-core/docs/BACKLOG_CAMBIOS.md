@@ -1062,6 +1062,38 @@ al **costado derecho**, no arriba, y se pueden **marcar varias a la vez**.
 - ✅ 425. El número y la acción quedan **fijos a los costados** cuando la tabla
   es más ancha que la pantalla.
 
+### Lote 38 — APLICADO (Cómo se lee y "a pedir")
+
+**La pantalla**
+- ✅ 426. Se agrupa por **categoría** —bibliotecas, cómodas—, que es como se
+  recorre el depósito; el modelo pasa a ser una columna más.
+- ✅ 427. Las columnas quedan **N° · modelo · medida · color · estado ·
+  ubicación · proveedor · llega · listo · venta**. *Llega* y *listo* son dos
+  fechas distintas: cuándo la promete el proveedor y desde cuándo está guardada.
+- ✅ 428. El orden por defecto es **por estado, después modelo, medida y
+  color**: lo que hay para entregar arriba, después lo que viene, al final lo
+  que salió. También se puede ordenar por **modelo, medida o ubicación**.
+- ✅ 429. **Categorías a la izquierda** (alfabético) y **terminaciones a la
+  derecha**, las dos con su cuenta y varias a la vez; el **estado arriba**. Así
+  el camino es: marco *bibliotecas*, marco *en stock*, listo.
+
+**"A pedir" — la unidad nace con la venta**
+- ✅ 430. Cuarto estado, adelante de todos: **A pedir**. Es el mueble vendido al
+  que **todavía no se le pidió a nadie** — el *6Dibujado* de la planilla.
+- ✅ 431. **Se crea en Inventario, automáticamente desde la venta.** Si naciera
+  recién cuando se confirma el proveedor, entre la venta y el pedido habría una
+  ventana donde el sistema no sabe que ese mueble hay que hacerlo, que es
+  justamente lo que obliga a llevar la planilla a mano.
+- ✅ 432. Esa lista **es el pedido a fábrica**: no hay que armarla. Producción
+  filtra por *a pedir*, ve lo que falta y con el botón **Pedir** le asigna
+  proveedor y fecha — ahí pasa a *en producción* y el vendedor ya puede decir
+  cuándo llega.
+- ✅ 433. Y es lo que permite el **rescate de stock**: como la unidad ya existe
+  atada a la venta, cuando aparece una en depósito se reserva ésa y se anula la
+  que estaba a pedir.
+- ✅ 434. *A pedir* **no cuenta en el depósito** ni está disponible: todavía no
+  existe físicamente.
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·

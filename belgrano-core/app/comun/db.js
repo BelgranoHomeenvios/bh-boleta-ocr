@@ -624,9 +624,13 @@
       return this.serieDe(n);
     },
 
-    // DÓNDE está la unidad en su vida. Son tres, no más: lo que se está
-    // fabricando ya existe —se puede reservar—, lo que llegó, y lo que salió.
+    // DÓNDE está la unidad en su vida. La primera es la que nace con la venta:
+    // el mueble está vendido y todavía no se le pidió a nadie. Existe porque si
+    // no existe, entre la venta y el pedido hay un agujero donde el sistema no
+    // sabe que ese mueble hay que hacerlo — y esa lista ES el pedido a fábrica.
     ESTADOS_UNIDAD: [
+      { k: 'pedir', label: 'A pedir', pill: 'crit',
+        pie: 'Vendida y todavía sin proveedor. Es lo que hay que pedir esta semana.' },
       { k: 'produccion', label: 'En producción', pill: 'viol',
         pie: 'La está haciendo el proveedor. Todavía no llegó, pero se puede reservar.' },
       { k: 'stock', label: 'En stock', pill: 'ok',
@@ -674,6 +678,9 @@
       if (m && u.marca === 'reclamo') return { label: 'Entregada · en reclamo', pill: 'crit' };
       if (m) return { label: m.label, pill: m.pill };
       const e = this.estadoUnidad(u.estado);
+      // "A pedir" siempre tiene dueño —nace de una venta—, así que no hace
+      // falta aclarar que está reservada: se aclara que falta pedirla.
+      if (u.estado === 'pedir') return { label: 'A pedir', pill: 'crit' };
       if (u.orden) {
         return u.estado === 'produccion'
           ? { label: 'Reservada · en fábrica', pill: 'warn' }
@@ -681,6 +688,8 @@
       }
       return { label: e.label, pill: e.pill };
     },
+    // Lo que Producción tiene que salir a pedir: vendido y sin proveedor.
+    aPedir() { return this.unidadesTodas().filter(u => u.estado === 'pedir'); },
     // Lo que se puede vender hoy: llegó, no tiene dueño y no tiene marcas.
     disponible(u) { return u.estado === 'stock' && !u.orden && !u.marca; },
     // Lo que existe físicamente, que es lo que tiene que dar el conteo.
@@ -704,13 +713,15 @@
           productoId: v.producto_id, varianteId: v.id,
           modelo: prod.nombre || '', medida: v.medida || '',
           color: [v.estructura, v.frente].filter(Boolean).join(' · '),
+          terminacion: v.estructura || '',
           tipo: 'estandar', detalle: '', foto: '', marca: null,
         };
         for (let j = 0; j < enStock; j++) {
           n++;
           out.push({ ...base, id: n, serie: this.serieDe(n), estado: 'stock',
             ubicacion: UBI[n % UBI.length], proveedor: PROV[n % PROV.length],
-            fechaProv: `${(n % 28) + 1}/7`, orden: j === 0 && i % 3 === 0 ? `#S00${200 + i}` : null,
+            llega: '', listo: `${(n % 28) + 1}/7`,
+            orden: j === 0 && i % 3 === 0 ? `#S00${200 + i}` : null,
             fechaVenta: j === 0 && i % 3 === 0 ? `${(n % 28) + 1}/6` : '',
             marca: i % 11 === 0 && j === 0 ? 'reparar' : null });
         }
@@ -718,17 +729,27 @@
           n++;
           out.push({ ...base, id: n, serie: '—', estado: 'produccion',
             ubicacion: '', proveedor: PROV[n % PROV.length],
-            fechaProv: `${(n % 28) + 1}/8`,
+            llega: `${(n % 28) + 1}/8`, listo: '',
             orden: j === 0 && i % 4 === 0 ? `#S00${240 + i}` : null,
             fechaVenta: j === 0 && i % 4 === 0 ? `${(n % 28) + 1}/7` : '',
             tipo: i % 5 === 0 ? 'medida' : 'estandar',
             detalle: i % 5 === 0 ? 'A medida' : '' });
         }
+        // Vendidas que todavía no se le pidieron a nadie: nacen con la venta.
+        const aPedir = [0, 0, 1, 0, 0, 1, 0, 0][i % 8];
+        for (let j = 0; j < aPedir; j++) {
+          n++;
+          out.push({ ...base, id: n, serie: '—', estado: 'pedir',
+            ubicacion: '', proveedor: '', llega: '', listo: '',
+            orden: `#S00${260 + i}`, fechaVenta: `${(n % 28) + 1}/7`,
+            tipo: i % 3 === 0 ? 'medida' : 'estandar',
+            detalle: i % 3 === 0 ? 'A medida' : '' });
+        }
         for (let j = 0; j < salidas; j++) {
           n++;
           out.push({ ...base, id: n, serie: this.serieDe(n), estado: 'entregada',
             ubicacion: '', proveedor: PROV[n % PROV.length],
-            fechaProv: `${(n % 28) + 1}/5`, orden: `#S00${100 + n}`,
+            llega: '', listo: `${(n % 28) + 1}/5`, orden: `#S00${100 + n}`,
             fechaVenta: `${(n % 28) + 1}/5`, fechaEntrega: `${(n % 28) + 1}/6`,
             marca: n % 17 === 0 ? 'reclamo' : null });
         }

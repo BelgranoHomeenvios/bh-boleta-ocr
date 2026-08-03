@@ -12,8 +12,8 @@
     _mount: 'view',
     texto: '',
     filtro: 'todo',        // todo · disponible · stock · produccion · reservada · entregada · marcas
-    cats: [],              // categorías marcadas
-    _abre: (() => { try { return localStorage.getItem(VER_KEY) === '1'; } catch { return false; } })(),
+    cats: [],              // categorías marcadas — costado izquierdo
+    terms: [],             // terminaciones marcadas — costado derecho
 
     async render(mount = 'view') {
       this._mount = mount;
@@ -29,9 +29,10 @@
         <div class="un-bar">
           <div class="un-busca"><input id="un-q" placeholder="Buscar por número, modelo, medida o color…"
             value="${UI.esc(this.texto)}"></div>
-          <button class="btn" id="un-vercat">Categorías<span id="un-cn"></span></button>
+          <select id="un-orden" class="un-ord" title="Cómo se ordenan">${this.ORDENES.map(o =>
+            `<option value="${o.k}">${UI.esc(o.label)}</option>`).join('')}</select>
         </div>
-        <div id="un-filtros"></div>
+        <div id="un-filtros" style="margin-bottom:12px"></div>
         <div id="un-lista">${UI.spinner()}</div>
         ${this.estilos()}`;
 
@@ -39,11 +40,6 @@
       let t; q.oninput = () => { clearTimeout(t); t = setTimeout(() => {
         this.texto = q.value.trim(); this.pintar();
       }, 200); };
-      document.getElementById('un-vercat').onclick = () => {
-        this._abre = !this._abre;
-        try { localStorage.setItem(VER_KEY, this._abre ? '1' : '0'); } catch {}
-        this.pintar();
-      };
       try { this.arbol = await global.DB.arbolCategorias(); } catch { this.arbol = []; }
       this.prods = await global.DB.productos({ limite: 500 }).catch(() => []);
       this.pintar();
@@ -55,20 +51,30 @@
       if (!p) return null;
       return (this.arbol || []).find(c => c.id === p.categoria_id) || null;
     },
+    normT(t) {
+      return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+    },
     // Lo que se ve, ya filtrado. El buscador entiende número, modelo, medida y
     // color en cualquier orden: "borges 100 pb" y "pb 100 borges" son lo mismo.
     lista() {
       const t = this.texto.toLowerCase().split(/\s+/).filter(Boolean);
       return global.DB.unidadesTodas().filter(u => {
-        if (this.cats.length) {
-          const c = this.catDe(u);
-          if (!c || !this.cats.includes(c.id)) return false;
-        }
+        if (!this.pasaCat(u)) return false;
+        if (!this.pasaTerm(u)) return false;
         if (!this.pasaFiltro(u)) return false;
         if (!t.length) return true;
         const txt = `${u.serie} ${u.modelo} ${u.medida} ${u.color} ${u.orden || ''}`.toLowerCase();
         return t.every(x => txt.includes(x));
       });
+    },
+    pasaCat(u) {
+      if (!this.cats.length) return true;
+      const c = this.catDe(u);
+      return !!c && this.cats.includes(c.id);
+    },
+    pasaTerm(u) {
+      if (!this.terms.length) return true;
+      return this.terms.includes(this.normT(u.terminacion));
     },
     pasaFiltro(u) {
       const f = this.filtro;
@@ -81,11 +87,8 @@
     cuenta(f) {
       const antes = this.filtro;
       this.filtro = f;
-      const base = global.DB.unidadesTodas().filter(u => {
-        if (!this.cats.length) return true;
-        const c = this.catDe(u); return c && this.cats.includes(c.id);
-      });
-      const n = base.filter(u => this.pasaFiltro(u)).length;
+      const n = global.DB.unidadesTodas()
+        .filter(u => this.pasaCat(u) && this.pasaTerm(u) && this.pasaFiltro(u)).length;
       this.filtro = antes;
       return n;
     },
@@ -94,11 +97,67 @@
       { k: 'todo', label: 'Todo' },
       { k: 'disponible', label: 'Disponible' },
       { k: 'stock', label: 'En stock' },
+      { k: 'pedir', label: 'A pedir' },
       { k: 'produccion', label: 'En producción' },
       { k: 'reservada', label: 'Reservadas' },
       { k: 'entregada', label: 'Entregadas' },
       { k: 'marcas', label: 'Con marca' },
     ],
+
+    // Cómo se ordena adentro de cada categoría. Por default por estado: lo que
+    // hay para entregar arriba, después lo que se está haciendo, y al final lo
+    // que ya salió — que es el orden en que se mira.
+    ORDENES: [
+      { k: 'estado', label: 'Por estado' },
+      { k: 'modelo', label: 'Por modelo' },
+      { k: 'medida', label: 'Por medida' },
+      { k: 'ubicacion', label: 'Por ubicación' },
+    ],
+    orden: 'estado',
+    PESO_ESTADO: { stock: 0, produccion: 1, pedir: 2, entregada: 3 },
+    ordenar(us) {
+      const cmp = (a, b) => {
+        if (this.orden === 'modelo') {
+          return a.modelo.localeCompare(b.modelo) || this.porEstado(a, b) || this.porMedida(a, b);
+        }
+        if (this.orden === 'medida') {
+          return this.porMedida(a, b) || a.modelo.localeCompare(b.modelo) || this.porEstado(a, b);
+        }
+        if (this.orden === 'ubicacion') {
+          const ua = global.DB.ubicacionLabel(a.ubicacion) || 'zz';
+          const ub = global.DB.ubicacionLabel(b.ubicacion) || 'zz';
+          return ua.localeCompare(ub) || a.modelo.localeCompare(b.modelo) || this.porMedida(a, b);
+        }
+        // Estado, después modelo, después medida y después color: así las de
+        // stock salen siempre primero y adentro quedan ordenadas de verdad.
+        return this.porEstado(a, b) || a.modelo.localeCompare(b.modelo)
+          || this.porMedida(a, b) || String(a.color).localeCompare(String(b.color))
+          || this.porLibre(a, b);
+      };
+      return [...us].sort(cmp);
+    },
+    porEstado(a, b) {
+      const pa = this.PESO_ESTADO[a.estado] ?? 3, pb = this.PESO_ESTADO[b.estado] ?? 3;
+      return pa - pb;
+    },
+    // A igualdad de todo lo demás, primero lo libre: es lo que se puede vender.
+    porLibre(a, b) { return (a.orden ? 1 : 0) - (b.orden ? 1 : 0); },
+    porMedida(a, b) {
+      const n = x => parseFloat(String(x.medida).replace(',', '.')) || 0;
+      return n(a) - n(b) || String(a.medida).localeCompare(String(b.medida));
+    },
+    // Las unidades se agrupan por CATEGORÍA —bibliotecas, cómodas—, que es
+    // como se recorre el depósito; el modelo es una columna más.
+    porCategoria(us) {
+      const m = new Map();
+      us.forEach(u => {
+        const c = this.catDe(u);
+        const id = c ? c.id : 0;
+        if (!m.has(id)) m.set(id, { id, nombre: c ? c.nombre : 'Sin categoría', items: [] });
+        m.get(id).items.push(u);
+      });
+      return [...m.values()].sort((a, b) => a.nombre.localeCompare(b.nombre));
+    },
 
     // ---- Pintado -----------------------------------------------------------
     pintar() {
@@ -111,85 +170,102 @@
       }
       const f = document.getElementById('un-filtros');
       if (f) {
-        f.innerHTML = `<div class="segm" style="margin-bottom:12px">${this.FILTROS.map(x =>
+        f.innerHTML = `<div class="segm">${this.FILTROS.map(x =>
           `<button class="seg ${this.filtro === x.k ? 'on' : ''}" data-f="${x.k}">${UI.esc(x.label)}
             <b>${this.cuenta(x.k)}</b></button>`).join('')}</div>`;
         f.querySelectorAll('[data-f]').forEach(b => b.onclick = () => {
           this.filtro = b.dataset.f; this.pintar();
         });
       }
-      const bc = document.getElementById('un-cn');
-      if (bc) bc.textContent = this.cats.length || '';
-      const bv = document.getElementById('un-vercat');
-      if (bv) bv.classList.toggle('on', this._abre);
+      const so = document.getElementById('un-orden');
+      if (so) { so.value = this.orden; so.onchange = () => { this.orden = so.value; this.pintar(); }; }
 
       const cont = document.getElementById('un-lista');
-      cont.innerHTML = `<div class="un-cols ${this._abre ? '' : 'sin-c'}">
+      cont.innerHTML = `<div class="un-cols">
+        ${this.htmlCats()}
         <div id="un-tabla"></div>
-        ${this._abre ? this.htmlCats() : ''}
+        ${this.htmlTerms()}
       </div>`;
       this.pintarTabla(document.getElementById('un-tabla'), us);
-      this.engancharCats();
+      this.engancharLados();
     },
 
-    // Las categorías al costado, como en el catálogo: se marcan varias.
+    // Izquierda: las categorías, en orden alfabético. Es por donde se entra.
     htmlCats() {
       const m = new Map();
       global.DB.unidadesTodas().forEach(u => {
+        if (!this.pasaTerm(u) || !this.pasaFiltro(u)) return;
         const c = this.catDe(u); if (!c) return;
         m.set(c.id, (m.get(c.id) || 0) + 1);
       });
       const ops = [...m.entries()].map(([id, n]) => ({
         id, n, label: (this.arbol.find(c => c.id === id) || {}).nombre || '—',
       })).sort((a, b) => a.label.localeCompare(b.label));
-      if (!ops.length) return '';
+      if (!ops.length) return '<aside class="un-c"></aside>';
       return `<aside class="un-c">
         <div class="un-c-h"><span>Categorías</span>
-          ${this.cats.length ? '<button class="lnk" id="un-todas">ver todas</button>' : ''}</div>
-        <label class="un-o ${this.cats.length ? '' : 'on'}">
-          <input type="checkbox" data-cat="" ${this.cats.length ? '' : 'checked'}>
-          <span class="un-o-n">Todas</span><span class="un-o-c tnum">${global.DB.unidadesTodas().length}</span></label>
+          ${this.cats.length ? '<button class="lnk" data-limpia="cats">ver todas</button>' : ''}</div>
         ${ops.map(o => `<label class="un-o ${this.cats.includes(o.id) ? 'on' : ''}">
           <input type="checkbox" data-cat="${o.id}" ${this.cats.includes(o.id) ? 'checked' : ''}>
           <span class="un-o-n">${UI.esc(o.label)}</span>
           <span class="un-o-c tnum">${o.n}</span></label>`).join('')}
       </aside>`;
     },
-    engancharCats() {
+
+    // Derecha: las terminaciones, con su redondelito.
+    htmlTerms() {
+      const m = new Map(); const nom = new Map();
+      global.DB.unidadesTodas().forEach(u => {
+        if (!this.pasaCat(u) || !this.pasaFiltro(u)) return;
+        const k = this.normT(u.terminacion); if (!k) return;
+        m.set(k, (m.get(k) || 0) + 1);
+        if (!nom.has(k)) nom.set(k, u.terminacion);
+      });
+      const ops = [...m.entries()].map(([k, n]) => ({ k, n, label: nom.get(k) }))
+        .sort((a, b) => String(a.label).localeCompare(String(b.label)));
+      if (!ops.length) return '<aside class="un-c"></aside>';
+      return `<aside class="un-c">
+        <div class="un-c-h"><span>Terminación</span>
+          ${this.terms.length ? '<button class="lnk" data-limpia="terms">ver todas</button>' : ''}</div>
+        ${ops.map(o => `<label class="un-o ${this.terms.includes(o.k) ? 'on' : ''}">
+          <input type="checkbox" data-term="${UI.esc(o.k)}" ${this.terms.includes(o.k) ? 'checked' : ''}>
+          <span class="pt" style="background:${global.DB.colorDe(o.label)}"></span>
+          <span class="un-o-n">${UI.esc(o.label)}</span>
+          <span class="un-o-c tnum">${o.n}</span></label>`).join('')}
+      </aside>`;
+    },
+
+    engancharLados() {
       document.querySelectorAll('[data-cat]').forEach(i => i.onchange = () => {
-        const v = i.dataset.cat;
-        if (!v) this.cats = [];
-        else {
-          const id = Number(v);
-          this.cats = this.cats.includes(id) ? this.cats.filter(x => x !== id) : [...this.cats, id];
-        }
+        const id = Number(i.dataset.cat);
+        this.cats = this.cats.includes(id) ? this.cats.filter(x => x !== id) : [...this.cats, id];
         this.pintar();
       });
-      const t = document.getElementById('un-todas');
-      if (t) t.onclick = () => { this.cats = []; this.pintar(); };
+      document.querySelectorAll('[data-term]').forEach(i => i.onchange = () => {
+        const k = i.dataset.term;
+        this.terms = this.terms.includes(k) ? this.terms.filter(x => x !== k) : [...this.terms, k];
+        this.pintar();
+      });
+      document.querySelectorAll('[data-limpia]').forEach(b => b.onclick = () => {
+        if (b.dataset.limpia === 'cats') this.cats = []; else this.terms = [];
+        this.pintar();
+      });
     },
 
     // El renglón es bajo a propósito: se trabaja mirando muchos a la vez.
     pintarTabla(cont, us) {
       if (!us.length) { cont.innerHTML = UI.vacio('Ninguna unidad con ese filtro.'); return; }
       const ed = global.App && global.App.puede && global.App.puede('editarCatalogo');
-      // Agrupadas por modelo, como la planilla: el corte ayuda a leer.
-      const grupos = [];
-      us.forEach(u => {
-        const ult = grupos[grupos.length - 1];
-        if (ult && ult.modelo === u.modelo) ult.items.push(u);
-        else grupos.push({ modelo: u.modelo, items: [u] });
-      });
+      const grupos = this.porCategoria(this.ordenar(us));
 
       cont.innerHTML = `<div class="card un-tabla">
         <table>
           <thead><tr>
             <th>N°</th><th>Modelo</th><th>Medida</th><th>Color</th><th>Estado</th>
-            <th>Ubicación</th><th>Proveedor</th><th>Llega / listo</th><th>Venta</th>
-            <th></th>
+            <th>Ubicación</th><th>Proveedor</th><th>Llega</th><th>Listo</th><th>Venta</th><th></th>
           </tr></thead>
           <tbody>${grupos.map(g => `
-            <tr class="un-g"><td colspan="10">${UI.esc(g.modelo)}
+            <tr class="un-g"><td colspan="11">${UI.esc(g.nombre)}
               <span class="muted">${g.items.length}</span></td></tr>
             ${g.items.map(u => this.renglon(u, ed)).join('')}`).join('')}
           </tbody>
@@ -200,12 +276,8 @@
 
       cont.querySelectorAll('[data-res]').forEach(b => b.onclick = () => this.reservar(Number(b.dataset.res)));
       cont.querySelectorAll('[data-lib]').forEach(b => b.onclick = () => this.liberar(Number(b.dataset.lib)));
+      cont.querySelectorAll('[data-pedir]').forEach(b => b.onclick = () => this.pedir(Number(b.dataset.pedir)));
       cont.querySelectorAll('[data-foto]').forEach(b => b.onclick = () => this.modalFoto(Number(b.dataset.foto)));
-      cont.querySelectorAll('[data-tipo]').forEach(el => el.onclick = () => {
-        const u = global.DB.unidad(Number(el.dataset.tipo)); if (!u) return;
-        global.DB.guardarUnidad({ id: u.id, tipo: u.tipo === 'medida' ? 'estandar' : 'medida' });
-        this.pintar();
-      });
     },
 
     renglon(u, ed) {
@@ -222,13 +294,14 @@
         <td><span class="pill ${e.pill}">${UI.esc(e.label)}</span></td>
         <td class="muted">${UI.esc(global.DB.ubicacionLabel(u.ubicacion) || '—')}</td>
         <td class="muted">${UI.esc(u.proveedor || '—')}</td>
-        <td>${enProd ? `<b>llega ${UI.esc(u.fechaProv)}</b>`
-          : `<span class="muted">${UI.esc(u.fechaProv || '—')}</span>`}</td>
+        <td>${enProd && u.llega ? `<b>${UI.esc(u.llega)}</b>`
+          : `<span class="muted">—</span>`}</td>
+        <td class="muted">${UI.esc(u.listo || '—')}</td>
         <td class="muted">${u.orden ? `${UI.esc(u.orden)}${u.fechaVenta ? ` · ${UI.esc(u.fechaVenta)}` : ''}` : '—'}</td>
-
         <td class="td-acc">${
-          disp ? `<button class="bres" data-res="${u.id}">Reservar</button>`
-          : (enProd && !u.orden) ? `<button class="bres" data-res="${u.id}">Reservar sobre pedido</button>`
+          u.estado === 'pedir' ? `<button class="bres" data-pedir="${u.id}">Pedir</button>`
+          : disp ? `<button class="bres" data-res="${u.id}">Reservar</button>`
+          : (enProd && !u.orden) ? `<button class="bres" data-res="${u.id}">Reservar</button>`
           : (u.orden && u.estado !== 'entregada') ? `<button class="b-x" data-lib="${u.id}">Liberar</button>`
           : ''}</td>
       </tr>`;
@@ -335,6 +408,46 @@
         cerrar(); this.pintar();
       };
     },
+    // Pedirla es asignarle proveedor y fecha: ahí deja de ser una promesa y
+    // pasa a ser una pieza que alguien está haciendo.
+    pedir(id) {
+      const u = global.DB.unidad(id); if (!u) return;
+      const provs = [...new Set(global.DB.unidadesTodas().map(x => x.proveedor).filter(Boolean))].sort();
+      document.body.insertAdjacentHTML('beforeend', `
+        <div class="un-back" id="un-mdl">
+          <div class="card pad" style="max-width:440px;width:100%">
+            <h3 class="h-title" style="font-size:17px">Pedir a fábrica</h3>
+            <p class="h-sub">${UI.esc(u.modelo)} ${UI.esc(u.medida)} · ${UI.esc(u.color)}
+              — vendida en <b>${UI.esc(u.orden || '')}</b></p>
+            <div class="cz-cols" style="margin-top:14px">
+              <label class="fld"><span class="lbl">Proveedor</span>
+                <select id="un-prov">${provs.map(x =>
+                  `<option value="${UI.esc(x)}">${UI.esc(x)}</option>`).join('')}</select></label>
+              <label class="fld"><span class="lbl">Cuándo llega</span>
+                <input id="un-llega" placeholder="30/8"></label>
+            </div>
+            <div class="hint" style="margin-top:6px">Pasa a <b>en producción</b> con esa fecha, y el
+              vendedor puede decirle al cliente cuándo la tiene.</div>
+            <div class="row" style="margin-top:16px;gap:10px">
+              <div class="sp"></div>
+              <button class="btn" id="un-x">Cancelar</button>
+              <button class="btn primary" id="un-ok">Pedir</button>
+            </div>
+          </div>
+        </div>`);
+      const cerrar = () => { const m = document.getElementById('un-mdl'); if (m) m.remove(); };
+      document.getElementById('un-x').onclick = cerrar;
+      document.getElementById('un-mdl').onclick = e => { if (e.target.id === 'un-mdl') cerrar(); };
+      document.getElementById('un-ok').onclick = () => {
+        const llega = document.getElementById('un-llega').value.trim();
+        if (!llega) return UI.aviso('Poné cuándo llega', 'warn');
+        global.DB.guardarUnidad({ id, estado: 'produccion',
+          proveedor: document.getElementById('un-prov').value, llega });
+        UI.aviso('Pedida — queda en producción', 'ok');
+        cerrar(); this.pintar();
+      };
+    },
+
     liberar(id) {
       const u = global.DB.unidad(id); if (!u) return;
       global.DB.guardarUnidad({ id, orden: null, fechaVenta: '' });
@@ -360,9 +473,16 @@
         .seg.on{background:var(--navy);border-color:var(--navy);color:#fff}
         .seg.on b{opacity:.75}
 
-        .un-cols{display:grid;grid-template-columns:minmax(0,1fr) 206px;gap:18px;align-items:start}
-        .un-cols.sin-c{grid-template-columns:1fr}
-        @media(max-width:1100px){.un-cols{grid-template-columns:1fr}}
+        /* Categorías a la izquierda —por donde se entra— y terminaciones a la
+           derecha. El estado va arriba, que es el corte de todos los días. */
+        .un-cols{display:grid;grid-template-columns:176px minmax(0,1fr) 166px;gap:14px;
+          align-items:start;max-width:100%}
+        .un-cols>#un-tabla{min-width:0;overflow:hidden}
+        @media(max-width:1240px){.un-cols{grid-template-columns:1fr}}
+        .un-ord{flex:none;width:auto;min-width:150px;padding:8px 10px;font-size:12.5px;font-weight:650;
+          color:var(--ink-soft);border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+        .pt{width:11px;height:11px;border-radius:50%;border:1px solid rgba(0,0,0,.18);flex:none;
+          display:inline-block}
         .un-c{position:sticky;top:104px;display:flex;flex-direction:column}
         .un-c-h{display:flex;align-items:baseline;gap:8px;font-size:11px;font-weight:700;
           text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:5px}
@@ -379,7 +499,8 @@
 
         /* El renglón va bajo: se trabaja mirando muchos a la vez. */
         .un-tabla{overflow-x:auto}
-        .un-tabla table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:940px}
+        .un-tabla{max-width:100%}
+        .un-tabla table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:880px}
         .un-tabla th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;
           color:var(--muted);font-weight:700;padding:7px 9px;border-bottom:1px solid var(--line);
           white-space:nowrap;background:var(--panel);position:sticky;top:95px;z-index:2}
