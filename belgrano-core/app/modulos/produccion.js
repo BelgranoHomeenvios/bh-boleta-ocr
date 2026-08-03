@@ -16,12 +16,12 @@
     agrupar: (() => { try { return localStorage.getItem(AGR_KEY) || 'proveedor'; }
       catch { return 'proveedor'; } })(),
     soloUrgentes: false,
-    soloSemana: false,
     taller: null,          // un taller marcado en el costado
     origen: 'todo',        // todo · venta · stock
     _abiertos: new Set(),
 
     AGRUPACIONES: [
+      { k: 'rubro', label: 'Por rubro', vacio: '—' },
       { k: 'proveedor', label: 'Por proveedor', vacio: 'Sin proveedor todavía' },
       { k: 'orden', label: 'Por orden de venta', vacio: 'Para stock' },
       { k: 'mueble', label: 'Por mueble', vacio: '—' },
@@ -66,8 +66,7 @@
         if (!this.pasaTaller(u)) return false;
         if (!this.pasaOrigen(u)) return false;
         if (!this.pasaFiltro(u)) return false;
-        if (this.soloUrgentes && !global.DB.vencida(u)) return false;
-        if (this.soloSemana && !this.entraSemana(u)) return false;
+        if (this.soloUrgentes) { const d = this.margen(u); if (d == null || d > 7) return false; }
         if (!t.length) return true;
         const txt = `${u.modelo} ${u.medida} ${u.color} ${u.proveedor || ''} ${u.pedido || ''} ${u.orden || ''}`
           .toLowerCase();
@@ -88,16 +87,16 @@
       return true;
     },
     // Lo que Producción tiene entre manos, o lo que ya trajo si se pide ver eso.
-    base() {
-      return this.verRecibido
-        ? global.DB.unidadesTodas().filter(u => u.pedido
-          && (u.estado === 'stock' || u.estado === 'entregada'))
-        : global.DB.aFabricar();
-    },
+    base() { return global.DB.aFabricar(); },
 
     // Cómo se apilan. La clave y el título de cada montón salen de acá, así
     // cambiar de agrupación no cambia nada más que esto.
     grupoDe(u) {
+      if (this.agrupar === 'rubro') {
+        const r = global.DB.rubroDe(u);
+        const d = global.DB.rubro(r);
+        return { k: `r:${r}`, nombre: (d && d.label) || r, tipo: 'rubro' };
+      }
       if (this.agrupar === 'proveedor') {
         return u.proveedor
           ? { k: `p:${u.proveedor}`, nombre: u.proveedor, tipo: 'proveedor' }
@@ -123,13 +122,18 @@
         g.vencidas = g.items.filter(x => global.DB.vencida(x)).length;
         g.sinPedir = g.items.filter(x => x.estado === 'pedir').length;
         g.trabas = g.items.filter(x => !global.DB.planoListo(x)).length;
-        g.items.sort((a, b) => this.peso(a) - this.peso(b)
+        // Lo más atrasado arriba: es lo primero que hay que reclamar.
+        const mg = u => { const x = this.margen(u); return x == null ? 9999 : x; };
+        g.peor = Math.min(...g.items.map(mg));
+        g.atrasadas = g.items.filter(u => mg(u) < 0).length;
+        g.items.sort((a, b) => mg(a) - mg(b)
+          || this.peso(a) - this.peso(b)
           || String(a.modelo).localeCompare(b.modelo));
       });
       // Primero lo que hay que hacer —lo que todavía no tiene proveedor—,
       // después lo que se está pasando de fecha, y al final el resto.
       return gs.sort((a, b) => (b.tipo === 'vacio') - (a.tipo === 'vacio')
-        || (b.vencidas > 0) - (a.vencidas > 0)
+        || a.peor - b.peor
         || (b.sinPedir > 0) - (a.sinPedir > 0)
         || b.items.length - a.items.length
         || a.nombre.localeCompare(b.nombre));
@@ -147,10 +151,10 @@
       const sub = document.getElementById('pr-sub');
       if (sub) {
         const venc = global.DB.aFabricar().filter(u => global.DB.vencida(u)).length;
-        const qué = this.verRecibido ? 'muebles ya recibidos' : 'muebles en el circuito';
+        const qué = 'muebles en el circuito';
         sub.innerHTML = `${us.length === tot.length ? tot.length
           : `${us.length} de ${tot.length}`} ${qué}${
-          !this.verRecibido && venc ? ` · <b style="color:var(--crit)">${venc} vencidos</b>` : ''}${
+          venc ? ` · <b style="color:var(--crit)">${venc} vencidos</b>` : ''}${
           this.taller ? ` · <b>${UI.esc(this.taller)}</b>` : ''}`;
       }
       this.pintarKpis(global.DB.aFabricar());
@@ -189,7 +193,7 @@
       const base = this.base();
       const cuenta = f => base.filter(u => this.pasaOrigen(u) && this.pasaFiltro(u)
         && (!this.soloUrgentes || global.DB.vencida(u))
-        && (!this.soloSemana || this.entraSemana(u)) && f(u)).length;
+ && f(u)).length;
       const talleres = global.DB.cargaTalleres().map(t => ({
         ...t, n: cuenta(u => u.proveedor === t.nombre),
       }));
@@ -239,42 +243,37 @@
 
     // Cada número de arriba es un botón: se aprieta y la lista queda con eso.
     // Volver a apretarlo lo saca. Son los cuatro cortes de todos los días.
-    entraSemana(u) {
-      const d = global.DB.diasHasta(u.hasta);
-      return u.estado === 'produccion' && d != null && d >= 0 && d <= 7;
-    },
     KPIS: [
       { k: 'dibujar', titulo: 'Falta dibujar', pie: 'no se pueden pedir', pieOk: 'nada trabado' },
-      { k: 'pedir', titulo: 'Sin pedir', pie: 'vendidos, sin proveedor', pieOk: 'nada pendiente' },
+      { k: 'confirmar', titulo: 'Falta confirmar el dibujo',
+        pie: 'dibujados, esperando el visto', pieOk: 'nada esperando' },
+      { k: 'pedir', titulo: 'Sin pedir', pie: 'listos, sin proveedor', pieOk: 'nada pendiente' },
       { k: 'fabricando', titulo: 'En fábrica', pie: '', pieOk: '' },
-      { k: 'vencidos', titulo: 'Vencidos', pie: 'se pasó el rango prometido', pieOk: 'todo en fecha' },
-      { k: 'semana', titulo: 'Entran esta semana', pie: 'para hacerles lugar', pieOk: 'nada esta semana' },
-      { k: 'recibido', titulo: 'Ya recibidos', pie: 'lo que trajeron', pieOk: 'todavía nada' },
+      { k: 'vencidos', titulo: 'Vencidos o por vencer', pie: 'hay que apurarlos',
+        pieOk: 'todo con aire' },
     ],
-    verRecibido: false,
     // Cuántas caen en cada corte. Es la misma cuenta que usa el filtro, así
     // el número de arriba y lo que se ve abajo no se pueden despegar.
     esDelKpi(u, k) {
-      if (k === 'vencidos') return global.DB.vencida(u);
-      if (k === 'semana') return this.entraSemana(u);
-      if (k === 'recibido') return u.estado === 'stock' || u.estado === 'entregada';
+      if (k === 'vencidos') { const d = this.margen(u); return d != null && d <= 7; }
       return global.DB.vistaFab(u) === k;
     },
     kpiActivo() {
-      if (this.verRecibido) return 'recibido';
       if (this.soloUrgentes) return 'vencidos';
-      if (this.soloSemana) return 'semana';
       return this.filtro === 'todo' ? null : this.filtro;
     },
     tocarKpi(k) {
       const ya = this.kpiActivo() === k;
       this.filtro = 'todo'; this.soloUrgentes = false; this.soloSemana = false;
-      this.verRecibido = false;
       if (!ya) {
         if (k === 'vencidos') this.soloUrgentes = true;
-        else if (k === 'semana') this.soloSemana = true;
-        else if (k === 'recibido') this.verRecibido = true;
         else this.filtro = k;
+        // Para pedir, lo primero es el rubro: no se le pide lo mismo al
+        // carpintero que al tapicero.
+        if (k === 'pedir' || k === 'dibujar' || k === 'confirmar') {
+          this.agrupar = 'rubro';
+          try { localStorage.setItem(AGR_KEY, 'rubro'); } catch {}
+        }
       }
       this._abiertos.clear();
       this.pintar();
@@ -282,14 +281,12 @@
     pintarKpis(tot) {
       const k = document.getElementById('pr-kpis'); if (!k) return;
       const activo = this.kpiActivo();
-      const semana = tot.filter(u => this.entraSemana(u)).length;
-      const recibidos = global.DB.unidadesTodas().filter(u => u.pedido
-        && (u.estado === 'stock' || u.estado === 'entregada')).length;
       k.innerHTML = `<div class="pr-kpis">${this.KPIS.map(x => {
-        const n = x.k === 'recibido' ? recibidos : tot.filter(u => this.esDelKpi(u, x.k)).length;
-        const mal = n > 0 && (x.k === 'dibujar' || x.k === 'pedir' || x.k === 'vencidos');
+        const n = tot.filter(u => this.esDelKpi(u, x.k)).length;
+        const mal = n > 0 && ['dibujar', 'confirmar', 'pedir', 'vencidos'].includes(x.k);
         const pie = x.k === 'fabricando'
-          ? `<b>${semana}</b> entran esta semana` : (n ? x.pie : x.pieOk);
+          ? `<b>${tot.filter(u => { const d = this.margen(u); return d != null && d < 0; }).length}</b> atrasados`
+          : (n ? x.pie : x.pieOk);
         return `<button class="pr-k ${activo === x.k ? 'on' : ''}" data-kpi="${x.k}"
           title="${activo === x.k ? 'Sacar este filtro' : 'Ver sólo estos'}">
           <span class="pr-k-t">${x.titulo}</span>
@@ -304,7 +301,13 @@
       const gs = this.grupos(us);
       // Si quedaron pocos, se abren solos: filtraste justamente para verlos.
       if (us.length <= 30 || gs.length === 1) gs.forEach(g => this._abiertos.add(g.k));
-      cont.innerHTML = gs.map(g => this.htmlGrupo(g)).join('') + `
+      const sel = this.filtro === 'pedir';
+      cont.innerHTML = (sel ? `<div class="pr-acc" id="pr-acc">
+        <span class="hint" id="pr-cn">Tildá los muebles que le vas a dar a un taller</span>
+        <div class="sp"></div>
+        <button class="btn" id="pr-fab">Mandar a fabricar para stock</button>
+        <button class="btn primary" id="pr-asignar" disabled>Asignar a un taller</button>
+      </div>` : '') + gs.map(g => this.htmlGrupo(g)).join('') + `
         <div class="hint" style="margin-top:10px">Es la misma lista apilada de tres maneras:
           <b>por proveedor</b> para saber qué tiene cada taller, <b>por orden</b> para saber qué
           traba cada entrega, y <b>por mueble</b> para juntar lo igual antes de pedir.</div>`;
@@ -315,11 +318,16 @@
       });
       cont.querySelectorAll('[data-ver]').forEach(b => b.onclick = () =>
         this.ficha(Number(b.dataset.ver)));
+      cont.querySelectorAll('[data-sel]').forEach(c => c.onchange = () => this.contarSel());
+      const bf = document.getElementById('pr-fab');
+      if (bf) bf.onclick = () => this.modalFabricar();
+      const ba = document.getElementById('pr-asignar');
+      if (ba) ba.onclick = () => this.modalAsignar();
     },
 
     htmlGrupo(g) {
       const on = this._abiertos.has(g.k);
-      const alerta = g.vencidas > 0;
+      const alerta = g.atrasadas > 0;
       return `<section class="pr-g ${alerta ? 'mal' : ''}">
         <button class="pr-g-h" data-abrir="${UI.esc(g.k)}" aria-expanded="${on}">
           <span class="pr-g-fl">${on ? '▾' : '▸'}</span>
@@ -327,7 +335,9 @@
             ? `<span class="pr-av">${UI.esc(this.inicial(g.nombre))}</span>` : ''}
           <b>${UI.esc(g.nombre)}</b>
           <span class="pill soft">${g.items.length} ${g.items.length === 1 ? 'mueble' : 'muebles'}</span>
-          ${g.vencidas ? `<span class="pill crit">${g.vencidas} vencidos</span>` : ''}
+          ${g.atrasadas ? `<span class="pill crit">${g.atrasadas} atrasados</span>`
+            : (g.peor < 9999 && g.peor <= 7
+              ? `<span class="pill warn">el más urgente en ${g.peor} días</span>` : '')}
           ${g.sinPedir && this.agrupar !== 'mueble'
             ? `<span class="pill warn">${g.sinPedir} sin pedir</span>` : ''}
           ${g.trabas ? `<span class="pill crit">${g.trabas} sin dibujo</span>` : ''}
@@ -345,6 +355,157 @@
       return (m ? m[0] : String(nombre || '?')[0] || '?').toUpperCase();
     },
 
+    tildados() {
+      return [...document.querySelectorAll('[data-sel]:checked')].map(x => Number(x.dataset.sel));
+    },
+    contarSel() {
+      const n = this.tildados().length;
+      const cn = document.getElementById('pr-cn');
+      const ba = document.getElementById('pr-asignar');
+      if (cn) cn.textContent = n
+        ? `${n} mueble${n === 1 ? '' : 's'} tildado${n === 1 ? '' : 's'}`
+        : 'Tildá los muebles que le vas a dar a un taller';
+      if (ba) ba.disabled = !n;
+    },
+
+    // Asignarle un taller es abrirle un pedido —o sumarlo a uno abierto— con
+    // el rango en que se comprometió a entregarlo.
+    modalAsignar() {
+      const ids = this.tildados();
+      if (!ids.length) return;
+      const us = ids.map(id => global.DB.unidad(id)).filter(Boolean);
+      const rubros = [...new Set(us.map(u => global.DB.rubroDe(u)))];
+      const provs = global.DB.proveedores();
+      const abiertos = global.DB.pedidosTodos().filter(p => p.estado === 'abierto');
+      const hoy = global.DB.hoyCorto();
+      document.body.insertAdjacentHTML('beforeend', `
+        <div class="pr-back" id="pr-mdl"><div class="card pad" style="max-width:460px;width:100%">
+          <h3 class="h-title" style="font-size:17px">Asignar ${ids.length} mueble${
+            ids.length === 1 ? '' : 's'} a un taller</h3>
+          <p class="h-sub">${rubros.map(r => UI.esc((global.DB.rubro(r) || {}).label || r)).join(' · ')}</p>
+          ${rubros.length > 1 ? `<div class="banner warn" style="margin-top:10px">Tildaste muebles
+            de <b>rubros distintos</b>. Un pedido es de un solo rubro: convendría hacerlos por
+            separado.</div>` : ''}
+          ${abiertos.length ? `<label class="fld" style="margin-top:12px">
+            <span class="lbl">Sumar a un pedido abierto</span>
+            <select id="pr-ped"><option value="">— abrir uno nuevo —</option>${abiertos.map(p =>
+              `<option value="${UI.esc(p.numero)}">${UI.esc(p.numero)} · ${UI.esc(p.proveedor)}
+                (${global.DB.itemsDePedido(p.numero).length})</option>`).join('')}</select></label>` : ''}
+          <label class="fld"><span class="lbl">Taller</span>
+            <select id="pr-prov">${provs.map(x =>
+              `<option value="${UI.esc(x.nombre)}">${UI.esc(x.nombre)} <span></span></option>`).join('')}</select></label>
+          <div class="cz-cols">
+            <label class="fld"><span class="lbl">Entra desde</span>
+              <input id="pr-d" value="${UI.esc(hoy)}"></label>
+            <label class="fld"><span class="lbl">Hasta</span>
+              <input id="pr-h" placeholder="12/8"></label>
+          </div>
+          <div class="hint">Queda como <b>pedido abierto</b>: se le puede seguir agregando hasta
+            que lo cierres y lo mandes.</div>
+          <div class="row" style="margin-top:16px;gap:10px"><div class="sp"></div>
+            <button class="btn" id="pr-x">Cancelar</button>
+            <button class="btn primary" id="pr-ok">Asignar</button></div>
+        </div></div>`);
+      const cerrar = () => { const m = document.getElementById('pr-mdl'); if (m) m.remove(); };
+      document.getElementById('pr-x').onclick = cerrar;
+      document.getElementById('pr-mdl').onclick = e => { if (e.target.id === 'pr-mdl') cerrar(); };
+      document.getElementById('pr-ok').onclick = () => {
+        const ya = (document.getElementById('pr-ped') || {}).value || '';
+        let num = ya;
+        if (!num) {
+          const p = global.DB.abrirPedido({
+            proveedor: document.getElementById('pr-prov').value,
+            rubro: rubros[0],
+            desde: document.getElementById('pr-d').value.trim(),
+            hasta: document.getElementById('pr-h').value.trim(), quien: 'yo',
+          });
+          num = p.numero;
+        }
+        ids.forEach(id => global.DB.agregarAPedido(num, id, 'yo'));
+        UI.aviso(`${ids.length} asignados a ${num}`, 'ok');
+        cerrar(); this.pintar();
+      };
+    },
+
+    // Pedir para tener: lo que se hace sin venta atrás —para el local, para
+    // guardar, o porque nos quedamos sin stock—. Es el listado que hoy le pasás
+    // a Adrián a mano.
+    modalFabricar() {
+      const vs = (global.DB.variantesTodas() || []).slice(0, 400);
+      const nombre = v => {
+        const p = (this.prods || []).find(x => x.id === v.producto_id) || {};
+        return `${p.nombre || ''} · ${v.medida || ''} · ${[v.estructura, v.frente]
+          .filter(Boolean).join(' · ')}`;
+      };
+      const conStock = vs.map(v => ({ v, libres: global.DB.libresDeVariante(v.id) }))
+        .sort((a, b) => a.libres - b.libres || nombre(a.v).localeCompare(nombre(b.v)));
+      document.body.insertAdjacentHTML('beforeend', `
+        <div class="pr-back" id="pr-mdl"><div class="card pad pr-mdl-g">
+          <h3 class="h-title" style="font-size:17px">Mandar a fabricar para stock</h3>
+          <p class="h-sub">Sin venta atrás: para el local, para tener, o porque nos quedamos sin.
+            Arriba, lo que menos stock libre tiene.</p>
+          <input id="pr-bq" placeholder="Buscar mueble…" style="width:100%;margin-top:10px">
+          <div class="pr-scroll" id="pr-vs">${conStock.map(({ v, libres }) => `
+            <label class="pr-it" data-txt="${UI.esc(nombre(v).toLowerCase())}">
+              <input type="checkbox" class="chk" data-var="${v.id}">
+              <span class="pr-it-n">${UI.esc(nombre(v))}</span>
+              <span class="sp"></span>
+              <span class="${libres ? 'muted' : 'tarde'}">${libres} libre${libres === 1 ? '' : 's'}</span>
+              <input class="pr-cant" type="number" min="1" value="1" data-cant="${v.id}">
+            </label>`).join('')}</div>
+          <label class="fld" style="margin-top:10px"><span class="lbl">Para qué</span>
+            <select id="pr-mot"><option>para tener</option><option>para el local</option>
+              <option>nos quedamos sin</option><option>muestra</option></select></label>
+          <div class="row" style="margin-top:12px;gap:10px">
+            <span class="hint" id="pr-fn">Ninguno tildado</span><div class="sp"></div>
+            <button class="btn" id="pr-x">Cancelar</button>
+            <button class="btn primary" id="pr-ok">Mandar a fabricar</button></div>
+        </div></div>`);
+      const cerrar = () => { const m = document.getElementById('pr-mdl'); if (m) m.remove(); };
+      document.getElementById('pr-x').onclick = cerrar;
+      const cn = () => {
+        const n = [...document.querySelectorAll('#pr-mdl [data-var]:checked')]
+          .reduce((a, c) => a + (Number(document.querySelector(`[data-cant="${c.dataset.var}"]`).value) || 1), 0);
+        document.getElementById('pr-fn').textContent = n ? `${n} muebles` : 'Ninguno tildado';
+      };
+      document.querySelectorAll('#pr-mdl [data-var]').forEach(c => c.onchange = cn);
+      document.querySelectorAll('#pr-mdl [data-cant]').forEach(c => c.oninput = cn);
+      const bq = document.getElementById('pr-bq');
+      bq.oninput = () => {
+        const t = bq.value.toLowerCase().trim();
+        document.querySelectorAll('#pr-vs .pr-it').forEach(l => {
+          l.style.display = !t || l.dataset.txt.includes(t) ? '' : 'none';
+        });
+      };
+      document.getElementById('pr-ok').onclick = () => {
+        const motivo = document.getElementById('pr-mot').value;
+        const sel = [...document.querySelectorAll('#pr-mdl [data-var]:checked')];
+        if (!sel.length) return UI.aviso('No tildaste ninguno', 'warn');
+        let n = 0;
+        sel.forEach(c => {
+          const cant = Number(document.querySelector(`[data-cant="${c.dataset.var}"]`).value) || 1;
+          n += global.DB.crearUnidadStock(Number(c.dataset.var), { motivo, cantidad: cant }).length;
+        });
+        UI.aviso(`${n} muebles a fabricar para stock`, 'ok');
+        cerrar(); this.pintar();
+      };
+    },
+
+    // Lo que se mira no es la fecha, es cuánto falta: es lo que dice si hay
+    // que apurar al taller o todavía hay aire.
+    margen(u) { return global.DB.margenEntrega(u); },
+    htmlMargen(u) {
+      const d = this.margen(u);
+      const f = global.DB.prometidaDe(u);
+      if (d == null) return '<span class="muted">sin fecha</span>';
+      if (d < 0) return `<b class="venc">${Math.abs(d)} días tarde</b>
+        <span class="muted">era el ${UI.esc(f)}</span>`;
+      if (d === 0) return `<b class="hoy">es hoy</b>`;
+      const cls = d <= 7 ? 'hoy' : '';
+      return `<b class="${cls}">faltan ${d} días</b>
+        <span class="muted">${UI.esc(f)}</span>`;
+    },
+
     // Plegado, el montón sigue diciendo lo importante sin tener que abrirlo.
     resumen(g) {
       const m = new Map();
@@ -357,28 +518,34 @@
 
     htmlTabla(g) {
       const porMueble = this.agrupar === 'mueble';
+      // Con "sin pedir" se puede tildar para asignarle un taller a varios.
+      const sel = this.filtro === 'pedir';
       return `<div class="card pr-tabla">
         <table>
           <thead><tr>
+            ${sel ? '<th style="width:26px"></th>' : ''}
+            ${this.agrupar === 'orden' ? '<th>Proveedor</th>' : '<th>Venta</th>'}
             <th>Estado</th><th>Mueble</th><th>Tipo</th>
             ${porMueble ? '' : '<th>Terminación</th>'}
-            <th>Plano</th>
-            ${this.agrupar === 'orden' ? '<th>Proveedor</th>' : '<th>Venta</th>'}
-            <th>Pedido</th><th>Entra entre</th><th></th>
+            <th>Plano</th><th>Pedido</th><th>Falta</th><th></th>
           </tr></thead>
-          <tbody>${g.items.map(u => this.renglon(u, porMueble)).join('')}</tbody>
+          <tbody>${g.items.map(u => this.renglon(u, porMueble, sel)).join('')}</tbody>
         </table></div>`;
     },
 
-    renglon(u, porMueble) {
+    renglon(u, porMueble, sel) {
       const v = global.DB.VISTAS_FAB.find(x => x.k === global.DB.vistaFab(u)) || {};
       const t = global.DB.tipoUnidad(u.tipo);
       const pe = global.DB.planoEstado(u.planoEstado || 'ok');
-      const venc = global.DB.vencida(u);
-      const dias = global.DB.diasHasta(u.hasta);
-      const rango = u.desde && u.hasta
-        ? `${UI.esc(u.desde)} y ${UI.esc(u.hasta)}` : '';
+      const venc = this.margen(u) != null && this.margen(u) < 0;
+      const venta = this.agrupar === 'orden'
+        ? `<td class="muted">${UI.esc(u.proveedor || '—')}</td>`
+        : `<td>${u.orden ? `<b class="nom">${UI.esc(u.orden)}</b>`
+            : `<span class="pr-stock">stock</span>${u.motivoStock
+              ? ` <span class="muted">${UI.esc(u.motivoStock)}</span>` : ''}`}</td>`;
       return `<tr class="${venc ? 'mal' : ''}">
+        ${sel ? `<td><input type="checkbox" class="chk" data-sel="${u.id}"></td>` : ''}
+        ${venta}
         <td><span class="pill ${v.pill}">${UI.esc(v.label || '')}</span></td>
         <td class="nom">${UI.esc(u.modelo)}${porMueble ? '' : ` <span class="muted">${UI.esc(u.medida)}</span>`}</td>
         <td>${u.tipo === 'estandar' ? '<span class="muted">estándar</span>'
@@ -390,13 +557,8 @@
         ${porMueble ? '' : `<td class="muted">${UI.esc(u.color)}</td>`}
         <td>${global.DB.planoListo(u) ? '<span class="muted">listo</span>'
           : `<span class="pill ${pe.pill}">${UI.esc(pe.label)}</span>`}</td>
-        ${this.agrupar === 'orden'
-          ? `<td class="muted">${UI.esc(u.proveedor || '—')}</td>`
-          : `<td class="muted">${u.orden ? `<b class="nom">${UI.esc(u.orden)}</b>` : 'stock'}</td>`}
         <td class="muted">${UI.esc(u.pedido || '—')}</td>
-        <td class="${venc ? 'venc' : ''}">${rango
-          ? `${rango}${venc ? ` · ${Math.abs(dias)} días tarde` : ''}`
-          : '<span class="muted">—</span>'}</td>
+        <td>${this.htmlMargen(u)}</td>
         <td class="td-acc"><button class="b-x" data-ver="${u.id}">Ver</button></td>
       </tr>`;
     },
@@ -430,7 +592,10 @@
               ${dato('Plano', pe.label)}
               ${dato('Proveedor', u.proveedor)}
               ${dato('Pedido', u.pedido)}
-              ${dato('Entra entre', u.desde && u.hasta ? `${u.desde} y ${u.hasta}` : '')}
+              ${dato('Hay que tenerlo', global.DB.prometidaDe(u))}
+              ${dato('Margen', (() => { const d = this.margen(u);
+                return d == null ? '' : d < 0 ? `${Math.abs(d)} días tarde` : `faltan ${d} días`; })())}
+              ${dato('El taller lo prometió entre', u.desde && u.hasta ? `${u.desde} y ${u.hasta}` : '')}
               ${u.orden ? `<div class="fi-r"><span>Orden de venta</span>
                 <b>${UI.esc(u.orden)}</b></div>`
                 : '<div class="fi-r"><span>Orden de venta</span><b>Para stock</b></div>'}
@@ -495,7 +660,7 @@
           border-radius:999px;padding:0 6px;line-height:15px;flex:none}
         .pr-t-sep{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
           color:var(--muted);margin:8px 0 2px;padding-left:6px}
-        .pr-kpis{grid-template-columns:repeat(6,1fr)}
+        .pr-kpis{grid-template-columns:repeat(5,1fr)}
         @media(max-width:1400px){.pr-kpis{grid-template-columns:repeat(3,1fr)}}
         @media(max-width:760px){.pr-kpis{grid-template-columns:1fr 1fr}}
         /* Cada número es un botón: apretarlo deja la lista con eso. */
@@ -540,7 +705,27 @@
         .pr-tabla tr.mal td{background:var(--crit-bg)}
         .pr-tabla .nom{font-weight:700;color:var(--navy)}
         .pr-tabla .venc{color:var(--crit);font-weight:700}
+        .pr-tabla .hoy{color:var(--warn);font-weight:700}
+        .pr-tabla td .muted{font-size:11px;margin-left:4px}
         .td-acc{text-align:right}
+        .pr-acc{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;
+          border:1px solid var(--line);border-radius:11px;padding:10px 13px;background:var(--panel)}
+        .pr-acc .btn[disabled]{opacity:.45;pointer-events:none}
+        .pr-stock{font-size:11px;font-weight:700;color:var(--muted);background:var(--panel-2);
+          border:1px solid var(--line);border-radius:999px;padding:1px 8px}
+        .chk{width:14px;height:14px;accent-color:var(--brand);margin:0}
+        .pr-mdl-g{max-width:620px;width:100%;max-height:86vh;display:flex;flex-direction:column}
+        .pr-scroll{overflow:auto;margin-top:10px;flex:1;border:1px solid var(--line);
+          border-radius:10px}
+        .pr-it{display:flex;align-items:center;gap:9px;padding:6px 11px;font-size:12.5px;
+          cursor:pointer;border-bottom:1px solid var(--line-soft)}
+        .pr-it:last-child{border-bottom:0}
+        .pr-it:hover{background:var(--panel-2)}
+        .pr-it-n{color:var(--navy);font-weight:650}
+        .pr-cant{width:52px;padding:2px 6px;font-size:12px;text-align:right;
+          border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
+        .tarde{color:var(--crit);font-weight:700}
+        .sp{flex:1}
         .pr-tipo{display:inline-block;font-size:10.5px;font-weight:700;border-radius:999px;
           padding:1px 8px;border:1px solid var(--line);background:var(--panel-2);color:var(--muted)}
         .pr-tipo.modificado{background:var(--warn-bg);border-color:#f3e2c0;color:var(--warn)}

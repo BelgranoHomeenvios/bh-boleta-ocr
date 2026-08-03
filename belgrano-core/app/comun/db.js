@@ -745,6 +745,7 @@
     // Cuatro lecturas que suman el total de lo que Producción tiene entre manos.
     VISTAS_FAB: [
       { k: 'dibujar', label: 'A dibujar', pill: 'crit' },
+      { k: 'confirmar', label: 'A confirmar el dibujo', pill: 'warn' },
       { k: 'pedir', label: 'Sin pedir', pill: 'warn' },
       { k: 'fabricando', label: 'En fábrica', pill: 'viol' },
       { k: 'recibido', label: 'Recibido', pill: 'ok' },
@@ -752,7 +753,8 @@
     vistaFab(u) {
       if (u.estado === 'stock' || u.estado === 'entregada') return 'recibido';
       if (u.estado === 'produccion') return 'fabricando';
-      return this.planoListo(u) ? 'pedir' : 'dibujar';
+      if (this.planoListo(u)) return 'pedir';
+      return u.planoEstado === 'a_verificar' ? 'confirmar' : 'dibujar';
     },
     // Lo que Producción tiene entre manos: ni lo entregado ni lo que ya está
     // guardado hace rato. Es la lista de trabajo, no el archivo.
@@ -772,6 +774,39 @@
       if ((cero - d) / 86400000 > 240) d = new Date(hoy.getFullYear() + 1, Number(m[2]) - 1, Number(m[1]));
       return Math.round((d - cero) / 86400000);
     },
+    // Por qué rubro pasa un mueble. Sale de la ficha del producto: ahí está
+    // cargado si lo hace carpintería, tapicería o los dos.
+    rubrosDe(productoId) {
+      const p = DEMO.productos.find(x => x.id === Number(productoId));
+      const rs = (p && p.rubros || []).map(r => r.k).filter(Boolean);
+      return rs.length ? rs : ['carpinteria'];
+    },
+    rubroDe(u) { return (u.rubro || this.rubrosDe(u.productoId)[0] || 'carpinteria'); },
+
+    // Mandar a fabricar algo sin venta atrás: para el local, para tener, o
+    // porque nos quedamos sin stock. Nace igual que cualquier otra unidad.
+    crearUnidadStock(varianteId, { motivo = '', cantidad = 1 } = {}) {
+      const v = (this.variantesTodas() || []).find(x => x.id === Number(varianteId));
+      if (!v) return [];
+      const prod = DEMO.productos.find(p => p.id === v.producto_id) || {};
+      const us = this.unidadesTodas();
+      const nuevas = [];
+      for (let i = 0; i < Math.max(1, Number(cantidad) || 1); i++) {
+        const id = us.reduce((mx, x) => Math.max(mx, x.id), 0) + 1 + i;
+        const u = {
+          id, serie: '—', productoId: v.producto_id, varianteId: v.id,
+          modelo: prod.nombre || '', medida: v.medida || '',
+          color: [v.estructura, v.frente].filter(Boolean).join(' · '),
+          terminacion: v.estructura || '', tipo: 'estandar', detalle: '', foto: '',
+          estado: 'pedir', ubicacion: '', proveedor: '', llega: '', listo: '',
+          orden: null, marca: null, planoEstado: 'ok',
+          motivoStock: motivo || 'para tener', creadaEl: this.hoyCorto(),
+        };
+        us.push(u); nuevas.push(u);
+      }
+      return nuevas;
+    },
+
     // ---- Pedidos: abrir, llenar, cerrar, reabrir --------------------------
     // El pedido vive en memoria como las unidades. Se arma con las unidades
     // que se le van agregando; la unidad guarda a qué pedido pertenece.
@@ -925,6 +960,32 @@
       return [...m.values()].sort((a, b) => b.n - a.n || a.nombre.localeCompare(b.nombre, 'es'));
     },
 
+    // Sumar días a una fecha corta "5/8". Devuelve otra fecha corta.
+    sumarDias(fecha, n) {
+      const m = /^(\d{1,2})\/(\d{1,2})$/.exec(String(fecha || '').trim());
+      if (!m) return '';
+      const hoy = new Date();
+      const d = new Date(hoy.getFullYear(), Number(m[2]) - 1, Number(m[1]) + Number(n || 0));
+      return `${d.getDate()}/${d.getMonth() + 1}`;
+    },
+    // La fecha que importa: cuándo hay que tenerlo. Si se vendió, es la que se
+    // le prometió al cliente —la venta más los días de fábrica del mueble—; si
+    // es para stock, el final del rango que dio el proveedor.
+    prometidaDe(u) {
+      if (u.prometida) return u.prometida;
+      if (u.orden && u.fechaVenta) {
+        const p = DEMO.productos.find(x => x.id === u.productoId) || {};
+        return this.sumarDias(u.fechaVenta, Number(p.dias) || 30);
+      }
+      return u.hasta || '';
+    },
+    // Cuántos días de margen quedan hasta la fecha comprometida. Negativo = ya
+    // se pasó. Es lo que dice si hay que apurar al taller o todavía hay aire.
+    // Ojo: margenDe() es otra cosa —la rentabilidad—, por eso el nombre largo.
+    margenEntrega(u) {
+      const f = this.prometidaDe(u);
+      return f ? this.diasHasta(f) : null;
+    },
     // Está vencido cuando pasó el final del rango comprometido.
     vencida(u) {
       if (u.estado !== 'produccion' || !u.hasta) return false;
