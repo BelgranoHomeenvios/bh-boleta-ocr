@@ -977,6 +977,18 @@ al **costado derecho**, no arriba, y se pueden **marcar varias a la vez**.
 - ✅ 402. Agrupado por categoría, el **encabezado de la tabla no se repite**:
   una sola tabla con un renglón de título entre grupo y grupo.
 
+### Lote 35 — APLICADO (Plegar categorías y acercar las cuentas)
+
+- ✅ 403. **Cada categoría se pliega desde su título**, en las dos vistas. Con
+  todas plegadas queda un **índice del catálogo**: se ve entero de un vistazo y
+  se abre sólo lo que interesa. Lo plegado se recuerda.
+- ✅ 404. **Plegar todas / abrir todas** de un toque, arriba de la lista de
+  categorías.
+- ✅ 405. Las **cuentas van pegadas al nombre** —*LIVING 5*, no *LIVING* a un
+  lado y *5* contra el borde—, que es como se leen.
+- ✅ 406. **limpiar** deja de ser un botón con caja al lado del título: es un
+  enlace chico, y ya no choca con la flecha de plegar el costado.
+
 > Falta decidir si el filtro guarda lo último usado por rol.
 
 ### Lote 13 — APLICADO (Inventario y solapa Otros)

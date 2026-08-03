@@ -7,6 +7,7 @@
   const VISTA_KEY = 'bh_catalogo_vista';
   const FILTROS_KEY = 'bh_catalogo_filtros';
   const CATS_KEY = 'bh_catalogo_cats';
+  const CERRADAS_KEY = 'bh_catalogo_cerradas';
   const Catalogo = {
     arbol: [],           // categorías cargadas
     ruta: [],            // breadcrumb: [{id,nombre}] hasta la categoría actual
@@ -130,6 +131,14 @@
             border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
           .cat-tabla .cat-tr-h .cat-sec-n{margin-left:8px}
           .cat-tabla .cat-tr-h .cat-sec-v{float:right}
+          /* El título de cada categoría es el botón para plegarla. */
+          .cat-sec-b{display:inline-flex;align-items:baseline;gap:8px;border:0;background:none;
+            font:inherit;cursor:pointer;padding:0;text-align:left}
+          .cat-sec-b:hover .cat-sec-t{color:var(--brand)}
+          .cat-sec-g{font-size:10px;color:var(--muted);width:10px;flex:none}
+          .cat-sec.plegada .cat-sec-h{border-bottom-color:var(--line-soft);margin-bottom:0}
+          .cat-sec.plegada+.cat-sec{margin-top:10px}
+          .lnk-b{align-self:flex-start;padding-left:22px}
           .cat-tabla .th-foto{width:70px}
           .cat-tabla .td-foto{padding-top:4px;padding-bottom:4px}
           .mini{display:grid;place-items:center;width:56px;height:56px;border-radius:8px;
@@ -176,9 +185,15 @@
             padding:1px 6px}
           #cat-cn:empty{display:none}
           .btn.on #cat-fn,.btn.on #cat-cn{background:#fff;color:var(--navy)}
-          .cat-f-h{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;
+          .cat-f-h{display:flex;align-items:baseline;gap:8px;font-size:11px;font-weight:700;
             text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
-          .cat-f-h .lnk{margin-left:auto;font-size:11.5px;text-transform:none;letter-spacing:0}
+          .cat-f .cat-f-h{padding-right:22px}
+          .cat-c .cat-f-h{padding-left:22px}
+          .cat-c-sub{margin-top:-10px;padding-left:22px}
+          /* Los enlaces del costado son texto, no botones con caja. */
+          .cat-c .lnk,.cat-f .lnk{border:0;background:none;padding:0;font:inherit;font-size:11px;
+            font-weight:600;color:var(--brand);cursor:pointer;text-transform:none;letter-spacing:0}
+          .cat-c .lnk:hover,.cat-f .lnk:hover{text-decoration:underline}
           .cat-g-t{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
             color:var(--muted);margin-bottom:5px}
           .cat-o{display:flex;align-items:center;gap:7px;padding:3px 0;cursor:pointer;font-size:12.5px;
@@ -186,8 +201,8 @@
           .cat-o:hover{color:var(--navy)}
           .cat-o.on{color:var(--navy);font-weight:650}
           .cat-o input{width:14px;height:14px;accent-color:var(--brand);flex:none;margin:0}
-          .cat-o-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-          .cat-o-c{font-size:11px;color:var(--muted);flex:none}
+          .cat-o-n{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+          .cat-o-c{font-size:11px;color:var(--muted);flex:none;margin-left:5px}
           .pt{width:12px;height:12px;border-radius:50%;border:1px solid rgba(0,0,0,.18);flex:none;
             display:inline-block}
           .pts{display:inline-flex;align-items:center;gap:3px}
@@ -436,7 +451,7 @@
           title="Ocultar los filtros" aria-label="Ocultar los filtros">‹</button>`}
         <div class="cat-f-h">
           <span>Filtros</span>
-          ${this.marcados() ? `<button class="lnk" id="cat-limpiar">limpiar ${this.marcados()}</button>` : ''}
+          ${this.marcados() ? '<button class="lnk" id="cat-limpiar">limpiar</button>' : ''}
         </div>
         ${gs.map(g => `<div class="cat-g">
           <div class="cat-g-t">${UI.esc(g.titulo)}</div>
@@ -479,9 +494,14 @@
       const flechaCat = this.chico() ? '' : `<button class="cat-fl der dentro" data-plegar="c"
         title="Ocultar las categorías" aria-label="Ocultar las categorías">›</button>`;
       const todos = (this._todo || []).filter(p => this.pasa(p, 'tipo')).length;
+      const visibles = g.map(o => o.k);
+      const todasPlegadas = visibles.length && visibles.every(k => this.plegada(k));
       return `<aside class="cat-c">
         <div class="cat-f-h"><span>Categorías</span>
           ${sel.length ? `<button class="lnk" data-tipo="">ver todas</button>` : ''}</div>
+        ${this.orden === 'cat' && visibles.length > 1 ? `<div class="cat-c-sub">
+          <button class="lnk" id="cat-plegar">${
+            todasPlegadas ? 'abrir todas' : 'plegar todas'}</button></div>` : ''}
         ${flechaCat}
         <div class="cat-lc">
           <label class="cat-o ${sel.length ? '' : 'on'}">
@@ -497,6 +517,13 @@
     },
 
     engancharCats() {
+      const pl = document.getElementById('cat-plegar');
+      if (pl) pl.onclick = () => {
+        const vis = this.grupoTipos().map(o => o.k);
+        const todas = vis.every(k => this.plegada(k));
+        vis.forEach(k => this.plegar(k, !todas));
+        this.pintar();
+      };
       document.querySelectorAll('[data-tipo]').forEach(el => {
         const usar = () => {
           const v = el.dataset.tipo;
@@ -669,6 +696,7 @@
       if (this.vista === 'lista' && grupos && grupos.length > 1) {
         cont.innerHTML = this.htmlLista(prods, grupos);
         this.enganchar(cont);
+        this.engancharPlegar(cont);
         cont.querySelectorAll('[data-solo]').forEach(a => a.onclick = e => {
           e.preventDefault(); e.stopPropagation();
           this._f.tipo = [Number(a.dataset.solo)]; this.pintar();
@@ -677,16 +705,23 @@
         return;
       }
       cont.innerHTML = grupos && grupos.length > 1
-        ? grupos.map(g => `<section class="cat-sec">
+        ? grupos.map(g => {
+            const cerrada = this.plegada(g.id);
+            return `<section class="cat-sec ${cerrada ? 'plegada' : ''}">
             <div class="cat-sec-h">
-              <span class="cat-sec-t">${UI.esc(g.nombre)}</span>
-              <span class="cat-sec-n">${g.items.length} ${g.items.length === 1 ? 'mueble' : 'muebles'}</span>
+              <button class="cat-sec-b" data-plegarcat="${g.id}"
+                aria-expanded="${!cerrada}" title="${cerrada ? 'Mostrar' : 'Ocultar'} ${UI.esc(g.nombre)}">
+                <span class="cat-sec-g">${cerrada ? '▸' : '▾'}</span>
+                <span class="cat-sec-t">${UI.esc(g.nombre)}</span>
+                <span class="cat-sec-n">${g.items.length} ${g.items.length === 1 ? 'mueble' : 'muebles'}</span>
+              </button>
               <a class="cat-sec-v" href="#" data-solo="${g.id}">ver sólo esta ›</a>
             </div>
-            ${uno(g.items)}
-          </section>`).join('')
+            ${cerrada ? '' : uno(g.items)}
+          </section>`; }).join('')
         : uno(prods);
       this.enganchar(cont);
+      this.engancharPlegar(cont);
       cont.querySelectorAll('[data-solo]').forEach(a => a.onclick = e => {
         e.preventDefault();
         this._f.tipo = [Number(a.dataset.solo)];
@@ -696,6 +731,23 @@
     },
 
     orden: 'cat',
+    _cerradas: (() => {
+      try { return new Set(JSON.parse(localStorage.getItem(CERRADAS_KEY)) || []); }
+      catch { return new Set(); }
+    })(),
+    plegada(id) { return this._cerradas.has(id); },
+    plegar(id, valor) {
+      if (valor === undefined) valor = !this.plegada(id);
+      if (valor) this._cerradas.add(id); else this._cerradas.delete(id);
+      try { localStorage.setItem(CERRADAS_KEY, JSON.stringify([...this._cerradas])); } catch {}
+    },
+    engancharPlegar(cont) {
+      cont.querySelectorAll('[data-plegarcat]').forEach(b => b.onclick = e => {
+        e.preventDefault(); e.stopPropagation();
+        this.plegar(Number(b.dataset.plegarcat));
+        this.pintar();
+      });
+    },
     ordenados(prods) {
       const l = [...prods];
       if (this.orden === 'nombre') return l.sort((a, b) => a.nombre.localeCompare(b.nombre));
@@ -753,11 +805,17 @@
               title="Abrir en…" aria-label="Abrir en…">⋯</button></td></tr>`;
       };
       const cuerpo = grupos
-        ? grupos.map(g => `<tr class="cat-tr-h"><td colspan="8">
-            <span class="cat-sec-t">${UI.esc(g.nombre)}</span>
-            <span class="cat-sec-n">${g.items.length} ${g.items.length === 1 ? 'mueble' : 'muebles'}</span>
+        ? grupos.map(g => {
+            const cerrada = this.plegada(g.id);
+            return `<tr class="cat-tr-h"><td colspan="8">
+            <button class="cat-sec-b" data-plegarcat="${g.id}"
+              aria-expanded="${!cerrada}" title="${cerrada ? 'Mostrar' : 'Ocultar'} ${UI.esc(g.nombre)}">
+              <span class="cat-sec-g">${cerrada ? '▸' : '▾'}</span>
+              <span class="cat-sec-t">${UI.esc(g.nombre)}</span>
+              <span class="cat-sec-n">${g.items.length} ${g.items.length === 1 ? 'mueble' : 'muebles'}</span>
+            </button>
             <a class="cat-sec-v" href="#" data-solo="${g.id}">ver sólo esta ›</a>
-          </td></tr>${g.items.map(renglon).join('')}`).join('')
+          </td></tr>${cerrada ? '' : g.items.map(renglon).join('')}`; }).join('')
         : prods.map(renglon).join('');
       return `<div class="card"><table class="cat-tabla">
         <thead><tr><th>Producto</th><th>Tipo</th>
