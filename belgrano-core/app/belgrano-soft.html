@@ -779,6 +779,9 @@ tr:hover td{background:var(--panel-2)}
             hasta: pr.length ? Math.max(...pr) : 0,
             stock: vs.reduce((a, v) => a + (Number(v.stock) || 0), 0),
             terminaciones: [...new Set(vs.map(v => v.estructura).filter(Boolean))],
+            // La foto del catálogo es la primera de venta que se cargó en
+            // Documentos: se ve el mueble sin tener que abrirlo.
+            foto: ((p.archivos || []).find(a => a.tipo === 'venta') || {}).url || '',
           };
         });
       }
@@ -2116,22 +2119,31 @@ tr:hover td{background:var(--panel-2)}
             display:inline-block}
           .pts{display:inline-flex;align-items:center;gap:3px}
 
-          .grid-prod{display:grid;grid-template-columns:repeat(auto-fill,minmax(212px,1fr));gap:12px}
+          /* Cuatro por fila, que es donde el mueble se ve y la fila no queda
+             desierta. Abajo de 1180 el costado ya se fue a un cajón, así que
+             el ancho alcanza igual. */
+          .grid-prod{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+          @media(max-width:1000px){.grid-prod{grid-template-columns:repeat(3,minmax(0,1fr))}}
+          @media(max-width:760px){.grid-prod{grid-template-columns:repeat(2,minmax(0,1fr))}}
+          @media(max-width:460px){.grid-prod{grid-template-columns:1fr}}
           .prod-tile{display:flex;flex-direction:column;gap:3px;align-items:stretch;padding:0 0 11px;
             border:1px solid var(--line);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);
             cursor:pointer;text-align:left;transition:.15s;overflow:hidden}
           .prod-tile:hover{border-color:var(--brand);transform:translateY(-1px)}
           .prod-img{position:relative;display:grid;place-items:center;background:var(--panel-2);
-            padding:14px;color:var(--muted);min-height:132px;border-bottom:1px solid var(--line-soft);
-            margin-bottom:9px}
+            padding:14px;color:var(--muted);height:154px;border-bottom:1px solid var(--line-soft);
+            margin-bottom:9px;overflow:hidden}
+          .prod-img img{width:100%;height:100%;object-fit:cover;display:block;
+            position:absolute;inset:0}
           .prod-tile:hover .prod-img{color:var(--brand)}
           .prod-est{position:absolute;top:9px;left:9px}
           .sil{width:100%;max-width:150px;height:96px}
           .prod-n{font-weight:700;color:var(--navy);font-size:13px;padding:0 11px;line-height:1.3}
           .prod-c{font-size:11.5px;color:var(--muted);padding:0 11px}
-          .prod-p{font-size:13px;color:var(--navy);padding:2px 11px 0}
           .prod-b{display:flex;align-items:center;gap:8px;padding:5px 11px 0}
           .prod-v{font-size:11.5px;color:var(--brand);font-weight:650;flex:1}
+          .prod-s{font-size:11.5px;color:var(--muted);padding:3px 11px 0}
+          .prod-s.hay{color:var(--ok)} .prod-s b{font-size:12.5px}
         </style>`;
       this.pintarTog();
       document.getElementById('v-bloques').onclick = () => this.setVista('bloques');
@@ -2589,18 +2601,26 @@ tr:hover td{background:var(--panel-2)}
         stroke-width="2" stroke-linecap="round" aria-hidden="true">${D[catId] || D[2]}</svg>`;
     },
 
+    // La tarjeta no muestra plata: acá se mira qué es el mueble, en cuántas
+    // versiones viene y cuánto hay hecho. El precio está adentro.
     htmlBloques(prods) {
       return `<div class="grid-prod">${prods.map(p => {
         const e = this.estado(p);
+        const st = Number(p.stock) || 0;
         return `<button class="prod-tile" data-prod="${p.id}">
-            <div class="prod-img">${this.silueta(p.categoria_id)}
+            <div class="prod-img">${p.foto
+              ? `<img src="${UI.esc(p.foto)}" alt="${UI.esc(p.nombre)}">`
+              : this.silueta(p.categoria_id)}
               <span class="pill ${e.pill} prod-est">${UI.esc(e.label)}</span></div>
             <div class="prod-n">${UI.esc(p.nombre)}</div>
             <div class="prod-c">${UI.esc(this.catDe(p.categoria_id))}</div>
-            <div class="prod-p">${p.desde
-              ? `desde <b class="tnum">${UI.pesos(p.desde)}</b>` : '<span class="muted">sin precio</span>'}</div>
-            <div class="prod-b"><span class="prod-v">${p.variantes}
-              ${p.variantes === 1 ? 'variante' : 'variantes'}</span>${this.puntos(p)}</div>
+            <div class="prod-b">
+              <span class="prod-v">${p.variantes} ${p.variantes === 1 ? 'variante' : 'variantes'}</span>
+              ${this.puntos(p)}
+            </div>
+            <div class="prod-s ${st ? 'hay' : ''}">${st
+              ? `<b class="tnum">${st}</b> en depósito`
+              : 'sin stock — se fabrica'}</div>
           </button>`;
       }).join('')}</div>`;
     },

@@ -935,8 +935,20 @@ al **costado derecho**, no arriba, y se pueden **marcar varias a la vez**.
   apretar el botón. Y si se agranda o achica la ventana, la pantalla se
   reacomoda sola.
 
-> Falta decidir **qué información va en cada vista** —ésta es la primera pasada—
-> y si el filtro guarda lo último usado por rol.
+### Lote 32 — APLICADO (La tarjeta del catálogo)
+
+- ✅ 390. **Se va el precio de la tarjeta.** Acá se mira qué es el mueble, no
+  cuánto sale; el precio está adentro.
+- ✅ 391. En su lugar quedan las **variantes** y, abajo, **cuánto hay en
+  depósito** sumando todas las variantes —*2 en depósito*, o *sin stock — se
+  fabrica*—.
+- ✅ 392. **Cuatro por fila**, que es donde el mueble se ve y la fila no queda
+  desierta. Con la pantalla más chica bajan a tres, dos y uno.
+- ✅ 393. La foto es la **primera imagen de venta cargada en Documentos**: se ve
+  el mueble sin abrirlo. Si todavía no tiene, sigue el dibujo de referencia.
+
+> Falta decidir **qué información va en el listado** —la tarjeta ya está— y si
+> el filtro guarda lo último usado por rol.
 
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 

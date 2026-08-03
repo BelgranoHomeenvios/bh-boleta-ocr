@@ -566,6 +566,9 @@
             hasta: pr.length ? Math.max(...pr) : 0,
             stock: vs.reduce((a, v) => a + (Number(v.stock) || 0), 0),
             terminaciones: [...new Set(vs.map(v => v.estructura).filter(Boolean))],
+            // La foto del catálogo es la primera de venta que se cargó en
+            // Documentos: se ve el mueble sin tener que abrirlo.
+            foto: ((p.archivos || []).find(a => a.tipo === 'venta') || {}).url || '',
           };
         });
       }
