@@ -1170,6 +1170,19 @@ al **costado derecho**, no arriba, y se pueden **marcar varias a la vez**.
   contorno, con algo escrito se pinta, así se ve de lejos cuál tiene algo que
   decir. Es de la unidad, no del modelo: la sigue a donde vaya.
 
+### Lote 41 — APLICADO (Las categorías, a la izquierda y siempre a la vista)
+
+- ✅ 453. Las categorías vuelven al **costado izquierdo**, pero **siempre
+  abiertas**: se ve el árbol entero —**ambiente** arriba y adentro los tipos de
+  mueble— con la cuenta de cada uno y *Todos* al principio. No hay que
+  desplegar nada para ver qué hay.
+- ✅ 454. El panel **se esconde con un botón** para ganar ancho, y ahí queda una
+  cinta angosta que sigue diciendo qué está marcado (*DORMITORIO / PLACARDS*).
+  Cada ambiente además se pliega solo.
+- ✅ 455. **Se sacaron de arriba los módulos de medida, estructura y frente**:
+  esas propiedades ya son **columnas de la tabla**, no hacía falta repetirlas.
+  Arriba queda un único módulo, el de **proveedor**, que no es columna de nada.
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·

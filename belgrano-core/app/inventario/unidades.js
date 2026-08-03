@@ -190,14 +190,118 @@
       const so = document.getElementById('un-orden');
       if (so) { so.value = this.orden; so.onchange = () => { this.orden = so.value; this.pintar(); }; }
 
-      // Los filtros van arriba, en módulos: se elige la categoría y ahí
-      // aparecen los de esa categoría —medida, estructura, frente—. La tabla
-      // se lleva todo el ancho.
+      // Las categorías van a la izquierda, siempre a la vista: es por donde se
+      // entra al depósito. Lo demás —medida, estructura, frente— no hace falta
+      // arriba porque son columnas de la tabla.
       const mods = document.getElementById('un-mods');
       if (mods) { mods.innerHTML = this.htmlModulos(); this.engancharModulos(); }
       const cont = document.getElementById('un-lista');
-      cont.innerHTML = '<div id="un-tabla"></div>';
+      cont.innerHTML = `<div class="un-cols ${this.verCats ? '' : 'sin-i'}">
+        ${this.htmlLateral()}
+        <div id="un-tabla"></div>
+      </div>`;
       this.pintarTabla(document.getElementById('un-tabla'), us);
+      this.engancharLateral();
+    },
+
+    // ---- El panel de categorías --------------------------------------------
+    // Siempre abierto: se ve el árbol entero —ambiente y adentro los tipos de
+    // mueble— con la cuenta de cada uno. Se puede esconder para ganar ancho,
+    // y ahí queda una cinta que sigue diciendo qué está marcado.
+    verCats: (() => { try { return localStorage.getItem(VER_KEY + '_i') !== '0'; } catch { return true; } })(),
+    _ambCerrados: (() => {
+      try { return new Set(JSON.parse(localStorage.getItem(VER_KEY + '_a')) || []); }
+      catch { return new Set(); }
+    })(),
+    // Cuántas unidades hay en cada categoría, con todo lo demás ya filtrado.
+    cuentaCats() {
+      const m = new Map();
+      global.DB.unidadesTodas().forEach(u => {
+        if (!this.pasaProv(u) || !this.pasaProps(u) || !this.pasaFiltro(u)) return;
+        const c = this.catDe(u); if (!c) return;
+        m.set(c.id, (m.get(c.id) || 0) + 1);
+      });
+      return m;
+    },
+    // El árbol: los ambientes de arriba y adentro los tipos de mueble, que es
+    // como está armado el catálogo.
+    arbolCats() {
+      const cn = this.cuentaCats();
+      const arbol = this.arbol || [];
+      const hijos = a => arbol.filter(c => c.padre_id === a.id)
+        .map(c => ({ ...c, n: cn.get(c.id) || 0 }))
+        .sort((x, y) => x.nombre.localeCompare(y.nombre));
+      const ambientes = arbol.filter(c => !c.padre_id)
+        .map(a => { const hs = hijos(a); return { ...a, hijos: hs, n: hs.reduce((s, h) => s + h.n, 0) }; })
+        .sort((x, y) => x.nombre.localeCompare(y.nombre));
+      // Las categorías sin ambiente no se pierden: van sueltas al final.
+      const conPadre = new Set(ambientes.flatMap(a => a.hijos.map(h => h.id)));
+      const sueltas = arbol.filter(c => c.padre_id && !conPadre.has(c.id))
+        .map(c => ({ ...c, n: cn.get(c.id) || 0 }));
+      return { ambientes, sueltas, total: [...cn.values()].reduce((a, b) => a + b, 0) };
+    },
+    // Qué dice la cinta cuando el panel está escondido.
+    rotuloCats() {
+      if (!this.cats.length) return 'Todas las categorías';
+      const nom = id => (this.arbol.find(c => c.id === id) || {}).nombre || '';
+      const uno = this.cats[0];
+      const c = this.arbol.find(x => x.id === uno);
+      const padre = c && c.padre_id ? nom(c.padre_id) : '';
+      return this.cats.length === 1
+        ? [padre, nom(uno)].filter(Boolean).join(' / ')
+        : `${this.cats.length} categorías`;
+    },
+    htmlLateral() {
+      const ic = `<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13"
+        height="11" rx="2"/><path d="M6.5 2.5v11" /></svg>`;
+      if (!this.verCats) {
+        return `<aside class="un-lat cerrada">
+          <button class="un-lat-b" data-vercats title="Mostrar las categorías">${ic}</button>
+          <span class="un-lat-r">${UI.esc(this.rotuloCats())}</span>
+        </aside>`;
+      }
+      const { ambientes, sueltas, total } = this.arbolCats();
+      const fila = c => `<button class="un-t-h ${this.cats.includes(c.id) ? 'on' : ''}"
+        data-cat="${c.id}"><span class="un-t-n">${UI.esc(c.nombre)}</span>
+        <span class="un-t-c tnum">${c.n}</span></button>`;
+      return `<aside class="un-lat">
+        <div class="un-lat-h"><span>Categoría</span>
+          <button class="un-lat-b" data-vercats title="Ocultar las categorías">${ic}</button></div>
+        <button class="un-t-todos ${this.cats.length ? '' : 'on'}" data-cat="0">Todos
+          <span class="un-t-c tnum">${total}</span></button>
+        ${ambientes.map(a => {
+          const on = !this._ambCerrados.has(a.id);
+          return `<div class="un-t-a">
+            <button class="un-t-t" data-amb="${a.id}" aria-expanded="${on}">
+              <span class="un-t-fl">${on ? '▾' : '▸'}</span>
+              <span class="un-t-n">${UI.esc(a.nombre)}</span>
+              <span class="un-t-c tnum">${a.n}</span></button>
+            ${on ? `<div class="un-t-hs">${a.hijos.map(fila).join('')}</div>` : ''}
+          </div>`;
+        }).join('')}
+        ${sueltas.map(fila).join('')}
+      </aside>`;
+    },
+    engancharLateral() {
+      const cont = document.getElementById('un-lista'); if (!cont) return;
+      cont.querySelectorAll('[data-vercats]').forEach(b => b.onclick = () => {
+        this.verCats = !this.verCats;
+        try { localStorage.setItem(VER_KEY + '_i', this.verCats ? '1' : '0'); } catch {}
+        this.pintar();
+      });
+      cont.querySelectorAll('[data-amb]').forEach(b => b.onclick = () => {
+        const id = Number(b.dataset.amb);
+        if (this._ambCerrados.has(id)) this._ambCerrados.delete(id); else this._ambCerrados.add(id);
+        try { localStorage.setItem(VER_KEY + '_a', JSON.stringify([...this._ambCerrados])); } catch {}
+        this.pintar();
+      });
+      cont.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => {
+        const id = Number(b.dataset.cat);
+        if (!id) this.cats = [];
+        else this.cats = this.cats.includes(id)
+          ? this.cats.filter(x => x !== id) : [...this.cats, id];
+        this.pintar();
+      });
     },
 
     // Cada categoría se pliega sola: con dos o tres marcadas, se abre la que se
@@ -297,64 +401,28 @@
       return (p && p.nombre) || k;
     },
 
-    // Los módulos de arriba. El de categoría siempre está; los de propiedad
-    // salen de lo que se está mirando, así los títulos cambian con la categoría.
+    // Arriba queda un solo módulo: el proveedor. Las categorías viven en el
+    // panel de la izquierda y las propiedades del mueble ya son columnas de la
+    // tabla — no hace falta repetirlas acá.
     modulos() {
-      const out = [];
-      const cats = new Map();
-      global.DB.unidadesTodas().forEach(u => {
-        if (!this.pasaProps(u) || !this.pasaProv(u) || !this.pasaFiltro(u)) return;
-        const c = this.catDe(u); if (!c) return;
-        cats.set(c.id, (cats.get(c.id) || 0) + 1);
-      });
-      out.push({
-        k: 'cats', titulo: 'Categoría', tipo: 'cat', sel: this.cats,
-        ops: [...cats.entries()].map(([id, n]) => ({
-          k: id, n, label: (this.arbol.find(c => c.id === id) || {}).nombre || '—',
-        })).sort((a, b) => String(a.label).localeCompare(String(b.label))),
-      });
-
-      // Una lista por propiedad, con la cuenta de cada valor.
-      this.clavesProp().forEach(k => {
-        const m = new Map(); const nom = new Map();
-        global.DB.unidadesTodas().forEach(u => {
-          if (!this.pasaCat(u) || !this.pasaProv(u) || !this.pasaFiltro(u)) return;
-          const val = this.valorProp(u, k); if (!val) return;
-          const nk = this.normT(val);
-          m.set(nk, (m.get(nk) || 0) + 1);
-          if (!nom.has(nk)) nom.set(nk, val);
-        });
-        const ops = [...m.entries()].map(([x, n]) => ({ k: x, n, label: nom.get(x) }))
-          .sort((a, b) => b.n - a.n || String(a.label).localeCompare(String(b.label)));
-        const sel = this.props[k] || [];
-        if (ops.length < 2 && !sel.length) return;
-        out.push({
-          k, titulo: this.tituloProp(k), tipo: 'prop', sel, ops,
-          color: ['estructura', 'frente', 'terminacion', 'material'].includes(global.DB.rolDe(k)),
-        });
-      });
-
-      // Quién la trae: con "en producción" marcado contesta la pregunta de
-      // todos los días —qué me tiene que entregar Tony.
       const provs = new Map();
       global.DB.unidadesTodas().forEach(u => {
         if (!this.pasaCat(u) || !this.pasaProps(u) || !this.pasaFiltro(u)) return;
         if (!u.proveedor) return;
         provs.set(u.proveedor, (provs.get(u.proveedor) || 0) + 1);
       });
-      if (provs.size > 1 || this.provs.length) {
-        out.push({
-          k: 'provs', titulo: 'Proveedor', tipo: 'prov', sel: this.provs,
-          ops: [...provs.entries()].map(([k, n]) => ({ k, n, label: k }))
-            .sort((a, b) => a.label.localeCompare(b.label)),
-        });
-      }
-      return out;
+      if (provs.size < 2 && !this.provs.length) return [];
+      return [{
+        k: 'provs', titulo: 'Proveedor', tipo: 'prov', sel: this.provs,
+        ops: [...provs.entries()].map(([k, n]) => ({ k, n, label: k }))
+          .sort((a, b) => a.label.localeCompare(b.label)),
+      }];
     },
 
     htmlModulos() {
       const ms = this.modulos();
       const hay = this.cats.length || this.provs.length || Object.keys(this.props).length;
+      if (!ms.length && !hay) return '';
       return `<div class="un-mods">
         ${ms.map(g => {
           const on = this._mod === g.k;
@@ -385,13 +453,6 @@
       const cont = document.getElementById('un-mods'); if (!cont) return;
       cont.querySelectorAll('[data-mod]').forEach(b => b.onclick = e => {
         e.stopPropagation(); this.abrirMod(b.dataset.mod); this.pintar();
-      });
-      cont.querySelectorAll('[data-cat]').forEach(i => i.onchange = () => {
-        const id = Number(i.dataset.cat.split('|')[1]);
-        this.cats = this.cats.includes(id) ? this.cats.filter(x => x !== id) : [...this.cats, id];
-        // Al cambiar de categoría, lo marcado de la anterior deja de aplicar.
-        this.props = {};
-        this.pintar();
       });
       cont.querySelectorAll('[data-prop]').forEach(i => i.onchange = () => {
         const [k, v] = i.dataset.prop.split('|');
@@ -714,8 +775,44 @@
         .seg.on{background:var(--navy);border-color:var(--navy);color:#fff}
         .seg.on b{opacity:.75}
 
-        /* Los filtros son módulos: una fila arriba, cada uno se abre solo.
-           Primero la categoría; los de propiedad cambian con ella. */
+        /* La categoría vive a la izquierda, siempre a la vista: es por donde se
+           entra al depósito. Se esconde para ganar ancho y queda una cinta. */
+        .un-cols{display:grid;grid-template-columns:196px minmax(0,1fr);gap:14px;
+          align-items:start;max-width:100%}
+        .un-cols.sin-i{grid-template-columns:30px minmax(0,1fr)}
+        .un-cols>#un-tabla{min-width:0}
+        @media(max-width:1080px){.un-cols,.un-cols.sin-i{grid-template-columns:1fr}}
+        .un-lat{position:sticky;top:104px;display:flex;flex-direction:column;
+          border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:9px 4px 9px 10px}
+        .un-lat.cerrada{align-items:center;padding:9px 3px;gap:12px}
+        .un-lat-h{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;
+          text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:6px}
+        .un-lat-h span{flex:1}
+        .un-lat-b{border:1px solid var(--line);background:var(--panel);border-radius:7px;width:24px;
+          height:22px;display:grid;place-items:center;cursor:pointer;color:var(--muted);padding:0;
+          margin-right:6px}
+        .un-lat-b svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.3}
+        .un-lat-b:hover{border-color:var(--brand);color:var(--brand)}
+        .un-lat.cerrada .un-lat-b{margin:0}
+        .un-lat-r{writing-mode:vertical-rl;font-size:11.5px;color:var(--muted);white-space:nowrap;
+          overflow:hidden;text-overflow:ellipsis;max-height:260px}
+        /* El árbol: ambiente arriba y adentro los tipos de mueble. */
+        .un-t-todos,.un-t-t,.un-t-h{display:flex;align-items:center;gap:6px;width:100%;border:0;
+          background:none;padding:4px 6px;cursor:pointer;font:inherit;text-align:left;
+          border-radius:7px;color:var(--ink-soft);font-size:12.5px}
+        .un-t-todos{font-weight:700;color:var(--navy);margin-bottom:2px}
+        .un-t-todos span,.un-t-t .un-t-c,.un-t-h .un-t-c{margin-left:auto}
+        .un-t-todos.on{background:var(--brand-soft);color:var(--brand-ink)}
+        .un-t-t{font-weight:650;color:var(--navy);margin-top:3px}
+        .un-t-t:hover,.un-t-h:hover{background:var(--panel-2)}
+        .un-t-fl{font-size:9px;color:var(--muted);width:9px;flex:none}
+        .un-t-n{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .un-t-c{font-size:11px;color:var(--muted);flex:none;font-weight:600}
+        /* Los hijos cuelgan de una línea, como un árbol de verdad. */
+        .un-t-hs{margin-left:11px;padding-left:8px;border-left:1px solid var(--line)}
+        .un-t-h.on{background:var(--brand-soft);color:var(--brand-ink);font-weight:700}
+        .un-t-h.on .un-t-c{color:var(--brand-ink)}
+        /* Arriba queda un módulo suelto: el proveedor. */
         .un-mods{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
         .un-mod{position:relative}
         .un-mod-b{display:flex;align-items:center;gap:6px;border:1px solid var(--line);
