@@ -611,15 +611,20 @@
     },
     // El próximo número libre. Cuando haya base de verdad esto es una secuencia
     // de Postgres; en demo alcanza con el contador guardado.
-    proximaSerie() {
+    // El contador no puede arrancar de cero si ya hay etiquetas puestas: la
+    // próxima sigue a la más alta que exista, venga del contador o del depósito.
+    _tope() {
       let n = 0;
       try { n = Number(localStorage.getItem('bh_serie')) || 0; } catch {}
-      return this.serieDe(n + 1);
+      this.unidadesTodas().forEach(u => {
+        const x = parseInt(String(u.serie || '').replace(/\D/g, ''), 10);
+        if (x > n) n = x;
+      });
+      return n;
     },
+    proximaSerie() { return this.serieDe(this._tope() + 1); },
     tomarSerie() {
-      let n = 0;
-      try { n = Number(localStorage.getItem('bh_serie')) || 0; } catch {}
-      n++;
+      const n = this._tope() + 1;
       try { localStorage.setItem('bh_serie', String(n)); } catch {}
       return this.serieDe(n);
     },
@@ -767,6 +772,141 @@
       if ((cero - d) / 86400000 > 240) d = new Date(hoy.getFullYear() + 1, Number(m[2]) - 1, Number(m[1]));
       return Math.round((d - cero) / 86400000);
     },
+    // ---- Pedidos: abrir, llenar, cerrar, reabrir --------------------------
+    // El pedido vive en memoria como las unidades. Se arma con las unidades
+    // que se le van agregando; la unidad guarda a qué pedido pertenece.
+    _peds: null,
+    pedidosTodos() {
+      if (this._peds) return this._peds;
+      // De la demo salen los pedidos que ya están en la calle: se reconstruyen
+      // de las unidades, agrupando por número de pedido y proveedor.
+      const m = new Map();
+      this.unidadesTodas().forEach(u => {
+        if (!u.pedido) return;
+        if (!m.has(u.pedido)) {
+          m.set(u.pedido, {
+            numero: u.pedido, proveedor: u.proveedor || '',
+            estado: u.estado === 'produccion' ? 'entregado' : 'recibido',
+            rubro: 'carpinteria', modo: 'dibujo',
+            desde: u.desde || '', hasta: u.hasta || '',
+            abiertoPor: 'Martín', abiertoEl: u.desde || '', cerradoEl: u.desde || '',
+            historial: [],
+          });
+        }
+      });
+      this._peds = [...m.values()].sort((a, b) => b.numero.localeCompare(a.numero));
+      return this._peds;
+    },
+    pedido(num) { return this.pedidosTodos().find(p => p.numero === num) || null; },
+    itemsDePedido(num) { return this.unidadesTodas().filter(u => u.pedido === num); },
+    // El próximo número: sigue la serie más alta que ya exista.
+    proximoPedido() {
+      const n = this.pedidosTodos().reduce((mx, p) => {
+        const x = parseInt(String(p.numero).replace(/\D/g, ''), 10) || 0;
+        return Math.max(mx, x);
+      }, 0);
+      return this.numPedido(n + 1);
+    },
+    // Abre un pedido vacío para un taller. Todavía no se le mandó nada.
+    abrirPedido({ proveedor, rubro = 'carpinteria', modo = 'dibujo', desde = '', hasta = '', quien = '' }) {
+      const p = {
+        numero: this.proximoPedido(), proveedor, rubro, modo, desde, hasta,
+        estado: 'abierto', abiertoPor: quien || 'yo', abiertoEl: this.hoyCorto(),
+        historial: [{ f: this.hoyCorto(), t: `${quien || 'Alguien'} abrió el pedido para ${proveedor}` }],
+      };
+      this.pedidosTodos().unshift(p);
+      return p;
+    },
+    // Sumar una unidad a un pedido abierto. La unidad se entera de a cuál va.
+    agregarAPedido(num, unidadId, quien = '') {
+      const p = this.pedido(num); if (!p || p.estado !== 'abierto') return null;
+      const u = this.unidad(unidadId); if (!u) return null;
+      this.guardarUnidad({ id: u.id, pedido: num, proveedor: p.proveedor,
+        agregadoEl: this.hoyCorto() });
+      p.historial.push({ f: this.hoyCorto(), t: `${quien || 'Alguien'} agregó ${u.modelo}` });
+      return p;
+    },
+    sacarDePedido(num, unidadId) {
+      const p = this.pedido(num); if (!p || p.estado !== 'abierto') return null;
+      this.guardarUnidad({ id: unidadId, pedido: '', proveedor: '', agregadoEl: '' });
+      return p;
+    },
+    // Cerrar congela el pedido: ya no entra nada sin reabrirlo. Y ahí las
+    // unidades pasan a estar en fábrica, con el rango comprometido.
+    cerrarPedido(num, quien = '') {
+      const p = this.pedido(num); if (!p) return null;
+      p.estado = 'cerrado';
+      p.cerradoPor = quien || 'yo'; p.cerradoEl = this.hoyCorto();
+      p.historial.push({ f: this.hoyCorto(),
+        t: `${quien || 'Alguien'} cerró el pedido · ${this.itemsDePedido(num).length} muebles` });
+      this.itemsDePedido(num).forEach(u => this.guardarUnidad({
+        id: u.id, estado: 'produccion', desde: p.desde, hasta: p.hasta,
+      }));
+      return p;
+    },
+    reabrirPedido(num, quien = '') {
+      const p = this.pedido(num); if (!p) return null;
+      p.estado = 'abierto';
+      p.historial.push({ f: this.hoyCorto(), t: `${quien || 'Alguien'} reabrió el pedido` });
+      return p;
+    },
+    hoyCorto() {
+      const d = new Date();
+      return `${d.getDate()}/${d.getMonth() + 1}`;
+    },
+
+    // ---- Recepción y control de calidad -----------------------------------
+    CALIDADES: [
+      { k: 'perfecto', label: 'Perfecto', pill: 'ok', entra: true,
+        pie: 'Llegó como tenía que llegar. Entra al depósito.' },
+      { k: 'detalle', label: 'Con detalle', pill: 'warn', entra: true,
+        pie: 'Se puede vivir con eso: entra, pero con la observación y las fotos pegadas.' },
+      { k: 'reparar', label: 'A reparar', pill: 'warn', entra: false,
+        pie: 'No entra al depósito: se queda en Producción hasta que se arregle.' },
+      { k: 'devuelto', label: 'Se devuelve', pill: 'crit', entra: false,
+        pie: 'Vuelve en la camioneta. El proveedor la sigue debiendo.' },
+    ],
+    calidad(k) { return this.CALIDADES.find(x => x.k === k) || null; },
+    SERIE_RECEPCION: { prefijo: 'R', digitos: 6 },
+    numRecepcion(n) {
+      return `${this.SERIE_RECEPCION.prefijo}-${String(n).padStart(this.SERIE_RECEPCION.digitos, '0')}`;
+    },
+    _recs: null,
+    recepciones() { if (!this._recs) this._recs = []; return this._recs; },
+    // Recibir una unidad: acá recién nace su número de serie.
+    recibirUnidad(id, { calidad = 'perfecto', nota = '', ubicacion = 'dep-pb', quien = '' } = {}) {
+      const u = this.unidad(id); if (!u) return null;
+      const c = this.calidad(calidad) || this.CALIDADES[0];
+      if (calidad === 'devuelto') {
+        this.guardarUnidad({ id, calidad, calidadNota: nota, recibidoPor: quien });
+        return this.unidad(id);
+      }
+      const cambios = { id, calidad, calidadNota: nota, recibidoPor: quien,
+        listo: this.hoyCorto() };
+      if (c.entra) {
+        cambios.estado = 'stock';
+        cambios.ubicacion = ubicacion;
+        cambios.serie = u.serie === '—' ? this.tomarSerie() : u.serie;
+        cambios.marca = calidad === 'detalle' ? null : u.marca;
+        if (nota) cambios.nota = nota;
+      } else {
+        cambios.marca = 'reparar';   // sigue en Producción, no entra al depósito
+      }
+      this.guardarUnidad(cambios);
+      return this.unidad(id);
+    },
+    // Lo que quedó a reparar: está, pero no cuenta como stock.
+    aReparar() {
+      return this.unidadesTodas().filter(u => u.calidad === 'reparar' && u.estado !== 'stock');
+    },
+    repararUnidad(id, { ubicacion = 'dep-pb', quien = '' } = {}) {
+      const u = this.unidad(id); if (!u) return null;
+      this.guardarUnidad({ id, estado: 'stock', marca: null, calidad: 'perfecto',
+        reparadoPor: quien, ubicacion,
+        serie: u.serie === '—' ? this.tomarSerie() : u.serie, listo: this.hoyCorto() });
+      return this.unidad(id);
+    },
+
     // Cuánto tiene cada taller entre manos ahora. Salen TODOS los proveedores,
     // también los que no tienen nada: saber quién está libre es la mitad de la
     // decisión de a quién darle el próximo pedido.

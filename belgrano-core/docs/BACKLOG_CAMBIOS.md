@@ -1252,6 +1252,41 @@ al **costado derecho**, no arriba, y se pueden **marcar varias a la vez**.
 - ✅ 476. El renglón nunca lee "estándar" si no lo es: el modificado muestra
   **qué cambió y qué decía el catálogo**, y el que no tiene plano lo dice.
 
+### Lote 46 — APLICADO (Producción: pedidos, dibujos y recepción)
+
+**El costado y los botones**
+- ✅ 477. Los seis números de arriba son **botones**: falta dibujar, sin pedir,
+  en fábrica, vencidos, entran esta semana y **ya recibidos**. Se aprietan y la
+  lista queda con eso; volver a apretarlos lo saca.
+- ✅ 478. **Panel de talleres** a la izquierda, como las categorías en
+  Inventario: cada uno con su carga y sus vencidos, y abajo separados **los que
+  hoy no tienen trabajo**. Debajo, para qué es: vendidos o para stock.
+
+**Pedidos**
+- ✅ 479. Se **abre** para un taller con su rango de fechas, se le **agregan**
+  muebles —juntando los iguales pero tildando sólo los que se le dan—, se
+  **cierra** (ahí pasan a fábrica con ese rango) y se puede **reabrir**.
+- ✅ 480. **No se puede cerrar** un pedido con muebles sin el plano resuelto.
+- ✅ 481. Todo queda en el **historial** del pedido: quién lo abrió, qué se
+  agregó, quién lo cerró.
+
+**A dibujar**
+- ✅ 482. Tres bandejas: **a dibujar** (a medida), **a editar** (una cota) y
+  **a verificar**. Se abre y aparecen **los dos dibujos grandes, uno al lado del
+  otro**: el croquis del vendedor y el plano de producción.
+- ✅ 483. Se **marca** lo que falta con atajos —*falta medida, acá modificalo,
+  falta aclarar, no coincide*—, cada marca se resuelve, y **con marcas sin
+  resolver el botón de verificar queda apagado**.
+
+**Recepción**
+- ✅ 484. Se entra al taller que llegó y se tilda lo que bajó, eligiendo **cómo
+  llegó**: perfecto, con detalle, a reparar o devuelto.
+- ✅ 485. Al recibir, cada mueble estrena su **número de serie** y su ubicación.
+  La **serie ya no arranca de cero**: sigue a la más alta que exista.
+- ✅ 486. El que va **a reparar no entra al depósito** —se queda en Producción y
+  no cuenta como stock— y el **devuelto** lo sigue debiendo el proveedor.
+  Cuando se repara, recién ahí sube a Inventario.
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·
