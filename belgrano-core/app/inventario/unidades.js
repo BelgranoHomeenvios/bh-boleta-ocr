@@ -34,7 +34,8 @@
             `<option value="${o.k}">${UI.esc(o.label)}</option>`).join('')}</select>
         </div>
         <div id="un-kpis"></div>
-        <div id="un-filtros" style="margin-bottom:12px"></div>
+        <div id="un-filtros" style="margin-bottom:10px"></div>
+        <div id="un-mods" style="margin-bottom:14px"></div>
         <div id="un-lista">${UI.spinner()}</div>
         ${this.estilos()}`;
 
@@ -189,14 +190,37 @@
       const so = document.getElementById('un-orden');
       if (so) { so.value = this.orden; so.onchange = () => { this.orden = so.value; this.pintar(); }; }
 
+      // Los filtros van arriba, en módulos: se elige la categoría y ahí
+      // aparecen los de esa categoría —medida, estructura, frente—. La tabla
+      // se lleva todo el ancho.
+      const mods = document.getElementById('un-mods');
+      if (mods) { mods.innerHTML = this.htmlModulos(); this.engancharModulos(); }
       const cont = document.getElementById('un-lista');
-      cont.innerHTML = `<div class="un-cols">
-        ${this.htmlCats()}
-        <div id="un-tabla"></div>
-        ${this.htmlProps()}
-      </div>`;
+      cont.innerHTML = '<div id="un-tabla"></div>';
       this.pintarTabla(document.getElementById('un-tabla'), us);
-      this.engancharLados();
+    },
+
+    // Cada categoría se pliega sola: con dos o tres marcadas, se abre la que se
+    // está mirando y las otras quedan en una línea con su cuenta.
+    _plegadas: (() => {
+      try { return new Set(JSON.parse(localStorage.getItem(VER_KEY + '_p')) || []); }
+      catch { return new Set(); }
+    })(),
+    // Plegada, la categoría sigue diciendo lo importante: cuánto hay de cada
+    // cosa, para no tener que abrirla sólo para mirar.
+    resumen(items) {
+      const m = new Map();
+      items.forEach(u => {
+        const v = global.DB.vistaUnidad(u);
+        m.set(v, (m.get(v) || 0) + 1);
+      });
+      return global.DB.VISTAS_UNIDAD.filter(v => m.get(v.k))
+        .map(v => `${m.get(v.k)} ${v.label.toLowerCase()}`).join(' · ');
+    },
+    plegada(id) { return this._plegadas.has(id); },
+    plegar(id) {
+      if (this._plegadas.has(id)) this._plegadas.delete(id); else this._plegadas.add(id);
+      try { localStorage.setItem(VER_KEY + '_p', JSON.stringify([...this._plegadas])); } catch {}
     },
 
     // Lo que se mira de un vistazo: cuánto hay, cuánto falta pedir, y cuánta
@@ -230,14 +254,12 @@
       </div>`;
     },
 
-    // Izquierda: las categorías. Derecha: las propiedades de la variante
-    // —medida, estructura, frente—, las mismas del catálogo, para que se lea
-    // igual en los dos lados. Los dos costados se pliegan.
-    _gAbiertos: new Set(),
-    grupoAbierto(k) { return this._gAbiertos.has(k); },
-    abrirGrupo(k) {
-      if (this._gAbiertos.has(k)) this._gAbiertos.delete(k); else this._gAbiertos.add(k);
-    },
+    // Los filtros viven arriba, en módulos: se abre uno por vez y se cierra
+    // solo. Primero la categoría; recién ahí aparecen los módulos de ESA
+    // categoría —medidas del frente, estructura, frente—, que es como se lee
+    // el catálogo.
+    _mod: null,
+    abrirMod(k) { this._mod = this._mod === k ? null : k; },
     // Las propiedades principales de cada unidad, sacadas de su variante.
     propsDe(u) {
       const v = (global.DB.variantesTodas ? global.DB.variantesTodas() : [])
@@ -275,136 +297,126 @@
       return (p && p.nombre) || k;
     },
 
-    htmlCats() {
-      const m = new Map();
+    // Los módulos de arriba. El de categoría siempre está; los de propiedad
+    // salen de lo que se está mirando, así los títulos cambian con la categoría.
+    modulos() {
+      const out = [];
+      const cats = new Map();
       global.DB.unidadesTodas().forEach(u => {
-        if (!this.pasaProps(u) || !this.pasaFiltro(u)) return;
+        if (!this.pasaProps(u) || !this.pasaProv(u) || !this.pasaFiltro(u)) return;
         const c = this.catDe(u); if (!c) return;
-        m.set(c.id, (m.get(c.id) || 0) + 1);
+        cats.set(c.id, (cats.get(c.id) || 0) + 1);
       });
-      const ops = [...m.entries()].map(([id, n]) => ({
-        id, n, label: (this.arbol.find(c => c.id === id) || {}).nombre || '—',
-      })).sort((a, b) => a.label.localeCompare(b.label));
-      const on = this.grupoAbierto('cats');
-      return `<aside class="un-c">
-        <div class="un-c-h"><span>Filtros</span>
-          ${this.cats.length || this.provs.length || Object.keys(this.props).length
-            ? '<button class="lnk" data-limpia="todo">limpiar</button>' : ''}</div>
-        <div class="un-g2 ${on ? 'on' : ''}">
-          <button class="un-g-t" data-grupo="cats" aria-expanded="${on}">
-            <span class="un-g-fl">${on ? '▾' : '▸'}</span>
-            <span class="un-g-n">Categorías</span>
-            ${this.cats.length ? `<span class="un-g-m">${this.cats.length}</span>` : ''}
-          </button>
-          ${!on && this.cats.length ? `<div class="un-g-r">${UI.esc(ops
-            .filter(o => this.cats.includes(o.id)).map(o => o.label).join(', '))}</div>` : ''}
-          ${on ? ops.map(o => `<label class="un-o ${this.cats.includes(o.id) ? 'on' : ''}">
-            <input type="checkbox" data-cat="${o.id}" ${this.cats.includes(o.id) ? 'checked' : ''}>
-            <span class="un-o-n">${UI.esc(o.label)}</span>
-            <span class="un-o-c tnum">${o.n}</span></label>`).join('') : ''}
-        </div>
-        ${this.htmlProvs()}
-      </aside>`;
-    },
-
-    // Quién la trae. Con el estado "en producción" marcado, esto contesta la
-    // pregunta de todos los días: qué me tiene que entregar Tony.
-    htmlProvs() {
-      const m = new Map();
-      global.DB.unidadesTodas().forEach(u => {
-        if (!this.pasaCat(u) || !this.pasaProps(u) || !this.pasaFiltro(u)) return;
-        if (!u.proveedor) return;
-        m.set(u.proveedor, (m.get(u.proveedor) || 0) + 1);
+      out.push({
+        k: 'cats', titulo: 'Categoría', tipo: 'cat', sel: this.cats,
+        ops: [...cats.entries()].map(([id, n]) => ({
+          k: id, n, label: (this.arbol.find(c => c.id === id) || {}).nombre || '—',
+        })).sort((a, b) => String(a.label).localeCompare(String(b.label))),
       });
-      const ops = [...m.entries()].map(([k, n]) => ({ k, n }))
-        .sort((a, b) => a.k.localeCompare(b.k));
-      if (ops.length < 2 && !this.provs.length) return '';
-      const on = this.grupoAbierto('provs');
-      return `<div class="un-g2 ${on ? 'on' : ''}">
-        <button class="un-g-t" data-grupo="provs" aria-expanded="${on}">
-          <span class="un-g-fl">${on ? '▾' : '▸'}</span>
-          <span class="un-g-n">Proveedor</span>
-          ${this.provs.length ? `<span class="un-g-m">${this.provs.length}</span>` : ''}
-        </button>
-        ${!on && this.provs.length ? `<div class="un-g-r">${UI.esc(this.provs.join(', '))}</div>` : ''}
-        ${on ? ops.map(o => `<label class="un-o ${this.provs.includes(o.k) ? 'on' : ''}">
-          <input type="checkbox" data-prov="${UI.esc(o.k)}" ${this.provs.includes(o.k) ? 'checked' : ''}>
-          <span class="un-o-n">${UI.esc(o.k)}</span>
-          <span class="un-o-c tnum">${o.n}</span></label>`).join('') : ''}
-      </div>`;
-    },
 
-    // Las propiedades de la variante, una lista por propiedad — igual que el
-    // catálogo: medidas del frente, estructura, frente.
-    htmlProps() {
-      const claves = this.clavesProp();
-      const gs = claves.map(k => {
+      // Una lista por propiedad, con la cuenta de cada valor.
+      this.clavesProp().forEach(k => {
         const m = new Map(); const nom = new Map();
         global.DB.unidadesTodas().forEach(u => {
-          if (!this.pasaCat(u) || !this.pasaFiltro(u)) return;
+          if (!this.pasaCat(u) || !this.pasaProv(u) || !this.pasaFiltro(u)) return;
           const val = this.valorProp(u, k); if (!val) return;
           const nk = this.normT(val);
           m.set(nk, (m.get(nk) || 0) + 1);
           if (!nom.has(nk)) nom.set(nk, val);
         });
-        const prop = global.DB.propiedad(k);
-        const rol = global.DB.rolDe(k);
-        return {
-          k, titulo: (prop && prop.nombre) || k,
-          color: ['estructura', 'frente', 'terminacion', 'material'].includes(rol),
-          ops: [...m.entries()].map(([x, n]) => ({ k: x, n, label: nom.get(x) }))
-            .sort((a, b) => b.n - a.n || String(a.label).localeCompare(String(b.label))),
-        };
-      }).filter(g => g.ops.length > 1 || (this.props[g.k] || []).length);
-      if (!gs.length) return '<aside class="un-c"></aside>';
-      return `<aside class="un-c">
-        <div class="un-c-h"><span>Propiedades</span></div>
-        ${gs.map(g => {
-          const sel = this.props[g.k] || [];
-          const on = this.grupoAbierto(g.k);
-          return `<div class="un-g2 ${on ? 'on' : ''}">
-            <button class="un-g-t" data-grupo="${UI.esc(g.k)}" aria-expanded="${on}">
-              <span class="un-g-fl">${on ? '▾' : '▸'}</span>
-              <span class="un-g-n">${UI.esc(g.titulo)}</span>
-              ${sel.length ? `<span class="un-g-m">${sel.length}</span>` : ''}
-            </button>
-            ${!on && sel.length ? `<div class="un-g-r">${UI.esc(g.ops
-              .filter(o => sel.includes(o.k)).map(o => o.label).join(', '))}</div>` : ''}
-            ${on ? g.ops.map(o => `<label class="un-o ${sel.includes(o.k) ? 'on' : ''}">
-              <input type="checkbox" data-prop="${UI.esc(g.k)}|${UI.esc(o.k)}"
-                ${sel.includes(o.k) ? 'checked' : ''}>
-              ${g.color ? `<span class="pt" style="background:${global.DB.colorDe(o.label)}"></span>` : ''}
-              <span class="un-o-n">${UI.esc(o.label)}</span>
-              <span class="un-o-c tnum">${o.n}</span></label>`).join('') : ''}
-          </div>`;
-        }).join('')}
-      </aside>`;
+        const ops = [...m.entries()].map(([x, n]) => ({ k: x, n, label: nom.get(x) }))
+          .sort((a, b) => b.n - a.n || String(a.label).localeCompare(String(b.label)));
+        const sel = this.props[k] || [];
+        if (ops.length < 2 && !sel.length) return;
+        out.push({
+          k, titulo: this.tituloProp(k), tipo: 'prop', sel, ops,
+          color: ['estructura', 'frente', 'terminacion', 'material'].includes(global.DB.rolDe(k)),
+        });
+      });
+
+      // Quién la trae: con "en producción" marcado contesta la pregunta de
+      // todos los días —qué me tiene que entregar Tony.
+      const provs = new Map();
+      global.DB.unidadesTodas().forEach(u => {
+        if (!this.pasaCat(u) || !this.pasaProps(u) || !this.pasaFiltro(u)) return;
+        if (!u.proveedor) return;
+        provs.set(u.proveedor, (provs.get(u.proveedor) || 0) + 1);
+      });
+      if (provs.size > 1 || this.provs.length) {
+        out.push({
+          k: 'provs', titulo: 'Proveedor', tipo: 'prov', sel: this.provs,
+          ops: [...provs.entries()].map(([k, n]) => ({ k, n, label: k }))
+            .sort((a, b) => a.label.localeCompare(b.label)),
+        });
+      }
+      return out;
     },
 
-    engancharLados() {
-      document.querySelectorAll('[data-grupo]').forEach(b => b.onclick = () => {
-        this.abrirGrupo(b.dataset.grupo); this.pintar();
+    htmlModulos() {
+      const ms = this.modulos();
+      const hay = this.cats.length || this.provs.length || Object.keys(this.props).length;
+      return `<div class="un-mods">
+        ${ms.map(g => {
+          const on = this._mod === g.k;
+          const marcadas = g.ops.filter(o => g.sel.includes(o.k));
+          const resumen = marcadas.length === 1 ? String(marcadas[0].label)
+            : marcadas.length ? `${marcadas.length} elegidas` : '';
+          return `<div class="un-mod ${on ? 'on' : ''} ${g.sel.length ? 'marca' : ''}">
+            <button class="un-mod-b" data-mod="${UI.esc(String(g.k))}" aria-expanded="${on}">
+              <span class="un-mod-t">${UI.esc(g.titulo)}</span>
+              ${resumen ? `<span class="un-mod-v">${UI.esc(resumen)}</span>` : ''}
+              <span class="un-mod-fl">▾</span>
+            </button>
+            ${on ? `<div class="un-mod-p">
+              ${g.ops.map(o => `<label class="un-o ${g.sel.includes(o.k) ? 'on' : ''}">
+                <input type="checkbox" data-${g.tipo}="${UI.esc(String(g.k))}|${UI.esc(String(o.k))}"
+                  ${g.sel.includes(o.k) ? 'checked' : ''}>
+                ${g.color ? `<span class="pt" style="background:${global.DB.colorDe(o.label)}"></span>` : ''}
+                <span class="un-o-n">${UI.esc(o.label)}</span>
+                <span class="un-o-c tnum">${o.n}</span></label>`).join('')}
+            </div>` : ''}
+          </div>`;
+        }).join('')}
+        ${hay ? '<button class="lnk" data-limpia="todo">limpiar</button>' : ''}
+      </div>`;
+    },
+
+    engancharModulos() {
+      const cont = document.getElementById('un-mods'); if (!cont) return;
+      cont.querySelectorAll('[data-mod]').forEach(b => b.onclick = e => {
+        e.stopPropagation(); this.abrirMod(b.dataset.mod); this.pintar();
       });
-      document.querySelectorAll('[data-cat]').forEach(i => i.onchange = () => {
-        const id = Number(i.dataset.cat);
+      cont.querySelectorAll('[data-cat]').forEach(i => i.onchange = () => {
+        const id = Number(i.dataset.cat.split('|')[1]);
         this.cats = this.cats.includes(id) ? this.cats.filter(x => x !== id) : [...this.cats, id];
+        // Al cambiar de categoría, lo marcado de la anterior deja de aplicar.
+        this.props = {};
         this.pintar();
       });
-      document.querySelectorAll('[data-prop]').forEach(i => i.onchange = () => {
+      cont.querySelectorAll('[data-prop]').forEach(i => i.onchange = () => {
         const [k, v] = i.dataset.prop.split('|');
         const sel = this.props[k] || [];
         this.props[k] = sel.includes(v) ? sel.filter(x => x !== v) : [...sel, v];
         if (!this.props[k].length) delete this.props[k];
         this.pintar();
       });
-      document.querySelectorAll('[data-prov]').forEach(i => i.onchange = () => {
-        const k = i.dataset.prov;
+      cont.querySelectorAll('[data-prov]').forEach(i => i.onchange = () => {
+        const k = i.dataset.prov.split('|')[1];
         this.provs = this.provs.includes(k) ? this.provs.filter(x => x !== k) : [...this.provs, k];
         this.pintar();
       });
-      document.querySelectorAll('[data-limpia]').forEach(b => b.onclick = () => {
+      cont.querySelectorAll('[data-limpia]').forEach(b => b.onclick = () => {
         this.cats = []; this.props = {}; this.provs = []; this.pintar();
       });
+      // Se cierra tocando afuera, como cualquier desplegable.
+      if (!this._afuera) {
+        this._afuera = ev => {
+          if (!this._mod) return;
+          if (ev.target.closest && ev.target.closest('.un-mod')) return;
+          this._mod = null; this.pintar();
+        };
+        document.addEventListener('click', this._afuera);
+      }
     },
 
     // Una tabla por categoría: arriba el nombre de la categoría, abajo los
@@ -418,37 +430,46 @@
 
       cont.innerHTML = `${grupos.map(g => {
         const claves = this.clavesCat(g.id);
+        const on = !this.plegada(g.id);
         return `<section class="un-sec">
-          <div class="un-cat">
+          <button class="un-cat" data-plegarcat="${g.id}" aria-expanded="${on}">
+            <span class="un-cat-fl">${on ? '▾' : '▸'}</span>
             <h2>${UI.esc(g.nombre)}</h2>
             <span class="un-cat-n">${g.items.length} ${g.items.length === 1 ? 'unidad' : 'unidades'}</span>
-          </div>
-          <div class="card un-tabla">
+            ${on ? '' : `<span class="un-cat-r">${UI.esc(this.resumen(g.items))}</span>`}
+          </button>
+          ${on ? `<div class="card un-tabla">
             <table>
               <thead><tr>
-                <th>N°</th><th class="th-f">Foto</th><th>Modelo</th>
+                <th>Estado</th><th>N°</th><th class="th-f">Foto</th><th>Modelo</th>
                 ${claves.map(k => `<th>${UI.esc(this.tituloProp(k))}</th>`).join('')}
-                <th>Estado</th><th>Ubicación</th><th>Proveedor</th>
-                <th>Llega</th><th>Listo</th><th>Venta</th><th></th>
+                <th>Ubicación</th><th class="th-f">Nota</th><th></th>
               </tr></thead>
               <tbody>${g.items.map(u => this.renglon(u, ed, claves)).join('')}</tbody>
             </table>
-          </div>
+          </div>` : ''}
         </section>`;
       }).join('')}
         <div class="hint" style="margin-top:9px">Acá se consulta qué hay y con qué número de
           serie. <b>Reservar se reserva desde la venta</b>, atada a su orden. La que es
           <b>a medida</b> lleva su foto para que el vendedor sepa qué está vendiendo.</div>`;
 
+      cont.querySelectorAll('[data-plegarcat]').forEach(b => b.onclick = () => {
+        this.plegar(Number(b.dataset.plegarcat)); this.pintar();
+      });
       cont.querySelectorAll('[data-ver]').forEach(b => b.onclick = () => this.ficha(Number(b.dataset.ver)));
       cont.querySelectorAll('[data-pedir]').forEach(b => b.onclick = () => this.pedir(Number(b.dataset.pedir)));
       cont.querySelectorAll('[data-foto]').forEach(b => b.onclick = () => this.modalFoto(Number(b.dataset.foto)));
+      cont.querySelectorAll('[data-nota]').forEach(b => b.onclick = () => this.modalNota(Number(b.dataset.nota)));
     },
 
+    // En la pantalla se ve lo que se mira de corrido: cómo está, cuál es, qué
+    // es y dónde está. Proveedor, fechas y venta viven en "Ver más": son datos
+    // de una pieza en particular, no de la recorrida.
     renglon(u, ed, claves) {
       const e = global.DB.etiquetaUnidad(u);
-      const enProd = u.estado === 'produccion';
       return `<tr class="${u.estado === 'entregada' ? 'off' : ''}">
+        <td class="td-e"><span class="pill ${e.pill}">${UI.esc(e.label)}</span></td>
         <td><span class="tnum nom">${UI.esc(u.serie)}</span></td>
         <td class="td-f">${this.botonFoto(u, ed)}</td>
         <td>${UI.esc(u.modelo)}${u.tipo === 'medida'
@@ -458,20 +479,9 @@
           return `<td class="${k === 'medida' ? 'tnum' : ''}">${val
             ? UI.esc(val) : '<span class="muted">—</span>'}</td>`;
         }).join('')}
-        <td><span class="pill ${e.pill}">${UI.esc(e.label)}</span></td>
         <td class="muted">${UI.esc(global.DB.ubicacionLabel(u.ubicacion) || '—')}</td>
-        <td class="muted">${UI.esc(u.proveedor || '—')}</td>
-        <td>${enProd && u.llega ? `<b>${UI.esc(u.llega)}</b>`
-          : `<span class="muted">—</span>`}</td>
-        <td class="muted">${UI.esc(u.listo || '—')}</td>
-        <td class="muted">${u.orden ? (() => {
-          const pos = global.DB.posEnOrden(u);
-          return `<b class="nom">${UI.esc(u.orden)}</b>${pos
-            ? ` <span class="un-pos">${pos.n} de ${pos.de}</span>` : ''}`;
-        })() : '—'}</td>
-        <td class="td-acc">${u.estado === 'pedir' && ed
-          ? `<button class="bres" data-pedir="${u.id}">Pedir</button>`
-          : `<button class="b-x" data-ver="${u.id}">Ver</button>`}</td>
+        <td class="td-f">${this.botonNota(u)}</td>
+        <td class="td-acc"><button class="b-x" data-ver="${u.id}">Ver más</button></td>
       </tr>`;
     },
 
@@ -488,6 +498,51 @@
       return `<button class="un-foto" data-foto="${u.id}"
         title="${u.tipo === 'medida' ? 'Falta la foto: es a medida' : 'Cargar una foto'}"
         >${ic}</button>`;
+    },
+
+    // El globito: fábrica escribe acá lo que pasa con ESA pieza —"le falta la
+    // manija", "viene con el frente cambiado"—. Cuando hay algo escrito el
+    // globito queda lleno, así se ve de lejos cuál tiene algo que decir.
+    botonNota(u) {
+      const ic = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.4 3.2h11.2v7.6H6.8L3.6
+        13.2v-2.4H2.4z"/></svg>`;
+      const hay = !!(u.nota || '').trim();
+      return `<button class="un-nota ${hay ? 'hay' : ''}" data-nota="${u.id}"
+        title="${hay ? UI.esc(u.nota) : 'Dejar una nota de fábrica'}">${ic}</button>`;
+    },
+
+    modalNota(id) {
+      const u = global.DB.unidad(id); if (!u) return;
+      document.body.insertAdjacentHTML('beforeend', `
+        <div class="un-back" id="un-mdl">
+          <div class="card pad" style="max-width:440px;width:100%">
+            <h3 class="h-title" style="font-size:17px">Nota de fábrica</h3>
+            <p class="h-sub">${UI.esc(u.serie === '—' ? 'Sin etiqueta' : u.serie)} ·
+              ${UI.esc(u.modelo)} ${UI.esc(u.medida)}</p>
+            <label class="fld" style="margin-top:12px"><span class="lbl">Qué pasa con esta pieza</span>
+              <textarea id="un-nt" rows="4"
+                placeholder="Vino con el frente cambiado, falta la manija…">${UI.esc(u.nota || '')}</textarea></label>
+            <div class="hint" style="margin-top:6px">Es de <b>esta unidad</b>, no del modelo: la
+              sigue a donde vaya y la ve el que la va a entregar.</div>
+            <div class="row" style="margin-top:16px;gap:10px">
+              ${(u.nota || '').trim() ? '<button class="btn" id="un-borrar">Borrar</button>' : ''}
+              <div class="sp"></div>
+              <button class="btn" id="un-x">Cancelar</button>
+              <button class="btn primary" id="un-ok">Guardar</button>
+            </div>
+          </div>
+        </div>`);
+      const cerrar = () => { const m = document.getElementById('un-mdl'); if (m) m.remove(); };
+      document.getElementById('un-x').onclick = cerrar;
+      document.getElementById('un-mdl').onclick = e => { if (e.target.id === 'un-mdl') cerrar(); };
+      const del = document.getElementById('un-borrar');
+      if (del) del.onclick = () => {
+        global.DB.guardarUnidad({ id, nota: '' }); cerrar(); this.pintar();
+      };
+      document.getElementById('un-ok').onclick = () => {
+        global.DB.guardarUnidad({ id, nota: document.getElementById('un-nt').value.trim() });
+        UI.aviso('Nota guardada', 'ok'); cerrar(); this.pintar();
+      };
     },
 
     modalFoto(id) {
@@ -571,17 +626,23 @@
               ${dato('Ubicación', global.DB.ubicacionLabel(u.ubicacion))}
               ${dato('Proveedor', u.proveedor)}
               ${dato('Llega', u.llega)}
-              ${dato('Listo desde', u.listo)}
+              ${dato('La tengo desde', u.listo)}
               ${u.orden ? `<div class="fi-r"><span>Orden de venta</span>
                 <b>${UI.esc(u.orden)}${pos ? ` · ${pos.n} de ${pos.de}` : ''}</b></div>` : ''}
               ${dato('Vendida el', u.fechaVenta)}
               ${dato('Entregada el', u.fechaEntrega)}
             </div>
+            ${(u.nota || '').trim() ? `<div class="fi-nota"><span>Nota de fábrica</span>
+              <p>${UI.esc(u.nota)}</p></div>` : ''}
             <div class="hint" style="margin-top:11px">${u.orden
               ? 'Está atada a esa venta. Para liberarla hay que hacerlo desde la orden.'
               : 'No tiene dueño. <b>Se reserva desde la venta</b>, no desde acá: así toda reserva queda respaldada por una orden.'}</div>
             <div class="row" style="margin-top:16px;gap:10px">
+              ${u.estado === 'pedir' && global.App && global.App.puede
+                && global.App.puede('editarCatalogo')
+                ? `<button class="btn primary" id="un-pedir">Pedir a fábrica</button>` : ''}
               <div class="sp"></div>
+              <button class="btn" id="un-nota">Nota de fábrica</button>
               <button class="btn" id="un-x">Cerrar</button>
             </div>
           </div>
@@ -589,6 +650,9 @@
       const cerrar = () => { const x = document.getElementById('un-mdl'); if (x) x.remove(); };
       document.getElementById('un-x').onclick = cerrar;
       document.getElementById('un-mdl').onclick = ev => { if (ev.target.id === 'un-mdl') cerrar(); };
+      document.getElementById('un-nota').onclick = () => { cerrar(); this.modalNota(id); };
+      const bp = document.getElementById('un-pedir');
+      if (bp) bp.onclick = () => { cerrar(); this.pedir(id); };
     },
 
 
@@ -650,53 +714,50 @@
         .seg.on{background:var(--navy);border-color:var(--navy);color:#fff}
         .seg.on b{opacity:.75}
 
-        /* Categorías a la izquierda —por donde se entra— y terminaciones a la
-           derecha. El estado va arriba, que es el corte de todos los días. */
-        .un-cols{display:grid;grid-template-columns:176px minmax(0,1fr) 166px;gap:14px;
-          align-items:start;max-width:100%}
-        .un-cols>#un-tabla{min-width:0}
-        @media(max-width:1240px){.un-cols{grid-template-columns:1fr}}
+        /* Los filtros son módulos: una fila arriba, cada uno se abre solo.
+           Primero la categoría; los de propiedad cambian con ella. */
+        .un-mods{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+        .un-mod{position:relative}
+        .un-mod-b{display:flex;align-items:center;gap:6px;border:1px solid var(--line);
+          background:var(--panel);border-radius:9px;padding:5px 10px;cursor:pointer;font:inherit;
+          font-size:12.5px;color:var(--ink-soft);white-space:nowrap}
+        .un-mod-b:hover{border-color:var(--brand);color:var(--brand)}
+        .un-mod-t{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+          color:var(--muted)}
+        .un-mod.marca .un-mod-t{color:var(--brand)}
+        .un-mod-v{font-weight:700;color:var(--navy);max-width:150px;overflow:hidden;
+          text-overflow:ellipsis}
+        .un-mod-fl{font-size:9px;color:var(--muted)}
+        .un-mod.on .un-mod-b,.un-mod.marca .un-mod-b{border-color:var(--brand)}
+        .un-mod.on .un-mod-fl{transform:rotate(180deg)}
+        .un-mod-p{position:absolute;top:calc(100% + 5px);left:0;z-index:20;min-width:200px;
+          max-height:300px;overflow:auto;background:var(--panel);border:1px solid var(--line);
+          border-radius:11px;padding:7px 11px;box-shadow:0 10px 26px rgba(12,22,44,.14)}
         .un-ord{flex:none;width:auto;min-width:150px;padding:8px 10px;font-size:12.5px;font-weight:650;
           color:var(--ink-soft);border:1px solid var(--line);border-radius:10px;background:var(--panel)}
         .pt{width:11px;height:11px;border-radius:50%;border:1px solid rgba(0,0,0,.18);flex:none;
           display:inline-block}
-        .un-c{position:sticky;top:104px;display:flex;flex-direction:column}
-        .un-c-h{display:flex;align-items:baseline;gap:8px;font-size:11px;font-weight:700;
-          text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:5px}
-        /* Cada grupo se pliega, igual que en el catálogo. */
-        .un-g2{display:flex;flex-direction:column;margin-bottom:6px}
-        .un-g-t{display:flex;align-items:center;gap:6px;width:100%;border:0;background:none;
-          padding:3px 0;cursor:pointer;font:inherit;font-size:11px;font-weight:700;
-          text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:left}
-        .un-g-t:hover{color:var(--navy)}
-        .un-g2.on .un-g-t{color:var(--ink-soft);margin-bottom:3px}
-        .un-g-fl{font-size:9px;width:9px;flex:none}
-        .un-g-n{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        .un-g-m{font-size:10px;font-weight:700;background:var(--brand);color:#fff;
-          border-radius:999px;padding:0 6px;line-height:15px;flex:none}
-        .un-g-r{font-size:11.5px;color:var(--brand);padding-left:15px;margin-bottom:2px;
-          overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        .un-c .lnk{border:0;background:none;padding:0;font:inherit;font-size:11px;font-weight:600;
-          color:var(--brand);cursor:pointer;text-transform:none;letter-spacing:0}
-        .un-c .lnk:hover{text-decoration:underline}
+        .un-mods .lnk{border:0;background:none;padding:0 4px;font:inherit;font-size:11.5px;
+          font-weight:600;color:var(--brand);cursor:pointer}
+        .un-mods .lnk:hover{text-decoration:underline}
         .un-o{display:flex;align-items:center;gap:7px;padding:3px 0;cursor:pointer;font-size:12.5px;
           color:var(--ink-soft)}
         .un-o:hover{color:var(--navy)}
         .un-o.on{color:var(--navy);font-weight:650}
         .un-o input{width:14px;height:14px;accent-color:var(--brand);flex:none;margin:0}
-        .un-o-n{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .un-o-n{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .un-o-c{font-size:11px;color:var(--muted);flex:none;margin-left:5px}
 
         /* El renglón va bajo: se trabaja mirando muchos a la vez. */
         .un-tabla{overflow-x:auto}
         .un-tabla{max-width:100%}
-        .un-tabla table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:880px}
+        .un-tabla table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:700px}
         .un-tabla th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;
-          color:var(--muted);font-weight:700;padding:7px 9px;border-bottom:1px solid var(--line);
+          color:var(--muted);font-weight:700;padding:7px 6px;border-bottom:1px solid var(--line);
           white-space:nowrap;background:var(--panel)}
-        .un-tabla td{padding:3px 8px;border-bottom:1px solid var(--line-soft);white-space:nowrap;
+        .un-tabla td{padding:3px 6px;border-bottom:1px solid var(--line-soft);white-space:nowrap;
           line-height:1.35}
-        .un-tabla th{padding-left:8px;padding-right:8px}
+        .un-tabla th{padding-left:6px;padding-right:6px}
         .un-tabla tr.off{opacity:.55}
         .un-tabla tr:hover td{background:var(--panel-2)}
         .un-tabla .nom{font-weight:700;color:var(--navy)}
@@ -706,9 +767,15 @@
         /* El título queda fijo mientras se recorre su categoría: son muchos
            renglones y hay que saber siempre qué se está mirando. */
         .un-cat{display:flex;align-items:baseline;gap:9px;margin:0;padding:7px 0 6px;
-          position:sticky;top:95px;z-index:4;background:var(--bg)}
+          position:sticky;top:95px;z-index:4;background:var(--bg);width:100%;border:0;
+          font:inherit;text-align:left;cursor:pointer}
         .un-cat h2{margin:0;font-size:17px;font-weight:800;color:var(--navy);letter-spacing:-.01em}
+        .un-cat:hover h2{color:var(--brand)}
         .un-cat-n{font-size:12px;color:var(--muted)}
+        .un-cat-fl{font-size:10px;color:var(--muted);width:11px;flex:none}
+        .un-cat-r{font-size:12px;color:var(--muted);min-width:0;overflow:hidden;
+          text-overflow:ellipsis;white-space:nowrap}
+        .un-sec:has(.un-cat[aria-expanded="false"]){margin-bottom:2px}
         .th-f{width:34px}
         .td-f{width:34px;padding-left:4px;padding-right:4px}
         .un-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
@@ -749,6 +816,19 @@
         .un-foto:hover{border-color:var(--brand);color:var(--brand)}
         .un-foto.hay{border-style:solid;border-color:var(--line)}
         .un-foto img{width:100%;height:100%;object-fit:cover}
+        /* El globito de fábrica: vacío es un contorno, lleno se pinta. */
+        .un-nota{width:24px;height:24px;border:0;background:none;color:var(--line);cursor:pointer;
+          display:grid;place-items:center;padding:0}
+        .un-nota svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.3;
+          stroke-linejoin:round}
+        .un-nota:hover{color:var(--brand)}
+        .un-nota.hay{color:var(--brand)}
+        .un-nota.hay svg{fill:var(--brand-soft)}
+        .fi-nota{margin-top:11px;border:1px solid var(--line);border-radius:10px;padding:8px 11px;
+          background:var(--panel-2)}
+        .fi-nota span{font-size:10.5px;font-weight:700;text-transform:uppercase;
+          letter-spacing:.05em;color:var(--muted)}
+        .fi-nota p{margin:2px 0 0;font-size:12.5px;color:var(--ink)}
         .bres{border:1px solid var(--brand);background:var(--brand-soft);color:var(--brand-ink);
           border-radius:7px;padding:2px 9px;font:inherit;font-size:11.5px;font-weight:700;cursor:pointer;
           white-space:nowrap}

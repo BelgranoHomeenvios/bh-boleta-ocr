@@ -1144,6 +1144,32 @@ al **costado derecho**, no arriba, y se pueden **marcar varias a la vez**.
 > asigna serie y ubicación) y la **confirmación administrativa** de las órdenes
 > antes de Producción van con esos módulos.
 
+### Lote 40 — APLICADO (Los filtros arriba, y la pieza en "Ver más")
+
+**Los costados se van: los filtros son módulos arriba**
+- ✅ 447. Se sacaron los dos paneles laterales. Los filtros quedan **arriba, en
+  módulos**: se elige la categoría y ahí aparecen los de *esa* categoría
+  —medidas del frente, estructura, frente— más el de **proveedor**. Cada uno se
+  abre solo, se cierra tocando afuera y muestra lo elegido en el propio botón.
+- ✅ 448. Sin costados, **la tabla entra entera**: ya no hay que correrla de
+  costado para ver la última columna.
+- ✅ 449. Cada **categoría se pliega** con su flecha: con dos o tres marcadas se
+  abre la que se está mirando y las otras quedan en una línea con su resumen
+  (*23 stock · 6 a pedir · 15 en producción…*).
+
+**El renglón dice lo que se mira de corrido**
+- ✅ 450. Orden de las columnas: **Estado · N° · foto · modelo · las tres
+  propiedades · ubicación · nota**. El estado va primero porque es el corte con
+  el que se recorre.
+- ✅ 451. **Proveedor, llega, listo y venta salieron de la tabla**: viven en
+  **Ver más**, que abre la ficha de esa pieza —tipo, ubicación, proveedor, *la
+  tengo desde*, la orden con *1 de 6*, cuándo se vendió y cuándo se entregó—.
+  Desde ahí también se pide a fábrica si está *a pedir*.
+- ✅ 452. **Globito de nota por unidad**: fábrica escribe qué pasa con *esa*
+  pieza ("vino con el frente cambiado", "falta la manija"). Vacío es un
+  contorno, con algo escrito se pinta, así se ve de lejos cuál tiene algo que
+  decir. Es de la unidad, no del modelo: la sigue a donde vaya.
+
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
 Las solapas quedan en: **Información general · Compra y venta · Inventario ·
