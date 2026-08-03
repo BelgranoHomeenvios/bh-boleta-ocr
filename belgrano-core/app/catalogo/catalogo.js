@@ -121,6 +121,33 @@
             font:inherit;font-size:12.5px;font-weight:650;color:var(--ink-soft);cursor:pointer}
           .fx-o:hover{border-color:var(--brand);color:var(--navy)}
           .fx-o.on{background:var(--brand);border-color:var(--brand);color:#fff}
+          /* El listado: renglón entero clickeable, foto chica al final. */
+          .cat-tabla tbody tr{cursor:pointer}
+          .cat-tabla tbody tr:hover{background:var(--panel-2)}
+          .cat-tabla .cat-tr-h{cursor:default}
+          .cat-tabla .cat-tr-h:hover{background:none}
+          .cat-tabla .cat-tr-h td{background:var(--panel-2);padding:7px 12px;
+            border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+          .cat-tabla .cat-tr-h .cat-sec-n{margin-left:8px}
+          .cat-tabla .cat-tr-h .cat-sec-v{float:right}
+          .cat-tabla .th-foto{width:70px}
+          .cat-tabla .td-foto{padding-top:4px;padding-bottom:4px}
+          .mini{display:grid;place-items:center;width:56px;height:56px;border-radius:8px;
+            background:var(--panel-2);border:1px solid var(--line-soft);overflow:hidden;
+            color:var(--muted)}
+          .mini img{width:100%;height:100%;object-fit:cover;display:block}
+          .mini .sil{width:44px;height:34px}
+          .cat-tabla .td-mas{width:44px;text-align:right}
+          .cat-tabla .lx{border:1px solid var(--line);background:var(--panel);border-radius:8px;
+            cursor:pointer;font-size:14px;line-height:1;padding:4px 8px;color:var(--muted)}
+          .cat-tabla .lx:hover{border-color:var(--brand);color:var(--brand)}
+          .cat-menu-back{position:fixed;inset:0;z-index:59}
+          .cat-menu{position:fixed;z-index:60;width:190px;background:var(--panel);
+            border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(15,26,42,.16);
+            padding:5px;display:flex;flex-direction:column}
+          .cat-menu button{border:0;background:none;font:inherit;font-size:12.5px;text-align:left;
+            padding:7px 10px;border-radius:7px;cursor:pointer;color:var(--ink-soft)}
+          .cat-menu button:hover{background:var(--brand-soft);color:var(--brand-ink)}
           /* La lista de categorías scrollea sola: son veinte y pico y no
              tienen que empujar la pantalla. */
           .cat-lc{display:flex;flex-direction:column;max-height:min(60vh,520px);overflow:auto;
@@ -637,6 +664,18 @@
       if (!prods.length) { cont.innerHTML = UI.vacio(vacio); this.enganchar(cont); this.pintarSub(); return; }
 
       const grupos = this.orden === 'cat' ? this.porCategoria(prods) : null;
+      // En el listado el encabezado de la tabla no se repite por categoría:
+      // va una sola tabla con un renglón de título entre grupo y grupo.
+      if (this.vista === 'lista' && grupos && grupos.length > 1) {
+        cont.innerHTML = this.htmlLista(prods, grupos);
+        this.enganchar(cont);
+        cont.querySelectorAll('[data-solo]').forEach(a => a.onclick = e => {
+          e.preventDefault(); e.stopPropagation();
+          this._f.tipo = [Number(a.dataset.solo)]; this.pintar();
+        });
+        this.pintarSub();
+        return;
+      }
       cont.innerHTML = grupos && grupos.length > 1
         ? grupos.map(g => `<section class="cat-sec">
             <div class="cat-sec-h">
@@ -693,24 +732,67 @@
     },
     catDe(id) { return (this.arbol.find(c => c.id === id) || {}).nombre || ''; },
 
-    htmlLista(prods) {
-      return `<div class="card"><table>
-        <thead><tr><th>Producto</th><th>Código</th><th>Tipo</th>
-          <th style="text-align:right">Variantes</th><th style="text-align:right">Stock</th>
-          <th style="text-align:right">Desde</th><th>Terminaciones</th><th></th><th></th></tr></thead>
-        <tbody>${prods.map(p => {
+    // El listado: lo mismo que la tarjeta pero apretado para comparar. Sin
+    // código ni precio —no es lo que se mira acá—, con una foto chica para
+    // reconocer el mueble de un vistazo. Se entra tocando el renglón; los
+    // tres puntitos son para ir derecho a una solapa.
+    htmlLista(prods, grupos) {
+      const renglon = p => {
           const e = this.estado(p);
-          return `<tr data-prod="${p.id}" style="cursor:pointer">
+          return `<tr data-prod="${p.id}">
             <td><b>${UI.esc(p.nombre)}</b></td>
-            <td class="muted tnum">${UI.esc(p.sku || '—')}</td>
             <td class="muted">${UI.esc(this.catDe(p.categoria_id))}</td>
             <td style="text-align:right" class="tnum">${p.variantes}</td>
             <td style="text-align:right" class="tnum">${p.stock || '—'}</td>
-            <td style="text-align:right" class="tnum">${p.desde ? UI.pesos(p.desde) : '—'}</td>
             <td>${this.puntos(p)}</td>
             <td><span class="pill ${e.pill}">${UI.esc(e.label)}</span></td>
-            <td style="text-align:right" class="muted">ver ›</td></tr>`;
-        }).join('')}</tbody></table></div>`;
+            <td class="td-foto"><span class="mini">${p.foto
+              ? `<img src="${UI.esc(p.foto)}" alt="">`
+              : this.silueta(p.categoria_id)}</span></td>
+            <td class="td-mas"><button class="lx" data-mas="${p.id}"
+              title="Abrir en…" aria-label="Abrir en…">⋯</button></td></tr>`;
+      };
+      const cuerpo = grupos
+        ? grupos.map(g => `<tr class="cat-tr-h"><td colspan="8">
+            <span class="cat-sec-t">${UI.esc(g.nombre)}</span>
+            <span class="cat-sec-n">${g.items.length} ${g.items.length === 1 ? 'mueble' : 'muebles'}</span>
+            <a class="cat-sec-v" href="#" data-solo="${g.id}">ver sólo esta ›</a>
+          </td></tr>${g.items.map(renglon).join('')}`).join('')
+        : prods.map(renglon).join('');
+      return `<div class="card"><table class="cat-tabla">
+        <thead><tr><th>Producto</th><th>Tipo</th>
+          <th style="text-align:right">Variantes</th><th style="text-align:right">Stock</th>
+          <th>Terminaciones</th><th></th><th class="th-foto"></th><th></th></tr></thead>
+        <tbody>${cuerpo}</tbody></table></div>`;
+    },
+
+    // El menú de los tres puntitos: entrar derecho a la solapa que hace falta.
+    menuMueble(id, boton) {
+      document.querySelectorAll('.cat-menu').forEach(m => m.remove());
+      const solapas = [
+        ['producto', 'Información general'], ['inventario', 'Inventario'],
+        ['produccion', 'Producción'],
+      ];
+      if (global.App && global.App.puede && global.App.puede('verCostos')) {
+        solapas.push(['costos', 'Compra y venta']);
+      }
+      solapas.push(['documentos', 'Documentos']);
+      const r = boton.getBoundingClientRect();
+      document.body.insertAdjacentHTML('beforeend', `
+        <div class="cat-menu-back"></div>
+        <div class="cat-menu" style="top:${Math.round(r.bottom + 4)}px;left:${Math.round(r.right - 190)}px">
+          ${solapas.map(([k, l]) => `<button data-ir="${k}">${UI.esc(l)}</button>`).join('')}
+        </div>`);
+      const cerrar = () => document.querySelectorAll('.cat-menu,.cat-menu-back').forEach(x => x.remove());
+      document.querySelector('.cat-menu-back').onclick = cerrar;
+      document.querySelectorAll('[data-ir]').forEach(b => b.onclick = () => {
+        const k = b.dataset.ir; cerrar();
+        this.ficha(id).then(() => {
+          if (global.ProductoDet && global.ProductoDet.p) {
+            global.ProductoDet._tab = k; global.ProductoDet.pintar();
+          }
+        });
+      });
     },
 
     // Silueta del mueble por tipo. Es un dibujo, no la foto: sirve para
@@ -756,7 +838,14 @@
       // En las dos vistas se entra a la FICHA del mueble: es la pantalla donde
       // el vendedor mira precios, medidas y terminaciones antes de cotizar.
       cont.querySelectorAll('[data-prod]').forEach(el =>
-        el.onclick = () => this.ficha(Number(el.dataset.prod)));
+        el.onclick = e => {
+          if (e.target.closest('[data-mas]')) return;   // los puntitos tienen lo suyo
+          this.ficha(Number(el.dataset.prod));
+        });
+      cont.querySelectorAll('[data-mas]').forEach(b => b.onclick = e => {
+        e.stopPropagation();
+        this.menuMueble(Number(b.dataset.mas), b);
+      });
     },
 
     // ---- Ficha del mueble --------------------------------------------------

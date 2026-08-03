@@ -963,8 +963,21 @@ al **costado derecho**, no arriba, y se pueden **marcar varias a la vez**.
   —categoría, ambiente, terminación— y **el pop-up, cómo ESTÁ**. Disponibilidad
   y Publicación se mudaron del costado al pop-up.
 
-> Falta decidir **qué información va en el listado** —la tarjeta ya está— y si
-> el filtro guarda lo último usado por rol.
+### Lote 34 — APLICADO (El listado)
+
+- ✅ 399. Las columnas quedan: **producto · tipo · variantes · stock ·
+  terminaciones · estado · foto**. Se van el **código** y el **desde**: acá no
+  se mira plata ni códigos.
+- ✅ 400. Una **foto chica** al final de cada renglón para reconocer el mueble
+  de un vistazo. Sale de la primera imagen de venta de Documentos; si no hay,
+  el dibujo.
+- ✅ 401. Se va el *ver ›*: **se entra tocando cualquier parte del renglón**. En
+  su lugar quedan los **tres puntitos**, que abren un menú para ir derecho a la
+  solapa que hace falta —Inventario, Producción, Compra y venta, Documentos—.
+- ✅ 402. Agrupado por categoría, el **encabezado de la tabla no se repite**:
+  una sola tabla con un renglón de título entre grupo y grupo.
+
+> Falta decidir si el filtro guarda lo último usado por rol.
 
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
 
