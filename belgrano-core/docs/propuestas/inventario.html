@@ -1,0 +1,531 @@
+<meta charset="utf-8">
+<title>Belgrano Soft · Inventario — el modelo y tres formas de verlo</title>
+<style>
+:root{
+  --bg:#f4f6f8; --panel:#fff; --panel-2:#fafbfc; --ink:#0f1a2a; --ink-soft:#5b6675;
+  --line:#d9e0e8; --line-soft:#eef1f5; --navy:#16324f; --brand:#1e5fce;
+  --brand-soft:#e7eefb; --brand-ink:#1a51b0; --ok:#15803d; --ok-bg:#e6f4ea;
+  --warn:#b45309; --warn-bg:#fff7e6; --crit:#b42318; --crit-bg:#fdecea; --muted:#8a94a3;
+  --viol:#6b21a8; --viol-bg:#f3e8ff;
+  --shadow:0 1px 2px rgba(15,26,42,.06),0 1px 3px rgba(15,26,42,.04);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);line-height:1.5;
+  font-family:'Public Sans',-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  font-variant-numeric:tabular-nums}
+h1,h2,h3{margin:0;letter-spacing:-.01em}
+button{font:inherit}
+input,select{font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);
+  border-radius:8px;background:var(--panel);color:var(--ink)}
+
+.top{background:var(--navy);color:#fff;padding:11px 20px;position:sticky;top:0;z-index:30}
+.top h1{font-size:15px;font-weight:800}
+.top p{margin:2px 0 0;font-size:12px;opacity:.75}
+.opts{display:flex;gap:6px;margin-top:11px;flex-wrap:wrap}
+.opt{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);color:rgba(255,255,255,.8);
+  border-radius:9px;padding:7px 13px;font-size:12.5px;font-weight:650;cursor:pointer;text-align:left}
+.opt:hover{background:rgba(255,255,255,.18);color:#fff}
+.opt.on{background:#fff;color:var(--navy);border-color:#fff}
+.opt small{display:block;font-size:10.5px;font-weight:500;opacity:.75}
+.opt.on small{opacity:.6}
+
+.wrap{padding:18px 20px 60px;max-width:1400px;margin:0 auto}
+.idea{background:var(--brand-soft);border:1px solid #cfe0fb;border-radius:12px;padding:13px 15px;
+  font-size:13px;margin-bottom:6px}
+.idea b{color:var(--brand-ink)}
+.pros{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0 18px}
+@media(max-width:820px){.pros{grid-template-columns:1fr}}
+.pro,.con{border-radius:11px;padding:11px 14px;font-size:12.5px;border:1px solid}
+.pro{background:var(--ok-bg);border-color:#cfe8d8;color:#14532d}
+.con{background:var(--warn-bg);border-color:#f3e2c0;color:#7c4a05}
+.pro b,.con b{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;
+  margin-bottom:3px;opacity:.75}
+
+/* ---- el modelo ---- */
+.modelo{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;
+  margin-bottom:22px;box-shadow:var(--shadow)}
+.modelo h2{font-size:16px;color:var(--navy);margin-bottom:4px}
+.modelo .sub{font-size:12.5px;color:var(--ink-soft);margin-bottom:16px}
+.ciclo{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:900px){.ciclo{grid-template-columns:1fr 1fr}}
+.paso{border:1px solid var(--line);border-radius:11px;padding:12px 13px;background:var(--panel-2);
+  position:relative}
+.paso b{display:block;font-size:13px;color:var(--navy);margin-bottom:3px}
+.paso small{font-size:11.5px;color:var(--ink-soft);line-height:1.45;display:block}
+.paso .est{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+  border-radius:999px;padding:2px 8px;display:inline-block;margin-bottom:6px}
+.e-prod{background:var(--viol-bg);color:var(--viol)}
+.e-dep{background:var(--ok-bg);color:var(--ok)}
+.e-res{background:var(--warn-bg);color:var(--warn)}
+.e-ent{background:#eef1f5;color:var(--muted)}
+.cruza{margin-top:14px;font-size:12.5px;color:var(--ink-soft);border-top:1px dashed var(--line);
+  padding-top:12px}
+.cruza b{color:var(--navy)}
+
+/* ---- el marco de la app ---- */
+.app{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;
+  box-shadow:var(--shadow)}
+.appbar{background:var(--navy);color:#fff;height:38px;display:flex;align-items:center;gap:9px;
+  padding:0 14px;font-size:11.5px;font-weight:650}
+.appbar span{opacity:.55}
+.appbar .on{opacity:1;background:rgba(255,255,255,.16);padding:3px 9px;border-radius:999px}
+.subbar{display:flex;gap:14px;padding:0 16px;border-bottom:1px solid var(--line);background:var(--panel);
+  font-size:12px;font-weight:600;color:var(--ink-soft)}
+.subbar div{padding:9px 0}
+.subbar .on{color:var(--navy);border-bottom:2px solid var(--brand)}
+.body{padding:16px;background:var(--bg)}
+.kick{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--brand)}
+.h1{font-size:19px;font-weight:800;color:var(--navy);margin:1px 0 1px}
+.sub{font-size:11.5px;color:var(--muted);margin-bottom:12px}
+
+.bar{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.bar input{flex:1;min-width:180px}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:8px 12px;
+  font-size:12.5px;font-weight:650;color:var(--ink-soft);cursor:pointer;white-space:nowrap}
+.btn.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}
+.segm{display:inline-flex;gap:6px;flex-wrap:wrap}
+.seg{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 13px;
+  font-size:12.5px;font-weight:650;color:var(--ink-soft);cursor:pointer}
+.seg .n{opacity:.6;margin-left:5px}
+.seg.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.seg.on .n{opacity:.7}
+
+table{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--panel)}
+th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+  padding:9px 10px;border-bottom:1px solid var(--line);font-weight:700;white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid var(--line-soft);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;
+  box-shadow:var(--shadow)}
+.pill{font-size:10px;font-weight:700;border-radius:999px;padding:2px 8px;white-space:nowrap}
+.p-ok{background:var(--ok-bg);color:var(--ok)}
+.p-prod{background:var(--viol-bg);color:var(--viol)}
+.p-res{background:var(--warn-bg);color:var(--warn)}
+.p-ent{background:#eef1f5;color:var(--muted)}
+.num{text-align:right}
+.mut{color:var(--muted)}
+.nom{font-weight:700;color:var(--navy)}
+.ser{font-size:11px;color:var(--muted)}
+.grupo td{background:var(--panel-2);font-weight:700;color:var(--navy);font-size:11.5px;
+  text-transform:uppercase;letter-spacing:.04em;border-top:1px solid var(--line)}
+.mini{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:7px;
+  background:var(--panel-2);border:1px solid var(--line-soft);color:var(--muted);vertical-align:middle}
+.mini svg{width:30px;height:22px;stroke:currentColor;fill:none;stroke-width:2}
+.chip{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px;
+  background:var(--panel-2);border:1px solid var(--line);color:var(--ink-soft)}
+.bres{border:1px solid var(--brand);background:var(--brand-soft);color:var(--brand-ink);
+  border-radius:7px;padding:3px 10px;font-size:11.5px;font-weight:700;cursor:pointer}
+.bres:hover{background:var(--brand);color:#fff}
+.b-x{border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:3px 8px;
+  font-size:11.5px;color:var(--muted);cursor:pointer}
+
+/* A · tablero */
+.tot{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+@media(max-width:820px){.tot{grid-template-columns:1fr 1fr}}
+.tot-c{border:1px solid var(--line);border-radius:11px;padding:11px 13px;background:var(--panel)}
+.tot-t{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700}
+.tot-v{font-size:22px;font-weight:800;color:var(--navy);margin-top:2px}
+.tot-p{font-size:11px;color:var(--muted)}
+.exp{background:var(--panel-2)}
+.exp td{padding:0}
+.exp .in{padding:10px 14px 12px}
+
+/* C · buscador */
+.busq{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;
+  box-shadow:var(--shadow);margin-bottom:14px}
+.busq input{width:100%;font-size:15px;padding:11px 14px}
+.res{display:flex;flex-direction:column;gap:10px}
+.rg{border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden}
+.rg-h{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--panel-2);
+  border-bottom:1px solid var(--line)}
+.rg-h b{font-size:13.5px;color:var(--navy)}
+.rg-h .sp{flex:1}
+.rg-b{padding:4px 0}
+.uni{display:flex;align-items:center;gap:11px;padding:8px 14px;border-bottom:1px solid var(--line-soft)}
+.uni:last-child{border-bottom:0}
+.uni .sp{flex:1}
+.hint{font-size:11.5px;color:var(--muted)}
+.nota{font-size:12.5px;color:var(--ink-soft);background:var(--panel);border:1px solid var(--line);
+  border-left:3px solid var(--brand);border-radius:10px;padding:12px 15px;margin-top:20px}
+.nota b{color:var(--navy)}
+.hide{display:none}
+.scroll{overflow-x:auto}
+</style>
+
+<div class="top">
+  <h1>Inventario — el modelo y tres formas de verlo</h1>
+  <p>La unidad es la pieza, no el modelo. Una Borges 100 PB que Raúl está fabricando ya existe y se puede reservar.</p>
+  <div class="opts">
+    <button class="opt on" data-o="m">El modelo<small>Cómo se mueve una unidad</small></button>
+    <button class="opt" data-o="a">A · Tablero por variante<small>Cuánto hay de cada cosa</small></button>
+    <button class="opt" data-o="b">B · Las unidades<small>Tu planilla, hecha sistema</small></button>
+    <button class="opt" data-o="c">C · Buscador de disponibilidad<small>Para el momento de vender</small></button>
+  </div>
+</div>
+
+<div class="wrap">
+
+<!-- ======================= EL MODELO ======================= -->
+<section data-p="m">
+  <div class="modelo">
+    <h2>Una unidad, cuatro estados</h2>
+    <div class="sub">Tenías razón: si se puede reservar, existe. La pieza que está en el taller
+      es una unidad igual que la que está en el depósito — lo único que cambia es dónde está y si
+      tiene dueño.</div>
+    <div class="ciclo">
+      <div class="paso">
+        <span class="est e-prod">En producción</span>
+        <b>Se está fabricando</b>
+        <small>Pedida al proveedor, con fecha de entrega comprometida. Todavía no está en el depósito
+          pero <b>se puede reservar</b> — es la venta sobre pedido.</small>
+      </div>
+      <div class="paso">
+        <span class="est e-dep">En depósito</span>
+        <b>Llegó y está libre</b>
+        <small>Entró, se le puso la etiqueta con su número de serie y está en su ubicación. Cualquier
+          vendedor la puede reservar y se entrega ya.</small>
+      </div>
+      <div class="paso">
+        <span class="est e-res">Reservada</span>
+        <b>Tiene dueño</b>
+        <small>Asignada a una venta. Puede estar <b>en el depósito</b> —lista para el flete— o
+          <b>todavía en producción</b> —vendida sobre pedido, con su fecha—.</small>
+      </div>
+      <div class="paso">
+        <span class="est e-ent">Entregada</span>
+        <b>Salió</b>
+        <small>Ya no está. Queda el histórico: qué proveedor la hizo, cuándo la trajo, cuándo se
+          entregó y a quién. Es lo que se mira cuando entra un reclamo.</small>
+      </div>
+    </div>
+    <div class="cruza">
+      <b>Reservada no es un quinto estado, es una marca.</b> Una unidad está <i>en producción</i> o
+      <i>en depósito</i>, y además puede estar reservada o libre. Por eso tu planilla tiene
+      <i>2PRODUCCIÓN</i> (sin dueño), <i>6Dibujado</i> (reservada, todavía en fábrica) y
+      <i>5Listo</i> (reservada, ya en el depósito): son las mismas dos cosas combinadas.
+      <br><br>
+      <b>Y cada unidad lleva además:</b> su <b>ubicación</b> —planta baja, 1er piso, 2do piso,
+      local— que es lo que hoy ponés en la columna del proveedor cuando ya está en casa; el
+      <b>proveedor</b> que la hace o la trajo; y las tres fechas — <b>venta</b>, <b>proveedor</b>
+      (cuándo se le pidió) y <b>entrega</b>.
+    </div>
+  </div>
+  <div class="modelo" style="margin-top:22px">
+    <h2>Quién mueve la unidad</h2>
+    <div class="sub">Inventario es la fuente, pero casi nunca es donde se toca: la unidad se mueve
+      sola cuando pasa algo en otro módulo. Acá se mira, se corrige y se reserva a mano cuando hace
+      falta.</div>
+    <div class="scroll"><table class="card" style="border-radius:11px">
+      <thead><tr><th>Cuando pasa esto…</th><th>en…</th><th>la unidad…</th><th>y queda</th></tr></thead>
+      <tbody>
+        <tr><td>Se manda a fabricar un mueble</td><td><b>Producción</b></td>
+          <td>se <b>crea</b>, con proveedor y fecha comprometida</td>
+          <td><span class="pill p-prod">En producción</span></td></tr>
+        <tr><td>Llega el camión del proveedor</td><td><b>Compras</b> / recepción</td>
+          <td>se le pone la <b>etiqueta</b> y su ubicación</td>
+          <td><span class="pill p-ok">En depósito</span></td></tr>
+        <tr><td>Se confirma una venta</td><td><b>Ventas</b></td>
+          <td>queda <b>reservada</b> para esa orden</td>
+          <td><span class="pill p-res">Reservada</span></td></tr>
+        <tr><td>Se cae la venta</td><td><b>Ventas</b></td>
+          <td>se <b>libera</b> y vuelve a estar disponible</td>
+          <td><span class="pill p-ok">En depósito</span></td></tr>
+        <tr><td>Sale el flete</td><td><b>Logística</b></td>
+          <td>se da de <b>baja</b> del depósito</td>
+          <td><span class="pill p-ent">Entregada</span></td></tr>
+        <tr><td>Vuelve por un reclamo</td><td><b>Reclamos</b></td>
+          <td>reingresa marcada, con su historia atrás</td>
+          <td><span class="pill p-ok">En depósito</span></td></tr>
+      </tbody></table></div>
+    <div class="cruza">
+      <b>Y al revés también.</b> El caso que contaste: el vendedor cargó dos mesas de luz para
+      fabricar, y Producción ve que hay dos en el depósito. Desde acá se <b>reserva de stock</b> y la
+      orden se actualiza sola — la venta pasa de "a fabricar" a "reservada, entrega inmediata" sin
+      que nadie reescriba nada. Es el único lugar donde se hace ese cambio, y por eso tiene que estar
+      acá y no en la orden.
+      <br><br>
+      <b>Cada movimiento queda registrado</b> con quién, cuándo y desde dónde. Es lo que después
+      contesta "¿quién liberó esta unidad?" y lo que hace que el conteo del depósito cierre.
+    </div>
+  </div>
+
+  <div class="nota">
+    <b>Lo que cambia respecto de hoy.</b> El stock deja de vivir adentro del mueble: las unidades
+    viven en <b>Inventario</b> y el mueble muestra el resumen que sale de ahí — igual que el
+    catálogo. Una sola fuente, tres lecturas. Y contar el inventario se hace acá: ves las cómodas
+    que están en depósito y las que están reservadas esperando el flete —las dos están físicamente—,
+    y aparte las que están por entrar.
+  </div>
+</section>
+
+<!-- ======================= A ======================= -->
+<section data-p="a" class="hide">
+  <div class="idea"><b>La idea:</b> una fila por <b>variante</b> con las cuatro cuentas. Es la vista
+    de "cuánto tengo de cada cosa". Se abre una fila y aparecen las unidades concretas.</div>
+  <div class="pros">
+    <div class="pro"><b>Para qué sirve</b>Ver el inventario entero en una pantalla y detectar de un
+      golpe qué falta reponer. Es la vista natural para Dirección y para decidir qué mandar a
+      fabricar.</div>
+    <div class="con"><b>Dónde se complica</b>Para reservar hay que abrir la fila: el vendedor
+      necesita <i>esa</i> Márquez 80 paraíso, no "una de las cuatro". Suma un clic a lo que más se
+      hace.</div>
+  </div>
+  <div class="app">
+    <div class="appbar"><span>BS</span><span>Ventas</span><span>Catálogo</span><span>Producción</span><div class="on">Inventario</div></div>
+    <div class="subbar"><div class="on">Existencias</div><div>Unidades</div><div>Movimientos</div><div>Ajustes</div></div>
+    <div class="body">
+      <div class="kick">Inventario</div><div class="h1">Existencias</div>
+      <div class="sub">418 unidades · 96 variantes con movimiento</div>
+      <div class="tot">
+        <div class="tot-c"><div class="tot-t">En producción</div><div class="tot-v">126</div>
+          <div class="tot-p">de las cuales <b>58</b> ya vendidas</div></div>
+        <div class="tot-c"><div class="tot-t">En depósito</div><div class="tot-v">204</div>
+          <div class="tot-p"><b>41</b> reservadas esperando flete</div></div>
+        <div class="tot-c"><div class="tot-t">Libres para vender</div><div class="tot-v">163</div>
+          <div class="tot-p">entrega inmediata</div></div>
+        <div class="tot-c"><div class="tot-t">Entregadas este mes</div><div class="tot-v">88</div>
+          <div class="tot-p">histórico completo</div></div>
+      </div>
+      <div class="bar">
+        <input placeholder="Buscar modelo, medida o color…">
+        <div class="segm">
+          <button class="seg on">Todo <span class="n">96</span></button>
+          <button class="seg">Con stock <span class="n">54</span></button>
+          <button class="seg">Sin stock <span class="n">42</span></button>
+          <button class="seg">Bajo el mínimo <span class="n">11</span></button>
+        </div>
+      </div>
+      <div class="card scroll"><table id="a-tabla"></table></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= B ======================= -->
+<section data-p="b" class="hide">
+  <div class="idea"><b>La idea:</b> una fila por <b>unidad</b>, agrupada por modelo, con el estado a
+    la vista y el botón de reservar en el renglón. Es tu planilla de hoy — mismas columnas, mismo
+    orden — pero con estados de verdad, reserva con un clic y sin filas de colores a mano.</div>
+  <div class="pros">
+    <div class="pro"><b>Para qué sirve</b>Es lo que el equipo ya sabe leer, así que se adopta sin
+      enseñar nada. El vendedor ve la unidad exacta y la reserva ahí mismo; Administración ve
+      proveedor y fechas sin salir de la pantalla.</div>
+    <div class="con"><b>Dónde se complica</b>Con 600 unidades la lista es larga: sin filtros y sin
+      buscador no se encuentra nada. Y "cuánto tengo de Borges 100 PB" hay que contarlo con el
+      filtro puesto.</div>
+  </div>
+  <div class="app">
+    <div class="appbar"><span>BS</span><span>Ventas</span><span>Catálogo</span><span>Producción</span><div class="on">Inventario</div></div>
+    <div class="subbar"><div>Existencias</div><div class="on">Unidades</div><div>Movimientos</div><div>Ajustes</div></div>
+    <div class="body">
+      <div class="kick">Inventario</div><div class="h1">Unidades · Bibliotecas</div>
+      <div class="sub">62 unidades en esta categoría</div>
+      <div class="bar">
+        <input placeholder="Buscar por número, modelo, medida o color…">
+        <button class="btn">Filtrar</button>
+        <div class="segm">
+          <button class="seg on">Todo <span class="n">62</span></button>
+          <button class="seg">En depósito <span class="n">28</span></button>
+          <button class="seg">En producción <span class="n">14</span></button>
+          <button class="seg">Reservadas <span class="n">13</span></button>
+          <button class="seg">Entregadas <span class="n">7</span></button>
+        </div>
+      </div>
+      <div class="card scroll"><table id="b-tabla"></table></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= C ======================= -->
+<section data-p="c" class="hide">
+  <div class="idea"><b>La idea:</b> el vendedor no navega el inventario, <b>pregunta</b>. Escribe lo
+    que el cliente le pidió y ve qué hay: lo que entrega ya, lo que llega con fecha, y lo que habría
+    que mandar a fabricar. Reserva desde el mismo renglón.</div>
+  <div class="pros">
+    <div class="pro"><b>Para qué sirve</b>Es la pantalla del momento de la venta, con el cliente
+      esperando: una sola respuesta clara —<i>tengo 2 para entregar ya y 1 que llega el 30/7</i>— y
+      la reserva en un clic sobre la unidad exacta.</div>
+    <div class="con"><b>Dónde se complica</b>No sirve para administrar: no se ve el total, no se
+      cuenta el depósito, no se repone. Necesita a la A o a la B al lado para el trabajo interno.</div>
+  </div>
+  <div class="app">
+    <div class="appbar"><span>BS</span><span>Ventas</span><span>Catálogo</span><span>Producción</span><div class="on">Inventario</div></div>
+    <div class="subbar"><div>Existencias</div><div>Unidades</div><div class="on">¿Qué hay?</div><div>Movimientos</div></div>
+    <div class="body">
+      <div class="kick">Inventario</div><div class="h1">¿Qué hay para entregar?</div>
+      <div class="sub">Escribí lo que el cliente pidió</div>
+      <div class="busq">
+        <input value="borges 100 pb" >
+        <div class="hint" style="margin-top:7px">Entiende modelo, medida y color en cualquier orden —
+          <i>borges 100 pb</i>, <i>pb 100 borges</i>, o el número de la unidad.</div>
+      </div>
+      <div class="res" id="c-res"></div>
+    </div>
+  </div>
+</section>
+
+<div class="nota" id="cierre">
+  <b>Mi recomendación:</b> la <b>B como pantalla principal</b> —es la que tu equipo ya sabe leer y
+  la que permite reservar la unidad exacta— con la <b>A como segunda solapa</b> para ver totales y
+  decidir reposición. La <b>C no es una tercera pantalla</b>: es el buscador de la B, puesto arriba
+  de todo. Las tres se alimentan de la misma tabla de unidades, así que no hay que elegir para
+  siempre: se empieza por una y las otras se agregan encima.
+</div>
+
+</div>
+
+<script>
+const SIL = '<svg viewBox="0 0 120 100"><rect x="20" y="12" width="80" height="80" rx="3"/><line x1="20" y1="38" x2="100" y2="38"/><line x1="20" y1="62" x2="100" y2="62"/></svg>';
+const mini = () => `<span class="mini">${SIL}</span>`;
+const P = (c, t) => `<span class="pill ${c}">${t}</span>`;
+
+// ---------- A · tablero por variante ----------
+const VAR = [
+  ['BORGES', '80', 'PB', 3, 1, 2, 1, 6],
+  ['BORGES', '100', 'PB', 2, 4, 1, 3, 12],
+  ['BORGES', '100', 'PN', 0, 2, 0, 0, 4],
+  ['BORGES', '120', 'PB', 1, 0, 1, 2, 5],
+  ['BRADBURY', '80', 'PB', 2, 3, 0, 1, 7],
+  ['BRADBURY', '100', 'PB', 0, 1, 1, 0, 3],
+  ['CORTÁZAR', '80', 'BB', 4, 5, 2, 2, 14],
+  ['CORTÁZAR', '100', 'PP', 1, 2, 1, 4, 9],
+  ['CORTÁZAR', '120', 'PP', 0, 0, 0, 1, 2],
+  ['LEWIS', '100', 'PB', 3, 2, 3, 1, 8],
+  ['MÁRQUEZ', '80', 'PP', 2, 4, 0, 0, 6],
+];
+document.getElementById('a-tabla').innerHTML = `
+  <thead><tr><th></th><th>Modelo</th><th>Medida</th><th>Color</th>
+    <th class="num">En producción</th><th class="num">En depósito</th>
+    <th class="num">Reservadas</th><th class="num">Libres</th>
+    <th class="num">Entregadas</th><th></th></tr></thead>
+  <tbody>${VAR.map(([m, med, col, prod, dep, res, ent, hist], i) => {
+    const libres = dep - res;
+    return `<tr${i === 1 ? ' style="background:var(--brand-soft)"' : ''}>
+      <td>${mini()}</td>
+      <td class="nom">${m}</td><td>${med}</td><td><span class="chip">${col}</span></td>
+      <td class="num">${prod ? `<b style="color:var(--viol)">${prod}</b>` : '<span class="mut">—</span>'}</td>
+      <td class="num">${dep || '<span class="mut">—</span>'}</td>
+      <td class="num">${res ? `<b style="color:var(--warn)">${res}</b>` : '<span class="mut">—</span>'}</td>
+      <td class="num">${libres > 0 ? `<b style="color:var(--ok)">${libres}</b>` : '<span class="mut">0</span>'}</td>
+      <td class="num mut">${hist}</td>
+      <td><button class="b-x">${i === 1 ? '▾' : '▸'} unidades</button></td>
+    </tr>` + (i === 1 ? `<tr class="exp"><td colspan="10"><div class="in">
+      <table style="background:none">
+        <thead><tr><th>N°</th><th>Estado</th><th>Ubicación</th><th>Proveedor</th>
+          <th>Llega / listo</th><th>Venta</th><th></th></tr></thead>
+        <tbody>
+          <tr><td class="nom">5660</td><td>${P('p-ok', 'En depósito')}</td><td>2do piso</td>
+            <td>7Raúl</td><td class="mut">hace 12 días</td><td class="mut">—</td>
+            <td><button class="bres">Reservar</button></td></tr>
+          <tr><td class="nom">5690</td><td>${P('p-ok', 'En depósito')}</td><td>Planta baja</td>
+            <td>7Raúl</td><td class="mut">hace 4 días</td><td class="mut">—</td>
+            <td><button class="bres">Reservar</button></td></tr>
+          <tr><td class="nom">5309</td><td>${P('p-res', 'Reservada · lista')}</td><td>1er piso</td>
+            <td>1Tony</td><td class="mut">hace 2 días</td><td>#S00214 · 5/5</td>
+            <td><button class="b-x">Liberar</button></td></tr>
+          <tr><td class="nom">5718</td><td>${P('p-prod', 'En producción')}</td><td class="mut">—</td>
+            <td>1Tony</td><td><b>llega 30/7</b></td><td class="mut">—</td>
+            <td><button class="bres">Reservar sobre pedido</button></td></tr>
+        </tbody></table></div></td></tr>` : '');
+  }).join('')}</tbody>`;
+
+// ---------- B · las unidades ----------
+const UNI = [
+  ['BIBLIOTECAS', 0, 0, 0, 0, 0, 0, 0],
+  ['', '5660', 'BORGES', '100', 'PB', 'dep', '2do piso', '7Raúl', '12/7', '', 'a medida'],
+  ['', '5690', 'BORGES', '100', 'PB', 'dep', 'Planta baja', '7Raúl', '20/7', '', 'a medida con dos puertas'],
+  ['', '4266', 'CORTÁZAR', '100', 'PP', 'prod', '', '7Raúl', 'llega 24/7', '', ''],
+  ['', '5309', 'BORGES', '120', 'PB', 'res-dep', '1er piso', '1Tony', '15/5', '#S00214 · 5/5', ''],
+  ['', '5576', 'BRADBURY', '80', 'BP', 'res-dep', '2do piso', '6Matías', '8/7', '#S00231 · 24/6', ''],
+  ['', '4278', 'CORTÁZAR', '120', 'PP', 'res-prod', '', '8Dibujado', 'llega 20/7', '#S00240 · 20/7', ''],
+  ['', '5757', 'KANT', '80', 'BB', 'res-prod', '', '8Dibujado', 'llega 25/7', '#S00244 · 25/7', 'a medida'],
+  ['', 'ze10708', 'CORTÁZAR', '120', 'PP', 'ent', '', '7Raúl', '', '#S00190 · 14/6', 'entregada 29/6'],
+  ['MESAS DE LUZ', 0, 0, 0, 0, 0, 0, 0],
+  ['', '10754', 'LEWIS', '80', 'PB', 'dep', 'Planta baja', '1Tony', '14/7', '', ''],
+  ['', '5645 A', 'LEWIS', '100', 'PB', 'res-dep', '1er piso', '1Tony', '22/7', '#S00250 · 4/7', 'a medida'],
+  ['', '5645 B', 'LEWIS', '100', 'PB', 'res-dep', '1er piso', '1Tony', '22/7', '#S00250 · 4/7', 'a medida'],
+];
+const EST = {
+  dep: ['p-ok', 'En depósito'], prod: ['p-prod', 'En producción'],
+  'res-dep': ['p-res', 'Reservada · lista'], 'res-prod': ['p-res', 'Reservada · en fábrica'],
+  ent: ['p-ent', 'Entregada'],
+};
+document.getElementById('b-tabla').innerHTML = `
+  <thead><tr><th></th><th>N°</th><th>Modelo</th><th>Medida</th><th>Color</th><th>Estado</th>
+    <th>Ubicación</th><th>Proveedor</th><th>Llega / listo</th><th>Venta</th><th>Detalle</th>
+    <th></th></tr></thead>
+  <tbody>${UNI.map(u => {
+    if (!u[1]) return `<tr class="grupo"><td colspan="12">${u[0]}</td></tr>`;
+    const [, n, mod, med, col, est, ubi, prov, fecha, venta, det] = u;
+    const [pc, pl] = EST[est];
+    return `<tr>
+      <td>${mini()}</td>
+      <td class="nom">${n}</td>
+      <td>${mod}</td><td>${med}</td><td><span class="chip">${col}</span></td>
+      <td>${P(pc, pl)}</td>
+      <td>${ubi || '<span class="mut">—</span>'}</td>
+      <td>${prov}</td>
+      <td>${/llega/.test(fecha) ? `<b>${fecha}</b>` : `<span class="mut">${fecha || '—'}</span>`}</td>
+      <td class="mut">${venta || '—'}</td>
+      <td class="mut">${det || ''}</td>
+      <td>${est === 'dep' ? '<button class="bres">Reservar</button>'
+        : est === 'prod' ? '<button class="bres">Reservar sobre pedido</button>'
+        : est.startsWith('res') ? '<button class="b-x">Liberar</button>' : ''}</td>
+    </tr>`;
+  }).join('')}</tbody>`;
+
+// ---------- C · buscador ----------
+document.getElementById('c-res').innerHTML = `
+  <div class="rg">
+    <div class="rg-h">${mini()}<b>BORGES 100 · PB</b>
+      <span class="pill p-ok">2 para entregar ya</span>
+      <span class="pill p-prod">1 llega el 30/7</span>
+      <div class="sp"></div>
+      <span class="hint">desde $415.000</span></div>
+    <div class="rg-b">
+      <div class="uni">${P('p-ok', 'En depósito')}<span class="nom">5660</span>
+        <span class="ser">2do piso · trajo 7Raúl hace 12 días</span><div class="sp"></div>
+        <button class="bres">Reservar</button></div>
+      <div class="uni">${P('p-ok', 'En depósito')}<span class="nom">5690</span>
+        <span class="ser">Planta baja · trajo 7Raúl hace 4 días</span><div class="sp"></div>
+        <button class="bres">Reservar</button></div>
+      <div class="uni">${P('p-prod', 'En producción')}<span class="nom">5718</span>
+        <span class="ser">La hace 1Tony · <b>llega el 30/7</b></span><div class="sp"></div>
+        <button class="bres">Reservar sobre pedido</button></div>
+      <div class="uni">${P('p-res', 'Reservada')}<span class="nom">5309</span>
+        <span class="ser">#S00214 · vendida el 5/5 · lista en 1er piso</span><div class="sp"></div>
+        <span class="hint">no disponible</span></div>
+    </div>
+  </div>
+  <div class="rg">
+    <div class="rg-h">${mini()}<b>BORGES 100 · PN</b>
+      <span class="pill p-ok">2 para entregar ya</span>
+      <div class="sp"></div><span class="hint">otro color, misma medida</span></div>
+    <div class="rg-b">
+      <div class="uni">${P('p-ok', 'En depósito')}<span class="nom">5612</span>
+        <span class="ser">Planta baja</span><div class="sp"></div>
+        <button class="bres">Reservar</button></div>
+      <div class="uni">${P('p-ok', 'En depósito')}<span class="nom">5613</span>
+        <span class="ser">Planta baja</span><div class="sp"></div>
+        <button class="bres">Reservar</button></div>
+    </div>
+  </div>
+  <div class="rg">
+    <div class="rg-h">${mini()}<b>BORGES 120 · PB</b>
+      <span class="pill p-ent">nada disponible</span>
+      <div class="sp"></div>
+      <span class="hint">se fabrica en 30 días</span></div>
+    <div class="rg-b"><div class="uni"><span class="hint">No hay unidades libres ni en producción.
+      Se pide a fábrica al confirmar la venta.</span><div class="sp"></div>
+      <button class="btn pri">Mandar a fabricar</button></div></div>
+  </div>`;
+
+document.querySelectorAll('.opt').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.opt').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('[data-p]').forEach(s =>
+    s.classList.toggle('hide', s.dataset.p !== b.dataset.o));
+  document.getElementById('cierre').classList.toggle('hide', b.dataset.o === 'm');
+  window.scrollTo(0, 0);
+});
+document.getElementById('cierre').classList.add('hide');
+</script>
