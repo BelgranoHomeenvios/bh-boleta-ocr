@@ -8,6 +8,7 @@
   const FILTROS_KEY = 'bh_catalogo_filtros';
   const CATS_KEY = 'bh_catalogo_cats';
   const CERRADAS_KEY = 'bh_catalogo_cerradas';
+  const GRUPOS_KEY = 'bh_catalogo_grupos';
   const Catalogo = {
     arbol: [],           // categorías cargadas
     ruta: [],            // breadcrumb: [{id,nombre}] hasta la categoría actual
@@ -195,8 +196,19 @@
           .cat-c .lnk,.cat-f .lnk{border:0;background:none;padding:0;font:inherit;font-size:11px;
             font-weight:600;color:var(--brand);cursor:pointer;text-transform:none;letter-spacing:0}
           .cat-c .lnk:hover,.cat-f .lnk:hover{text-decoration:underline}
-          .cat-g-t{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
-            color:var(--muted);margin-bottom:5px}
+          /* Cada grupo se abre y se cierra desde su título. */
+          .cat-g{display:flex;flex-direction:column}
+          .cat-g-t{display:flex;align-items:center;gap:6px;width:100%;border:0;background:none;
+            padding:3px 0;cursor:pointer;font:inherit;font-size:11px;font-weight:700;
+            text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:left}
+          .cat-g-t:hover{color:var(--navy)}
+          .cat-g.on .cat-g-t{margin-bottom:3px;color:var(--ink-soft)}
+          .cat-g-fl{font-size:9px;width:9px;flex:none}
+          .cat-g-n{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+          .cat-g-m{font-size:10px;font-weight:700;background:var(--brand);color:#fff;
+            border-radius:999px;padding:0 6px;line-height:15px;flex:none}
+          .cat-g-r{font-size:11.5px;color:var(--brand);padding-left:15px;margin-bottom:2px;
+            overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
           .cat-o{display:flex;align-items:center;gap:7px;padding:3px 0;cursor:pointer;font-size:12.5px;
             color:var(--ink-soft)}
           .cat-o:hover{color:var(--navy)}
@@ -288,6 +300,18 @@
     _fp: {},
     selProp(k) { return this._fp[k] || []; },
     _verMas: new Set(),
+    // Los grupos del costado arrancan cerrados: con cinco propiedades la
+    // columna era una lista interminable. Cerrado igual dice qué tiene
+    // marcado, así que no hace falta abrirlo para saberlo.
+    _gAbiertos: (() => {
+      try { return new Set(JSON.parse(localStorage.getItem(GRUPOS_KEY)) || []); }
+      catch { return new Set(); }
+    })(),
+    grupoAbierto(k) { return this._gAbiertos.has(k); },
+    abrirGrupo(k) {
+      if (this._gAbiertos.has(k)) this._gAbiertos.delete(k); else this._gAbiertos.add(k);
+      try { localStorage.setItem(GRUPOS_KEY, JSON.stringify([...this._gAbiertos])); } catch {}
+    },
 
     // Todos los productos del catálogo, sin filtrar: es contra esto que se
     // cuentan las opciones de cada filtro.
@@ -494,17 +518,27 @@
           const ops = abierto ? g.ops
             : [...g.ops.slice(0, tope), ...g.ops.slice(tope).filter(o => sel.includes(o.k))];
           const ocultas = g.ops.length - ops.length;
-          return `<div class="cat-g">
-          <div class="cat-g-t">${UI.esc(g.titulo)}</div>
-          ${ops.map(o => `<label class="cat-o ${sel.includes(o.k) ? 'on' : ''}">
+          const on = this.grupoAbierto(g.k);
+          // Cerrado, el título lleva lo que esté marcado: "ESTRUCTURA · Blanca".
+          const resumen = sel.length
+            ? g.ops.filter(o => sel.includes(o.k)).map(o => o.label).join(', ')
+            : '';
+          return `<div class="cat-g ${on ? 'on' : ''}">
+          <button class="cat-g-t" data-grupo="${UI.esc(g.k)}" aria-expanded="${on}">
+            <span class="cat-g-fl">${on ? '▾' : '▸'}</span>
+            <span class="cat-g-n">${UI.esc(g.titulo)}</span>
+            ${sel.length ? `<span class="cat-g-m">${sel.length}</span>` : ''}
+          </button>
+          ${!on && resumen ? `<div class="cat-g-r">${UI.esc(resumen)}</div>` : ''}
+          ${!on ? '' : ops.map(o => `<label class="cat-o ${sel.includes(o.k) ? 'on' : ''}">
             <input type="checkbox" data-f="${UI.esc(g.k)}" data-v="${UI.esc(String(o.k))}"
               ${sel.includes(o.k) ? 'checked' : ''}>
             ${g.color ? `<span class="pt" style="background:${global.DB.colorDe(o.label)}"></span>` : ''}
             <span class="cat-o-n">${UI.esc(o.label)}</span>
             <span class="cat-o-c tnum">${o.n}</span>
           </label>`).join('')}
-          ${ocultas > 0 || abierto ? `<button class="lnk lnk-mas" data-vermas="${UI.esc(g.k)}">${
-            abierto ? 'ver menos' : `ver ${ocultas} más`}</button>` : ''}
+          ${!on || !(ocultas > 0 || abierto) ? '' : `<button class="lnk lnk-mas"
+            data-vermas="${UI.esc(g.k)}">${abierto ? 'ver menos' : `ver ${ocultas} más`}</button>`}
         </div>`; }).join('')}
       </aside>`;
     },
@@ -515,6 +549,9 @@
         const v = /^\d+$/.test(i.dataset.v) ? Number(i.dataset.v) : i.dataset.v;
         this.ponerMarca(i.dataset.f, v, i.checked);
         this.pintar();
+      });
+      document.querySelectorAll('[data-grupo]').forEach(b => b.onclick = () => {
+        this.abrirGrupo(b.dataset.grupo); this.pintar();
       });
       document.querySelectorAll('[data-vermas]').forEach(b => b.onclick = () => {
         const k = b.dataset.vermas;

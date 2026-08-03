@@ -1005,6 +1005,12 @@ al **costado derecho**, no arriba, y se pueden **marcar varias a la vez**.
   scroll: con seis solapas y pantallas largas uno se perdía de qué mueble estaba
   mirando.
 
+- ✅ 412. **Cada grupo del costado se abre y se cierra con su flecha, y arrancan
+  todos cerrados**: se ven sólo los títulos y se abre el que haga falta. Cerrado,
+  el grupo que tiene algo marcado lo muestra —*ESTRUCTURA ① / Negra*—, así que no
+  hay que abrirlo para saber qué está filtrando. Lo que dejás abierto se
+  recuerda.
+
 > Falta decidir si el filtro guarda lo último usado por rol.
 
 ### Lote 13 — APLICADO (Inventario y solapa Otros)
