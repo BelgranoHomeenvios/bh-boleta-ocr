@@ -876,6 +876,7 @@
         t: `${quien || 'Alguien'} cerró el pedido · ${this.itemsDePedido(num).length} muebles` });
       this.itemsDePedido(num).forEach(u => this.guardarUnidad({
         id: u.id, estado: 'produccion', desde: p.desde, hasta: p.hasta,
+        serie: u.serie && u.serie !== '—' ? u.serie : this.tomarSerie(),
       }));
       return p;
     },
@@ -891,6 +892,19 @@
     },
 
     // ---- Recepción y control de calidad -----------------------------------
+    // Recibir por lector: el lector es un teclado que escribe el código y da
+    // Enter. Se busca por número de serie —la copia pegada al mueble— o por
+    // el número de pedido, que también sale impreso en el remito.
+    buscarPorCodigo(txt) {
+      const t = String(txt || '').trim().toUpperCase();
+      if (!t) return null;
+      const u = this.unidadesTodas().find(x => String(x.serie).toUpperCase() === t);
+      if (u) return { tipo: 'unidad', unidad: u };
+      const p = this.pedidosTodos().find(x => String(x.numero).toUpperCase() === t);
+      if (p) return { tipo: 'pedido', pedido: p, items: this.itemsDePedido(p.numero) };
+      return null;
+    },
+
     CALIDADES: [
       { k: 'perfecto', label: 'Perfecto', pill: 'ok', entra: true,
         pie: 'Llegó como tenía que llegar. Entra al depósito.' },
@@ -1064,7 +1078,7 @@
         }
         for (let j = 0; j < enProd; j++) {
           n++;
-          out.push({ ...base, id: n, serie: '—', estado: 'produccion',
+          out.push({ ...base, id: n, serie: this.serieDe(n), estado: 'produccion',
             ubicacion: '', proveedor: PROV[n % PROV.length],
             llega: `${(n % 28) + 1}/8`, listo: '',
             desde: n % 7 === 0 ? `${(n % 20) + 5}/7` : `${(n % 20) + 1}/8`,

@@ -1089,6 +1089,7 @@ tr:hover td{background:var(--panel-2)}
         t: `${quien || 'Alguien'} cerró el pedido · ${this.itemsDePedido(num).length} muebles` });
       this.itemsDePedido(num).forEach(u => this.guardarUnidad({
         id: u.id, estado: 'produccion', desde: p.desde, hasta: p.hasta,
+        serie: u.serie && u.serie !== '—' ? u.serie : this.tomarSerie(),
       }));
       return p;
     },
@@ -1104,6 +1105,19 @@ tr:hover td{background:var(--panel-2)}
     },
 
     // ---- Recepción y control de calidad -----------------------------------
+    // Recibir por lector: el lector es un teclado que escribe el código y da
+    // Enter. Se busca por número de serie —la copia pegada al mueble— o por
+    // el número de pedido, que también sale impreso en el remito.
+    buscarPorCodigo(txt) {
+      const t = String(txt || '').trim().toUpperCase();
+      if (!t) return null;
+      const u = this.unidadesTodas().find(x => String(x.serie).toUpperCase() === t);
+      if (u) return { tipo: 'unidad', unidad: u };
+      const p = this.pedidosTodos().find(x => String(x.numero).toUpperCase() === t);
+      if (p) return { tipo: 'pedido', pedido: p, items: this.itemsDePedido(p.numero) };
+      return null;
+    },
+
     CALIDADES: [
       { k: 'perfecto', label: 'Perfecto', pill: 'ok', entra: true,
         pie: 'Llegó como tenía que llegar. Entra al depósito.' },
@@ -1277,7 +1291,7 @@ tr:hover td{background:var(--panel-2)}
         }
         for (let j = 0; j < enProd; j++) {
           n++;
-          out.push({ ...base, id: n, serie: '—', estado: 'produccion',
+          out.push({ ...base, id: n, serie: this.serieDe(n), estado: 'produccion',
             ubicacion: '', proveedor: PROV[n % PROV.length],
             llega: `${(n % 28) + 1}/8`, listo: '',
             desde: n % 7 === 0 ? `${(n % 20) + 5}/7` : `${(n % 20) + 1}/8`,
@@ -13722,9 +13736,15 @@ tr:hover td{background:var(--panel-2)}
           <select id="rc-ubi" class="pr-sel">${ubis.map(x =>
             `<option value="${x.k}">${UI.esc(x.label)}</option>`).join('')}</select>
         </div>
+        <div class="rc-scan">
+          <span class="rc-scan-ic">▮▮▯▮</span>
+          <input id="rc-cod" placeholder="Escaneá el código del mueble o del remito…" autocomplete="off">
+          <span class="hint" id="rc-msg">El lector escribe el código y da Enter solo.</span>
+        </div>
         ${us.length ? `<div class="card rc-tabla"><table>
           <thead><tr><th style="width:26px"></th><th>Mueble</th><th>Terminación</th>
-            <th>Pedido</th><th>Venta</th><th>Entra entre</th><th>Cómo llegó</th></tr></thead>
+            <th>Pedido</th><th>Venta</th><th>Entra entre</th><th>N°</th>
+            <th>Cómo llegó</th></tr></thead>
           <tbody>${us.map(u => `<tr data-fila="${u.id}">
             <td><input type="checkbox" class="chk" data-rec="${u.id}"></td>
             <td class="nom">${UI.esc(u.modelo)} <span class="muted">${UI.esc(u.medida)}</span></td>
@@ -13733,6 +13753,9 @@ tr:hover td{background:var(--panel-2)}
             <td class="muted">${u.orden ? UI.esc(u.orden) : 'stock'}</td>
             <td class="${global.DB.vencida(u) ? 'venc' : 'muted'}">${u.desde && u.hasta
               ? `${UI.esc(u.desde)} y ${UI.esc(u.hasta)}` : '—'}</td>
+            <td>${u.serie && u.serie !== '—'
+              ? `<span class="tnum nom">${UI.esc(u.serie)}</span>`
+              : '<span class="muted">sin etiqueta</span>'}</td>
             <td><div class="rc-cal">${global.DB.CALIDADES.map(c =>
               `<button class="rc-c ${c.k === 'perfecto' ? 'on' : ''}" data-cal="${u.id}|${c.k}"
                 title="${UI.esc(c.pie)}">${UI.esc(c.label)}</button>`).join('')}</div></td>
@@ -13757,6 +13780,11 @@ tr:hover td{background:var(--panel-2)}
         <div class="row" style="margin-bottom:12px"><div>
           <div class="kick">Producción</div><h1 class="h-title">A reparar</h1>
           <div class="h-sub">${us.length} muebles que llegaron con algo</div></div></div>
+        <div class="rc-scan">
+          <span class="rc-scan-ic">▮▮▯▮</span>
+          <input id="rc-cod" placeholder="Escaneá el código del mueble o del remito…" autocomplete="off">
+          <span class="hint" id="rc-msg">El lector escribe el código y da Enter solo.</span>
+        </div>
         ${us.length ? `<div class="card rc-tabla"><table>
           <thead><tr><th>Mueble</th><th>Terminación</th><th>Qué le vieron</th><th>Venta</th>
             <th>Taller</th><th></th></tr></thead>
@@ -13801,6 +13829,32 @@ tr:hover td{background:var(--panel-2)}
         if (chk) { chk.checked = true; this.cuenta(); }
       });
       document.querySelectorAll('[data-rec]').forEach(c => c.onchange = () => this.cuenta());
+      // El lector de códigos es un teclado: escribe y da Enter. Con eso alcanza.
+      const cod = q('rc-cod');
+      if (cod) {
+        cod.focus();
+        cod.onkeydown = ev => {
+          if (ev.key !== 'Enter') return;
+          ev.preventDefault();
+          const r = global.DB.buscarPorCodigo(cod.value);
+          const msg = q('rc-msg');
+          cod.value = '';
+          if (!r) { msg.innerHTML = '<b class="tarde">No encontré ese código.</b>'; return; }
+          const ids = r.tipo === 'unidad' ? [r.unidad.id] : r.items.map(u => u.id);
+          let n = 0;
+          ids.forEach(id => {
+            const chk = document.querySelector(`[data-rec="${id}"]`);
+            if (!chk) return;
+            chk.checked = true; n++;
+            const fila = chk.closest('tr');
+            if (fila) { fila.classList.add('escaneada'); fila.scrollIntoView({ block: 'center' }); }
+          });
+          msg.innerHTML = n
+            ? `<b class="ok">${n} tildado${n === 1 ? '' : 's'}</b> — marcá cómo llegó y confirmá.`
+            : 'Ese código no es de este taller.';
+          this.cuenta();
+        };
+      }
       const ok = q('rc-ok'); if (ok) ok.onclick = () => {
         const ubi = (q('rc-ubi') || {}).value || 'dep-pb';
         const tildados = [...document.querySelectorAll('[data-rec]:checked')];
@@ -13851,6 +13905,14 @@ tr:hover td{background:var(--panel-2)}
           font:inherit;font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap}
         .rc-c:hover{border-color:var(--brand);color:var(--brand)}
         .rc-c.on{background:var(--navy);border-color:var(--navy);color:#fff;font-weight:700}
+        .rc-scan{display:flex;align-items:center;gap:10px;border:1px solid var(--brand);
+          border-radius:11px;padding:9px 13px;background:var(--brand-soft);margin-bottom:12px}
+        .rc-scan input{flex:1;min-width:180px;font-size:14px;padding:8px 11px;border:1px solid var(--line);
+          border-radius:9px;background:var(--panel);color:var(--ink)}
+        .rc-scan-ic{font-size:15px;letter-spacing:-2px;color:var(--brand-ink)}
+        .rc-tabla tr.escaneada td{background:var(--ok-bg)}
+        .rc-tabla .nom{font-weight:700;color:var(--navy)}
+        .ok{color:var(--ok)}
       </style>`;
     },
   };

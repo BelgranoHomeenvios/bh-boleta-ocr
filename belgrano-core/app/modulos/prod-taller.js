@@ -304,9 +304,15 @@
           <select id="rc-ubi" class="pr-sel">${ubis.map(x =>
             `<option value="${x.k}">${UI.esc(x.label)}</option>`).join('')}</select>
         </div>
+        <div class="rc-scan">
+          <span class="rc-scan-ic">▮▮▯▮</span>
+          <input id="rc-cod" placeholder="Escaneá el código del mueble o del remito…" autocomplete="off">
+          <span class="hint" id="rc-msg">El lector escribe el código y da Enter solo.</span>
+        </div>
         ${us.length ? `<div class="card rc-tabla"><table>
           <thead><tr><th style="width:26px"></th><th>Mueble</th><th>Terminación</th>
-            <th>Pedido</th><th>Venta</th><th>Entra entre</th><th>Cómo llegó</th></tr></thead>
+            <th>Pedido</th><th>Venta</th><th>Entra entre</th><th>N°</th>
+            <th>Cómo llegó</th></tr></thead>
           <tbody>${us.map(u => `<tr data-fila="${u.id}">
             <td><input type="checkbox" class="chk" data-rec="${u.id}"></td>
             <td class="nom">${UI.esc(u.modelo)} <span class="muted">${UI.esc(u.medida)}</span></td>
@@ -315,6 +321,9 @@
             <td class="muted">${u.orden ? UI.esc(u.orden) : 'stock'}</td>
             <td class="${global.DB.vencida(u) ? 'venc' : 'muted'}">${u.desde && u.hasta
               ? `${UI.esc(u.desde)} y ${UI.esc(u.hasta)}` : '—'}</td>
+            <td>${u.serie && u.serie !== '—'
+              ? `<span class="tnum nom">${UI.esc(u.serie)}</span>`
+              : '<span class="muted">sin etiqueta</span>'}</td>
             <td><div class="rc-cal">${global.DB.CALIDADES.map(c =>
               `<button class="rc-c ${c.k === 'perfecto' ? 'on' : ''}" data-cal="${u.id}|${c.k}"
                 title="${UI.esc(c.pie)}">${UI.esc(c.label)}</button>`).join('')}</div></td>
@@ -339,6 +348,11 @@
         <div class="row" style="margin-bottom:12px"><div>
           <div class="kick">Producción</div><h1 class="h-title">A reparar</h1>
           <div class="h-sub">${us.length} muebles que llegaron con algo</div></div></div>
+        <div class="rc-scan">
+          <span class="rc-scan-ic">▮▮▯▮</span>
+          <input id="rc-cod" placeholder="Escaneá el código del mueble o del remito…" autocomplete="off">
+          <span class="hint" id="rc-msg">El lector escribe el código y da Enter solo.</span>
+        </div>
         ${us.length ? `<div class="card rc-tabla"><table>
           <thead><tr><th>Mueble</th><th>Terminación</th><th>Qué le vieron</th><th>Venta</th>
             <th>Taller</th><th></th></tr></thead>
@@ -383,6 +397,32 @@
         if (chk) { chk.checked = true; this.cuenta(); }
       });
       document.querySelectorAll('[data-rec]').forEach(c => c.onchange = () => this.cuenta());
+      // El lector de códigos es un teclado: escribe y da Enter. Con eso alcanza.
+      const cod = q('rc-cod');
+      if (cod) {
+        cod.focus();
+        cod.onkeydown = ev => {
+          if (ev.key !== 'Enter') return;
+          ev.preventDefault();
+          const r = global.DB.buscarPorCodigo(cod.value);
+          const msg = q('rc-msg');
+          cod.value = '';
+          if (!r) { msg.innerHTML = '<b class="tarde">No encontré ese código.</b>'; return; }
+          const ids = r.tipo === 'unidad' ? [r.unidad.id] : r.items.map(u => u.id);
+          let n = 0;
+          ids.forEach(id => {
+            const chk = document.querySelector(`[data-rec="${id}"]`);
+            if (!chk) return;
+            chk.checked = true; n++;
+            const fila = chk.closest('tr');
+            if (fila) { fila.classList.add('escaneada'); fila.scrollIntoView({ block: 'center' }); }
+          });
+          msg.innerHTML = n
+            ? `<b class="ok">${n} tildado${n === 1 ? '' : 's'}</b> — marcá cómo llegó y confirmá.`
+            : 'Ese código no es de este taller.';
+          this.cuenta();
+        };
+      }
       const ok = q('rc-ok'); if (ok) ok.onclick = () => {
         const ubi = (q('rc-ubi') || {}).value || 'dep-pb';
         const tildados = [...document.querySelectorAll('[data-rec]:checked')];
@@ -433,6 +473,14 @@
           font:inherit;font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap}
         .rc-c:hover{border-color:var(--brand);color:var(--brand)}
         .rc-c.on{background:var(--navy);border-color:var(--navy);color:#fff;font-weight:700}
+        .rc-scan{display:flex;align-items:center;gap:10px;border:1px solid var(--brand);
+          border-radius:11px;padding:9px 13px;background:var(--brand-soft);margin-bottom:12px}
+        .rc-scan input{flex:1;min-width:180px;font-size:14px;padding:8px 11px;border:1px solid var(--line);
+          border-radius:9px;background:var(--panel);color:var(--ink)}
+        .rc-scan-ic{font-size:15px;letter-spacing:-2px;color:var(--brand-ink)}
+        .rc-tabla tr.escaneada td{background:var(--ok-bg)}
+        .rc-tabla .nom{font-weight:700;color:var(--navy)}
+        .ok{color:var(--ok)}
       </style>`;
     },
   };
