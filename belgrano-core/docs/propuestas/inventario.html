@@ -50,7 +50,8 @@ input,select{font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(-
 @media(max-width:900px){.ciclo{grid-template-columns:1fr 1fr}}
 .paso{border:1px solid var(--line);border-radius:11px;padding:12px 13px;background:var(--panel-2);
   position:relative}
-.paso b{display:block;font-size:13px;color:var(--navy);margin-bottom:3px}
+.paso>b{display:block;font-size:13px;color:var(--navy);margin-bottom:3px}
+.paso small b{color:var(--navy)}
 .paso small{font-size:11.5px;color:var(--ink-soft);line-height:1.45;display:block}
 .paso .est{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
   border-radius:999px;padding:2px 8px;display:inline-block;margin-bottom:6px}
@@ -177,11 +178,10 @@ tr:last-child td{border-bottom:0}
       <div class="paso">
         <span class="est e-prod">En producción</span>
         <b>Se está fabricando</b>
-        <small>Pedida al proveedor, con fecha de entrega comprometida. Todavía no está en el depósito
-          pero <b>se puede reservar</b> — es la venta sobre pedido.</small>
+        <small>Pedida al proveedor, con fecha de entrega comprometida. Todavía no llegó pero <b>se puede reservar</b> — es la venta sobre pedido.</small>
       </div>
       <div class="paso">
-        <span class="est e-dep">En depósito</span>
+        <span class="est e-dep">En stock</span>
         <b>Llegó y está libre</b>
         <small>Entró, se le puso la etiqueta con su número de serie y está en su ubicación. Cualquier
           vendedor la puede reservar y se entrega ya.</small>
@@ -201,14 +201,74 @@ tr:last-child td{border-bottom:0}
     </div>
     <div class="cruza">
       <b>Reservada no es un quinto estado, es una marca.</b> Una unidad está <i>en producción</i> o
-      <i>en depósito</i>, y además puede estar reservada o libre. Por eso tu planilla tiene
+      <i>en stock</i>, y además puede estar reservada o libre. Por eso tu planilla tiene
       <i>2PRODUCCIÓN</i> (sin dueño), <i>6Dibujado</i> (reservada, todavía en fábrica) y
       <i>5Listo</i> (reservada, ya en el depósito): son las mismas dos cosas combinadas.
       <br><br>
-      <b>Y cada unidad lleva además:</b> su <b>ubicación</b> —planta baja, 1er piso, 2do piso,
-      local— que es lo que hoy ponés en la columna del proveedor cuando ya está en casa; el
+      <b>Y cada unidad lleva además:</b> su <b>ubicación</b> —depósito planta baja, 1er piso, 2do piso, local 2020, local 2299— que es lo que hoy ponés en la columna del proveedor cuando ya está en casa; el
       <b>proveedor</b> que la hace o la trajo; y las tres fechas — <b>venta</b>, <b>proveedor</b>
       (cuándo se le pidió) y <b>entrega</b>.
+    </div>
+  </div>
+
+  <div class="modelo">
+    <h2>Y tres situaciones que no van en la misma escalera</h2>
+    <div class="sub">Los cuatro estados dicen <b>dónde está</b> la unidad en su vida. Lo que sumaste
+      —reclamo, reparación, dudas del conteo— no reemplaza a eso: una unidad <i>a reparar</i> sigue
+      estando físicamente, ocupa lugar y se ve; lo que cambia es que <b>no se puede vender</b>.
+      Por eso van como una marca aparte, igual que <i>reservada</i>.</div>
+    <div class="ciclo" style="grid-template-columns:repeat(3,1fr)">
+      <div class="paso">
+        <span class="est" style="background:var(--crit-bg);color:var(--crit)">En reclamo</span>
+        <b>El cliente se quejó</b>
+        <small>Se entregó y hay un reclamo abierto. Puede volver o no. Queda enganchada al caso, así
+          que desde la unidad se ve el reclamo y desde el reclamo, la unidad — con su proveedor y sus
+          fechas, que es lo que hoy vas a buscar a la planilla.</small>
+      </div>
+      <div class="paso">
+        <span class="est" style="background:var(--warn-bg);color:var(--warn)">A reparar</span>
+        <b>Está, pero no se vende</b>
+        <small>Volvió por un reclamo, llegó golpeada o se dañó guardada. <b>Cuenta en el
+          inventario físico</b> —está ahí— pero no aparece como disponible ni se puede reservar.
+          Cuando se arregla vuelve sola a <i>en stock</i>.</small>
+      </div>
+      <div class="paso">
+        <span class="est" style="background:#eef1f5;color:var(--ink-soft)">A confirmar</span>
+        <b>El conteo no cerró</b>
+        <small>El sistema dice que está y no apareció, o apareció una que no figuraba. <b>No se borra
+          nada</b>: queda marcada con la fecha del conteo y quién contó, hasta que alguien la busca y
+          la resuelve. Es lo que evita que un faltante desaparezca sin explicación.</small>
+      </div>
+    </div>
+    <div class="cruza">
+      <b>Por qué no son estados sueltos.</b> Si <i>a reparar</i> fuera un estado más, la unidad
+      dejaría de estar en stock y el conteo no cerraría — pero la pieza está ahí, la ves.
+      Separando <b>dónde está</b> de <b>cómo está</b>, el depósito siempre suma bien y aparte sabés
+      qué podés vender: <b>disponible = en stock, sin reservar y sin marcas</b>.
+      <br><br>
+      <b>En pantalla se ve como una sola cosa</b>, igual que en tu planilla: el sistema combina las
+      dos y escribe <i>En stock</i>, <i>Reservada · lista</i>, <i>Reservada · en fábrica</i>,
+      <i>A reparar</i>, <i>Entregada · en reclamo</i>. Vos ves una columna; adentro son dos campos,
+      que es lo que hace que las cuentas den.
+    </div>
+  </div>
+
+  <div class="modelo">
+    <h2>El conteo</h2>
+    <div class="sub">Lo que hoy hacés recorriendo el depósito y los locales contra la planilla.</div>
+    <div class="cruza" style="border-top:0;padding-top:0;margin-top:0">
+      Se abre un <b>conteo</b> —de todo o de una ubicación sola—, se recorre escaneando etiquetas y el sistema va marcando lo que
+      aparece. Al cerrarlo quedan tres listas:
+      <br><br>
+      · <b>Cerró</b> — figuraba y apareció.<br>
+      · <b>No apareció</b> — figura en el sistema y no se encontró. Pasa a <b>A confirmar</b>, no se
+      borra.<br>
+      · <b>Apareció de más</b> — está y no figuraba. Se da de alta con su etiqueta y
+      queda marcada para revisar de dónde salió.
+      <br><br>
+      El conteo se guarda con fecha y con quién lo hizo, así que se compara contra el anterior y se
+      ve qué se movió. <b>Nada se borra en silencio</b> — que es el problema de corregir una planilla
+      a mano.
     </div>
   </div>
   <div class="modelo" style="margin-top:22px">
@@ -224,19 +284,25 @@ tr:last-child td{border-bottom:0}
           <td><span class="pill p-prod">En producción</span></td></tr>
         <tr><td>Llega el camión del proveedor</td><td><b>Compras</b> / recepción</td>
           <td>se le pone la <b>etiqueta</b> y su ubicación</td>
-          <td><span class="pill p-ok">En depósito</span></td></tr>
+          <td><span class="pill p-ok">En stock</span></td></tr>
         <tr><td>Se confirma una venta</td><td><b>Ventas</b></td>
           <td>queda <b>reservada</b> para esa orden</td>
           <td><span class="pill p-res">Reservada</span></td></tr>
         <tr><td>Se cae la venta</td><td><b>Ventas</b></td>
           <td>se <b>libera</b> y vuelve a estar disponible</td>
-          <td><span class="pill p-ok">En depósito</span></td></tr>
+          <td><span class="pill p-ok">En stock</span></td></tr>
         <tr><td>Sale el flete</td><td><b>Logística</b></td>
-          <td>se da de <b>baja</b> del depósito</td>
+          <td>se da de <b>baja</b>, sale del stock</td>
           <td><span class="pill p-ent">Entregada</span></td></tr>
-        <tr><td>Vuelve por un reclamo</td><td><b>Reclamos</b></td>
-          <td>reingresa marcada, con su historia atrás</td>
-          <td><span class="pill p-ok">En depósito</span></td></tr>
+        <tr><td>El cliente abre un reclamo</td><td><b>Reclamos</b></td>
+          <td>se <b>engancha al caso</b> sin volver al depósito</td>
+          <td><span class="pill" style="background:var(--crit-bg);color:var(--crit)">Entregada · en reclamo</span></td></tr>
+        <tr><td>Vuelve una pieza para arreglar</td><td><b>Reclamos</b></td>
+          <td><b>reingresa</b> con su historia atrás, pero no se vende</td>
+          <td><span class="pill p-res">A reparar</span></td></tr>
+        <tr><td>Se cierra un conteo y falta una</td><td><b>Inventario</b></td>
+          <td>queda <b>marcada</b>, no se borra</td>
+          <td><span class="pill p-ent">A confirmar</span></td></tr>
       </tbody></table></div>
     <div class="cruza">
       <b>Y al revés también.</b> El caso que contaste: el vendedor cargó dos mesas de luz para
@@ -254,7 +320,7 @@ tr:last-child td{border-bottom:0}
     <b>Lo que cambia respecto de hoy.</b> El stock deja de vivir adentro del mueble: las unidades
     viven en <b>Inventario</b> y el mueble muestra el resumen que sale de ahí — igual que el
     catálogo. Una sola fuente, tres lecturas. Y contar el inventario se hace acá: ves las cómodas
-    que están en depósito y las que están reservadas esperando el flete —las dos están físicamente—,
+    que están en stock y las que están reservadas esperando el flete —las dos están físicamente—,
     y aparte las que están por entrar.
   </div>
 </section>
@@ -280,7 +346,7 @@ tr:last-child td{border-bottom:0}
       <div class="tot">
         <div class="tot-c"><div class="tot-t">En producción</div><div class="tot-v">126</div>
           <div class="tot-p">de las cuales <b>58</b> ya vendidas</div></div>
-        <div class="tot-c"><div class="tot-t">En depósito</div><div class="tot-v">204</div>
+        <div class="tot-c"><div class="tot-t">En stock</div><div class="tot-v">204</div>
           <div class="tot-p"><b>41</b> reservadas esperando flete</div></div>
         <div class="tot-c"><div class="tot-t">Libres para vender</div><div class="tot-v">163</div>
           <div class="tot-p">entrega inmediata</div></div>
@@ -325,7 +391,7 @@ tr:last-child td{border-bottom:0}
         <button class="btn">Filtrar</button>
         <div class="segm">
           <button class="seg on">Todo <span class="n">62</span></button>
-          <button class="seg">En depósito <span class="n">28</span></button>
+          <button class="seg">En stock <span class="n">28</span></button>
           <button class="seg">En producción <span class="n">14</span></button>
           <button class="seg">Reservadas <span class="n">13</span></button>
           <button class="seg">Entregadas <span class="n">7</span></button>
@@ -395,7 +461,7 @@ const VAR = [
 ];
 document.getElementById('a-tabla').innerHTML = `
   <thead><tr><th></th><th>Modelo</th><th>Medida</th><th>Color</th>
-    <th class="num">En producción</th><th class="num">En depósito</th>
+    <th class="num">En producción</th><th class="num">En stock</th>
     <th class="num">Reservadas</th><th class="num">Libres</th>
     <th class="num">Entregadas</th><th></th></tr></thead>
   <tbody>${VAR.map(([m, med, col, prod, dep, res, ent, hist], i) => {
@@ -414,13 +480,13 @@ document.getElementById('a-tabla').innerHTML = `
         <thead><tr><th>N°</th><th>Estado</th><th>Ubicación</th><th>Proveedor</th>
           <th>Llega / listo</th><th>Venta</th><th></th></tr></thead>
         <tbody>
-          <tr><td class="nom">5660</td><td>${P('p-ok', 'En depósito')}</td><td>2do piso</td>
+          <tr><td class="nom">5660</td><td>${P('p-ok', 'En stock')}</td><td>Depósito · 2do piso</td>
             <td>7Raúl</td><td class="mut">hace 12 días</td><td class="mut">—</td>
             <td><button class="bres">Reservar</button></td></tr>
-          <tr><td class="nom">5690</td><td>${P('p-ok', 'En depósito')}</td><td>Planta baja</td>
+          <tr><td class="nom">5690</td><td>${P('p-ok', 'En stock')}</td><td>Depósito · planta baja</td>
             <td>7Raúl</td><td class="mut">hace 4 días</td><td class="mut">—</td>
             <td><button class="bres">Reservar</button></td></tr>
-          <tr><td class="nom">5309</td><td>${P('p-res', 'Reservada · lista')}</td><td>1er piso</td>
+          <tr><td class="nom">5309</td><td>${P('p-res', 'Reservada · lista')}</td><td>Depósito · 1er piso</td>
             <td>1Tony</td><td class="mut">hace 2 días</td><td>#S00214 · 5/5</td>
             <td><button class="b-x">Liberar</button></td></tr>
           <tr><td class="nom">5718</td><td>${P('p-prod', 'En producción')}</td><td class="mut">—</td>
@@ -432,21 +498,21 @@ document.getElementById('a-tabla').innerHTML = `
 // ---------- B · las unidades ----------
 const UNI = [
   ['BIBLIOTECAS', 0, 0, 0, 0, 0, 0, 0],
-  ['', '5660', 'BORGES', '100', 'PB', 'dep', '2do piso', '7Raúl', '12/7', '', 'a medida'],
-  ['', '5690', 'BORGES', '100', 'PB', 'dep', 'Planta baja', '7Raúl', '20/7', '', 'a medida con dos puertas'],
+  ['', '5660', 'BORGES', '100', 'PB', 'dep', 'Dep · 2do piso', '7Raúl', '12/7', '', 'a medida'],
+  ['', '5690', 'BORGES', '100', 'PB', 'dep', 'Dep · planta baja', '7Raúl', '20/7', '', 'a medida con dos puertas'],
   ['', '4266', 'CORTÁZAR', '100', 'PP', 'prod', '', '7Raúl', 'llega 24/7', '', ''],
-  ['', '5309', 'BORGES', '120', 'PB', 'res-dep', '1er piso', '1Tony', '15/5', '#S00214 · 5/5', ''],
-  ['', '5576', 'BRADBURY', '80', 'BP', 'res-dep', '2do piso', '6Matías', '8/7', '#S00231 · 24/6', ''],
+  ['', '5309', 'BORGES', '120', 'PB', 'res-dep', 'Local 2020', '1Tony', '15/5', '#S00214 · 5/5', ''],
+  ['', '5576', 'BRADBURY', '80', 'BP', 'res-dep', 'Dep · 2do piso', '6Matías', '8/7', '#S00231 · 24/6', ''],
   ['', '4278', 'CORTÁZAR', '120', 'PP', 'res-prod', '', '8Dibujado', 'llega 20/7', '#S00240 · 20/7', ''],
   ['', '5757', 'KANT', '80', 'BB', 'res-prod', '', '8Dibujado', 'llega 25/7', '#S00244 · 25/7', 'a medida'],
   ['', 'ze10708', 'CORTÁZAR', '120', 'PP', 'ent', '', '7Raúl', '', '#S00190 · 14/6', 'entregada 29/6'],
   ['MESAS DE LUZ', 0, 0, 0, 0, 0, 0, 0],
-  ['', '10754', 'LEWIS', '80', 'PB', 'dep', 'Planta baja', '1Tony', '14/7', '', ''],
-  ['', '5645 A', 'LEWIS', '100', 'PB', 'res-dep', '1er piso', '1Tony', '22/7', '#S00250 · 4/7', 'a medida'],
-  ['', '5645 B', 'LEWIS', '100', 'PB', 'res-dep', '1er piso', '1Tony', '22/7', '#S00250 · 4/7', 'a medida'],
+  ['', '10754', 'LEWIS', '80', 'PB', 'dep', 'Dep · planta baja', '1Tony', '14/7', '', ''],
+  ['', '5645 A', 'LEWIS', '100', 'PB', 'res-dep', 'Local 2020', '1Tony', '22/7', '#S00250 · 4/7', 'a medida'],
+  ['', '5645 B', 'LEWIS', '100', 'PB', 'res-dep', 'Local 2020', '1Tony', '22/7', '#S00250 · 4/7', 'a medida'],
 ];
 const EST = {
-  dep: ['p-ok', 'En depósito'], prod: ['p-prod', 'En producción'],
+  dep: ['p-ok', 'En stock'], prod: ['p-prod', 'En producción'],
   'res-dep': ['p-res', 'Reservada · lista'], 'res-prod': ['p-res', 'Reservada · en fábrica'],
   ent: ['p-ent', 'Entregada'],
 };
@@ -483,17 +549,17 @@ document.getElementById('c-res').innerHTML = `
       <div class="sp"></div>
       <span class="hint">desde $415.000</span></div>
     <div class="rg-b">
-      <div class="uni">${P('p-ok', 'En depósito')}<span class="nom">5660</span>
-        <span class="ser">2do piso · trajo 7Raúl hace 12 días</span><div class="sp"></div>
+      <div class="uni">${P('p-ok', 'En stock')}<span class="nom">5660</span>
+        <span class="ser">Dep · 2do piso · trajo 7Raúl hace 12 días</span><div class="sp"></div>
         <button class="bres">Reservar</button></div>
-      <div class="uni">${P('p-ok', 'En depósito')}<span class="nom">5690</span>
-        <span class="ser">Planta baja · trajo 7Raúl hace 4 días</span><div class="sp"></div>
+      <div class="uni">${P('p-ok', 'En stock')}<span class="nom">5690</span>
+        <span class="ser">Dep · planta baja · trajo 7Raúl hace 4 días</span><div class="sp"></div>
         <button class="bres">Reservar</button></div>
       <div class="uni">${P('p-prod', 'En producción')}<span class="nom">5718</span>
         <span class="ser">La hace 1Tony · <b>llega el 30/7</b></span><div class="sp"></div>
         <button class="bres">Reservar sobre pedido</button></div>
       <div class="uni">${P('p-res', 'Reservada')}<span class="nom">5309</span>
-        <span class="ser">#S00214 · vendida el 5/5 · lista en 1er piso</span><div class="sp"></div>
+        <span class="ser">#S00214 · vendida el 5/5 · lista en local 2020</span><div class="sp"></div>
         <span class="hint">no disponible</span></div>
     </div>
   </div>
@@ -502,11 +568,11 @@ document.getElementById('c-res').innerHTML = `
       <span class="pill p-ok">2 para entregar ya</span>
       <div class="sp"></div><span class="hint">otro color, misma medida</span></div>
     <div class="rg-b">
-      <div class="uni">${P('p-ok', 'En depósito')}<span class="nom">5612</span>
-        <span class="ser">Planta baja</span><div class="sp"></div>
+      <div class="uni">${P('p-ok', 'En stock')}<span class="nom">5612</span>
+        <span class="ser">Local 2020</span><div class="sp"></div>
         <button class="bres">Reservar</button></div>
-      <div class="uni">${P('p-ok', 'En depósito')}<span class="nom">5613</span>
-        <span class="ser">Planta baja</span><div class="sp"></div>
+      <div class="uni">${P('p-ok', 'En stock')}<span class="nom">5613</span>
+        <span class="ser">Local 2020</span><div class="sp"></div>
         <button class="bres">Reservar</button></div>
     </div>
   </div>
