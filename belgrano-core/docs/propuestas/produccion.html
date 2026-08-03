@@ -1,0 +1,598 @@
+<meta charset="utf-8">
+<title>Belgrano Soft · Producción — el circuito y tres formas de ver las órdenes a fabricar</title>
+<style>
+:root{
+  --bg:#f4f6f8; --panel:#fff; --panel-2:#fafbfc; --ink:#0f1a2a; --ink-soft:#5b6675;
+  --line:#d9e0e8; --line-soft:#eef1f5; --navy:#16324f; --brand:#1e5fce;
+  --brand-soft:#e7eefb; --brand-ink:#1a51b0; --ok:#15803d; --ok-bg:#e6f4ea;
+  --warn:#b45309; --warn-bg:#fff7e6; --crit:#b42318; --crit-bg:#fdecea; --muted:#8a94a3;
+  --viol:#6b21a8; --viol-bg:#f3e8ff;
+  --shadow:0 1px 2px rgba(15,26,42,.06),0 1px 3px rgba(15,26,42,.04);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);line-height:1.5;
+  font-family:'Public Sans',-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  font-variant-numeric:tabular-nums}
+h1,h2,h3{margin:0;letter-spacing:-.01em}
+button{font:inherit}
+input,select{font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);
+  border-radius:8px;background:var(--panel);color:var(--ink)}
+
+.top{background:var(--navy);color:#fff;padding:11px 20px;position:sticky;top:0;z-index:30}
+.top h1{font-size:15px;font-weight:800}
+.top p{margin:2px 0 0;font-size:12px;opacity:.75}
+.opts{display:flex;gap:6px;margin-top:11px;flex-wrap:wrap}
+.opt{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);color:rgba(255,255,255,.8);
+  border-radius:9px;padding:7px 13px;font-size:12.5px;font-weight:650;cursor:pointer;text-align:left}
+.opt:hover{background:rgba(255,255,255,.18);color:#fff}
+.opt.on{background:#fff;color:var(--navy);border-color:#fff}
+.opt small{display:block;font-size:10.5px;font-weight:500;opacity:.75}
+.opt.on small{opacity:.6}
+
+.wrap{padding:18px 20px 60px;max-width:1400px;margin:0 auto}
+.idea{background:var(--brand-soft);border:1px solid #cfe0fb;border-radius:12px;padding:13px 15px;
+  font-size:13px;margin-bottom:6px}
+.idea b{color:var(--brand-ink)}
+.pros{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0 18px}
+@media(max-width:820px){.pros{grid-template-columns:1fr}}
+.pro,.con{border-radius:11px;padding:11px 14px;font-size:12.5px;border:1px solid}
+.pro{background:var(--ok-bg);border-color:#cfe8d8;color:#14532d}
+.con{background:var(--warn-bg);border-color:#f3e2c0;color:#7c4a05}
+.pro b,.con b{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;
+  margin-bottom:3px;opacity:.75}
+
+/* ---- el modelo ---- */
+.modelo{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;
+  margin-bottom:22px;box-shadow:var(--shadow)}
+.modelo h2{font-size:16px;color:var(--navy);margin-bottom:4px}
+.modelo .sub{font-size:12.5px;color:var(--ink-soft);margin-bottom:16px}
+.ciclo{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:900px){.ciclo{grid-template-columns:1fr 1fr}}
+.paso{border:1px solid var(--line);border-radius:11px;padding:12px 13px;background:var(--panel-2);
+  position:relative}
+.paso>b{display:block;font-size:13px;color:var(--navy);margin-bottom:3px}
+.paso small b{color:var(--navy)}
+.paso small{font-size:11.5px;color:var(--ink-soft);line-height:1.45;display:block}
+.paso .est{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+  border-radius:999px;padding:2px 8px;display:inline-block;margin-bottom:6px}
+.e-prod{background:var(--viol-bg);color:var(--viol)}
+.e-dep{background:var(--ok-bg);color:var(--ok)}
+.e-res{background:var(--warn-bg);color:var(--warn)}
+.e-ent{background:#eef1f5;color:var(--muted)}
+.cruza{margin-top:14px;font-size:12.5px;color:var(--ink-soft);border-top:1px dashed var(--line);
+  padding-top:12px}
+.cruza b{color:var(--navy)}
+
+/* ---- el marco de la app ---- */
+.app{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;
+  box-shadow:var(--shadow)}
+.appbar{background:var(--navy);color:#fff;height:38px;display:flex;align-items:center;gap:9px;
+  padding:0 14px;font-size:11.5px;font-weight:650}
+.appbar span{opacity:.55}
+.appbar .on{opacity:1;background:rgba(255,255,255,.16);padding:3px 9px;border-radius:999px}
+.subbar{display:flex;gap:14px;padding:0 16px;border-bottom:1px solid var(--line);background:var(--panel);
+  font-size:12px;font-weight:600;color:var(--ink-soft)}
+.subbar div{padding:9px 0}
+.subbar .on{color:var(--navy);border-bottom:2px solid var(--brand)}
+.body{padding:16px;background:var(--bg)}
+.kick{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--brand)}
+.h1{font-size:19px;font-weight:800;color:var(--navy);margin:1px 0 1px}
+.sub{font-size:11.5px;color:var(--muted);margin-bottom:12px}
+
+.bar{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.bar input{flex:1;min-width:180px}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:8px 12px;
+  font-size:12.5px;font-weight:650;color:var(--ink-soft);cursor:pointer;white-space:nowrap}
+.btn.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}
+.segm{display:inline-flex;gap:6px;flex-wrap:wrap}
+.seg{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 13px;
+  font-size:12.5px;font-weight:650;color:var(--ink-soft);cursor:pointer}
+.seg .n{opacity:.6;margin-left:5px}
+.seg.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.seg.on .n{opacity:.7}
+
+table{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--panel)}
+th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+  padding:9px 10px;border-bottom:1px solid var(--line);font-weight:700;white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid var(--line-soft);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;
+  box-shadow:var(--shadow)}
+.pill{font-size:10px;font-weight:700;border-radius:999px;padding:2px 8px;white-space:nowrap}
+.p-ok{background:var(--ok-bg);color:var(--ok)}
+.p-prod{background:var(--viol-bg);color:var(--viol)}
+.p-res{background:var(--warn-bg);color:var(--warn)}
+.p-ent{background:#eef1f5;color:var(--muted)}
+.num{text-align:right}
+.mut{color:var(--muted)}
+.nom{font-weight:700;color:var(--navy)}
+.ser{font-size:11px;color:var(--muted)}
+.grupo td{background:var(--panel-2);font-weight:700;color:var(--navy);font-size:11.5px;
+  text-transform:uppercase;letter-spacing:.04em;border-top:1px solid var(--line)}
+.mini{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:7px;
+  background:var(--panel-2);border:1px solid var(--line-soft);color:var(--muted);vertical-align:middle}
+.mini svg{width:30px;height:22px;stroke:currentColor;fill:none;stroke-width:2}
+.chip{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px;
+  background:var(--panel-2);border:1px solid var(--line);color:var(--ink-soft)}
+.bres{border:1px solid var(--brand);background:var(--brand-soft);color:var(--brand-ink);
+  border-radius:7px;padding:3px 10px;font-size:11.5px;font-weight:700;cursor:pointer}
+.bres:hover{background:var(--brand);color:#fff}
+.b-x{border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:3px 8px;
+  font-size:11.5px;color:var(--muted);cursor:pointer}
+
+/* A · tablero */
+.tot{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+@media(max-width:820px){.tot{grid-template-columns:1fr 1fr}}
+.tot-c{border:1px solid var(--line);border-radius:11px;padding:11px 13px;background:var(--panel)}
+.tot-t{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700}
+.tot-v{font-size:22px;font-weight:800;color:var(--navy);margin-top:2px}
+.tot-p{font-size:11px;color:var(--muted)}
+.exp{background:var(--panel-2)}
+.exp td{padding:0}
+.exp .in{padding:10px 14px 12px}
+
+/* C · buscador */
+.busq{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;
+  box-shadow:var(--shadow);margin-bottom:14px}
+.busq input{width:100%;font-size:15px;padding:11px 14px}
+.res{display:flex;flex-direction:column;gap:10px}
+.rg{border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden}
+.rg-h{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--panel-2);
+  border-bottom:1px solid var(--line)}
+.rg-h b{font-size:13.5px;color:var(--navy)}
+.rg-h .sp{flex:1}
+.rg-b{padding:4px 0}
+.uni{display:flex;align-items:center;gap:11px;padding:8px 14px;border-bottom:1px solid var(--line-soft)}
+.uni:last-child{border-bottom:0}
+.uni .sp{flex:1}
+.hint{font-size:11.5px;color:var(--muted)}
+.nota{font-size:12.5px;color:var(--ink-soft);background:var(--panel);border:1px solid var(--line);
+  border-left:3px solid var(--brand);border-radius:10px;padding:12px 15px;margin-top:20px}
+.nota b{color:var(--navy)}
+.hide{display:none}
+.scroll{overflow-x:auto}
+
+/* ---- Producción ---- */
+.flecha{display:grid;place-items:center;color:var(--muted);font-size:18px}
+.ciclo6{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media(max-width:900px){.ciclo6{grid-template-columns:1fr}}
+.e-ped{background:var(--brand-soft);color:var(--brand-ink)}
+.e-conf{background:var(--warn-bg);color:var(--warn)}
+.e-rec{background:var(--ok-bg);color:var(--ok)}
+.quien{margin-top:14px;border-top:1px dashed var(--line);padding-top:12px}
+.quien table{font-size:12px;background:none}
+.quien th,.quien td{white-space:normal}
+.prov{border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden;
+  margin-bottom:12px;box-shadow:var(--shadow)}
+.prov-h{display:flex;align-items:center;gap:11px;padding:11px 14px;background:var(--panel-2);
+  border-bottom:1px solid var(--line)}
+.prov-h b{font-size:14px;color:var(--navy)}
+.prov-h .sp{flex:1}
+.av{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;
+  border-radius:8px;background:var(--navy);color:#fff;font-size:12px;font-weight:800}
+.tarde{color:var(--crit);font-weight:700}
+.hoy{color:var(--warn);font-weight:700}
+.chk{width:15px;height:15px;accent-color:var(--brand);margin:0;vertical-align:-2px}
+.lote{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:10px;
+  overflow:hidden;box-shadow:var(--shadow)}
+.lote-h{display:flex;align-items:center;gap:11px;padding:10px 14px;border-bottom:1px solid var(--line-soft)}
+.lote-h .sp{flex:1}
+.lote-b{padding:2px 14px 10px;font-size:12px;color:var(--ink-soft)}
+.uds{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.ud{border:1px solid var(--line);border-radius:7px;padding:2px 8px;font-size:11px;
+  background:var(--panel-2);color:var(--ink-soft)}
+.ud b{color:var(--navy)}
+.barra{height:7px;border-radius:99px;background:var(--line-soft);display:flex;overflow:hidden;
+  min-width:120px}
+.barra i{display:block}
+.b-ok{background:var(--ok)} .b-prod{background:#8b5cf6} .b-ped{background:var(--brand)}
+.b-fal{background:var(--crit)}
+.ley{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin:10px 0 14px}
+.ley span{display:inline-flex;align-items:center;gap:5px}
+.ley i{width:9px;height:9px;border-radius:3px;display:inline-block}
+.ven{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:10px;
+  box-shadow:var(--shadow);overflow:hidden}
+.ven-h{display:flex;align-items:center;gap:11px;padding:11px 14px;border-bottom:1px solid var(--line-soft)}
+.ven-h .sp{flex:1}
+.ven-b{padding:0 0 4px}
+.li{display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px solid var(--line-soft);
+  font-size:12.5px}
+.li:last-child{border-bottom:0}
+.li .sp{flex:1}
+.pregs{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--brand);
+  border-radius:12px;padding:16px 18px;margin-top:22px}
+.pregs h3{font-size:14px;color:var(--navy);margin-bottom:8px}
+.pregs ol{margin:0;padding-left:20px;font-size:13px;color:var(--ink-soft)}
+.pregs li{margin-bottom:9px}
+.pregs b{color:var(--navy)}
+</style>
+
+<div class="top">
+  <h1>Producción — el circuito y tres formas de ver las órdenes a fabricar</h1>
+  <p>La unidad ya existe desde la venta. Producción es el módulo que la convierte en un pedido a alguien, y que la recibe cuando llega.</p>
+  <div class="opts">
+    <button class="opt on" data-o="m">El circuito<small>De la venta al depósito</small></button>
+    <button class="opt" data-o="a">A · Por proveedor<small>Qué me tiene que traer cada uno</small></button>
+    <button class="opt" data-o="b">B · Por mueble a fabricar<small>Qué mando a hacer hoy</small></button>
+    <button class="opt" data-o="c">C · Por orden de venta<small>Puedo entregar la venta de Bibiana</small></button>
+  </div>
+</div>
+
+<div class="wrap">
+
+<!-- ================= EL CIRCUITO ================= -->
+<section data-p="m">
+  <div class="modelo">
+    <h2>De la venta al depósito, sin planilla en el medio</h2>
+    <div class="sub">Cada paso lo hace alguien distinto y deja registro. La unidad es siempre la
+      misma pieza: lo único que cambia es en qué parte del camino está.</div>
+    <div class="ciclo6">
+      <div class="paso">
+        <span class="est e-conf">Administración</span>
+        <b>1 · Se confirma la orden</b>
+        <small>El vendedor cerró la venta. Antes de que llegue a Producción, alguien de
+          Administración <b>confirma</b>: que la seña esté, que el mueble esté bien cargado, que la
+          medida a medida tenga plano. Recién ahí baja.</small>
+      </div>
+      <div class="paso">
+        <span class="est e-res">A producir</span>
+        <b>2 · Cae en Producción</b>
+        <small>Aparece una unidad por mueble vendido, con su orden. Es el <b>6 Dibujado</b> de la
+          planilla: existe, tiene dueño, y todavía <b>no se le pidió a nadie</b>.</small>
+      </div>
+      <div class="paso">
+        <span class="est e-ped">Pedido</span>
+        <b>3 · Se le pide a un proveedor</b>
+        <small>Se juntan las que son iguales —cinco Borges 1.60 van en un solo pedido— y se le
+          asigna proveedor y fecha comprometida. Ahí nace la <b>orden de compra</b>, que es lo que
+          después ve Compras.</small>
+      </div>
+      <div class="paso">
+        <span class="est e-prod">En producción</span>
+        <b>4 · La está haciendo</b>
+        <small>Con fecha prometida a la vista. El vendedor ya puede decirle al cliente cuándo la
+          tiene. Si la fecha se pasa, se prende sola.</small>
+      </div>
+      <div class="paso">
+        <span class="est e-rec">Recepción</span>
+        <b>5 · Llegan — puede que no todas</b>
+        <small>Toni trae <b>5 de 8</b>. Se tildan las cinco que llegaron: se les pone número de
+          serie, etiqueta y ubicación. Las otras tres <b>siguen en producción</b>, con su fecha.</small>
+      </div>
+      <div class="paso">
+        <span class="est e-dep">Stock</span>
+        <b>6 · Ya es inventario</b>
+        <small>La unidad pasa a Inventario con su etiqueta. Si tenía dueño queda
+          <i>lista para entregar</i> y Logística la ve; si no, queda libre para vender.</small>
+      </div>
+    </div>
+
+    <div class="quien">
+      <h3 style="font-size:13px;color:var(--navy);margin-bottom:7px">Quién hace cada cosa</h3>
+      <table>
+        <tr><th>Paso</th><th>Quién</th><th>Qué necesita tener a mano</th></tr>
+        <tr><td><b>Confirmar la orden</b></td><td>Administración</td>
+          <td>La venta con su seña y sus muebles. Lo que no cierra, no baja.</td></tr>
+        <tr><td><b>Pedir a fábrica</b></td><td>Encargado de Producción</td>
+          <td>Todo lo que está <i>a producir</i>, junto por modelo, para pedir de a lotes.</td></tr>
+        <tr><td><b>Seguir lo pedido</b></td><td>Producción / Dirección</td>
+          <td>Qué le debe cada proveedor y qué fecha prometió. Lo atrasado, primero.</td></tr>
+        <tr><td><b>Recibir</b></td><td>Depósito</td>
+          <td>El pedido abierto para tildar lo que bajó del camión y etiquetarlo.</td></tr>
+      </table>
+      <div class="cruza" style="margin-top:12px">
+        <b>Producción no inventa muebles:</b> las unidades ya vienen de la venta. Y no reserva
+        nada: eso sigue viviendo en la venta. Lo que Producción agrega es <b>a quién se le pidió,
+        para cuándo, y si ya llegó</b>.
+      </div>
+    </div>
+  </div>
+
+  <div class="idea"><b>Tres formas de mirar lo mismo.</b> Son la misma lista de unidades ordenada de
+    tres maneras distintas, porque son tres preguntas distintas: <b>A</b> ¿qué me tiene que traer
+    Toni?, <b>B</b> ¿qué mando a fabricar hoy?, <b>C</b> ¿puedo entregar la venta de Bibiana? Se
+    pueden tener las tres —serían tres solapas—, pero conviene decidir cuál es la de entrada.</div>
+</section>
+
+<!-- ================= A · POR PROVEEDOR ================= -->
+<section data-p="a" class="hide">
+  <div class="idea"><b>A · Por proveedor.</b> Una tarjeta por proveedor con todo lo que te debe,
+    ordenado por fecha comprometida. Es la pantalla de "recepción de Toni": entra el camión, abrís
+    la tarjeta, tildás lo que bajó.</div>
+  <div class="pros">
+    <div class="pro"><b>A favor</b>Contesta la pregunta de todos los días y hace la recepción en el
+      mismo lugar donde mirás. Lo atrasado salta a la vista.</div>
+    <div class="con"><b>En contra</b>No sirve para decidir qué pedir: lo que todavía no tiene
+      proveedor no está en ninguna tarjeta —queda arriba, aparte.</div>
+  </div>
+
+  <div class="app">
+    <div class="appbar"><span>Belgrano Soft</span><span>Ventas</span><span class="on">Producción</span>
+      <span>Compras</span><span>Inventario</span></div>
+    <div class="subbar"><div>Resumen</div><div class="on">Pedidos a fábrica</div><div>Recepciones</div>
+      <div>Cola de trabajo</div><div>Historial</div></div>
+    <div class="body">
+      <div class="kick">Producción</div><div class="h1">Pedidos a fábrica</div>
+      <div class="sub">83 muebles pedidos · 12 llegan esta semana · 6 atrasados</div>
+
+      <div class="tot">
+        <div class="tot-c"><div class="tot-t">Sin pedir</div><div class="tot-v" style="color:var(--crit)">18</div>
+          <div class="tot-p">vendidos, sin proveedor</div></div>
+        <div class="tot-c"><div class="tot-t">En fábrica</div><div class="tot-v">83</div>
+          <div class="tot-p">con fecha comprometida</div></div>
+        <div class="tot-c"><div class="tot-t">Atrasados</div><div class="tot-v" style="color:var(--crit)">6</div>
+          <div class="tot-p">pasó la fecha prometida</div></div>
+        <div class="tot-c"><div class="tot-t">Llegan esta semana</div><div class="tot-v">12</div>
+          <div class="tot-p">para avisarle a los clientes</div></div>
+      </div>
+
+      <div class="prov" style="border-color:var(--crit)">
+        <div class="prov-h" style="background:var(--crit-bg)">
+          <span class="av" style="background:var(--crit)">!</span>
+          <b>18 muebles sin pedir</b>
+          <span class="hint">vendidos y confirmados — falta decidir quién los hace</span>
+          <div class="sp"></div><button class="btn pri">Armar el pedido</button>
+        </div>
+      </div>
+
+      <div class="prov">
+        <div class="prov-h"><span class="av">T</span><b>1 Tony</b>
+          <span class="pill p-prod">24 muebles</span>
+          <span class="tarde">3 atrasados</span>
+          <div class="sp"></div>
+          <button class="btn">Ver todo</button>
+          <button class="btn pri">Recibir</button></div>
+        <div class="scroll"><table>
+          <tr><th style="width:28px"><input type="checkbox" class="chk"></th><th>Modelo</th>
+            <th>Medida</th><th>Estructura</th><th>Frente</th><th>Venta</th><th>Pedido</th>
+            <th>Prometido</th><th></th></tr>
+          <tr><td><input type="checkbox" class="chk"></td><td class="nom">PLACARD OLIVER</td>
+            <td>2.00</td><td>Blanca</td><td>Paraíso</td><td class="mut">5660 · 1 de 6</td>
+            <td class="mut">12/6</td><td class="tarde">28/7 · 6 días</td>
+            <td><button class="bres">Recibir</button></td></tr>
+          <tr><td><input type="checkbox" class="chk"></td><td class="nom">PLACARD OLIVER</td>
+            <td>2.00</td><td>Negra</td><td>Blanco</td><td class="mut">5660 · 2 de 6</td>
+            <td class="mut">12/6</td><td class="tarde">28/7 · 6 días</td>
+            <td><button class="bres">Recibir</button></td></tr>
+          <tr><td><input type="checkbox" class="chk"></td><td class="nom">CÓMODA AMBERES 55</td>
+            <td>1.20</td><td>Blanca</td><td>Blanco</td><td class="mut">—</td>
+            <td class="mut">2/7</td><td class="hoy">hoy</td>
+            <td><button class="bres">Recibir</button></td></tr>
+          <tr><td><input type="checkbox" class="chk"></td><td class="nom">CÓMODA AMBERES 55</td>
+            <td>1.40</td><td>Negra</td><td>Paraíso</td><td class="mut">5712 · 1 de 2</td>
+            <td class="mut">2/7</td><td>4/8</td>
+            <td><button class="b-x">Ver</button></td></tr>
+          <tr><td colspan="9" class="mut" style="font-size:11.5px">…20 más</td></tr>
+        </table></div>
+      </div>
+
+      <div class="prov">
+        <div class="prov-h"><span class="av">R</span><b>7 Raúl</b>
+          <span class="pill p-prod">19 muebles</span>
+          <span class="hint">el primero llega el 8/8</span>
+          <div class="sp"></div>
+          <button class="btn">Ver todo</button>
+          <button class="btn pri">Recibir</button></div>
+        <div class="lote-b">RACK BERGEN 1.60 ×6 · MESA RATONA NORUEGA ×4 · PLACARD AMBERES ×9</div>
+      </div>
+
+      <div class="prov">
+        <div class="prov-h"><span class="av">E</span><b>5 Enrique</b>
+          <span class="pill p-prod">14 muebles</span>
+          <span class="hint">el primero llega el 11/8</span>
+          <div class="sp"></div>
+          <button class="btn">Ver todo</button>
+          <button class="btn pri">Recibir</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= B · POR MUEBLE A FABRICAR ================= -->
+<section data-p="b" class="hide">
+  <div class="idea"><b>B · Por mueble a fabricar.</b> Lo que hay que mandar a hacer, <b>agrupado por
+    mueble y variante</b>: si hay cinco Borges 1.60 blancas vendidas, es una sola línea de cinco y
+    se piden juntas. Abajo, cada unidad con su venta.</div>
+  <div class="pros">
+    <div class="pro"><b>A favor</b>Es la pantalla de decidir. Juntar lo igual es lo que hace que el
+      proveedor te haga mejor precio y que no se pidan de a una.</div>
+    <div class="con"><b>En contra</b>Para seguir lo ya pedido hay que cambiar de vista: acá lo
+      importante es lo que falta pedir.</div>
+  </div>
+
+  <div class="app">
+    <div class="appbar"><span>Belgrano Soft</span><span>Ventas</span><span class="on">Producción</span>
+      <span>Compras</span><span>Inventario</span></div>
+    <div class="subbar"><div>Resumen</div><div class="on">A fabricar</div><div>Pedidos</div>
+      <div>Recepciones</div><div>Historial</div></div>
+    <div class="body">
+      <div class="kick">Producción</div><div class="h1">A fabricar</div>
+      <div class="sub">18 muebles vendidos esperando que se le pidan a alguien</div>
+
+      <div class="bar">
+        <input placeholder="Buscar modelo, medida o número de venta…">
+        <div class="segm">
+          <button class="seg on">Sin pedir <span class="n">18</span></button>
+          <button class="seg">Pedido <span class="n">83</span></button>
+          <button class="seg">Atrasado <span class="n">6</span></button>
+        </div>
+        <div style="flex:1"></div>
+        <button class="btn pri">Pedir lo tildado (7)</button>
+      </div>
+
+      <div class="lote">
+        <div class="lote-h"><input type="checkbox" class="chk" checked>
+          <span class="mini"><svg viewBox="0 0 34 26"><rect x="2" y="3" width="30" height="20" rx="2"/><path d="M17 3v20"/></svg></span>
+          <div><b class="nom">PLACARD OLIVER</b> · 2.00 · Blanca · Paraíso<br>
+            <span class="hint">se fabrica en 32 días · lo hace Tony o Raúl</span></div>
+          <div class="sp"></div>
+          <span class="pill p-res">5 a pedir</span>
+          <button class="btn pri">Pedir estas 5</button></div>
+        <div class="lote-b">Son de cuatro ventas distintas:
+          <div class="uds">
+            <span class="ud"><b>5660</b> · 1 de 6</span>
+            <span class="ud"><b>5660</b> · 2 de 6</span>
+            <span class="ud"><b>5712</b> · 1 de 2</span>
+            <span class="ud"><b>5744</b> · 3 de 3</span>
+            <span class="ud"><b>5751</b> · 1 de 1</span>
+          </div></div>
+      </div>
+
+      <div class="lote">
+        <div class="lote-h"><input type="checkbox" class="chk" checked>
+          <span class="mini"><svg viewBox="0 0 34 26"><rect x="2" y="3" width="30" height="20" rx="2"/><path d="M2 10h30M2 17h30"/></svg></span>
+          <div><b class="nom">CÓMODA AMBERES 55</b> · 1.40 · Negra · Blanco<br>
+            <span class="hint">hay <b>2 libres en el depósito</b> — conviene mirarlas antes de pedir</span></div>
+          <div class="sp"></div>
+          <span class="pill p-res">2 a pedir</span>
+          <button class="btn">Usar las de stock</button></div>
+        <div class="lote-b">
+          <div class="uds"><span class="ud"><b>5698</b> · 1 de 1</span>
+            <span class="ud"><b>5701</b> · 2 de 4</span></div></div>
+      </div>
+
+      <div class="lote">
+        <div class="lote-h"><input type="checkbox" class="chk">
+          <span class="mini"><svg viewBox="0 0 34 26"><rect x="2" y="6" width="30" height="14" rx="2"/></svg></span>
+          <div><b class="nom">MESA DE LUZ NÓRDICA</b> · 0.45 · Natural · Nogal
+            <span class="chip" style="border-color:#cfe0fb;background:var(--brand-soft);color:var(--brand-ink)">a medida</span><br>
+            <span class="hint">tiene plano cargado · no se junta con otras: es única</span></div>
+          <div class="sp"></div>
+          <span class="pill p-res">1 a pedir</span>
+          <button class="btn pri">Pedir</button></div>
+      </div>
+
+      <div class="lote" style="border-color:#f3e2c0">
+        <div class="lote-h" style="background:var(--warn-bg)"><span style="width:15px"></span>
+          <div><b class="nom">3 muebles sin confirmar</b><br>
+            <span class="hint">la venta está cargada pero Administración todavía no la confirmó —
+              no se piden hasta que baje</span></div>
+          <div class="sp"></div>
+          <button class="btn">Ver cuáles</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= C · POR ORDEN DE VENTA ================= -->
+<section data-p="c" class="hide">
+  <div class="idea"><b>C · Por orden de venta.</b> Una fila por venta, con la barra de cómo viene:
+    cuántos muebles están listos, cuántos en fábrica y cuántos sin pedir. Contesta lo que pregunta
+    el cliente y lo que necesita Logística: <b>¿la 5660 se puede entregar?</b></div>
+  <div class="pros">
+    <div class="pro"><b>A favor</b>Es la vista del cliente. Una venta se entrega entera: si falta
+      uno de los seis, no sale el flete — y acá se ve cuál es el que traba.</div>
+    <div class="con"><b>En contra</b>Para pedir hay que entrar venta por venta; no deja juntar lo
+      igual de ventas distintas, que es lo que abarata.</div>
+  </div>
+
+  <div class="app">
+    <div class="appbar"><span>Belgrano Soft</span><span>Ventas</span><span class="on">Producción</span>
+      <span>Compras</span><span>Inventario</span></div>
+    <div class="subbar"><div>Resumen</div><div class="on">Órdenes</div><div>A fabricar</div>
+      <div>Recepciones</div><div>Historial</div></div>
+    <div class="body">
+      <div class="kick">Producción</div><div class="h1">Órdenes en curso</div>
+      <div class="sub">37 ventas con muebles pendientes · 4 completas para entregar</div>
+
+      <div class="ley">
+        <span><i class="b-ok"></i> listo en depósito</span>
+        <span><i class="b-prod"></i> en fábrica</span>
+        <span><i class="b-ped"></i> pedido</span>
+        <span><i class="b-fal"></i> sin pedir</span>
+      </div>
+
+      <div class="ven" style="border-color:#cfe8d8">
+        <div class="ven-h" style="background:var(--ok-bg)">
+          <b class="nom">5644 · Abel Schoenmaker</b>
+          <span class="barra" style="width:150px"><i class="b-ok" style="width:100%"></i></span>
+          <span class="pill p-ok">3 de 3 listos</span>
+          <div class="sp"></div>
+          <span class="hint">vendida el 12/6</span>
+          <button class="btn pri">Pasar a Logística</button></div>
+      </div>
+
+      <div class="ven">
+        <div class="ven-h"><b class="nom">5660 · Bibiana</b>
+          <span class="barra" style="width:150px">
+            <i class="b-ok" style="width:50%"></i><i class="b-prod" style="width:33%"></i><i class="b-fal" style="width:17%"></i></span>
+          <span class="pill p-res">3 listos · 2 en fábrica · 1 sin pedir</span>
+          <div class="sp"></div>
+          <span class="tarde">traba: 1 sin pedir</span>
+          <button class="btn">Ver los 6</button></div>
+        <div class="ven-b">
+          <div class="li"><span class="pill p-ok">Listo</span><span class="nom">BH-000100</span>
+            <span>PLACARD AMBERES 2 PUERTAS · 1.20 · Blanca · Paraíso</span>
+            <div class="sp"></div><span class="mut">Depósito · planta baja</span></div>
+          <div class="li"><span class="pill p-ok">Listo</span><span class="nom">BH-000104</span>
+            <span>PLACARD AMBERES 2 PUERTAS · 1.20 · Negra · Paraíso</span>
+            <div class="sp"></div><span class="mut">Local 2299</span></div>
+          <div class="li"><span class="pill p-ok">Listo</span><span class="nom">BH-000117</span>
+            <span>PLACARD AMBERES 2 PUERTAS · 1.40 · Negra · Blanco</span>
+            <div class="sp"></div><span class="mut">Depósito · 2do piso</span></div>
+          <div class="li"><span class="pill p-prod">En fábrica</span><span class="mut">sin etiqueta</span>
+            <span>PLACARD OLIVER · 2.00 · Blanca · Paraíso</span>
+            <div class="sp"></div><span class="mut">1 Tony ·</span><span class="tarde">28/7 · 6 días tarde</span></div>
+          <div class="li"><span class="pill p-prod">En fábrica</span><span class="mut">sin etiqueta</span>
+            <span>PLACARD OLIVER · 2.00 · Negra · Blanco</span>
+            <div class="sp"></div><span class="mut">1 Tony ·</span><span class="tarde">28/7 · 6 días tarde</span></div>
+          <div class="li" style="background:var(--crit-bg)"><span class="pill p-res">Sin pedir</span><span class="mut">sin etiqueta</span>
+            <span>MESA DE LUZ NÓRDICA · 0.45 · Natural · Nogal <span class="chip">a medida</span></span>
+            <div class="sp"></div><button class="bres">Pedir a fábrica</button></div>
+        </div>
+      </div>
+
+      <div class="ven">
+        <div class="ven-h"><b class="nom">5712 · Andrea</b>
+          <span class="barra" style="width:150px">
+            <i class="b-prod" style="width:50%"></i><i class="b-ped" style="width:50%"></i></span>
+          <span class="pill p-prod">2 en fábrica</span>
+          <div class="sp"></div><span class="hint">completa el 4/8</span>
+          <button class="btn">Ver los 2</button></div>
+      </div>
+
+      <div class="ven" style="border-color:#f3e2c0">
+        <div class="ven-h" style="background:var(--warn-bg)"><b class="nom">5788 · Camila</b>
+          <span class="pill p-res">sin confirmar</span>
+          <div class="sp"></div>
+          <span class="hint">seña de $50.000 sin acreditar — Administración todavía no la bajó</span>
+          <button class="btn">Ver la venta</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="pregs" id="pregs">
+  <h3>Lo que necesito que me cuentes de cómo lo hacen hoy</h3>
+  <ol>
+    <li><b>¿Se junta el pedido?</b> Si hay cinco Placard Oliver 2.00 vendidos en cinco ventas
+      distintas, ¿se le piden a Tony de una o cada uno por su lado? ¿Y se le agregan muebles
+      <b>sin vender</b> para hacer stock en el mismo pedido?</li>
+    <li><b>¿El pedido es un papel?</b> ¿Le mandás a Tony una orden de compra escrita con precio, o
+      es un mensaje y el precio se arregla después? Esto decide si Producción genera la OC o si eso
+      es de Compras.</li>
+    <li><b>¿Quién elige el proveedor?</b> ¿Cada mueble ya tiene "su" fábrica, o se decide cada vez
+      según quién esté más libre o más barato?</li>
+    <li><b>La fecha:</b> ¿la promete el proveedor cuando le pedís, o vos calculás con los días del
+      mueble? ¿Y qué hacés cuando se atrasa: se avisa al cliente, se reprograma la entrega?</li>
+    <li><b>Cuando llegan 5 de 8:</b> ¿el número de serie se lo ponen ustedes al recibirlo, o el
+      proveedor manda algo identificado? ¿Se revisa antes de entrarlo —control de calidad— o entra
+      y si está mal se marca después?</li>
+    <li><b>¿Un mueble pasa por dos manos?</b> Ejemplo: carpintería lo hace y herrería le pone las
+      patas. Si eso pasa, la unidad tiene que poder estar en dos pedidos encadenados.</li>
+    <li><b>¿Qué mira el encargado apenas abre el sistema a la mañana?</b> Esa es la que va a ser la
+      pantalla de entrada de las tres.</li>
+  </ol>
+</div>
+
+</div>
+
+<script>
+document.querySelectorAll('.opt').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.opt').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('[data-p]').forEach(s =>
+    s.classList.toggle('hide', s.dataset.p !== b.dataset.o));
+  window.scrollTo(0, 0);
+});
+</script>
