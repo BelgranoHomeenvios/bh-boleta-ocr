@@ -63,13 +63,19 @@
           <label class="fld" style="margin:0"><span class="lbl">Pasó un aumento del</span>
             <div class="cx-aum-in"><input id="cx-pct" type="number" step="0.5" placeholder="12">
               <span>%</span></div></label>
-          <button class="btn primary" id="cx-aplicar">Aplicar a toda su lista</button>
+          <label class="fld" style="margin:0"><span class="lbl">Sobre qué</span>
+            <select id="cx-alcance">
+              <option value="">Toda su lista (${filas.length})</option>
+              ${global.DB.categoriasDeProveedor(this.prov).map(c =>
+                `<option value="${c.id}">Sólo ${UI.esc(c.nombre.toLowerCase())} (${c.n})</option>`).join('')}
+            </select></label>
+          <button class="btn primary" id="cx-aplicar">Aplicar</button>
         </div>` : ''}
 
         ${filas.length ? `<div class="card cx-tabla"><table>
           <thead><tr><th>Mueble</th><th>Terminación</th><th class="num">Precio</th>
             <th class="num">Costeo</th><th class="num">Dif.</th>
-            <th>Desde</th><th>Cambios</th></tr></thead>
+            <th>Desde</th><th>Cambios</th><th></th></tr></thead>
           <tbody>${filas.map(f => {
             const d = f.costeo ? f.precio - f.costeo.costo : null;
             const ab = this.abierta === f.varianteId;
@@ -83,6 +89,7 @@
               <td class="muted">${UI.esc(f.desde || '—')}</td>
               <td>${f.cambios.length ? `<span class="pill soft">${f.cambios.length}</span>`
                 : '<span class="muted">—</span>'}</td>
+              <td class="td-acc"><button class="b-x" data-editar="${f.varianteId}">Editar</button></td>
             </tr>${ab ? this.htmlCambios(f) : ''}`;
           }).join('')}</tbody></table></div>`
           : UI.vacio('Este taller todavía no tiene ningún precio cargado.')}
@@ -96,12 +103,12 @@
     // La historia de un mueble: cada aumento con su fecha y su porcentaje.
     htmlCambios(f) {
       if (!f.cambios.length) {
-        return `<tr class="cx-det"><td colspan="7"><div class="hint">Este precio nunca cambió
+        return `<tr class="cx-det"><td colspan="8"><div class="hint">Este precio nunca cambió
           desde que se cargó.</div></td></tr>`;
       }
       const primero = f.cambios[f.cambios.length - 1];
       const total = primero.antes ? ((f.precio - primero.antes) / primero.antes) * 100 : null;
-      return `<tr class="cx-det"><td colspan="7"><div class="cx-hist">
+      return `<tr class="cx-det"><td colspan="8"><div class="cx-hist">
         ${f.cambios.map(c => `<div class="cx-hist-f">
           <b>${UI.esc(c.desde)}</b>
           <span class="muted">${UI.pesos(c.antes)} →</span>
@@ -128,12 +135,33 @@
       if (ap) ap.onclick = () => {
         const pct = Number(document.getElementById('cx-pct').value) || 0;
         if (!pct) return UI.aviso('Poné el porcentaje del aumento', 'warn');
+        const cat = document.getElementById('cx-alcance').value;
         const p = global.DB.proveedor(this.prov);
-        if (!confirm(`¿Aumentar un ${pct}% toda la lista de ${p.nombre}?`)) return;
-        const n = global.DB.aumentarProveedor(this.prov, pct, 'Brian');
+        const donde = cat
+          ? (global.DB.categoriasDeProveedor(this.prov).find(c => c.id === Number(cat)) || {}).nombre
+          : 'toda la lista';
+        if (!confirm(`¿Aumentar un ${pct}% ${cat ? donde.toLowerCase() : donde} de ${p.nombre}?`)) return;
+        const n = global.DB.aumentarProveedor(this.prov, pct,
+          { categoriaId: cat ? Number(cat) : null, quien: 'Brian' });
         UI.aviso(`${n} precios aumentados un ${pct}%`, 'ok');
         this.render(this._mount);
       };
+      // Un precio suelto se edita en el renglón: el proveedor a veces sube
+      // uno solo y no vale la pena inventar una pantalla para eso.
+      document.querySelectorAll('[data-editar]').forEach(b => b.onclick = e => {
+        e.stopPropagation();
+        const vid = Number(b.dataset.editar);
+        const act = global.DB.listaPrecios().find(x => x.provId === this.prov
+          && x.varianteId === vid);
+        const txt = prompt(`Nuevo precio de ${global.DB.nombreVariante(vid)}`,
+          act ? act.precio : '');
+        if (txt == null) return;
+        const nuevo = Number(txt) || 0;
+        if (!nuevo) return UI.aviso('Precio inválido', 'warn');
+        global.DB.guardarPrecioProveedor(this.prov, vid, nuevo, 'Brian');
+        UI.aviso('Precio actualizado — rige desde hoy', 'ok');
+        this.render(this._mount);
+      });
       const q = document.getElementById('cx-q');
       if (q) q.oninput = () => {
         this.q = q.value;

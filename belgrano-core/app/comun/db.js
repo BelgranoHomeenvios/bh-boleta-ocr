@@ -1418,15 +1418,104 @@
         .filter(x => x.provId === Number(provId) && x.varianteId === Number(varianteId))
         .sort((a, b) => (this.diasDesde(a.desde) || 0) - (this.diasDesde(b.desde) || 0));
     },
-    // El aumento que pasó un proveedor, de una sola vez. Es como llega en la
-    // realidad: no manda una lista nueva, dice "todo un 12% más".
-    aumentarProveedor(provId, pct, quien = '') {
+    // El aumento que pasó un proveedor. Casi siempre es parejo —"todo un 12%
+    // más"— pero de vez en cuando sube sólo un tipo de mueble, así que se
+    // puede acotar a una categoría o a un mueble suelto.
+    aumentarProveedor(provId, pct, { categoriaId = null, varianteId = null,
+      quien = '' } = {}) {
       const p = Number(pct) || 0;
       if (!p) return 0;
-      const suyos = this.listaPrecios().filter(x => x.provId === Number(provId));
+      let suyos = this.listaPrecios().filter(x => x.provId === Number(provId));
+      if (varianteId != null) {
+        suyos = suyos.filter(x => x.varianteId === Number(varianteId));
+      } else if (categoriaId != null) {
+        suyos = suyos.filter(x => {
+          const prod = this.productoDeVariante(x.varianteId);
+          return prod && prod.categoria_id === Number(categoriaId);
+        });
+      }
       suyos.forEach(x => this.guardarPrecioProveedor(provId, x.varianteId,
         Math.round((Number(x.precio) || 0) * (1 + p / 100)), quien));
       return suyos.length;
+    },
+    // Las categorías en las que ese taller tiene precios: son las únicas a
+    // las que tiene sentido aplicarle un aumento acotado.
+    categoriasDeProveedor(provId) {
+      const ids = {};
+      this.listaPrecios().filter(x => x.provId === Number(provId)).forEach(x => {
+        const p = this.productoDeVariante(x.varianteId);
+        if (p) ids[p.categoria_id] = (ids[p.categoria_id] || 0) + 1;
+      });
+      return Object.keys(ids).map(id => {
+        const c = DEMO.categorias.find(x => x.id === Number(id));
+        return { id: Number(id), nombre: c ? c.nombre : `#${id}`, n: ids[id] };
+      }).sort((a, b) => b.n - a.n);
+    },
+
+    // ---- Lo que le vendemos al proveedor -----------------------------------
+    // Jony le entrega correderas, placas, paraíso, y eso baja lo que le
+    // debemos. No a todos se les vende al mismo precio, así que cada taller
+    // tiene su propia lista. El insumo sale del catálogo de INSUMOS.
+    VENTA_KEY: 'bh_venta_materiales',
+    listaMateriales() {
+      if (this._vmat) return this._vmat;
+      let g = [];
+      try { g = JSON.parse(localStorage.getItem(this.VENTA_KEY)) || []; } catch {}
+      this._vmat = g;
+      if (!g.length) this._sembrarMateriales();
+      return this._vmat;
+    },
+    _guardarMateriales() {
+      try { localStorage.setItem(this.VENTA_KEY, JSON.stringify(this._vmat || [])); } catch {}
+    },
+    // Lo que le cobramos a ESE taller por ESE insumo. Si nunca se le vendió,
+    // se usa lo que nos costó a nosotros y se avisa que es una estimación.
+    precioMaterial(provId, insumoK) {
+      const x = this.listaMateriales().find(y => y.provId === Number(provId)
+        && y.insumo === insumoK);
+      if (x) return { precio: Number(x.precio) || 0, desde: x.desde, estimado: false };
+      const i = this.INSUMOS.find(y => y.k === insumoK);
+      return { precio: i ? Number(i.precio) || 0 : 0, desde: '', estimado: true };
+    },
+    guardarPrecioMaterial(provId, insumoK, precio, quien = '') {
+      const lista = this.listaMateriales();
+      const i = lista.findIndex(x => x.provId === Number(provId) && x.insumo === insumoK);
+      const reg = { provId: Number(provId), insumo: insumoK,
+        precio: Number(precio) || 0, desde: this.hoyCorto(), quien: quien || 'yo' };
+      if (i >= 0) lista[i] = reg; else lista.push(reg);
+      this._guardarMateriales();
+      return reg;
+    },
+    materialesDe(provId) {
+      return this.INSUMOS.map(i => ({ ...i, ...this.precioMaterial(provId, i.k) }));
+    },
+    // Venderle materiales: anota la venta en la cuenta y deja el detalle de
+    // qué se llevó, que es lo que después se discute.
+    venderMateriales(provId, lineas, quien = '') {
+      const det = lineas.filter(l => Number(l.cantidad) > 0).map(l => {
+        const i = this.INSUMOS.find(x => x.k === l.insumo) || {};
+        const pu = Number(l.precio) || this.precioMaterial(provId, l.insumo).precio;
+        return { insumo: l.insumo, label: i.nombre || l.insumo, unidad: i.unidad || '',
+          cantidad: Number(l.cantidad), precio: pu, total: Math.round(pu * Number(l.cantidad)) };
+      });
+      if (!det.length) return null;
+      const total = det.reduce((a, x) => a + x.total, 0);
+      const mov = this.anotarCuenta({ provId, tipo: 'materiales', monto: total,
+        detalle: det.map(x => `${x.cantidad} ${x.label}`).join(' · '), quien });
+      if (mov) mov.lineas = det;
+      this._guardarCta();
+      return mov;
+    },
+    _sembrarMateriales() {
+      this._vmat = [];
+      // A cada taller se le vende con su propio recargo sobre lo que nos costó.
+      this.proveedores().forEach((p, i) => {
+        const recargo = 1.12 + (p.id % 4) * 0.05;
+        this.INSUMOS.slice(0, 6 + (p.id % 4)).forEach(ins => {
+          this.guardarPrecioMaterial(p.id, ins.k,
+            Math.round((Number(ins.precio) || 0) * recargo / 100) * 100, 'Jony');
+        });
+      });
     },
     // El último aumento que pasó un taller. No el promedio de toda su
     // historia: eso mezcla el aumento de marzo con el de julio y no dice
@@ -1451,7 +1540,18 @@
       const r = this.recepcion(num); if (!r) return null;
       lineas.forEach(l => {
         const it = r.items.find(x => x.unidadId === l.unidadId);
-        if (it) { it.precio = Number(l.precio) || 0; it.motivo = l.motivo || ''; }
+        if (it) {
+          it.precio = Number(l.precio) || 0;
+          it.motivo = l.motivo || '';
+          // El descuento se guarda aparte del precio: hace falta poder
+          // decirle al taller "tenías que traer un millón, trajiste 900,
+          // los 100 los perdiste en descuentos".
+          if (l.descuento) {
+            it.lista = Number(l.lista) || it.lista || 0;
+            it.descuento = Number(l.descuento) || 0;
+            it.descuentoMotivo = l.descuentoMotivo || '';
+          }
+        }
         if (l.aLista) this.guardarPrecioProveedor(r.provId, l.varianteId, l.precio, quien);
       });
       r.estadoCompras = 'conformada';
@@ -1636,6 +1736,16 @@
         forma, quien: quien || 'yo', el: this.hoyCorto() };
       return r.comprobante;
     },
+    // Cuánto se le descontó en esa entrega y por qué. Es lo que Jony le
+    // muestra al carpintero cuando le paga menos de lo que él esperaba.
+    descuentosDe(r) {
+      const ls = (r && r.items || []).filter(x => x.descuento);
+      return { total: ls.reduce((a, x) => a + (Number(x.descuento) || 0), 0),
+        lineas: ls,
+        deberia: (r && r.items || []).reduce((a, x) =>
+          a + (Number(x.lista) || Number(x.precio) || 0), 0) };
+    },
+
     // Lo que se paga de verdad: los muebles, más el IVA y los impuestos si la
     // compra fue formal, más el flete si se decidió meterlo adentro.
     totalDeEntrega(r) {
@@ -1691,8 +1801,45 @@
         && d.momento === 'despues'
         && (provId == null || d.provId === Number(provId)));
     },
+    // El mueble que no vuelve se descuenta de la cuenta. Si el taller
+    // reaparece con él, se le vuelve a pagar: por eso no se borra, cambia
+    // de estado y queda a la vista.
+    descontarDevolucion(id, monto, quien = '') {
+      const d = this.devoluciones().find(x => x.id === Number(id)); if (!d) return null;
+      const p = monto != null ? Number(monto)
+        : this.precioProveedor(d.provId, d.varianteId).precio;
+      this.anotarCuenta({ provId: d.provId, tipo: 'descuento', monto: p,
+        detalle: `${d.modelo || 'mueble'} devuelto y no repuesto${
+          d.serie ? ` · ${d.serie}` : ''}`,
+        ref: d.serie || '', quien: quien || 'yo' });
+      d.estado = 'descontado';
+      d.descontadoEl = this.hoyCorto();
+      d.descontadoPor = quien || 'yo';
+      d.montoDescontado = p;
+      this._guardarDevol();
+      return d;
+    },
+    // Cuánto hace que se lo llevó. Es el número que hay que gritar: a la
+    // primera entrega ya tiene que aparecer, y si vuelve a venir sin traerlo
+    // aparece más fuerte.
+    diasDeDevolucion(d) { return this.diasDesde(d.fecha); },
+    // Las que hay que reclamarle al taller que está enfrente ahora mismo,
+    // ya sea porque nunca las trajo o porque ya se le descontaron.
+    reclamosA(provId) {
+      return this.devoluciones().filter(d => d.provId === Number(provId)
+        && (d.estado === 'pendiente' || d.estado === 'descontado')
+        && d.momento === 'despues')
+        .map(d => ({ ...d, dias: this.diasDeDevolucion(d) }))
+        .sort((a, b) => (b.dias || 0) - (a.dias || 0));
+    },
     saldarDevolucion(id, quien = '') {
       const d = this.devoluciones().find(x => x.id === Number(id)); if (!d) return null;
+      // Si ya se lo habíamos descontado, al traerlo hay que volver a pagárselo.
+      if (d.estado === 'descontado' && d.montoDescontado) {
+        this.anotarCuenta({ provId: d.provId, tipo: 'compra', monto: d.montoDescontado,
+          detalle: `${d.modelo || 'mueble'} repuesto — se le había descontado`,
+          ref: d.serie || '', quien: quien || 'yo' });
+      }
       d.estado = 'repuesto'; d.repuestoEl = this.hoyCorto(); d.repuestoPor = quien || 'yo';
       this._guardarDevol();
       return d;
@@ -1714,24 +1861,80 @@
     _guardarAgenda() {
       try { localStorage.setItem(this.AGENDA_KEY, JSON.stringify(this._agenda || [])); } catch {}
     },
-    // Quién tiene tomado un día. null quiere decir que está libre.
-    diaTomado(fecha) {
-      return this.agenda().find(x => x.fecha === fecha && x.estado === 'reservado') || null;
+    // Entran dos por día, pero no a la misma hora: uno bien temprano y el
+    // otro después del mediodía. Un solo taller puede venir cuando quiera
+    // mientras llegue antes de las tres.
+    FRANJAS: [
+      { k: 'manana', label: 'A la mañana', pie: 'Temprano, antes del mediodía.' },
+      { k: 'tarde', label: 'A la tarde', pie: 'Después del mediodía, antes de las tres.' },
+    ],
+    franja(k) { return this.FRANJAS.find(x => x.k === k) || this.FRANJAS[0]; },
+    // Cuántos muebles se pueden bajar en una jornada. Más que esto no entra
+    // aunque los dos talleres se porten bien.
+    TOPE_DIA: 70,
+    // Todos los que tienen tomado un día. Puede haber dos.
+    delDia(fecha) {
+      return this.agenda().filter(x => x.fecha === fecha && x.estado === 'reservado');
     },
-    reservarDia(provId, fecha, { muebles = 0, nota = '', quien = '' } = {}) {
-      const ya = this.diaTomado(fecha);
-      if (ya && ya.provId !== Number(provId)) {
-        return { error: `Ese día ya lo tiene ${ya.proveedor}` };
-      }
+    // El primero del día, para lo que necesita uno solo.
+    diaTomado(fecha) { return this.delDia(fecha)[0] || null; },
+    // Cómo viene ese día: cuántos vienen, cuántos muebles y si se pasa.
+    cargaDelDia(fecha) {
+      const hs = this.delDia(fecha);
+      const muebles = hs.reduce((a, x) => a + (Number(x.muebles) || 0), 0);
+      return { visitas: hs.length, muebles, tope: this.TOPE_DIA,
+        pasado: muebles > this.TOPE_DIA, lleno: hs.length >= 2 };
+    },
+    reservarDia(provId, fecha, { muebles = 0, nota = '', franja = '', quien = '',
+      forzar = false } = {}) {
       const ag = this.agenda();
-      if (ya) { ya.muebles = Number(muebles) || ya.muebles; ya.nota = nota || ya.nota;
-        this._guardarAgenda(); return ya; }
+      const hs = this.delDia(fecha);
+      const mio = hs.find(x => x.provId === Number(provId));
+      if (mio) {
+        mio.muebles = Number(muebles) || mio.muebles;
+        mio.nota = nota || mio.nota;
+        if (franja) mio.franja = franja;
+        this._guardarAgenda();
+        return mio;
+      }
+      // Tres talleres el mismo día no entran de ninguna manera.
+      if (hs.length >= 2) {
+        return { error: `El ${fecha} ya tiene dos: ${hs.map(x => x.proveedor).join(' y ')}` };
+      }
+      // El segundo se puede, pero no en la misma franja y avisando.
+      const libre = franja || (hs.length ? (hs[0].franja === 'manana' ? 'tarde' : 'manana') : 'manana');
+      if (hs.length && hs[0].franja === libre) {
+        return { error: `${hs[0].proveedor} ya viene ${this.franja(libre).label.toLowerCase()}` };
+      }
+      const total = hs.reduce((a, x) => a + (Number(x.muebles) || 0), 0) + (Number(muebles) || 0);
+      if (hs.length && total > this.TOPE_DIA && !forzar) {
+        return { aviso: `Serían ${total} muebles en un día y el tope son ${this.TOPE_DIA}`,
+          total, otro: hs[0] };
+      }
       const r = { id: ag.reduce((m, x) => Math.max(m, x.id || 0), 0) + 1,
         provId: Number(provId), proveedor: this.provLabel(provId), fecha,
-        muebles: Number(muebles) || 0, nota, estado: 'reservado',
-        quien: quien || 'yo', reprogramada: 0 };
+        muebles: Number(muebles) || 0, nota, franja: libre, estado: 'reservado',
+        quien: quien || 'yo', reprogramada: 0,
+        forzado: !!(hs.length && total > this.TOPE_DIA) };
       ag.push(r);
       this._guardarAgenda();
+      return r;
+    },
+    // El taller que cayó sin avisar: se anota igual, como vino.
+    anotarQueVino(provId, { muebles = 0, quien = '' } = {}) {
+      const hoy = this.hoyCorto();
+      const r = this.reservarDia(provId, hoy, { muebles, nota: 'vino sin avisar',
+        quien, forzar: true });
+      if (r && r.error) {
+        // Aunque el día esté lleno, si vino, vino. Queda anotado igual.
+        const ag = this.agenda();
+        const x = { id: ag.reduce((m, y) => Math.max(m, y.id || 0), 0) + 1,
+          provId: Number(provId), proveedor: this.provLabel(provId), fecha: hoy,
+          muebles: Number(muebles) || 0, nota: 'vino sin avisar', franja: 'tarde',
+          estado: 'reservado', quien: quien || 'yo', reprogramada: 0, forzado: true };
+        ag.push(x); this._guardarAgenda();
+        return x;
+      }
       return r;
     },
     // Reprogramar no borra: se anota, porque el taller que corre la fecha
@@ -1773,7 +1976,8 @@
       provs.forEach((p, i) => {
         const f = this.sumarDias(this.hoyCorto(), dia);
         this.reservarDia(p.id, f, { muebles: 38 + (p.id * 5) % 18,
-          nota: i % 3 === 0 ? 'trae los del pedido cerrado' : '', quien: 'Jony' });
+          nota: i % 3 === 0 ? 'trae los del pedido cerrado' : '',
+          franja: 'manana', quien: 'Jony' });
         dia += (i % 2) ? 2 : 1;
       });
       // Uno que ya corrió la fecha dos veces: pasa y hay que verlo.

@@ -10,6 +10,7 @@
     _mount: 'view',
     abierta: null,
     _lineas: {},
+    _desc: {},
 
     async render(mount = 'view') {
       this._mount = mount;
@@ -69,6 +70,8 @@
           costeo: pr.costeo || null,
           precio: puesto != null ? puesto : (it.precio != null ? it.precio : pr.precio) };
       });
+      const totDesc = lin.reduce((a, l) => a
+        + (this._desc[l.it.unidadId] || l.it.descuento || 0), 0);
       const total = lin.reduce((a, l) => a + (Number(l.precio) || 0), 0);
       const totLista = lin.reduce((a, l) => a + l.lista, 0);
       const dif = total - (this._remito != null ? this._remito : total);
@@ -82,12 +85,16 @@
             <div class="h-sub">Recibida por <b>${UI.esc(r.recibidoPor)}</b> el ${UI.esc(r.fecha)} ·
               ${r.items.length} muebles del pedido ${UI.esc(r.pedido || '—')}</div></div>
           <div class="sp"></div>
+          <button class="b-x" data-lprov="${r.provId}">Ver su lista de precios</button>
           ${hecha ? `<span class="pill ok">conformada por ${UI.esc(r.conformadaPor)}</span>` : ''}
         </div>
 
+        ${this.htmlReclamos(r)}
+
         <div class="card cp-tabla"><table>
           <thead><tr><th>Mueble</th><th>Terminación</th><th>Cómo llegó</th><th>Venta</th>
-            <th class="num">De lista</th><th class="num">A pagar</th><th></th></tr></thead>
+            <th class="num">De lista</th><th class="num">Descuento</th>
+            <th class="num">A pagar</th><th></th></tr></thead>
           <tbody>${lin.map(l => {
             const c = global.DB.calidad(l.it.calidad) || {};
             const d = (Number(l.precio) || 0) - l.lista;
@@ -100,6 +107,11 @@
               <td class="num muted">${UI.pesos(l.lista)}${l.estimado
                 ? `<span class="cp-est" title="${UI.esc(this.pieOrigen(l))}">${
                   UI.esc((global.DB.ORIGENES_PRECIO[l.origen] || {}).label || 'est.')}</span>` : ''}</td>
+              <td class="num">${hecha
+                ? (l.it.descuento ? `<span class="baja">−${UI.pesos(l.it.descuento)}</span>` : '—')
+                : `<input class="cp-in cp-desc" type="number" placeholder="0"
+                    value="${this._desc[l.it.unidadId] || ''}"
+                    data-desc="${l.it.unidadId}" title="Cuánto se le descuenta a este mueble">`}</td>
               <td class="num">${hecha ? UI.pesos(l.precio)
                 : `<input class="cp-in" type="number" value="${l.precio}"
                     data-precio="${l.it.unidadId}">`}</td>
@@ -112,6 +124,7 @@
           }).join('')}
           <tr class="cp-tot"><td colspan="4">Total de lo recibido</td>
             <td class="num">${UI.pesos(totLista)}</td>
+            <td class="num" id="cp-descs">${totDesc ? `−${UI.pesos(totDesc)}` : '—'}</td>
             <td class="num" id="cp-total">${UI.pesos(total)}</td><td></td></tr>
           </tbody></table></div>
 
@@ -130,10 +143,33 @@
           <button class="btn" id="cp-guardar">Guardar sin conformar</button>
           <button class="btn primary" id="cp-ok">Conformar y pasar a pagar</button>
         </div>
+        <div class="card pad cp-desc-r" id="cp-resu" ${totDesc ? '' : 'hidden'}></div>
         <div class="hint" style="margin-top:9px">Corregir un precio tiene dos caminos:
           <b>sólo en esta orden</b> —queda como excepción— o <b>actualizar la lista</b>, que cambia
           lo que nos cobra ese taller de acá en más. Los <b>devueltos no están</b>: no se pagan. El
           que va <b>a reparar se paga igual</b>, el mueble está.</div>`}`;
+    },
+
+    // Lo que se llevó y no trajo. Va arriba de todo y en rojo: es lo que
+    // Jony le tiene que reclamar antes de pagarle, sin tener que acordarse.
+    htmlReclamos(r) {
+      const rs = global.DB.reclamosA(r.provId);
+      if (!rs.length) return '';
+      return `<div class="card pad cp-recl">
+        <div class="cp-recl-h">⚠ ${UI.esc(r.proveedor)} tiene ${rs.length}
+          ${rs.length === 1 ? 'mueble' : 'muebles'} de una entrega anterior sin traer</div>
+        ${rs.map(d => `<div class="cp-recl-f">
+          <span class="pill ${d.estado === 'descontado' ? 'soft' : 'crit'}">${
+            d.estado === 'descontado' ? 'ya descontado'
+              : `hace ${d.dias == null ? '?' : d.dias} días`}</span>
+          <b>${UI.esc(d.modelo || '')}</b>
+          <span class="muted">${UI.esc(d.medida || '')} · ${UI.esc(d.color || '')}
+            ${d.serie ? `· ${UI.esc(d.serie)}` : ''}</span>
+          <span class="muted">${UI.esc(d.motivo || '')}</span>
+        </div>`).join('')}
+        <div class="hint">Preguntarle si lo trajo hoy. Si no, se le descuenta desde su
+          <button class="lnk" data-cta="${r.provId}">cuenta corriente</button>.</div>
+      </div>`;
     },
 
     // De dónde salió el número que aparece como precio de lista.
@@ -269,17 +305,41 @@
         this.abierta = null; this._lineas = {}; this._remito = null;
         this._flete = null; this._fleteMonto = null;
         this._comp = null; this._iva = null; this._otros = null; this._forma = null;
+        this._desc = {};
         this.render(this._mount);
       };
       document.querySelectorAll('[data-ver]').forEach(b => b.onclick = () => {
         this.abierta = b.dataset.ver; this._lineas = {}; this._remito = null;
         this._flete = null; this._fleteMonto = null;
         this._comp = null; this._iva = null; this._otros = null; this._forma = null;
+        this._desc = {};
         this.render(this._mount);
       });
       document.querySelectorAll('[data-precio]').forEach(i => i.oninput = () => {
         this._lineas[i.dataset.precio] = Number(i.value) || 0;
         this.recalcular();
+      });
+      // El descuento baja el precio a pagar: se escribe una vez y el resto
+      // se acomoda solo.
+      document.querySelectorAll('[data-desc]').forEach(i => i.oninput = () => {
+        const id = i.dataset.desc;
+        const d = Number(i.value) || 0;
+        this._desc[id] = d;
+        const r = global.DB.recepcion(this.abierta);
+        const it = r.items.find(x => String(x.unidadId) === String(id));
+        const lista = global.DB.precioProveedor(r.provId, it.varianteId).precio;
+        this._lineas[id] = Math.max(0, lista - d);
+        const inp = document.querySelector(`[data-precio="${id}"]`);
+        if (inp) inp.value = this._lineas[id];
+        this.recalcular();
+      });
+      document.querySelectorAll('[data-lprov]').forEach(b => b.onclick = () => {
+        global.ComprasLista.prov = Number(b.dataset.lprov);
+        global.App.goSub('compras', 'lista');
+      });
+      document.querySelectorAll('[data-cta]').forEach(b => b.onclick = () => {
+        global.ComprasCuenta.abierto = Number(b.dataset.cta);
+        global.App.goSub('compras', 'cuenta');
       });
       document.querySelectorAll('[data-lista]').forEach(b => b.onclick = () => {
         const [uid, vid] = b.dataset.lista.split('|');
@@ -319,7 +379,11 @@
         const r = global.DB.recepcion(this.abierta);
         const lineas = r.items.map(it => ({ unidadId: it.unidadId, varianteId: it.varianteId,
           precio: this._lineas[it.unidadId] != null ? this._lineas[it.unidadId]
-            : global.DB.precioProveedor(r.provId, it.varianteId).precio }));
+            : global.DB.precioProveedor(r.provId, it.varianteId).precio,
+          lista: global.DB.precioProveedor(r.provId, it.varianteId).precio,
+          descuento: this._desc[it.unidadId] || 0,
+          descuentoMotivo: it.nota || (it.calidad && it.calidad !== 'perfecto'
+            ? `vino ${(global.DB.calidad(it.calidad) || {}).label || it.calidad}` : '') }));
         const total = lineas.reduce((a, l) => a + l.precio, 0);
         if (this._remito != null && Math.round(this._remito) !== Math.round(total)) {
           return UI.aviso('El total no coincide con el remito — corregí una línea o sacá el remito', 'warn');
@@ -347,6 +411,20 @@
         ? this._lineas[it.unidadId] : global.DB.precioProveedor(r.provId, it.varianteId).precio), 0);
       const t = document.getElementById('cp-total');
       if (t) t.textContent = UI.pesos(total);
+      const td = r.items.reduce((a, it) => a + (this._desc[it.unidadId] || 0), 0);
+      const dd = document.getElementById('cp-descs');
+      if (dd) dd.textContent = td ? `−${UI.pesos(td)}` : '—';
+      // La frase que Jony le dice al carpintero, armada mientras escribe.
+      const resu = document.getElementById('cp-resu');
+      if (resu) {
+        const lista = r.items.reduce((a, it) =>
+          a + global.DB.precioProveedor(r.provId, it.varianteId).precio, 0);
+        resu.hidden = !td;
+        if (td) resu.innerHTML = `<b>Tenía que traer ${UI.pesos(lista)} y trajo
+          ${UI.pesos(total)}.</b><span>Se le descuentan
+          <b class="baja">${UI.pesos(td)}</b> por los muebles que vinieron con detalle.
+          Eso es lo que hay que mostrarle cuando se le paga.</span>`;
+      }
       const d = document.getElementById('cp-dif');
       const ok = document.getElementById('cp-ok');
       if (!d) return;
@@ -403,6 +481,17 @@
           padding-top:9px;border-top:1px solid var(--line-soft);font-size:12.5px;color:var(--muted)}
         .cp-comp-t b{color:var(--navy);font-size:13.5px}
         .cp-comp-tot b{font-size:17px}
+        .cp-recl{border-color:var(--crit);background:var(--crit-bg);margin-bottom:12px}
+        .cp-recl-h{font-size:13px;font-weight:700;color:var(--crit);margin-bottom:7px}
+        .cp-recl-f{display:flex;gap:9px;align-items:center;flex-wrap:wrap;font-size:12.5px;
+          padding:3px 0}
+        .cp-recl-f b{color:var(--navy)}
+        .cp-recl .hint{margin-top:6px}
+        .cp-desc{border-color:var(--warn)}
+        .cp-desc-r{margin-top:11px;border-left:3px solid var(--warn);display:flex;
+          flex-direction:column;gap:3px}
+        .cp-desc-r b{font-size:14px;color:var(--navy)}
+        .cp-desc-r span{font-size:12px;color:var(--muted)}
         .cp-back{position:fixed;inset:0;background:rgba(12,20,34,.45);z-index:70;
           display:flex;align-items:center;justify-content:center;padding:20px}
       </style>`;

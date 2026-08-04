@@ -91,7 +91,7 @@
       const movs = global.DB.movimientosDe(id);
       const c = global.DB.compensacion(id);
       const s = global.DB.leerSaldo(c.saldo);
-      const debeTraer = global.DB.devolucionesPendientes(id);
+      const reclamos = global.DB.reclamosA(id);
       const prox = global.DB.agenda().find(x => x.provId === id && x.estado === 'reservado');
       // El saldo corrido, para poder seguir la cuenta renglón por renglón.
       let acum = 0;
@@ -116,17 +116,27 @@
             <b>${UI.pesos(Math.abs(c.saldo))}</b></div>
         </div>
 
-        <div class="card pad cx-comp">
-          <div class="cx-b-h">Cómo se compone</div>
-          <div class="cx-comp-g">
-            <span><b>${UI.pesos(c.debe)}</b><span>muebles que trajo</span></span>
-            <span class="cx-menos">−</span>
-            <span><b>${UI.pesos(c.materiales)}</b><span>materiales que le vendimos</span></span>
-            <span class="cx-menos">−</span>
-            <span><b>${UI.pesos(c.haber - c.materiales)}</b><span>pagos y anticipos</span></span>
-            <span class="cx-menos">=</span>
-            <span class="cx-igual"><b class="${c.saldo > 0 ? 'sube' : 'baja'}">${
-              UI.pesos(Math.abs(c.saldo))}</b><span>${UI.esc(s.txt)}</span></span>
+        <div class="cx-dos">
+          <div class="card pad cx-lado compro">
+            <div class="cx-b-h">Lo que le compramos</div>
+            <b class="cx-lado-v">${UI.pesos(c.debe)}</b>
+            <div class="hint">${movs.filter(m => m.tipo === 'compra').length} entregas de muebles</div>
+          </div>
+          <div class="card pad cx-lado vendo">
+            <div class="cx-b-h">Lo que le vendimos</div>
+            <b class="cx-lado-v">${UI.pesos(c.materiales)}</b>
+            <div class="hint">${movs.filter(m => m.tipo === 'materiales').length} entregas de materiales</div>
+          </div>
+          <div class="card pad cx-lado pago">
+            <div class="cx-b-h">Lo que le pagamos</div>
+            <b class="cx-lado-v">${UI.pesos(c.haber - c.materiales)}</b>
+            <div class="hint">${c.anticipos ? `incluye ${UI.pesos(c.anticipos)} de anticipos`
+              : 'pagos contra entrega'}</div>
+          </div>
+          <div class="card pad cx-lado queda ${c.saldo > 0 ? 'debe' : 'haber'}">
+            <div class="cx-b-h">Queda</div>
+            <b class="cx-lado-v ${c.saldo > 0 ? 'sube' : 'baja'}">${UI.pesos(Math.abs(c.saldo))}</b>
+            <div class="hint">${UI.esc(s.txt)}</div>
           </div>
         </div>
 
@@ -135,44 +145,130 @@
             `<button class="btn" data-nuevo="${m.k}">${UI.esc(m.label)}</button>`).join('')}
         </div>
 
-        ${debeTraer.length ? `<div class="card pad cx-debe">
-          <div class="cx-b-h">Muebles que ya pagamos y nos tiene que traer
-            <span class="muted">${debeTraer.length}</span></div>
-          ${debeTraer.map(d => `<div class="cx-debe-f">
+        ${reclamos.length ? `<div class="card pad cx-debe">
+          <div class="cx-b-h mal">Se llevó y no trajo <span class="muted">${reclamos.length}</span></div>
+          ${reclamos.map(d => `<div class="cx-debe-f ${d.estado === 'descontado' ? 'ya' : ''}">
+            <span class="pill ${d.estado === 'descontado' ? 'soft' : 'crit'}">${
+              d.estado === 'descontado' ? 'descontado' : `hace ${d.dias == null ? '?' : d.dias} días`}</span>
             <b>${UI.esc(d.modelo || '')}</b>
             <span class="muted">${UI.esc(d.medida || '')} · ${UI.esc(d.color || '')}
               · ${UI.esc(d.serie || '')}</span>
-            <span class="muted">${UI.esc(d.motivo || '')} · devuelto el ${UI.esc(d.fecha)}</span>
+            <span class="muted">${UI.esc(d.motivo || '')}</span>
             <span class="sp"></span>
-            <button class="b-x" data-repuesto="${d.id}">Ya lo trajo</button>
+            ${d.estado === 'descontado'
+              ? `<span class="muted">se le descontaron ${UI.pesos(d.montoDescontado || 0)}</span>
+                 <button class="b-x hacer" data-repuesto="${d.id}">Lo trajo · pagarle</button>`
+              : `<button class="b-x" data-descontar="${d.id}">Descontárselo</button>
+                 <button class="b-x hacer" data-repuesto="${d.id}">Ya lo trajo</button>`}
           </div>`).join('')}
+          <div class="hint">Esto tiene que estar a la vista cuando el taller está enfrente:
+            es lo que se le reclama antes de pagarle.</div>
         </div>` : ''}
 
         <div class="cx-b">
           <div class="cx-b-h">Movimientos <span class="muted">${movs.length}</span></div>
           <div class="card cx-tabla"><table>
-            <thead><tr><th>Fecha</th><th>Qué</th><th>Detalle</th><th>Cómo</th><th>Quién</th>
-              <th class="num">Le debemos</th><th class="num">Le pagamos</th>
+            <thead><tr><th>Fecha</th><th>Qué</th><th>Detalle</th><th>Muebles</th><th>Cómo</th>
+              <th>Quién</th><th class="num">Le debemos</th><th class="num">Le pagamos</th>
               <th class="num">Saldo</th></tr></thead>
             <tbody>${filas.map(({ m, acum }) => {
               const t = global.DB.movCta(m.tipo) || {};
-              return `<tr>
+              // Si el movimiento salió de una entrega, se puede entrar a ver
+              // qué muebles trajo ese día: es la primera pregunta que aparece.
+              const rec = m.ref ? global.DB.recepcion(m.ref) : null;
+              return `<tr class="${rec ? 'cliq' : ''}" ${rec ? `data-rec="${UI.esc(m.ref)}"` : ''}>
                 <td class="muted">${UI.esc(m.fecha)}</td>
                 <td><span class="pill ${t.pill}">${UI.esc(t.label)}</span></td>
                 <td class="muted">${UI.esc(m.detalle || '')}${m.ref
                   ? ` <b>${UI.esc(m.ref)}</b>` : ''}</td>
+                <td>${rec ? `<b>${rec.items.length}</b>
+                  <span class="cx-ver">ver</span>` : ''}</td>
                 <td class="muted">${UI.esc((global.DB.FORMAS_PAGO.find(f => f.k === m.forma) || {}).label || '')}</td>
                 <td class="muted">${UI.esc(m.quien)}</td>
                 <td class="num">${m.signo > 0 ? UI.pesos(m.monto) : ''}</td>
                 <td class="num">${m.signo < 0 ? UI.pesos(m.monto) : ''}</td>
                 <td class="num nom">${UI.pesos(Math.abs(acum))}</td>
-              </tr>`;
+              </tr>${m.lineas ? this.htmlMateriales(m) : ''}`;
             }).join('')}</tbody></table></div>
         </div>`;
     },
 
+    // Qué se llevó exactamente en esa venta de materiales.
+    htmlMateriales(m) {
+      return `<tr class="cx-det"><td colspan="9"><div class="cx-mat">
+        ${m.lineas.map(l => `<span class="cx-mat-f"><b>${l.cantidad}</b>
+          ${UI.esc(l.label)} <span class="muted">a ${UI.pesos(l.precio)} el ${UI.esc(l.unidad)}
+          = ${UI.pesos(l.total)}</span></span>`).join('')}
+      </div></td></tr>`;
+    },
+
     // ---- Anotar un movimiento ----------------------------------------
+    // Venderle materiales no es poner un monto: es marcar qué se llevó. El
+    // precio sale de la lista de ESE taller, porque no a todos se les vende
+    // al mismo valor.
+    modalMateriales() {
+      const p = global.DB.proveedor(this.abierto);
+      const mats = global.DB.materialesDe(this.abierto);
+      document.body.insertAdjacentHTML('beforeend', `
+        <div class="cx-back" id="cx-mdl"><div class="card pad" style="max-width:620px;width:100%">
+          <h3 class="h-title" style="font-size:17px">Materiales para ${UI.esc(p.nombre)}</h3>
+          <p class="h-sub">Su lista propia. Lo que marques se le descuenta de lo que le debemos.</p>
+          <div class="cx-tabla" style="max-height:340px;overflow:auto;margin:10px 0"><table>
+            <thead><tr><th>Material</th><th>Unidad</th><th class="num">Su precio</th>
+              <th class="num">Cantidad</th><th class="num">Total</th></tr></thead>
+            <tbody>${mats.map(m => `<tr>
+              <td class="nom">${UI.esc(m.nombre)}</td>
+              <td class="muted">${UI.esc(m.unidad)}</td>
+              <td class="num"><input class="cp-in cx-p" type="number" value="${m.precio}"
+                data-p="${m.k}" style="width:92px">${m.estimado
+                ? '<span class="cx-est">est.</span>' : ''}</td>
+              <td class="num"><input class="cp-in cx-c" type="number" value="" placeholder="0"
+                data-c="${m.k}" style="width:70px"></td>
+              <td class="num nom" data-t="${m.k}">—</td>
+            </tr>`).join('')}</tbody></table></div>
+          <div class="row" style="gap:8px;align-items:center">
+            <b style="font-size:17px;color:var(--navy)">Total <span id="cx-tot">$0</span></b>
+            <div class="sp"></div>
+            <button class="btn" id="cx-cancel">Cancelar</button>
+            <button class="btn primary" id="cx-ok">Anotar la venta</button></div>
+          <div class="hint" style="margin-top:8px">Si le cambiás un precio acá, queda como su
+            precio de lista de acá en más.</div>
+        </div></div>`);
+      const cerrar = () => { const m = document.getElementById('cx-mdl'); if (m) m.remove(); };
+      const recalcular = () => {
+        let tot = 0;
+        document.querySelectorAll('[data-c]').forEach(i => {
+          const k = i.dataset.c;
+          const pr = Number(document.querySelector(`[data-p="${k}"]`).value) || 0;
+          const ca = Number(i.value) || 0;
+          const t = Math.round(pr * ca);
+          tot += t;
+          document.querySelector(`[data-t="${k}"]`).textContent = t ? UI.pesos(t) : '—';
+        });
+        document.getElementById('cx-tot').textContent = UI.pesos(tot);
+      };
+      document.querySelectorAll('[data-c],[data-p]').forEach(i => i.oninput = recalcular);
+      document.getElementById('cx-cancel').onclick = cerrar;
+      document.getElementById('cx-ok').onclick = () => {
+        const lineas = [];
+        document.querySelectorAll('[data-c]').forEach(i => {
+          const k = i.dataset.c;
+          const ca = Number(i.value) || 0;
+          if (!ca) return;
+          const pr = Number(document.querySelector(`[data-p="${k}"]`).value) || 0;
+          // El precio que puso Jony queda como el de ese taller.
+          global.DB.guardarPrecioMaterial(this.abierto, k, pr, 'Jony');
+          lineas.push({ insumo: k, cantidad: ca, precio: pr });
+        });
+        if (!lineas.length) return UI.aviso('No marcaste ningún material', 'warn');
+        const mov = global.DB.venderMateriales(this.abierto, lineas, 'Jony');
+        UI.aviso(`Se le vendieron ${UI.pesos(mov.monto)} en materiales`, 'ok');
+        cerrar(); this.render(this._mount);
+      };
+    },
+
     modalNuevo(tipo) {
+      if (tipo === 'materiales') return this.modalMateriales();
       const t = global.DB.movCta(tipo); if (!t) return;
       const p = global.DB.proveedor(this.abierto);
       const conForma = tipo === 'pago' || tipo === 'anticipo';
@@ -234,7 +330,21 @@
       if (v) v.onclick = () => { this.abierto = null; this.render(this._mount); };
       document.querySelectorAll('[data-nuevo]').forEach(b => b.onclick = () =>
         this.modalNuevo(b.dataset.nuevo));
-      document.querySelectorAll('[data-repuesto]').forEach(b => b.onclick = () => {
+      document.querySelectorAll('[data-rec]').forEach(tr => tr.onclick = () => {
+        global.ComprasRecepciones.abierta = tr.dataset.rec;
+        global.App.goSub('compras', 'recepciones');
+      });
+      document.querySelectorAll('[data-descontar]').forEach(b => b.onclick = e => {
+        e.stopPropagation();
+        const d = global.DB.devoluciones().find(x => x.id === Number(b.dataset.descontar));
+        const pr = global.DB.precioProveedor(d.provId, d.varianteId).precio;
+        if (!confirm(`¿Descontarle ${UI.pesos(pr)} por el ${d.modelo} que no trajo?`)) return;
+        global.DB.descontarDevolucion(d.id, pr, 'Jony');
+        UI.aviso('Descontado de su cuenta', 'ok');
+        this.render(this._mount);
+      });
+      document.querySelectorAll('[data-repuesto]').forEach(b => b.onclick = e => {
+        e.stopPropagation();
         global.DB.saldarDevolucion(Number(b.dataset.repuesto), 'Jony');
         UI.aviso('Anotado: lo trajo', 'ok');
         this.render(this._mount);
@@ -269,6 +379,23 @@
         .cx-debe-f:last-child{border-bottom:0}
         .cx-debe-f b{color:var(--navy)}
         .cx-debe-f .muted{font-size:11px}
+        .cx-dos{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+          gap:9px;margin-bottom:14px}
+        .cx-lado{display:flex;flex-direction:column}
+        .cx-lado-v{font-size:21px;color:var(--navy);line-height:1.2;margin:2px 0}
+        .cx-lado.compro{border-left:3px solid var(--navy)}
+        .cx-lado.vendo{border-left:3px solid var(--ok)}
+        .cx-lado.pago{border-left:3px solid var(--muted)}
+        .cx-lado.queda.debe{border-left:3px solid var(--warn);background:var(--warn-bg)}
+        .cx-lado.queda.haber{border-left:3px solid var(--ok);background:var(--ok-bg)}
+        .cx-ver{font-size:10px;color:var(--brand);font-weight:700;margin-left:4px}
+        .cx-mat{display:flex;gap:14px;flex-wrap:wrap;padding:4px 0}
+        .cx-mat-f{font-size:12px}
+        .cx-mat-f b{color:var(--navy)}
+        .cx-debe-f.ya{opacity:.65}
+        .cx-b-h.mal{color:var(--crit)}
+        .cx-est{font-size:9.5px;background:var(--panel-2);border:1px solid var(--line);
+          border-radius:999px;padding:0 5px;margin-left:4px;color:var(--muted)}
         .cx-back{position:fixed;inset:0;background:rgba(12,20,34,.45);z-index:70;
           display:flex;align-items:center;justify-content:center;padding:20px}
       </style>`;

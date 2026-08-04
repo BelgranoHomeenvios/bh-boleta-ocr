@@ -40,9 +40,10 @@
       for (let i = 0; i < corr; i++) out.push(null);
       for (let d = 1; d <= ultimo; d++) {
         const fecha = `${d}/${m + 1}`;
-        const r = global.DB.diaTomado(fecha);
+        const rs = global.DB.delDia(fecha);
+        const carga = global.DB.cargaDelDia(fecha);
         const finde = new Date(año, m, d).getDay();
-        out.push({ d, fecha, r, finde: finde === 0 || finde === 6,
+        out.push({ d, fecha, rs, carga, r: rs[0] || null, finde: finde === 0 || finde === 6,
           hoy: d === hoy.getDate() && m === hoy.getMonth(),
           pasado: new Date(año, m, d) < new Date(año, hoy.getMonth(), hoy.getDate()) });
       }
@@ -51,15 +52,18 @@
 
     html() {
       const cs = this.celdas();
-      const delMes = cs.filter(c => c && c.r);
-      const muebles = delMes.reduce((a, c) => a + (c.r.muebles || 0), 0);
-      const corridas = delMes.reduce((a, c) => a + (c.r.reprogramada || 0), 0);
-      const libres = cs.filter(c => c && !c.r && !c.finde && !c.pasado).length;
+      const visitas = cs.filter(c => c).flatMap(c => c.rs);
+      const delMes = cs.filter(c => c && c.rs.length);
+      const muebles = visitas.reduce((a, v) => a + (v.muebles || 0), 0);
+      const corridas = visitas.reduce((a, v) => a + (v.reprogramada || 0), 0);
+      const libres = cs.filter(c => c && !c.rs.length && !c.finde && !c.pasado).length;
+      const cargados = delMes.filter(c => c.carga.pasado).length;
       return `
         <div class="row" style="margin-bottom:12px;align-items:flex-start">
           <div><div class="kick">Compras</div><h1 class="h-title">Agenda de entregas</h1>
-            <div class="h-sub">Un proveedor por día — el depósito no da para dos</div></div>
+            <div class="h-sub">Hasta dos por día, uno a la mañana y otro a la tarde · tope ${global.DB.TOPE_DIA} muebles</div></div>
           <div class="sp"></div>
+          <button class="b-x" id="cx-vino">Vino uno sin avisar</button>
           <div class="cx-nav">
             <button class="b-x" id="cx-ant">‹</button>
             <b>${UI.esc(this.MESES[this.mes()])}</b>
@@ -68,8 +72,10 @@
         </div>
 
         <div class="cx-kpis">
-          ${this.kpi('Entregas del mes', delMes.length, `${muebles} muebles en total`)}
+          ${this.kpi('Entregas del mes', visitas.length, `${muebles} muebles en total`)}
           ${this.kpi('Días libres', libres, 'hábiles, sin nadie anotado')}
+          ${this.kpi('Días cargados', cargados,
+            cargados ? `pasan los ${global.DB.TOPE_DIA} muebles` : `ninguno pasa los ${global.DB.TOPE_DIA}`)}
           ${this.kpi('Fechas corridas', corridas,
             corridas ? 'alguien reprogramó' : 'nadie corrió la fecha')}
         </div>
@@ -82,69 +88,103 @@
         ${delMes.length ? `<div class="cx-b" style="margin-top:16px">
           <div class="cx-b-h">Las entregas de ${UI.esc(this.MESES[this.mes()])}</div>
           <div class="card cx-tabla"><table>
-            <thead><tr><th>Día</th><th>Proveedor</th><th>Muebles</th><th>Nota</th>
+            <thead><tr><th>Día</th><th>Cuándo</th><th>Proveedor</th><th>Muebles</th><th>Nota</th>
               <th>Corrió la fecha</th><th></th></tr></thead>
-            <tbody>${delMes.map(c => `<tr class="${c.r.reprogramada > 1 ? 'ojo' : ''}">
-              <td class="nom">${UI.esc(c.r.fecha)}</td>
-              <td>${UI.esc(c.r.proveedor)}</td>
-              <td>${c.r.muebles}</td>
-              <td class="muted">${UI.esc(c.r.nota || '')}</td>
-              <td class="muted">${c.r.reprogramada
-                ? `<b class="${c.r.reprogramada > 1 ? 'mal' : ''}">${c.r.reprogramada} ${
-                  c.r.reprogramada === 1 ? 'vez' : 'veces'}</b> ·
-                  ${UI.esc((c.r.corridas || []).map(x => x.motivo).join(' · '))}`
+            <tbody>${delMes.flatMap(c => c.rs.map(r => `<tr class="${
+              r.reprogramada > 1 ? 'ojo' : (c.carga.pasado ? 'mal' : '')}">
+              <td class="nom">${UI.esc(r.fecha)}</td>
+              <td class="muted">${UI.esc(global.DB.franja(r.franja).label)}</td>
+              <td>${UI.esc(r.proveedor)}</td>
+              <td>${r.muebles}${c.carga.pasado
+                ? ` <b class="mal">${c.carga.muebles} ese día</b>` : ''}</td>
+              <td class="muted">${UI.esc(r.nota || '')}</td>
+              <td class="muted">${r.reprogramada
+                ? `<b class="${r.reprogramada > 1 ? 'mal' : ''}">${r.reprogramada} ${
+                  r.reprogramada === 1 ? 'vez' : 'veces'}</b> ·
+                  ${UI.esc((r.corridas || []).map(x => x.motivo).join(' · '))}`
                 : 'no'}</td>
               <td class="td-acc">
-                <button class="b-x" data-mover="${c.r.id}">Correr</button>
-                <button class="b-x" data-libre="${c.r.id}">Liberar</button></td>
-            </tr>`).join('')}</tbody></table></div>
+                <button class="b-x" data-mover="${r.id}">Correr</button>
+                <button class="b-x" data-libre="${r.id}">Liberar</button></td>
+            </tr>`)).join('')}</tbody></table></div>
         </div>` : ''}
 
-        <div class="hint" style="margin-top:10px">Tocá un día libre para anotar quién viene. Si el
-          día ya está tomado el sistema no deja poner a otro encima: hay que correr uno de los dos.</div>`;
+        <div class="hint" style="margin-top:10px">Tocá un día para anotar quién viene. Entran
+          <b>dos por día</b> —uno a la mañana y otro a la tarde— y el tope son
+          <b>${global.DB.TOPE_DIA} muebles</b>: si se pasa, el sistema avisa pero deja seguir.
+          Un tercero no entra.</div>`;
     },
 
     celda(c) {
       if (!c) return '<span class="cx-d vacia"></span>';
       const cls = [c.finde ? 'finde' : '', c.hoy ? 'hoy' : '', c.pasado ? 'pasado' : '',
-        c.r ? 'tomado' : 'libre'].filter(Boolean).join(' ');
-      return `<button class="cx-d ${cls}" data-dia="${UI.esc(c.fecha)}"
-        ${c.pasado ? 'disabled' : ''}>
-        <span class="cx-d-n">${c.d}</span>
-        ${c.r ? `<span class="cx-d-p">${UI.esc(c.r.proveedor)}</span>
-          <span class="cx-d-m">${c.r.muebles} muebles</span>
-          ${c.r.reprogramada ? `<span class="cx-d-r">corrida ${c.r.reprogramada}×</span>` : ''}`
-          : ''}</button>`;
+        c.rs.length ? 'tomado' : 'libre'].filter(Boolean).join(' ');
+      return `<button class="cx-d ${cls} ${c.carga.pasado ? 'cargado' : ''}"
+        data-dia="${UI.esc(c.fecha)}" ${c.pasado ? 'disabled' : ''}>
+        <span class="cx-d-n">${c.d}${c.carga.pasado
+          ? `<span class="cx-d-t">${c.carga.muebles}</span>` : ''}</span>
+        ${c.rs.map(r => `<span class="cx-d-v">
+          <span class="cx-d-f">${r.franja === 'tarde' ? 'T' : 'M'}</span>
+          <span class="cx-d-p">${UI.esc(r.proveedor)}</span>
+          <span class="cx-d-m">${r.muebles}</span>
+          ${r.reprogramada ? `<span class="cx-d-r">${r.reprogramada}×</span>` : ''}
+        </span>`).join('')}</button>`;
     },
 
     // ---- Anotar quién viene -------------------------------------------
     modalDia(fecha) {
-      const ya = global.DB.diaTomado(fecha);
+      const hs = global.DB.delDia(fecha);
+      const carga = global.DB.cargaDelDia(fecha);
       const provs = global.DB.proveedores();
+      const libre = hs.length && hs[0].franja === 'manana' ? 'tarde' : 'manana';
       document.body.insertAdjacentHTML('beforeend', `
-        <div class="cx-back" id="cx-mdl"><div class="card pad" style="max-width:400px;width:100%">
-          <h3 class="h-title" style="font-size:17px">${ya ? 'Cambiar el' : 'Anotar el'} ${UI.esc(fecha)}</h3>
-          <p class="h-sub">${ya ? `Hoy está ${UI.esc(ya.proveedor)}. Si ponés otro hay que
-            correr a éste primero.` : 'Un solo proveedor por día.'}</p>
+        <div class="cx-back" id="cx-mdl"><div class="card pad" style="max-width:430px;width:100%">
+          <h3 class="h-title" style="font-size:17px">Anotar el ${UI.esc(fecha)}</h3>
+          <p class="h-sub">${hs.length
+            ? `Ya viene ${hs.map(x => `<b>${UI.esc(x.proveedor)}</b> ${
+              global.DB.franja(x.franja).label.toLowerCase()} con ${x.muebles}`).join(' y ')}.
+              ${carga.lleno ? 'No entra un tercero.' : `Entra uno más ${
+                global.DB.franja(libre).label.toLowerCase()}.`}`
+            : `Entran dos: uno a la mañana y otro a la tarde. El tope del día son
+               ${global.DB.TOPE_DIA} muebles.`}</p>
+          ${carga.lleno ? '' : `
           <label class="fld"><span class="lbl">Quién viene</span>
-            <select id="cx-prov">${provs.map(p => `<option value="${p.id}" ${
-              ya && ya.provId === p.id ? 'selected' : ''}>${UI.esc(p.nombre)} · ${
+            <select id="cx-prov">${provs.map(p => `<option value="${p.id}">${UI.esc(p.nombre)} · ${
               UI.esc((global.DB.rubro(p.rubro) || {}).label || p.rubro)}</option>`).join('')}</select></label>
+          <label class="fld"><span class="lbl">Cuándo</span>
+            <select id="cx-franja">${global.DB.FRANJAS.map(f =>
+              `<option value="${f.k}" ${f.k === libre ? 'selected' : ''}>${UI.esc(f.label)} — ${
+                UI.esc(f.pie)}</option>`).join('')}</select></label>
           <label class="fld"><span class="lbl">Cuántos muebles trae</span>
-            <input id="cx-mue" type="number" value="${ya ? ya.muebles : 45}"></label>
+            <input id="cx-mue" type="number" value="45"></label>
           <label class="fld"><span class="lbl">Nota</span>
-            <input id="cx-nota" value="${ya ? UI.esc(ya.nota || '') : ''}"
-              placeholder="trae los del pedido cerrado"></label>
+            <input id="cx-nota" placeholder="trae los del pedido cerrado"></label>
+          <div id="cx-alerta"></div>`}
           <div class="row" style="gap:8px;margin-top:12px"><div class="sp"></div>
-            <button class="btn" id="cx-cancel">Cancelar</button>
-            <button class="btn primary" id="cx-ok">Anotar</button></div>
+            <button class="btn" id="cx-cancel">${carga.lleno ? 'Cerrar' : 'Cancelar'}</button>
+            ${carga.lleno ? '' : '<button class="btn primary" id="cx-ok">Anotar</button>'}</div>
         </div></div>`);
       const cerrar = () => { const m = document.getElementById('cx-mdl'); if (m) m.remove(); };
       document.getElementById('cx-cancel').onclick = cerrar;
-      document.getElementById('cx-ok').onclick = () => {
+      const ok = document.getElementById('cx-ok');
+      if (!ok) return;
+      // Si con el segundo taller el día se pasa del tope, se avisa antes de
+      // que lo anote: no se prohíbe, se muestra.
+      const mirar = () => {
+        const n = Number(document.getElementById('cx-mue').value) || 0;
+        const tot = carga.muebles + n;
+        const a = document.getElementById('cx-alerta');
+        a.innerHTML = tot > global.DB.TOPE_DIA
+          ? `<div class="cx-alerta">⚠ Serían <b>${tot} muebles</b> ese día y el tope son
+             ${global.DB.TOPE_DIA}. Se puede anotar igual, pero va a estar apretado.</div>` : '';
+      };
+      document.getElementById('cx-mue').oninput = mirar;
+      mirar();
+      ok.onclick = () => {
         const r = global.DB.reservarDia(Number(document.getElementById('cx-prov').value), fecha, {
           muebles: Number(document.getElementById('cx-mue').value) || 0,
-          nota: document.getElementById('cx-nota').value, quien: 'Jony' });
+          franja: document.getElementById('cx-franja').value,
+          nota: document.getElementById('cx-nota').value, quien: 'Jony', forzar: true });
         if (r && r.error) return UI.aviso(r.error, 'warn');
         UI.aviso(`Anotado el ${fecha}`, 'ok');
         cerrar(); this.render(this._mount);
@@ -178,12 +218,40 @@
       };
     },
 
+    // El taller que cayó sin estar anotado. Se anota igual: si vino, vino.
+    modalVino() {
+      const provs = global.DB.proveedores();
+      document.body.insertAdjacentHTML('beforeend', `
+        <div class="cx-back" id="cx-mdl"><div class="card pad" style="max-width:380px;width:100%">
+          <h3 class="h-title" style="font-size:17px">Vino sin avisar</h3>
+          <p class="h-sub">Queda anotado hoy aunque el día ya estuviera tomado.</p>
+          <label class="fld"><span class="lbl">Quién vino</span>
+            <select id="cx-prov">${provs.map(p => `<option value="${p.id}">${
+              UI.esc(p.nombre)}</option>`).join('')}</select></label>
+          <label class="fld"><span class="lbl">Cuántos muebles trajo</span>
+            <input id="cx-mue" type="number" value="20"></label>
+          <div class="row" style="gap:8px;margin-top:12px"><div class="sp"></div>
+            <button class="btn" id="cx-cancel">Cancelar</button>
+            <button class="btn primary" id="cx-ok">Anotarlo</button></div>
+        </div></div>`);
+      const cerrar = () => { const m = document.getElementById('cx-mdl'); if (m) m.remove(); };
+      document.getElementById('cx-cancel').onclick = cerrar;
+      document.getElementById('cx-ok').onclick = () => {
+        global.DB.anotarQueVino(Number(document.getElementById('cx-prov').value),
+          { muebles: Number(document.getElementById('cx-mue').value) || 0, quien: 'Jony' });
+        UI.aviso('Anotado', 'ok');
+        cerrar(); this._mes = new Date().getMonth(); this.render(this._mount);
+      };
+    },
+
     kpi(t, v, pie) {
       return `<div class="cx-k"><span class="cx-k-t">${t}</span>
         <span class="cx-k-v">${v}</span><span class="cx-k-p">${pie}</span></div>`;
     },
 
     enganchar() {
+      const vino = document.getElementById('cx-vino');
+      if (vino) vino.onclick = () => this.modalVino();
       const a = document.getElementById('cx-ant');
       if (a) a.onclick = () => { this._mes = (this.mes() + 11) % 12; this.render(this._mount); };
       const s = document.getElementById('cx-sig');
@@ -216,7 +284,16 @@
         .cx-d.finde{background:var(--panel-2)}
         .cx-d.hoy{border-color:var(--navy);border-width:2px}
         .cx-d.tomado{background:var(--warn-bg);border-color:var(--warn)}
-        .cx-d-n{font-size:11.5px;font-weight:700;color:var(--muted)}
+        .cx-d-n{font-size:11.5px;font-weight:700;color:var(--muted);display:flex;
+          justify-content:space-between;align-items:center}
+        .cx-d-t{font-size:9.5px;color:var(--crit);background:var(--crit-bg);
+          border-radius:999px;padding:0 5px}
+        .cx-d-v{display:flex;gap:3px;align-items:baseline;line-height:1.2}
+        .cx-d-f{font-size:8.5px;font-weight:800;color:#fff;background:var(--muted);
+          border-radius:3px;padding:0 3px;flex:0 0 auto}
+        .cx-d.cargado{background:var(--crit-bg);border-color:var(--crit)}
+        .cx-alerta{font-size:11.5px;color:var(--crit);background:var(--crit-bg);
+          border:1px solid var(--crit);border-radius:8px;padding:7px 9px;margin-top:8px}
         .cx-d.tomado .cx-d-n{color:var(--navy)}
         .cx-d-p{font-size:11.5px;font-weight:700;color:var(--navy);line-height:1.15}
         .cx-d-m{font-size:10px;color:var(--muted)}
