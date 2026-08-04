@@ -135,7 +135,7 @@
 
     htmlCostos(n) {
       return `<div class="card cx-tabla tn-det"><table>
-        <thead><tr><th>De dónde</th><th>Quién</th><th class="num">Entregas</th>
+        <thead><tr><th>De dónde</th><th>Quién</th><th class="num">Compras</th>
           <th class="num">Muebles</th><th class="num">Total</th></tr></thead>
         <tbody>${n.costos.terminado.map(x => `<tr class="cliq" data-prov="${x.provId}">
           <td class="muted">Producto terminado</td>
@@ -144,11 +144,11 @@
           <td class="num">${x.piezas}</td>
           <td class="num nom">${UI.pesos(x.total)}</td>
         </tr>`).join('')}
-        ${n.costos.prima.map(x => `<tr>
+        ${n.costos.prima.map(x => `<tr class="cliq" data-mat="1">
           <td class="muted">Materia prima</td>
-          <td class="nom">${UI.esc(x.label)} <span class="muted">${UI.esc(x.numero)}</span></td>
-          <td class="num">1</td>
-          <td class="num muted">${x.items} insumos</td>
+          <td class="nom">${UI.esc(x.label)}</td>
+          <td class="num">${x.items}</td>
+          <td class="num muted">—</td>
           <td class="num nom">${UI.pesos(x.total)}</td>
         </tr>`).join('')}
         ${!n.costos.terminado.length && !n.costos.prima.length
@@ -156,8 +156,9 @@
         <tr class="cx-tot"><td colspan="4">Total de costos</td>
           <td class="num">${UI.pesos(n.costos.total)}</td></tr>
         </tbody></table>
-        <div class="hint" style="padding:8px 11px">Sale de las entregas que Jony conformó en
-          Compras. Tocá una fila para abrir la cuenta de ese taller.</div></div>`;
+        <div class="hint" style="padding:8px 11px">El producto terminado sale de las entregas
+          que Jony conformó; tocá una fila para abrir la cuenta de ese taller. La materia prima
+          sale de lo anotado en Compras · Materiales.</div></div>`;
     },
 
     htmlGastos(n) {
@@ -188,6 +189,10 @@
       });
       document.querySelectorAll('[data-mes]').forEach(tr => tr.onclick = () => {
         this.mes = Number(tr.dataset.mes); this.render(this._mount);
+      });
+      document.querySelectorAll('[data-mat]').forEach(tr => tr.onclick = () => {
+        global.ComprasMateriales.mes = this.mes;
+        global.App.goSub('compras', 'materiales');
       });
       document.querySelectorAll('[data-prov]').forEach(tr => tr.onclick = () => {
         global.ComprasCuenta.abierto = Number(tr.dataset.prov);

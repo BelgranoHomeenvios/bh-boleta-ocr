@@ -2103,6 +2103,110 @@
     },
 
 
+
+    // ---- Compras de material ------------------------------------------------
+    // La segunda etapa es llevar el stock de materiales: cuántas placas hay,
+    // cuántas cajas de correderas quedan. Eso todavía no. Lo que sí hace falta
+    // ya es poder anotar que se compró, porque en la planilla la materia prima
+    // es un costo del mes y sin eso el número no cierra.
+    //
+    // Los rubros son los de la planilla, no los de una lista inventada.
+    MATERIALES: [
+      { k: 'placas', rubro: 'madera', label: 'Placas', unidad: 'placa' },
+      { k: 'laca', rubro: 'laca', label: 'Laca', unidad: 'litro' },
+      { k: 'herrajes', rubro: 'herrajes', label: 'Herrajes', unidad: 'unidad' },
+      { k: 'correderas', rubro: 'herrajes', label: 'Correderas', unidad: 'par' },
+      { k: 'tornillos', rubro: 'herrajes', label: 'Tornillos', unidad: 'caja' },
+      { k: 'bisagras', rubro: 'herrajes', label: 'Bisagras', unidad: 'unidad' },
+      { k: 'perfiles', rubro: 'herrajes', label: 'Perfiles', unidad: 'unidad' },
+      { k: 'barrales', rubro: 'herrajes', label: 'Barrales', unidad: 'unidad' },
+      { k: 'eles', rubro: 'herrajes', label: 'Eles', unidad: 'unidad' },
+      { k: 'filos', rubro: 'filos', label: 'Filos', unidad: 'rollo' },
+      { k: 'espejos', rubro: 'espejos', label: 'Espejos', unidad: 'unidad' },
+      { k: 'adicionales', rubro: 'otros', label: 'Adicionales', unidad: '' },
+      { k: 'otros', rubro: 'otros', label: 'Otros', unidad: '' },
+    ],
+    RUBROS_MATERIAL: [
+      { k: 'madera', label: 'Madera' },
+      { k: 'laca', label: 'Laca' },
+      { k: 'herrajes', label: 'Herrajes' },
+      { k: 'filos', label: 'Filos' },
+      { k: 'espejos', label: 'Espejos' },
+      { k: 'otros', label: 'Otros' },
+    ],
+    material(k) { return this.MATERIALES.find(x => x.k === k) || null; },
+    rubroMaterial(k) { return this.RUBROS_MATERIAL.find(x => x.k === k) || null; },
+
+    MAT_KEY: 'bh_compras_material',
+    comprasMaterial() {
+      if (this._cmat) return this._cmat;
+      let g = [];
+      try { g = JSON.parse(localStorage.getItem(this.MAT_KEY)) || []; } catch {}
+      this._cmat = g;
+      if (!g.length) this._sembrarComprasMaterial();
+      return this._cmat;
+    },
+    _guardarComprasMaterial() {
+      try { localStorage.setItem(this.MAT_KEY, JSON.stringify(this._cmat || [])); } catch {}
+    },
+    // Anotar que se compró: qué, a quién, cuánto salió. La cantidad es
+    // opcional porque muchas veces se compra "un viaje de placas" y lo que
+    // importa es la plata, no el conteo.
+    comprarMaterial({ material, proveedor = '', cantidad = 0, monto, fecha = '',
+      forma = 'transferencia', comprobante = '', nota = '', quien = '' } = {}) {
+      const m = this.material(material); if (!m) return null;
+      const cs = this.comprasMaterial();
+      const c = { id: cs.reduce((a, x) => Math.max(a, x.id || 0), 0) + 1,
+        material, rubro: m.rubro, label: m.label, unidad: m.unidad,
+        proveedor, cantidad: Number(cantidad) || 0,
+        monto: Math.abs(Number(monto) || 0), fecha: fecha || this.hoyCorto(),
+        forma, comprobante, nota, quien: quien || 'yo', anulado: false };
+      cs.unshift(c);
+      this._guardarComprasMaterial();
+      return c;
+    },
+    anularCompraMaterial(id, motivo = '', quien = '') {
+      const c = this.comprasMaterial().find(x => x.id === Number(id)); if (!c) return null;
+      c.anulado = true; c.motivoAnulacion = motivo;
+      c.anuladoPor = quien || 'yo'; c.anuladoEl = this.hoyCorto();
+      this._guardarComprasMaterial();
+      return c;
+    },
+    materialesDelMes(mes) {
+      return this.comprasMaterial().filter(c => !c.anulado
+        && this.mesDe(c.fecha) === Number(mes));
+    },
+    // Lo comprado en el mes agrupado como en la planilla: por rubro.
+    materialPorRubro(mes) {
+      const cs = this.materialesDelMes(mes);
+      return this.RUBROS_MATERIAL.map(r => {
+        const suyos = cs.filter(x => x.rubro === r.k);
+        return { ...r, total: suyos.reduce((a, x) => a + x.monto, 0),
+          n: suyos.length, items: suyos };
+      }).filter(x => x.n > 0);
+    },
+    _sembrarComprasMaterial() {
+      this._cmat = [];
+      const mes = new Date().getMonth() + 1;
+      const D = [
+        ['placas', 'Maderera del Oeste', 40, 1680000, 2],
+        ['correderas', 'Herrajes Vitale', 60, 408000, 3],
+        ['laca', 'Pinturería Norte', 0, 620000, 5],
+        ['bisagras', 'Herrajes Vitale', 200, 380000, 8],
+        ['filos', 'Maderera del Oeste', 12, 240000, 12],
+        ['espejos', 'Cristalería Sur', 8, 520000, 15],
+      ];
+      for (let atras = 0; atras < 4; atras++) {
+        const mm = mes - atras > 0 ? mes - atras : 12 + (mes - atras);
+        D.forEach(([k, p, c, m, d], i) => {
+          const ruido = 1 + (((i + atras * 2) % 5) - 2) * 0.06;
+          this.comprarMaterial({ material: k, proveedor: p, cantidad: c,
+            monto: Math.round(m * ruido / 1000) * 1000,
+            fecha: `${d}/${mm}`, forma: 'transferencia', quien: 'Jony' });
+        });
+      }
+    },
+
     // ---- El número económico -----------------------------------------------
     // Es la tabla que hoy se arma una vez por mes en la planilla:
     //
@@ -2159,11 +2263,11 @@
           label: r.proveedor, total: 0, piezas: 0, entregas: 0 });
         b.total += t; b.piezas += r.items.length; b.entregas++;
       });
-      const ocs = this.ordenesCompra().filter(o => o.estado === 'recibida'
-        && this.mesDe(o.recibidaEl || o.entrega) === Number(mes));
       const terminado = Object.values(porProv).sort((a, b) => b.total - a.total);
-      const prima = ocs.map(o => ({ numero: o.numero, label: o.proveedor,
-        total: this.totalOC(o), items: o.items.length }));
+      // La materia prima sale de lo que se anotó como comprado. El stock —
+      // cuántas placas quedan— es la segunda etapa; el costo es ahora.
+      const prima = this.materialPorRubro(mes).map(r => ({ numero: r.k, label: r.label,
+        total: r.total, items: r.n }));
       return { terminado, prima,
         totalTerminado: terminado.reduce((a, x) => a + x.total, 0),
         totalPrima: prima.reduce((a, x) => a + x.total, 0),
@@ -2811,9 +2915,17 @@
     // carpintería los cinco son pares — ninguno es mejor que otro, sólo
     // cambia cuánto puede hacer por semana. Por eso el plano y la planilla van
     // dirigidos al rubro, no a una persona.
+    // Los rubros son los de la planilla de costos: cada uno agrupa a los
+    // talleres que hacen ese tipo de mueble. Un taller de sillas no es un
+    // carpintero aunque los dos trabajen la madera.
     RUBROS: [
       { k: 'carpinteria', label: 'Carpintería' },
+      { k: 'respaldos', label: 'Respaldos' },
+      { k: 'mesas', label: 'Mesas' },
+      { k: 'sillas', label: 'Sillas' },
+      { k: 'sillones', label: 'Sillones' },
       { k: 'herreria', label: 'Herrería' },
+      { k: 'lustrado', label: 'Lustrado' },
       { k: 'tapiceria', label: 'Tapicería' },
       { k: 'vidrieria', label: 'Vidriería' },
       { k: 'marmoleria', label: 'Marmolería' },
@@ -2835,6 +2947,16 @@
       { id: 8, nombre: 'Herrería Sur', rubro: 'herreria', capacidad: 15, direccion: 'Ruta 8 km 42' },
       { id: 9, nombre: 'Carla', rubro: 'herreria', capacidad: 10, direccion: 'Lavalle 990' },
       { id: 10, nombre: 'Laqueados Vera', rubro: 'laqueado', capacidad: 20, direccion: 'Colón 1330' },
+      // Los otros rubros: cada uno hace un tipo de mueble y no se mezclan.
+      { id: 11, nombre: 'Vicente', rubro: 'respaldos', capacidad: 14, direccion: '' },
+      { id: 12, nombre: 'Michel', rubro: 'mesas', capacidad: 10, direccion: '' },
+      { id: 13, nombre: 'David', rubro: 'mesas', capacidad: 8, direccion: '' },
+      { id: 14, nombre: 'La Classe', rubro: 'sillas', capacidad: 40, direccion: '' },
+      { id: 15, nombre: 'Julio Ledesma', rubro: 'sillas', capacidad: 25, direccion: '' },
+      { id: 16, nombre: 'Puro Palo', rubro: 'sillas', capacidad: 30, direccion: '' },
+      { id: 17, nombre: 'Andrés Roger', rubro: 'sillas', capacidad: 20, direccion: '' },
+      { id: 18, nombre: 'Sacchi', rubro: 'sillones', capacidad: 6, direccion: '' },
+      { id: 19, nombre: 'Roberto', rubro: 'lustrado', capacidad: 15, direccion: '' },
     ],
     // El id es el que manda: puede haber dos Vicente distintos, cada uno con su
     // domicilio y su rubro, y el sistema no los confunde.

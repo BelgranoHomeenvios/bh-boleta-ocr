@@ -2344,6 +2344,110 @@ tr:hover td{background:var(--panel-2)}
     },
 
 
+
+    // ---- Compras de material ------------------------------------------------
+    // La segunda etapa es llevar el stock de materiales: cuántas placas hay,
+    // cuántas cajas de correderas quedan. Eso todavía no. Lo que sí hace falta
+    // ya es poder anotar que se compró, porque en la planilla la materia prima
+    // es un costo del mes y sin eso el número no cierra.
+    //
+    // Los rubros son los de la planilla, no los de una lista inventada.
+    MATERIALES: [
+      { k: 'placas', rubro: 'madera', label: 'Placas', unidad: 'placa' },
+      { k: 'laca', rubro: 'laca', label: 'Laca', unidad: 'litro' },
+      { k: 'herrajes', rubro: 'herrajes', label: 'Herrajes', unidad: 'unidad' },
+      { k: 'correderas', rubro: 'herrajes', label: 'Correderas', unidad: 'par' },
+      { k: 'tornillos', rubro: 'herrajes', label: 'Tornillos', unidad: 'caja' },
+      { k: 'bisagras', rubro: 'herrajes', label: 'Bisagras', unidad: 'unidad' },
+      { k: 'perfiles', rubro: 'herrajes', label: 'Perfiles', unidad: 'unidad' },
+      { k: 'barrales', rubro: 'herrajes', label: 'Barrales', unidad: 'unidad' },
+      { k: 'eles', rubro: 'herrajes', label: 'Eles', unidad: 'unidad' },
+      { k: 'filos', rubro: 'filos', label: 'Filos', unidad: 'rollo' },
+      { k: 'espejos', rubro: 'espejos', label: 'Espejos', unidad: 'unidad' },
+      { k: 'adicionales', rubro: 'otros', label: 'Adicionales', unidad: '' },
+      { k: 'otros', rubro: 'otros', label: 'Otros', unidad: '' },
+    ],
+    RUBROS_MATERIAL: [
+      { k: 'madera', label: 'Madera' },
+      { k: 'laca', label: 'Laca' },
+      { k: 'herrajes', label: 'Herrajes' },
+      { k: 'filos', label: 'Filos' },
+      { k: 'espejos', label: 'Espejos' },
+      { k: 'otros', label: 'Otros' },
+    ],
+    material(k) { return this.MATERIALES.find(x => x.k === k) || null; },
+    rubroMaterial(k) { return this.RUBROS_MATERIAL.find(x => x.k === k) || null; },
+
+    MAT_KEY: 'bh_compras_material',
+    comprasMaterial() {
+      if (this._cmat) return this._cmat;
+      let g = [];
+      try { g = JSON.parse(localStorage.getItem(this.MAT_KEY)) || []; } catch {}
+      this._cmat = g;
+      if (!g.length) this._sembrarComprasMaterial();
+      return this._cmat;
+    },
+    _guardarComprasMaterial() {
+      try { localStorage.setItem(this.MAT_KEY, JSON.stringify(this._cmat || [])); } catch {}
+    },
+    // Anotar que se compró: qué, a quién, cuánto salió. La cantidad es
+    // opcional porque muchas veces se compra "un viaje de placas" y lo que
+    // importa es la plata, no el conteo.
+    comprarMaterial({ material, proveedor = '', cantidad = 0, monto, fecha = '',
+      forma = 'transferencia', comprobante = '', nota = '', quien = '' } = {}) {
+      const m = this.material(material); if (!m) return null;
+      const cs = this.comprasMaterial();
+      const c = { id: cs.reduce((a, x) => Math.max(a, x.id || 0), 0) + 1,
+        material, rubro: m.rubro, label: m.label, unidad: m.unidad,
+        proveedor, cantidad: Number(cantidad) || 0,
+        monto: Math.abs(Number(monto) || 0), fecha: fecha || this.hoyCorto(),
+        forma, comprobante, nota, quien: quien || 'yo', anulado: false };
+      cs.unshift(c);
+      this._guardarComprasMaterial();
+      return c;
+    },
+    anularCompraMaterial(id, motivo = '', quien = '') {
+      const c = this.comprasMaterial().find(x => x.id === Number(id)); if (!c) return null;
+      c.anulado = true; c.motivoAnulacion = motivo;
+      c.anuladoPor = quien || 'yo'; c.anuladoEl = this.hoyCorto();
+      this._guardarComprasMaterial();
+      return c;
+    },
+    materialesDelMes(mes) {
+      return this.comprasMaterial().filter(c => !c.anulado
+        && this.mesDe(c.fecha) === Number(mes));
+    },
+    // Lo comprado en el mes agrupado como en la planilla: por rubro.
+    materialPorRubro(mes) {
+      const cs = this.materialesDelMes(mes);
+      return this.RUBROS_MATERIAL.map(r => {
+        const suyos = cs.filter(x => x.rubro === r.k);
+        return { ...r, total: suyos.reduce((a, x) => a + x.monto, 0),
+          n: suyos.length, items: suyos };
+      }).filter(x => x.n > 0);
+    },
+    _sembrarComprasMaterial() {
+      this._cmat = [];
+      const mes = new Date().getMonth() + 1;
+      const D = [
+        ['placas', 'Maderera del Oeste', 40, 1680000, 2],
+        ['correderas', 'Herrajes Vitale', 60, 408000, 3],
+        ['laca', 'Pinturería Norte', 0, 620000, 5],
+        ['bisagras', 'Herrajes Vitale', 200, 380000, 8],
+        ['filos', 'Maderera del Oeste', 12, 240000, 12],
+        ['espejos', 'Cristalería Sur', 8, 520000, 15],
+      ];
+      for (let atras = 0; atras < 4; atras++) {
+        const mm = mes - atras > 0 ? mes - atras : 12 + (mes - atras);
+        D.forEach(([k, p, c, m, d], i) => {
+          const ruido = 1 + (((i + atras * 2) % 5) - 2) * 0.06;
+          this.comprarMaterial({ material: k, proveedor: p, cantidad: c,
+            monto: Math.round(m * ruido / 1000) * 1000,
+            fecha: `${d}/${mm}`, forma: 'transferencia', quien: 'Jony' });
+        });
+      }
+    },
+
     // ---- El número económico -----------------------------------------------
     // Es la tabla que hoy se arma una vez por mes en la planilla:
     //
@@ -2400,11 +2504,11 @@ tr:hover td{background:var(--panel-2)}
           label: r.proveedor, total: 0, piezas: 0, entregas: 0 });
         b.total += t; b.piezas += r.items.length; b.entregas++;
       });
-      const ocs = this.ordenesCompra().filter(o => o.estado === 'recibida'
-        && this.mesDe(o.recibidaEl || o.entrega) === Number(mes));
       const terminado = Object.values(porProv).sort((a, b) => b.total - a.total);
-      const prima = ocs.map(o => ({ numero: o.numero, label: o.proveedor,
-        total: this.totalOC(o), items: o.items.length }));
+      // La materia prima sale de lo que se anotó como comprado. El stock —
+      // cuántas placas quedan— es la segunda etapa; el costo es ahora.
+      const prima = this.materialPorRubro(mes).map(r => ({ numero: r.k, label: r.label,
+        total: r.total, items: r.n }));
       return { terminado, prima,
         totalTerminado: terminado.reduce((a, x) => a + x.total, 0),
         totalPrima: prima.reduce((a, x) => a + x.total, 0),
@@ -3052,9 +3156,17 @@ tr:hover td{background:var(--panel-2)}
     // carpintería los cinco son pares — ninguno es mejor que otro, sólo
     // cambia cuánto puede hacer por semana. Por eso el plano y la planilla van
     // dirigidos al rubro, no a una persona.
+    // Los rubros son los de la planilla de costos: cada uno agrupa a los
+    // talleres que hacen ese tipo de mueble. Un taller de sillas no es un
+    // carpintero aunque los dos trabajen la madera.
     RUBROS: [
       { k: 'carpinteria', label: 'Carpintería' },
+      { k: 'respaldos', label: 'Respaldos' },
+      { k: 'mesas', label: 'Mesas' },
+      { k: 'sillas', label: 'Sillas' },
+      { k: 'sillones', label: 'Sillones' },
       { k: 'herreria', label: 'Herrería' },
+      { k: 'lustrado', label: 'Lustrado' },
       { k: 'tapiceria', label: 'Tapicería' },
       { k: 'vidrieria', label: 'Vidriería' },
       { k: 'marmoleria', label: 'Marmolería' },
@@ -3076,6 +3188,16 @@ tr:hover td{background:var(--panel-2)}
       { id: 8, nombre: 'Herrería Sur', rubro: 'herreria', capacidad: 15, direccion: 'Ruta 8 km 42' },
       { id: 9, nombre: 'Carla', rubro: 'herreria', capacidad: 10, direccion: 'Lavalle 990' },
       { id: 10, nombre: 'Laqueados Vera', rubro: 'laqueado', capacidad: 20, direccion: 'Colón 1330' },
+      // Los otros rubros: cada uno hace un tipo de mueble y no se mezclan.
+      { id: 11, nombre: 'Vicente', rubro: 'respaldos', capacidad: 14, direccion: '' },
+      { id: 12, nombre: 'Michel', rubro: 'mesas', capacidad: 10, direccion: '' },
+      { id: 13, nombre: 'David', rubro: 'mesas', capacidad: 8, direccion: '' },
+      { id: 14, nombre: 'La Classe', rubro: 'sillas', capacidad: 40, direccion: '' },
+      { id: 15, nombre: 'Julio Ledesma', rubro: 'sillas', capacidad: 25, direccion: '' },
+      { id: 16, nombre: 'Puro Palo', rubro: 'sillas', capacidad: 30, direccion: '' },
+      { id: 17, nombre: 'Andrés Roger', rubro: 'sillas', capacidad: 20, direccion: '' },
+      { id: 18, nombre: 'Sacchi', rubro: 'sillones', capacidad: 6, direccion: '' },
+      { id: 19, nombre: 'Roberto', rubro: 'lustrado', capacidad: 15, direccion: '' },
     ],
     // El id es el que manda: puede haber dos Vicente distintos, cada uno con su
     // domicilio y su rubro, y el sistema no los confunde.
@@ -18290,6 +18412,192 @@ tr:hover td{background:var(--panel-2)}
 
 </script><script>
 // =====================================================================
+//  Belgrano Soft · Compras · Materiales
+//  Llevar el stock de materiales —cuántas placas hay, cuántas cajas de
+//  correderas quedan— es la segunda etapa. Lo que hace falta ya es poder
+//  anotar que se compró, porque en la planilla la materia prima es un
+//  costo del mes y sin eso el número no cierra.
+//
+//  Por eso esta pantalla anota la plata, no el inventario. La cantidad es
+//  opcional: muchas veces se compra "un viaje de placas" y lo que importa
+//  es cuánto salió.
+// =====================================================================
+(function (global) {
+  const Mat = {
+    _mount: 'view',
+    mes: null,
+    rubro: '',
+
+    async render(mount = 'view') {
+      this._mount = mount;
+      if (this.mes == null) this.mes = global.DB.ultimoMesConDatos();
+      const v = document.getElementById(mount);
+      v.innerHTML = this.html() + this.estilos();
+      this.enganchar();
+    },
+
+    MESES: ['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
+      'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'],
+
+    html() {
+      const rubros = global.DB.materialPorRubro(this.mes);
+      const total = rubros.reduce((a, r) => a + r.total, 0);
+      const cs = global.DB.comprasMaterial()
+        .filter(c => global.DB.mesDe(c.fecha) === this.mes)
+        .filter(c => !this.rubro || c.rubro === this.rubro)
+        .sort((a, b) => (global.DB.diasDesde(a.fecha) || 0) - (global.DB.diasDesde(b.fecha) || 0));
+      return `
+        <div class="row" style="margin-bottom:12px;align-items:flex-start">
+          <div><div class="kick">Compras</div><h1 class="h-title">Materiales</h1>
+            <div class="h-sub">${UI.esc(this.MESES[this.mes])} ·
+              ${UI.pesos(total)} en ${global.DB.materialesDelMes(this.mes).length} compras</div></div>
+          <div class="sp"></div>
+          <button class="btn primary" id="cm-nuevo">Anotar una compra</button>
+          <div class="cx-nav" style="margin-left:8px">
+            <button class="b-x" id="cm-ant">‹</button>
+            <b>${UI.esc(this.MESES[this.mes])}</b>
+            <button class="b-x" id="cm-sig">›</button>
+          </div>
+        </div>
+
+        <div class="cx-kpis">
+          ${global.DB.RUBROS_MATERIAL.map(r => {
+            const x = rubros.find(y => y.k === r.k);
+            const pct = total && x ? Math.round((x.total / total) * 100) : 0;
+            return `<button class="cx-k cm-k ${this.rubro === r.k ? 'on' : ''}"
+              data-rubro="${r.k}">
+              <span class="cx-k-t">${UI.esc(r.label)}</span>
+              <span class="cx-k-v" style="font-size:18px">${UI.pesos(x ? x.total : 0)}</span>
+              <span class="cx-k-p">${x ? `${pct}% · ${x.n} compras` : 'nada este mes'}</span>
+            </button>`;
+          }).join('')}
+        </div>
+
+        ${cs.length ? `<div class="card cx-tabla"><table>
+          <thead><tr><th>Fecha</th><th>Qué</th><th>A quién</th><th class="num">Cantidad</th>
+            <th>Cómo se pagó</th><th>Comprobante</th><th>Quién</th>
+            <th class="num">Monto</th><th></th></tr></thead>
+          <tbody>${cs.map(c => `<tr class="${c.anulado ? 'anul' : ''}">
+            <td class="muted">${UI.esc(c.fecha)}</td>
+            <td class="nom">${UI.esc(c.label)}${c.nota
+              ? `<span class="hint">${UI.esc(c.nota)}</span>` : ''}</td>
+            <td>${UI.esc(c.proveedor || '—')}</td>
+            <td class="num muted">${c.cantidad
+              ? `${c.cantidad} ${UI.esc(c.unidad || '')}` : '—'}</td>
+            <td class="muted">${UI.esc((global.DB.FORMAS_PAGO.find(f => f.k === c.forma) || {}).label || c.forma)}</td>
+            <td class="muted">${UI.esc(c.comprobante || '—')}</td>
+            <td class="muted">${UI.esc(c.quien)}</td>
+            <td class="num nom">${UI.pesos(c.monto)}</td>
+            <td class="td-acc">${c.anulado ? '<span class="pill crit">anulada</span>'
+              : `<button class="b-x" data-anular="${c.id}">Anular</button>`}</td>
+          </tr>`).join('')}
+          <tr class="cx-tot"><td colspan="7">Total de lo que se está viendo</td>
+            <td class="num">${UI.pesos(cs.filter(c => !c.anulado)
+              .reduce((a, c) => a + c.monto, 0))}</td><td></td></tr>
+          </tbody></table></div>`
+          : UI.vacio('No hay compras de material anotadas con ese filtro.')}
+
+        <div class="hint" style="margin-top:10px">Esto entra en <b>El número</b> como materia
+          prima del mes. El stock —cuántas placas quedan, cuántas cajas de correderas— es la
+          segunda etapa: acá se anota la plata, no el inventario.</div>`;
+    },
+
+    modalNuevo() {
+      const provs = [...new Set(global.DB.comprasMaterial().map(c => c.proveedor))]
+        .filter(Boolean).sort();
+      document.body.insertAdjacentHTML('beforeend', `
+        <div class="cx-back" id="cm-mdl"><div class="card pad" style="max-width:430px;width:100%">
+          <h3 class="h-title" style="font-size:17px">Anotar una compra de material</h3>
+          <p class="h-sub">Lo que importa es qué se compró y cuánto salió.</p>
+          <label class="fld"><span class="lbl">Qué</span>
+            <select id="cm-m">${global.DB.RUBROS_MATERIAL.map(r => `
+              <optgroup label="${UI.esc(r.label)}">${global.DB.MATERIALES
+                .filter(m => m.rubro === r.k)
+                .map(m => `<option value="${m.k}">${UI.esc(m.label)}</option>`).join('')}
+              </optgroup>`).join('')}</select></label>
+          <label class="fld"><span class="lbl">A quién</span>
+            <input id="cm-p" list="cm-provs" placeholder="Maderera del Oeste">
+            <datalist id="cm-provs">${provs.map(p =>
+              `<option value="${UI.esc(p)}"></option>`).join('')}</datalist></label>
+          <div class="row" style="gap:10px">
+            <label class="fld" style="flex:1"><span class="lbl">Cuánto salió</span>
+              <input id="cm-monto" type="number" placeholder="0"></label>
+            <label class="fld" style="flex:1"><span class="lbl">Cantidad</span>
+              <input id="cm-cant" type="number" placeholder="opcional"></label>
+          </div>
+          <div class="row" style="gap:10px">
+            <label class="fld" style="flex:1"><span class="lbl">Cómo se pagó</span>
+              <select id="cm-f">${global.DB.FORMAS_PAGO.map(f =>
+                `<option value="${f.k}">${UI.esc(f.label)}</option>`).join('')}</select></label>
+            <label class="fld" style="flex:1"><span class="lbl">Fecha</span>
+              <input id="cm-fe" value="${global.DB.hoyCorto()}"></label>
+          </div>
+          <label class="fld"><span class="lbl">Comprobante</span>
+            <input id="cm-comp" placeholder="número de factura o remito"></label>
+          <div class="row" style="gap:8px;margin-top:12px"><div class="sp"></div>
+            <button class="btn" id="cm-cancel">Cancelar</button>
+            <button class="btn primary" id="cm-ok">Anotar</button></div>
+        </div></div>`);
+      const cerrar = () => { const m = document.getElementById('cm-mdl'); if (m) m.remove(); };
+      document.getElementById('cm-cancel').onclick = cerrar;
+      document.getElementById('cm-monto').focus();
+      document.getElementById('cm-ok').onclick = () => {
+        const monto = Number(document.getElementById('cm-monto').value) || 0;
+        if (!monto) return UI.aviso('Falta cuánto salió', 'warn');
+        const c = global.DB.comprarMaterial({
+          material: document.getElementById('cm-m').value,
+          proveedor: document.getElementById('cm-p').value,
+          cantidad: document.getElementById('cm-cant').value,
+          monto,
+          fecha: document.getElementById('cm-fe').value,
+          forma: document.getElementById('cm-f').value,
+          comprobante: document.getElementById('cm-comp').value,
+          quien: 'Jony' });
+        UI.aviso(`${c.label}: ${UI.pesos(monto)}`, 'ok');
+        this.mes = global.DB.mesDe(c.fecha) || this.mes;
+        cerrar(); this.render(this._mount);
+      };
+    },
+
+    enganchar() {
+      const q = id => document.getElementById(id);
+      const n = q('cm-nuevo'); if (n) n.onclick = () => this.modalNuevo();
+      const a = q('cm-ant'); if (a) a.onclick = () => {
+        this.mes = this.mes > 1 ? this.mes - 1 : 12; this.render(this._mount);
+      };
+      const si = q('cm-sig'); if (si) si.onclick = () => {
+        this.mes = this.mes < 12 ? this.mes + 1 : 1; this.render(this._mount);
+      };
+      document.querySelectorAll('[data-rubro]').forEach(b => b.onclick = () => {
+        this.rubro = this.rubro === b.dataset.rubro ? '' : b.dataset.rubro;
+        this.render(this._mount);
+      });
+      document.querySelectorAll('[data-anular]').forEach(b => b.onclick = () => {
+        const motivo = prompt('¿Por qué se anula? Queda anotado.');
+        if (motivo == null) return;
+        global.DB.anularCompraMaterial(Number(b.dataset.anular), motivo, 'yo');
+        UI.aviso('Anulada — la original queda a la vista', 'ok');
+        this.render(this._mount);
+      });
+    },
+
+    estilos() {
+      return (global.ComprasEstilos ? global.ComprasEstilos() : '') + `<style>
+        .cm-k{cursor:pointer;text-align:left;font:inherit;color:inherit}
+        .cm-k:hover{border-color:var(--brand)}
+        .cm-k.on{border-color:var(--navy);background:var(--panel-2)}
+        .cx-tabla tr.anul td{opacity:.5;text-decoration:line-through}
+        .cx-tabla tr.anul td:last-child{text-decoration:none;opacity:1}
+        .cx-back{position:fixed;inset:0;background:rgba(12,20,34,.45);z-index:70;
+          display:flex;align-items:center;justify-content:center;padding:20px}
+      </style>`;
+    },
+  };
+  global.ComprasMateriales = Mat;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script><script>
+// =====================================================================
 //  Belgrano Soft · Tesorería · Gastos
 //  Los rubros y los conceptos son los mismos de la planilla con la que se
 //  lleva el número hoy. Lo único que cambia es cuándo se cargan: en vez
@@ -18627,7 +18935,7 @@ tr:hover td{background:var(--panel-2)}
 
     htmlCostos(n) {
       return `<div class="card cx-tabla tn-det"><table>
-        <thead><tr><th>De dónde</th><th>Quién</th><th class="num">Entregas</th>
+        <thead><tr><th>De dónde</th><th>Quién</th><th class="num">Compras</th>
           <th class="num">Muebles</th><th class="num">Total</th></tr></thead>
         <tbody>${n.costos.terminado.map(x => `<tr class="cliq" data-prov="${x.provId}">
           <td class="muted">Producto terminado</td>
@@ -18636,11 +18944,11 @@ tr:hover td{background:var(--panel-2)}
           <td class="num">${x.piezas}</td>
           <td class="num nom">${UI.pesos(x.total)}</td>
         </tr>`).join('')}
-        ${n.costos.prima.map(x => `<tr>
+        ${n.costos.prima.map(x => `<tr class="cliq" data-mat="1">
           <td class="muted">Materia prima</td>
-          <td class="nom">${UI.esc(x.label)} <span class="muted">${UI.esc(x.numero)}</span></td>
-          <td class="num">1</td>
-          <td class="num muted">${x.items} insumos</td>
+          <td class="nom">${UI.esc(x.label)}</td>
+          <td class="num">${x.items}</td>
+          <td class="num muted">—</td>
           <td class="num nom">${UI.pesos(x.total)}</td>
         </tr>`).join('')}
         ${!n.costos.terminado.length && !n.costos.prima.length
@@ -18648,8 +18956,9 @@ tr:hover td{background:var(--panel-2)}
         <tr class="cx-tot"><td colspan="4">Total de costos</td>
           <td class="num">${UI.pesos(n.costos.total)}</td></tr>
         </tbody></table>
-        <div class="hint" style="padding:8px 11px">Sale de las entregas que Jony conformó en
-          Compras. Tocá una fila para abrir la cuenta de ese taller.</div></div>`;
+        <div class="hint" style="padding:8px 11px">El producto terminado sale de las entregas
+          que Jony conformó; tocá una fila para abrir la cuenta de ese taller. La materia prima
+          sale de lo anotado en Compras · Materiales.</div></div>`;
     },
 
     htmlGastos(n) {
@@ -18680,6 +18989,10 @@ tr:hover td{background:var(--panel-2)}
       });
       document.querySelectorAll('[data-mes]').forEach(tr => tr.onclick = () => {
         this.mes = Number(tr.dataset.mes); this.render(this._mount);
+      });
+      document.querySelectorAll('[data-mat]').forEach(tr => tr.onclick = () => {
+        global.ComprasMateriales.mes = this.mes;
+        global.App.goSub('compras', 'materiales');
       });
       document.querySelectorAll('[data-prov]').forEach(tr => tr.onclick = () => {
         global.ComprasCuenta.abierto = Number(tr.dataset.prov);
@@ -18907,8 +19220,10 @@ tr:hover td{background:var(--panel-2)}
       S('pendientes', 'Pendientes', m => global.ComprasPendientes.render(m)),
       S('historial', 'Historial', m => global.ComprasHistorial.render(m)),
       S('indicadores', 'Indicadores', m => global.ComprasIndicadores.render(m)),
-      // Los insumos son la segunda etapa: hoy Compras es sólo muebles.
-      S('oc', 'Insumos', m => global.ComprasOC.render(m)),
+      S('materiales', 'Materiales', m => global.ComprasMateriales.render(m)),
+      // El stock de insumos es la segunda etapa: hoy se anota la plata, no
+      // el inventario.
+      S('oc', 'Insumos · 2ª etapa', m => global.ComprasOC.render(m)),
     ]},
 
     inventario: { label: 'Inventario', icon: '📦', subs: [

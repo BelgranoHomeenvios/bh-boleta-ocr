@@ -79,8 +79,10 @@
       S('pendientes', 'Pendientes', m => global.ComprasPendientes.render(m)),
       S('historial', 'Historial', m => global.ComprasHistorial.render(m)),
       S('indicadores', 'Indicadores', m => global.ComprasIndicadores.render(m)),
-      // Los insumos son la segunda etapa: hoy Compras es sólo muebles.
-      S('oc', 'Insumos', m => global.ComprasOC.render(m)),
+      S('materiales', 'Materiales', m => global.ComprasMateriales.render(m)),
+      // El stock de insumos es la segunda etapa: hoy se anota la plata, no
+      // el inventario.
+      S('oc', 'Insumos · 2ª etapa', m => global.ComprasOC.render(m)),
     ]},
 
     inventario: { label: 'Inventario', icon: '📦', subs: [
