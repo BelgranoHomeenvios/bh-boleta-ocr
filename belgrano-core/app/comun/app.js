@@ -34,7 +34,7 @@
       S('ordenes', 'Or. Venta', m => global.Ordenes.render(m)),
       S('clientes', 'Clientes', m => global.Clientes.render(m)),
       S('agenda', 'Agenda', skel('Agenda del vendedor')),
-      S('comisiones', 'Comisiones', skel('Comisiones (con venta compartida)')),
+      S('comisiones', 'Comisiones', m => global.Comisiones.render(m)),
       S('indicadores', 'Indicadores', skel('Indicadores de ventas')),
     ]},
 

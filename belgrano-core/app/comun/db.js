@@ -2207,6 +2207,168 @@
       }
     },
 
+
+    // ---- Comisiones del vendedor -------------------------------------------
+    // El vendedor no carga su venta: la venta ya está en la boleta. De ahí
+    // salen solos el número de pedido, el cliente, el local, el canal y cómo
+    // pagó. Si Jony después anula la boleta o cambia un cobro de efectivo a
+    // tarjeta, la comisión se acomoda sola — porque es la misma boleta, no
+    // una copia.
+    //
+    // La base no es el total de la venta. Es lo que queda para la casa:
+    //
+    //   efectivo + transferencia/1,21 + crédito×0,65 − flete
+    //
+    // La transferencia se divide por el IVA porque va facturada, y el crédito
+    // se castiga porque la tarjeta se lleva su parte.
+    COMISION: {
+      ivaDivisor: 1.21,
+      creditoFactor: 0.65,
+      pct: 2.5,          // % sobre la base, si el vendedor no tiene el suyo
+    },
+    // Cómo cae cada cobro en los tres baldes de la comisión.
+    BALDES_COBRO: {
+      efectivo: 'efectivo',
+      transferencia: 'transferencia',
+      deposito: 'transferencia',
+      debito: 'transferencia',
+      tarjeta: 'credito',
+      credito: 'credito',
+      cuotas: 'credito',
+      cheque: 'transferencia',
+      mercadopago: 'transferencia',
+    },
+    baldeDe(metodo) {
+      const t = sinTilde(String(metodo || '')).replace(/[^a-z]/g, '');
+      for (const k in this.BALDES_COBRO) if (t.includes(k)) return this.BALDES_COBRO[k];
+      return 'efectivo';
+    },
+    // Una boleta cuenta para la comisión cuando la venta está confirmada. Una
+    // venta a confirmar o anulada no le paga a nadie.
+    cuentaParaComision(o) {
+      return !!o && o.estado !== 'a_confirmar' && o.estado !== 'anulada'
+        && o.situacion !== 'anulada';
+    },
+    // Lo que deja una boleta: los tres baldes, el flete y la base.
+    baseDeComision(o) {
+      const b = { efectivo: 0, transferencia: 0, credito: 0 };
+      // Se mira cobro por cobro, no el campo "pago" de la boleta: una venta
+      // puede tener la seña en efectivo y el saldo con tarjeta.
+      const cs = o.cobros || [];
+      if (cs.length) {
+        cs.forEach(c => { b[this.baldeDe(c.metodo)] += Number(c.m) || 0; });
+        // Lo que todavía no se cobró se proyecta con el método de la boleta.
+        const cobrado = cs.reduce((a, c) => a + (Number(c.m) || 0), 0);
+        const falta = Math.max(0, (Number(o.total) || 0) - cobrado);
+        if (falta) b[this.baldeDe(o.pago)] += falta;
+      } else {
+        b[this.baldeDe(o.pago)] = Number(o.total) || 0;
+      }
+      const flete = Number((o.flete || {}).monto) || 0;
+      const C = this.COMISION;
+      const base = b.efectivo + (b.transferencia / C.ivaDivisor)
+        + (b.credito * C.creditoFactor) - flete;
+      return { ...b, flete, base: Math.max(0, Math.round(base)),
+        total: Number(o.total) || 0, cobrado: cs.reduce((a, c) => a + (Number(c.m) || 0), 0) };
+    },
+    // El porcentaje de ese vendedor. Por ahora uno solo para todos; cuando
+    // haya esquemas por persona sale de ahí.
+    pctDe(vendedor) {
+      const e = this.esquemaVendedor(vendedor);
+      return e && e.pct != null ? Number(e.pct) : this.COMISION.pct;
+    },
+    comisionDe(o) {
+      const b = this.baseDeComision(o);
+      return Math.round(b.base * this.pctDe(o.vendedor) / 100);
+    },
+    // El mes que conviene abrir en comisiones: el último con boletas. El de
+    // gastos puede ser otro, y abrir en un mes sin ventas confunde.
+    ultimoMesConVentas() {
+      const hoy = new Date().getMonth() + 1;
+      for (let i = 0; i < 12; i++) {
+        const m = hoy - i > 0 ? hoy - i : 12 + (hoy - i);
+        if ((DEMO.ordenes || []).some(o => this.mesDe(o.fecha) === m)) return m;
+      }
+      return hoy;
+    },
+    // Las boletas de un vendedor en un mes, con lo que le deja cada una.
+    ventasDeVendedor(vendedor, mes) {
+      return (DEMO.ordenes || [])
+        .filter(o => o.vendedor === vendedor)
+        .filter(o => mes == null || this.mesDe(o.fecha) === Number(mes))
+        .map(o => ({ o, ...this.baseDeComision(o),
+          cuenta: this.cuentaParaComision(o),
+          comision: this.cuentaParaComision(o) ? this.comisionDe(o) : 0 }))
+        .sort((a, b) => (this.diasDesde(a.o.fecha) || 0) - (this.diasDesde(b.o.fecha) || 0));
+    },
+    // El mes del vendedor: cuánto vendió, cuánto le queda de comisión, y qué
+    // está trabado esperando que alguien confirme.
+    mesDelVendedor(vendedor, mes) {
+      const vs = this.ventasDeVendedor(vendedor, mes);
+      const firmes = vs.filter(x => x.cuenta);
+      const trabadas = vs.filter(x => !x.cuenta);
+      const base = firmes.reduce((a, x) => a + x.base, 0);
+      const esq = this.esquemaVendedor(vendedor);
+      const bono = this.bonoDe(base, esq);
+      const fija = esq ? Number(esq.fija) || 0 : 0;
+      const comision = firmes.reduce((a, x) => a + x.comision, 0);
+      return { vendedor, mes: Number(mes), ventas: vs, firmes, trabadas,
+        vendido: firmes.reduce((a, x) => a + x.total, 0),
+        base, comision, pct: this.pctDe(vendedor),
+        trabado: trabadas.reduce((a, x) => a + x.total, 0),
+        fija, bono, esquema: esq,
+        aCobrar: fija + comision + bono.monto };
+    },
+
+    // ---- El esquema de cada vendedor ----------------------------------------
+    // Base fija, porcentaje propio si lo tiene, y las franjas de bono: al
+    // pasar cierta venta, se suma un premio. Es lo que hace que el vendedor
+    // sepa por qué le conviene empujar el mes.
+    ESQ_KEY: 'bh_esquemas_vend',
+    esquemas() {
+      if (this._esq) return this._esq;
+      let g = [];
+      try { g = JSON.parse(localStorage.getItem(this.ESQ_KEY)) || []; } catch {}
+      this._esq = g;
+      if (!g.length) this._sembrarEsquemas();
+      return this._esq;
+    },
+    _guardarEsquemas() {
+      try { localStorage.setItem(this.ESQ_KEY, JSON.stringify(this._esq || [])); } catch {}
+    },
+    esquemaVendedor(v) { return this.esquemas().find(e => e.vendedor === v) || null; },
+    guardarEsquema(e) {
+      const es = this.esquemas();
+      const i = es.findIndex(x => x.vendedor === e.vendedor);
+      if (i >= 0) es[i] = { ...es[i], ...e }; else es.push({ ...e });
+      this._guardarEsquemas();
+      return this.esquemaVendedor(e.vendedor);
+    },
+    // La franja que alcanzó y la que sigue: lo que falta para el próximo
+    // premio es el número que mueve la aguja.
+    bonoDe(base, esq) {
+      const fs = ((esq && esq.franjas) || []).slice()
+        .sort((a, b) => Number(a.desde) - Number(b.desde));
+      let alcanzada = null, siguiente = null;
+      fs.forEach(f => {
+        if (base >= Number(f.desde)) alcanzada = f;
+        else if (!siguiente) siguiente = f;
+      });
+      return { monto: alcanzada ? Number(alcanzada.monto) || 0 : 0,
+        alcanzada, siguiente,
+        falta: siguiente ? Math.max(0, Number(siguiente.desde) - base) : 0 };
+    },
+    _sembrarEsquemas() {
+      this._esq = [];
+      this.vendedores().forEach((v, i) => this.guardarEsquema({
+        vendedor: v, fija: 340000 + i * 20000, pct: null,
+        franjas: [
+          { desde: 8000000, monto: 120000 },
+          { desde: 14000000, monto: 260000 },
+          { desde: 20000000, monto: 450000 },
+        ] }));
+    },
+
     // ---- El número económico -----------------------------------------------
     // Es la tabla que hoy se arma una vez por mes en la planilla:
     //
