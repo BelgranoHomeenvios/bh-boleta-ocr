@@ -1163,15 +1163,28 @@
       { k: 'comboParaiso', label: 'Combinado + Paraíso' },
       { k: 'paraiso',      label: 'Paraíso' },
     ],
-    // La terminación sale de mirar las dos caras del mueble: si alguna es
-    // paraíso manda el paraíso; si no, va laqueado cuando las dos son del
-    // mismo color y combinado cuando son de dos.
+    // La terminación mide CUÁNTO PARAÍSO tiene el mueble, y la que manda es
+    // la estructura, que es la cara grande. Las cuatro columnas van de menos
+    // a más paraíso:
+    //
+    //   laqueado      todo laqueado, sin paraíso
+    //   comboBlanco   más blanco que paraíso — estructura laqueada, frente paraíso
+    //   comboParaiso  más paraíso que blanco — estructura paraíso, frente laqueado
+    //   paraiso       todo paraíso
+    //
+    // Ojo: el catálogo de Costeo tiene mal etiquetadas las combinaciones con
+    // estructura laqueada y frente paraíso —las manda a comboParaiso cuando
+    // van a comboBlanco—. Acá se aplica la regla buena; allá hay que
+    // corregirlo, porque de ese costo sale el precio de venta.
     terminacionDe(estructura, frente) {
       const limpio = t => sinTilde(String(t || '')).trim().replace(/a$/, 'o');
       const esPar = t => limpio(t).includes('paraiso');
-      const a = esPar(estructura), b = esPar(frente);
-      if (a && b) return 'paraiso';
-      if (a || b) return 'comboParaiso';
+      const e = esPar(estructura), f = esPar(frente);
+      if (e && f) return 'paraiso';
+      if (e) return 'comboParaiso';
+      if (f) return 'comboBlanco';
+      // Sin paraíso: laqueado si las dos caras van del mismo color, y
+      // combinado si son dos colores distintos —son dos pasadas de laca—.
       return limpio(estructura) === limpio(frente) ? 'laqueado' : 'comboBlanco';
     },
     // Cada tipo de mueble del catálogo con el nombre que tiene en Costeo.
