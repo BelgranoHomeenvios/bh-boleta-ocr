@@ -52,7 +52,8 @@ Las entregas, los viajes, los cupos por chofer.
 | **Compras** | El stock de insumos —cuántas placas quedan— es segunda etapa. Hoy se anota la plata, no el inventario. |
 | **Tesorería** | Están el número y los gastos. Faltan cajas, movimientos, cobros, señas, rendiciones, cheques, conciliación, arqueos y el calendario de plata. |
 | **Ventas** | Comisiones anda; faltan la agenda del vendedor, los indicadores, las reseñas y la venta compartida entre dos vendedores. |
-| **CRM** | Consultas y seguimiento, sin desarrollar. |
+| **CRM** | Diseñado en `ARQUITECTURA_CRM.md`, sin construir. |
+| **Logística** | Andan entregas, viajes y cupos. La integración está diseñada en `ARQUITECTURA_LOGISTICA.md`, sin construir. |
 | **Reclamos** | Sin desarrollar. |
 
 ---
