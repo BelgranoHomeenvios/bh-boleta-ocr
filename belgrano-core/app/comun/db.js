@@ -2263,26 +2263,37 @@
         && o.situacion !== 'anulada';
     },
     // Lo que deja una boleta: los tres baldes, el flete y la base.
+    //
+    // La comisión se paga POR LO COBRADO y por el método con que pagó el
+    // cliente de verdad. Si dijo que pagaba en efectivo y después transfirió,
+    // manda la transferencia. Por eso no se proyecta lo que falta: hasta que
+    // no entra, no cuenta.
     baseDeComision(o) {
       const b = { efectivo: 0, transferencia: 0, credito: 0 };
-      // Se mira cobro por cobro, no el campo "pago" de la boleta: una venta
-      // puede tener la seña en efectivo y el saldo con tarjeta.
-      const cs = o.cobros || [];
-      if (cs.length) {
-        cs.forEach(c => { b[this.baldeDe(c.metodo)] += Number(c.m) || 0; });
-        // Lo que todavía no se cobró se proyecta con el método de la boleta.
-        const cobrado = cs.reduce((a, c) => a + (Number(c.m) || 0), 0);
-        const falta = Math.max(0, (Number(o.total) || 0) - cobrado);
-        if (falta) b[this.baldeDe(o.pago)] += falta;
-      } else {
-        b[this.baldeDe(o.pago)] = Number(o.total) || 0;
-      }
-      const flete = Number((o.flete || {}).monto) || 0;
+      // Cobro por cobro, no el campo "pago" de la boleta: una venta puede
+      // tener la seña en efectivo y el saldo con tarjeta.
+      const cs = (o.cobros || []).filter(c => this.cobroCuenta(c));
+      cs.forEach(c => { b[this.baldeDe(c.metodo)] += Number(c.m) || 0; });
+      const cobrado = cs.reduce((a, c) => a + (Number(c.m) || 0), 0);
+      // El flete se resta entero cuando ya se cobró todo. Si la venta está a
+      // medio cobrar se resta en proporción, para no comerse la comisión de
+      // una seña chica con un flete grande.
+      const total = Number(o.total) || 0;
+      const fleteTot = Number((o.flete || {}).monto) || 0;
+      const parte = total ? Math.min(1, cobrado / total) : 0;
+      const flete = Math.round(fleteTot * parte);
       const C = this.COMISION;
       const base = b.efectivo + (b.transferencia / C.ivaDivisor)
         + (b.credito * C.creditoFactor) - flete;
-      return { ...b, flete, base: Math.max(0, Math.round(base)),
-        total: Number(o.total) || 0, cobrado: cs.reduce((a, c) => a + (Number(c.m) || 0), 0) };
+      return { ...b, flete, fleteTot, base: Math.max(0, Math.round(base)),
+        total, cobrado, falta: Math.max(0, total - cobrado),
+        completa: total > 0 && cobrado >= total };
+    },
+    // Un cobro cuenta cuando la plata está de verdad. La transferencia que
+    // nadie vio en el banco no le paga comisión a nadie.
+    cobroCuenta(c) {
+      return !!c && c.estado !== 'pendiente_banco' && c.estado !== 'rechazado'
+        && c.estado !== 'anulado';
     },
     // El porcentaje de ese vendedor. Por ahora uno solo para todos; cuando
     // haya esquemas por persona sale de ahí.
@@ -2325,12 +2336,79 @@
       const bono = this.bonoDe(base, esq);
       const fija = esq ? Number(esq.fija) || 0 : 0;
       const comision = firmes.reduce((a, x) => a + x.comision, 0);
+      const ajustes = this.ajustesDelMes(vendedor, mes);
+      const ajuste = ajustes.reduce((a, x) => a + x.dif, 0);
       return { vendedor, mes: Number(mes), ventas: vs, firmes, trabadas,
         vendido: firmes.reduce((a, x) => a + x.total, 0),
+        cobrado: firmes.reduce((a, x) => a + x.cobrado, 0),
+        porCobrar: firmes.reduce((a, x) => a + x.falta, 0),
         base, comision, pct: this.pctDe(vendedor),
         trabado: trabadas.reduce((a, x) => a + x.total, 0),
-        fija, bono, esquema: esq,
-        aCobrar: fija + comision + bono.monto };
+        fija, bono, esquema: esq, ajustes, ajuste,
+        cerrado: this.mesCerrado(vendedor, mes),
+        aCobrar: fija + comision + bono.monto + ajuste };
+    },
+
+
+    // ---- El cierre del mes y los ajustes ------------------------------------
+    // El mes se cierra con lo que se sabía ese día. Una venta del 29 todavía
+    // no terminó de cobrarse, así que la comisión que se liquida es la de lo
+    // cobrado hasta ahí.
+    //
+    // Cuando esa venta se termina de cobrar —o se anula, o el cliente cambia
+    // de método— la comisión de verdad es otra. Esa diferencia NO se corrige
+    // hacia atrás: aparece como un AJUSTE en la liquidación del mes que sigue,
+    // con el número de la venta vieja, en más o en menos. Es como se hace hoy
+    // en la planilla, y es lo correcto: un mes cerrado no se vuelve a tocar.
+    LIQ_KEY: 'bh_liquidaciones',
+    liquidaciones() {
+      if (this._liq) return this._liq;
+      let g = [];
+      try { g = JSON.parse(localStorage.getItem(this.LIQ_KEY)) || []; } catch {}
+      this._liq = g;
+      return g;
+    },
+    _guardarLiq() {
+      try { localStorage.setItem(this.LIQ_KEY, JSON.stringify(this._liq || [])); } catch {}
+    },
+    liquidacionDe(numero) {
+      return this.liquidaciones().find(x => x.numero === numero) || null;
+    },
+    // Cerrar el mes: se guarda cuánta comisión se pagó por cada venta. Ese
+    // número es el que después se compara para saber si hay que ajustar.
+    cerrarMesVendedor(vendedor, mes, quien = '') {
+      const vs = this.ventasDeVendedor(vendedor, mes).filter(x => x.cuenta);
+      const liq = this.liquidaciones();
+      vs.forEach(x => {
+        const i = liq.findIndex(y => y.numero === x.o.numero);
+        const reg = { numero: x.o.numero, vendedor, mes: Number(mes),
+          comision: x.comision, base: x.base, cobrado: x.cobrado,
+          cerradoEl: this.hoyCorto(), quien: quien || 'yo' };
+        if (i >= 0) liq[i] = reg; else liq.push(reg);
+      });
+      this._guardarLiq();
+      return vs.length;
+    },
+    mesCerrado(vendedor, mes) {
+      return this.liquidaciones().some(x => x.vendedor === vendedor && x.mes === Number(mes));
+    },
+    // Los ajustes que le tocan a un mes: ventas de meses anteriores ya
+    // liquidadas cuya comisión hoy da distinto.
+    ajustesDelMes(vendedor, mes) {
+      const out = [];
+      this.liquidaciones().filter(l => l.vendedor === vendedor && l.mes < Number(mes))
+        .forEach(l => {
+          const o = (DEMO.ordenes || []).find(x => x.numero === l.numero);
+          if (!o) return;
+          const ahora = this.cuentaParaComision(o) ? this.comisionDe(o) : 0;
+          const dif = ahora - l.comision;
+          if (!dif) return;
+          out.push({ numero: l.numero, cliente: o.cliente, mesOrigen: l.mes,
+            liquidado: l.comision, ahora, dif,
+            motivo: !this.cuentaParaComision(o) ? 'la venta se anuló'
+              : (dif > 0 ? 'terminó de pagar' : 'se cobró menos de lo previsto') });
+        });
+      return out.sort((a, b) => Math.abs(b.dif) - Math.abs(a.dif));
     },
 
     // ---- El esquema de cada vendedor ----------------------------------------

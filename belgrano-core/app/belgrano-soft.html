@@ -2504,26 +2504,37 @@ tr:hover td{background:var(--panel-2)}
         && o.situacion !== 'anulada';
     },
     // Lo que deja una boleta: los tres baldes, el flete y la base.
+    //
+    // La comisión se paga POR LO COBRADO y por el método con que pagó el
+    // cliente de verdad. Si dijo que pagaba en efectivo y después transfirió,
+    // manda la transferencia. Por eso no se proyecta lo que falta: hasta que
+    // no entra, no cuenta.
     baseDeComision(o) {
       const b = { efectivo: 0, transferencia: 0, credito: 0 };
-      // Se mira cobro por cobro, no el campo "pago" de la boleta: una venta
-      // puede tener la seña en efectivo y el saldo con tarjeta.
-      const cs = o.cobros || [];
-      if (cs.length) {
-        cs.forEach(c => { b[this.baldeDe(c.metodo)] += Number(c.m) || 0; });
-        // Lo que todavía no se cobró se proyecta con el método de la boleta.
-        const cobrado = cs.reduce((a, c) => a + (Number(c.m) || 0), 0);
-        const falta = Math.max(0, (Number(o.total) || 0) - cobrado);
-        if (falta) b[this.baldeDe(o.pago)] += falta;
-      } else {
-        b[this.baldeDe(o.pago)] = Number(o.total) || 0;
-      }
-      const flete = Number((o.flete || {}).monto) || 0;
+      // Cobro por cobro, no el campo "pago" de la boleta: una venta puede
+      // tener la seña en efectivo y el saldo con tarjeta.
+      const cs = (o.cobros || []).filter(c => this.cobroCuenta(c));
+      cs.forEach(c => { b[this.baldeDe(c.metodo)] += Number(c.m) || 0; });
+      const cobrado = cs.reduce((a, c) => a + (Number(c.m) || 0), 0);
+      // El flete se resta entero cuando ya se cobró todo. Si la venta está a
+      // medio cobrar se resta en proporción, para no comerse la comisión de
+      // una seña chica con un flete grande.
+      const total = Number(o.total) || 0;
+      const fleteTot = Number((o.flete || {}).monto) || 0;
+      const parte = total ? Math.min(1, cobrado / total) : 0;
+      const flete = Math.round(fleteTot * parte);
       const C = this.COMISION;
       const base = b.efectivo + (b.transferencia / C.ivaDivisor)
         + (b.credito * C.creditoFactor) - flete;
-      return { ...b, flete, base: Math.max(0, Math.round(base)),
-        total: Number(o.total) || 0, cobrado: cs.reduce((a, c) => a + (Number(c.m) || 0), 0) };
+      return { ...b, flete, fleteTot, base: Math.max(0, Math.round(base)),
+        total, cobrado, falta: Math.max(0, total - cobrado),
+        completa: total > 0 && cobrado >= total };
+    },
+    // Un cobro cuenta cuando la plata está de verdad. La transferencia que
+    // nadie vio en el banco no le paga comisión a nadie.
+    cobroCuenta(c) {
+      return !!c && c.estado !== 'pendiente_banco' && c.estado !== 'rechazado'
+        && c.estado !== 'anulado';
     },
     // El porcentaje de ese vendedor. Por ahora uno solo para todos; cuando
     // haya esquemas por persona sale de ahí.
@@ -2566,12 +2577,79 @@ tr:hover td{background:var(--panel-2)}
       const bono = this.bonoDe(base, esq);
       const fija = esq ? Number(esq.fija) || 0 : 0;
       const comision = firmes.reduce((a, x) => a + x.comision, 0);
+      const ajustes = this.ajustesDelMes(vendedor, mes);
+      const ajuste = ajustes.reduce((a, x) => a + x.dif, 0);
       return { vendedor, mes: Number(mes), ventas: vs, firmes, trabadas,
         vendido: firmes.reduce((a, x) => a + x.total, 0),
+        cobrado: firmes.reduce((a, x) => a + x.cobrado, 0),
+        porCobrar: firmes.reduce((a, x) => a + x.falta, 0),
         base, comision, pct: this.pctDe(vendedor),
         trabado: trabadas.reduce((a, x) => a + x.total, 0),
-        fija, bono, esquema: esq,
-        aCobrar: fija + comision + bono.monto };
+        fija, bono, esquema: esq, ajustes, ajuste,
+        cerrado: this.mesCerrado(vendedor, mes),
+        aCobrar: fija + comision + bono.monto + ajuste };
+    },
+
+
+    // ---- El cierre del mes y los ajustes ------------------------------------
+    // El mes se cierra con lo que se sabía ese día. Una venta del 29 todavía
+    // no terminó de cobrarse, así que la comisión que se liquida es la de lo
+    // cobrado hasta ahí.
+    //
+    // Cuando esa venta se termina de cobrar —o se anula, o el cliente cambia
+    // de método— la comisión de verdad es otra. Esa diferencia NO se corrige
+    // hacia atrás: aparece como un AJUSTE en la liquidación del mes que sigue,
+    // con el número de la venta vieja, en más o en menos. Es como se hace hoy
+    // en la planilla, y es lo correcto: un mes cerrado no se vuelve a tocar.
+    LIQ_KEY: 'bh_liquidaciones',
+    liquidaciones() {
+      if (this._liq) return this._liq;
+      let g = [];
+      try { g = JSON.parse(localStorage.getItem(this.LIQ_KEY)) || []; } catch {}
+      this._liq = g;
+      return g;
+    },
+    _guardarLiq() {
+      try { localStorage.setItem(this.LIQ_KEY, JSON.stringify(this._liq || [])); } catch {}
+    },
+    liquidacionDe(numero) {
+      return this.liquidaciones().find(x => x.numero === numero) || null;
+    },
+    // Cerrar el mes: se guarda cuánta comisión se pagó por cada venta. Ese
+    // número es el que después se compara para saber si hay que ajustar.
+    cerrarMesVendedor(vendedor, mes, quien = '') {
+      const vs = this.ventasDeVendedor(vendedor, mes).filter(x => x.cuenta);
+      const liq = this.liquidaciones();
+      vs.forEach(x => {
+        const i = liq.findIndex(y => y.numero === x.o.numero);
+        const reg = { numero: x.o.numero, vendedor, mes: Number(mes),
+          comision: x.comision, base: x.base, cobrado: x.cobrado,
+          cerradoEl: this.hoyCorto(), quien: quien || 'yo' };
+        if (i >= 0) liq[i] = reg; else liq.push(reg);
+      });
+      this._guardarLiq();
+      return vs.length;
+    },
+    mesCerrado(vendedor, mes) {
+      return this.liquidaciones().some(x => x.vendedor === vendedor && x.mes === Number(mes));
+    },
+    // Los ajustes que le tocan a un mes: ventas de meses anteriores ya
+    // liquidadas cuya comisión hoy da distinto.
+    ajustesDelMes(vendedor, mes) {
+      const out = [];
+      this.liquidaciones().filter(l => l.vendedor === vendedor && l.mes < Number(mes))
+        .forEach(l => {
+          const o = (DEMO.ordenes || []).find(x => x.numero === l.numero);
+          if (!o) return;
+          const ahora = this.cuentaParaComision(o) ? this.comisionDe(o) : 0;
+          const dif = ahora - l.comision;
+          if (!dif) return;
+          out.push({ numero: l.numero, cliente: o.cliente, mesOrigen: l.mes,
+            liquidado: l.comision, ahora, dif,
+            motivo: !this.cuentaParaComision(o) ? 'la venta se anuló'
+              : (dif > 0 ? 'terminó de pagar' : 'se cobró menos de lo previsto') });
+        });
+      return out.sort((a, b) => Math.abs(b.dif) - Math.abs(a.dif));
     },
 
     // ---- El esquema de cada vendedor ----------------------------------------
@@ -18638,6 +18716,8 @@ tr:hover td{background:var(--panel-2)}
             ${global.DB.vendedores().map(v =>
               `<option ${v === this.vend ? 'selected' : ''}>${UI.esc(v)}</option>`).join('')}
           </select>` : ''}
+          ${this.jefe ? `<button class="b-x ${m.cerrado ? '' : 'hacer'}" id="cv-cerrar">${
+            m.cerrado ? 'Mes cerrado · recerrar' : 'Cerrar el mes'}</button>` : ''}
           <div class="cx-nav" style="margin-left:8px">
             <button class="b-x" id="cv-ant">‹</button>
             <b>${UI.esc(this.MESES[this.mes])}</b>
@@ -18647,15 +18727,17 @@ tr:hover td{background:var(--panel-2)}
 
         <div class="cx-kpis">
           ${this.kpi('Vendido', UI.pesos(m.vendido), `${m.firmes.length} boletas confirmadas`)}
-          ${this.kpi('Base de comisión', UI.pesos(m.base),
-            'lo que le queda a la casa')}
-          ${this.kpi('Comisión', UI.pesos(m.comision), `${m.pct}% sobre la base`)}
+          ${this.kpi('Cobrado', UI.pesos(m.cobrado), m.porCobrar
+            ? `faltan cobrar ${UI.pesos(m.porCobrar)}` : 'todo cobrado')}
+          ${this.kpi('Comisión', UI.pesos(m.comision), `${m.pct}% sobre lo cobrado`)}
           ${this.kpi('Bono', UI.pesos(m.bono.monto), m.bono.siguiente
             ? `faltan ${UI.pesos(m.bono.falta)} para el próximo`
             : (m.bono.alcanzada ? 'último tramo alcanzado' : 'sin franjas cargadas'))}
           ${this.kpi('A cobrar', UI.pesos(m.aCobrar),
-            `${UI.pesos(m.fija)} de base fija + comisión + bono`)}
+            `fija + comisión + bono${m.ajuste ? ' + ajustes' : ''}`)}
         </div>
+
+        ${this.bloqueAjustes(m)}
 
         ${m.trabadas.length ? `<div class="card pad cv-trab">
           <div class="cv-trab-h">⚠ ${UI.pesos(m.trabado)} sin contar todavía</div>
@@ -18679,8 +18761,8 @@ tr:hover td{background:var(--panel-2)}
           ${m.ventas.length ? `<div class="card cx-tabla"><table>
             <thead><tr><th>Fecha</th><th>Pedido</th><th>Cliente</th><th>Local</th>
               <th class="num">Efectivo</th><th class="num">Transf.</th><th class="num">Crédito</th>
-              <th class="num">Flete</th><th class="num">Base</th><th class="num">Comisión</th>
-              <th></th></tr></thead>
+              <th class="num">Flete</th><th class="num">Cobrado</th><th class="num">Falta</th>
+              <th class="num">Comisión</th><th></th></tr></thead>
             <tbody>${m.ventas.map(x => `<tr class="cliq ${x.cuenta ? '' : 'ojo'}"
               data-ir="${UI.esc(x.o.numero)}">
               <td class="muted">${UI.esc(x.o.fecha)}</td>
@@ -18691,23 +18773,51 @@ tr:hover td{background:var(--panel-2)}
               <td class="num muted">${x.transferencia ? UI.pesos(x.transferencia) : '—'}</td>
               <td class="num muted">${x.credito ? UI.pesos(x.credito) : '—'}</td>
               <td class="num muted">${x.flete ? `−${UI.pesos(x.flete)}` : '—'}</td>
-              <td class="num">${UI.pesos(x.base)}</td>
+              <td class="num">${UI.pesos(x.cobrado)}</td>
+              <td class="num ${x.falta ? 'sube' : 'muted'}">${x.falta
+                ? UI.pesos(x.falta) : '—'}</td>
               <td class="num nom">${x.cuenta ? UI.pesos(x.comision)
                 : '<span class="muted">no cuenta</span>'}</td>
               <td><span class="pill ${x.cuenta ? 'ok' : 'warn'}">${x.cuenta ? 'firme'
                 : 'a confirmar'}</span></td>
             </tr>`).join('')}
             <tr class="cx-tot"><td colspan="8">Total del mes</td>
-              <td class="num">${UI.pesos(m.base)}</td>
+              <td class="num">${UI.pesos(m.cobrado)}</td>
+              <td class="num">${m.porCobrar ? UI.pesos(m.porCobrar) : '—'}</td>
               <td class="num">${UI.pesos(m.comision)}</td><td></td></tr>
             </tbody></table></div>`
             : UI.vacio('No hay ventas de este vendedor en el mes.')}
         </div>
 
-        <div class="hint">La base sale de cada cobro de la boleta, no de un campo aparte:
-          <b>efectivo + transferencia ÷ ${C.ivaDivisor} + crédito × ${C.creditoFactor} − flete</b>.
-          Si una seña se cobró en efectivo y el saldo con tarjeta, cada parte cae en su columna.
-          Lo que todavía no se cobró se proyecta con el método de la boleta.</div>`;
+        <div class="hint">La comisión se paga <b>por lo cobrado</b> y por el método con que
+          pagó el cliente de verdad: <b>efectivo + transferencia ÷ ${C.ivaDivisor} +
+          crédito × ${C.creditoFactor} − flete</b>. Lo que todavía no entró no cuenta, y una
+          transferencia que nadie vio en el banco tampoco.
+          Al cerrar el mes queda firme lo que se pagó; si esa venta después se termina de
+          cobrar o se anula, la diferencia aparece como <b>ajuste</b> en el mes siguiente.</div>`;
+    },
+
+    // Los ajustes de meses cerrados. Un mes cerrado no se vuelve a tocar: si
+    // una venta vieja cambió, la diferencia aparece acá, con su número y su
+    // motivo, en más o en menos. Es como se hace en la planilla.
+    bloqueAjustes(m) {
+      if (!m.ajustes.length) return '';
+      return `<div class="card pad cv-aj">
+        <div class="cx-b-h">Ajustes de meses anteriores
+          <span class="muted">${m.ajustes.length}</span></div>
+        ${m.ajustes.map(a => `<div class="cv-aj-f">
+          <b>${UI.esc(a.numero)}</b>
+          <span>${UI.esc(a.cliente || '')}</span>
+          <span class="muted">de ${UI.esc(this.MESES[a.mesOrigen])} · ${UI.esc(a.motivo)}</span>
+          <span class="muted">se le pagó ${UI.pesos(a.liquidado)}, iba ${UI.pesos(a.ahora)}</span>
+          <span class="sp"></span>
+          <b class="${a.dif > 0 ? 'baja' : 'sube'}">${a.dif > 0 ? '+' : '−'}${
+            UI.pesos(Math.abs(a.dif))}</b>
+        </div>`).join('')}
+        <div class="cv-aj-t">Total de ajustes
+          <b class="${m.ajuste > 0 ? 'baja' : 'sube'}">${m.ajuste > 0 ? '+' : '−'}${
+            UI.pesos(Math.abs(m.ajuste))}</b></div>
+      </div>`;
     },
 
     // Las franjas: lo que falta para el próximo premio es el número que
@@ -18750,6 +18860,15 @@ tr:hover td{background:var(--panel-2)}
       const s = q('cv-sig'); if (s) s.onclick = () => {
         this.mes = this.mes < 12 ? this.mes + 1 : 1; this.render(this._mount);
       };
+      const cc = q('cv-cerrar'); if (cc) cc.onclick = () => {
+        const m = global.DB.mesDelVendedor(this.vend, this.mes);
+        if (!confirm(`¿Cerrar ${this.MESES[this.mes]} de ${this.vend} con ${
+          UI.pesos(m.comision)} de comisión?\n\nLo que cambie después de una venta de este`
+          + ' mes va a aparecer como ajuste en el mes que sigue.')) return;
+        const n = global.DB.cerrarMesVendedor(this.vend, this.mes, 'Brian');
+        UI.aviso(`${n} ventas liquidadas`, 'ok');
+        this.render(this._mount);
+      };
       const v = q('cv-vend'); if (v) v.onchange = () => {
         this.vend = v.value; this.render(this._mount);
       };
@@ -18779,6 +18898,16 @@ tr:hover td{background:var(--panel-2)}
         .cv-obj-f b{font-size:14px;color:var(--muted)}
         .cv-obj-f span span{font-size:10.5px;color:var(--muted)}
         .cv-obj-f>span.ok b{color:var(--ok)}
+        .cv-aj{border-left:3px solid var(--brand);margin-bottom:14px}
+        .cv-aj-f{display:flex;gap:9px;align-items:center;flex-wrap:wrap;font-size:12.5px;
+          padding:4px 0;border-bottom:1px solid var(--line-soft)}
+        .cv-aj-f:last-of-type{border-bottom:0}
+        .cv-aj-f b{color:var(--navy)}
+        .cv-aj-f .muted{font-size:11px}
+        .cv-aj-t{display:flex;gap:8px;justify-content:flex-end;align-items:baseline;
+          margin-top:8px;padding-top:8px;border-top:1px solid var(--line);
+          font-size:12px;color:var(--muted)}
+        .cv-aj-t b{font-size:15px}
       </style>`;
     },
   };

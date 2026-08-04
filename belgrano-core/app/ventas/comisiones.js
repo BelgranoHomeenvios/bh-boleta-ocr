@@ -50,6 +50,8 @@
             ${global.DB.vendedores().map(v =>
               `<option ${v === this.vend ? 'selected' : ''}>${UI.esc(v)}</option>`).join('')}
           </select>` : ''}
+          ${this.jefe ? `<button class="b-x ${m.cerrado ? '' : 'hacer'}" id="cv-cerrar">${
+            m.cerrado ? 'Mes cerrado · recerrar' : 'Cerrar el mes'}</button>` : ''}
           <div class="cx-nav" style="margin-left:8px">
             <button class="b-x" id="cv-ant">‹</button>
             <b>${UI.esc(this.MESES[this.mes])}</b>
@@ -59,15 +61,17 @@
 
         <div class="cx-kpis">
           ${this.kpi('Vendido', UI.pesos(m.vendido), `${m.firmes.length} boletas confirmadas`)}
-          ${this.kpi('Base de comisión', UI.pesos(m.base),
-            'lo que le queda a la casa')}
-          ${this.kpi('Comisión', UI.pesos(m.comision), `${m.pct}% sobre la base`)}
+          ${this.kpi('Cobrado', UI.pesos(m.cobrado), m.porCobrar
+            ? `faltan cobrar ${UI.pesos(m.porCobrar)}` : 'todo cobrado')}
+          ${this.kpi('Comisión', UI.pesos(m.comision), `${m.pct}% sobre lo cobrado`)}
           ${this.kpi('Bono', UI.pesos(m.bono.monto), m.bono.siguiente
             ? `faltan ${UI.pesos(m.bono.falta)} para el próximo`
             : (m.bono.alcanzada ? 'último tramo alcanzado' : 'sin franjas cargadas'))}
           ${this.kpi('A cobrar', UI.pesos(m.aCobrar),
-            `${UI.pesos(m.fija)} de base fija + comisión + bono`)}
+            `fija + comisión + bono${m.ajuste ? ' + ajustes' : ''}`)}
         </div>
+
+        ${this.bloqueAjustes(m)}
 
         ${m.trabadas.length ? `<div class="card pad cv-trab">
           <div class="cv-trab-h">⚠ ${UI.pesos(m.trabado)} sin contar todavía</div>
@@ -91,8 +95,8 @@
           ${m.ventas.length ? `<div class="card cx-tabla"><table>
             <thead><tr><th>Fecha</th><th>Pedido</th><th>Cliente</th><th>Local</th>
               <th class="num">Efectivo</th><th class="num">Transf.</th><th class="num">Crédito</th>
-              <th class="num">Flete</th><th class="num">Base</th><th class="num">Comisión</th>
-              <th></th></tr></thead>
+              <th class="num">Flete</th><th class="num">Cobrado</th><th class="num">Falta</th>
+              <th class="num">Comisión</th><th></th></tr></thead>
             <tbody>${m.ventas.map(x => `<tr class="cliq ${x.cuenta ? '' : 'ojo'}"
               data-ir="${UI.esc(x.o.numero)}">
               <td class="muted">${UI.esc(x.o.fecha)}</td>
@@ -103,23 +107,51 @@
               <td class="num muted">${x.transferencia ? UI.pesos(x.transferencia) : '—'}</td>
               <td class="num muted">${x.credito ? UI.pesos(x.credito) : '—'}</td>
               <td class="num muted">${x.flete ? `−${UI.pesos(x.flete)}` : '—'}</td>
-              <td class="num">${UI.pesos(x.base)}</td>
+              <td class="num">${UI.pesos(x.cobrado)}</td>
+              <td class="num ${x.falta ? 'sube' : 'muted'}">${x.falta
+                ? UI.pesos(x.falta) : '—'}</td>
               <td class="num nom">${x.cuenta ? UI.pesos(x.comision)
                 : '<span class="muted">no cuenta</span>'}</td>
               <td><span class="pill ${x.cuenta ? 'ok' : 'warn'}">${x.cuenta ? 'firme'
                 : 'a confirmar'}</span></td>
             </tr>`).join('')}
             <tr class="cx-tot"><td colspan="8">Total del mes</td>
-              <td class="num">${UI.pesos(m.base)}</td>
+              <td class="num">${UI.pesos(m.cobrado)}</td>
+              <td class="num">${m.porCobrar ? UI.pesos(m.porCobrar) : '—'}</td>
               <td class="num">${UI.pesos(m.comision)}</td><td></td></tr>
             </tbody></table></div>`
             : UI.vacio('No hay ventas de este vendedor en el mes.')}
         </div>
 
-        <div class="hint">La base sale de cada cobro de la boleta, no de un campo aparte:
-          <b>efectivo + transferencia ÷ ${C.ivaDivisor} + crédito × ${C.creditoFactor} − flete</b>.
-          Si una seña se cobró en efectivo y el saldo con tarjeta, cada parte cae en su columna.
-          Lo que todavía no se cobró se proyecta con el método de la boleta.</div>`;
+        <div class="hint">La comisión se paga <b>por lo cobrado</b> y por el método con que
+          pagó el cliente de verdad: <b>efectivo + transferencia ÷ ${C.ivaDivisor} +
+          crédito × ${C.creditoFactor} − flete</b>. Lo que todavía no entró no cuenta, y una
+          transferencia que nadie vio en el banco tampoco.
+          Al cerrar el mes queda firme lo que se pagó; si esa venta después se termina de
+          cobrar o se anula, la diferencia aparece como <b>ajuste</b> en el mes siguiente.</div>`;
+    },
+
+    // Los ajustes de meses cerrados. Un mes cerrado no se vuelve a tocar: si
+    // una venta vieja cambió, la diferencia aparece acá, con su número y su
+    // motivo, en más o en menos. Es como se hace en la planilla.
+    bloqueAjustes(m) {
+      if (!m.ajustes.length) return '';
+      return `<div class="card pad cv-aj">
+        <div class="cx-b-h">Ajustes de meses anteriores
+          <span class="muted">${m.ajustes.length}</span></div>
+        ${m.ajustes.map(a => `<div class="cv-aj-f">
+          <b>${UI.esc(a.numero)}</b>
+          <span>${UI.esc(a.cliente || '')}</span>
+          <span class="muted">de ${UI.esc(this.MESES[a.mesOrigen])} · ${UI.esc(a.motivo)}</span>
+          <span class="muted">se le pagó ${UI.pesos(a.liquidado)}, iba ${UI.pesos(a.ahora)}</span>
+          <span class="sp"></span>
+          <b class="${a.dif > 0 ? 'baja' : 'sube'}">${a.dif > 0 ? '+' : '−'}${
+            UI.pesos(Math.abs(a.dif))}</b>
+        </div>`).join('')}
+        <div class="cv-aj-t">Total de ajustes
+          <b class="${m.ajuste > 0 ? 'baja' : 'sube'}">${m.ajuste > 0 ? '+' : '−'}${
+            UI.pesos(Math.abs(m.ajuste))}</b></div>
+      </div>`;
     },
 
     // Las franjas: lo que falta para el próximo premio es el número que
@@ -162,6 +194,15 @@
       const s = q('cv-sig'); if (s) s.onclick = () => {
         this.mes = this.mes < 12 ? this.mes + 1 : 1; this.render(this._mount);
       };
+      const cc = q('cv-cerrar'); if (cc) cc.onclick = () => {
+        const m = global.DB.mesDelVendedor(this.vend, this.mes);
+        if (!confirm(`¿Cerrar ${this.MESES[this.mes]} de ${this.vend} con ${
+          UI.pesos(m.comision)} de comisión?\n\nLo que cambie después de una venta de este`
+          + ' mes va a aparecer como ajuste en el mes que sigue.')) return;
+        const n = global.DB.cerrarMesVendedor(this.vend, this.mes, 'Brian');
+        UI.aviso(`${n} ventas liquidadas`, 'ok');
+        this.render(this._mount);
+      };
       const v = q('cv-vend'); if (v) v.onchange = () => {
         this.vend = v.value; this.render(this._mount);
       };
@@ -191,6 +232,16 @@
         .cv-obj-f b{font-size:14px;color:var(--muted)}
         .cv-obj-f span span{font-size:10.5px;color:var(--muted)}
         .cv-obj-f>span.ok b{color:var(--ok)}
+        .cv-aj{border-left:3px solid var(--brand);margin-bottom:14px}
+        .cv-aj-f{display:flex;gap:9px;align-items:center;flex-wrap:wrap;font-size:12.5px;
+          padding:4px 0;border-bottom:1px solid var(--line-soft)}
+        .cv-aj-f:last-of-type{border-bottom:0}
+        .cv-aj-f b{color:var(--navy)}
+        .cv-aj-f .muted{font-size:11px}
+        .cv-aj-t{display:flex;gap:8px;justify-content:flex-end;align-items:baseline;
+          margin-top:8px;padding-top:8px;border-top:1px solid var(--line);
+          font-size:12px;color:var(--muted)}
+        .cv-aj-t b{font-size:15px}
       </style>`;
     },
   };

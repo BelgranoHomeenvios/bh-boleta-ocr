@@ -117,6 +117,17 @@ dónde entra el equipamiento.
 - La deuda con el proveedor **nace al conformar**, sin paso intermedio.
 - Devolver en el momento y devolver después de pagar **son dos cosas
   distintas**.
+- **La comisión se paga por lo cobrado**, con el método con que pagó el
+  cliente de verdad. Lo que no entró no cuenta, y una transferencia que nadie
+  vio en el banco tampoco.
+- **El mes cerrado no se toca.** Lo que cambie después de una venta ya
+  liquidada aparece como **ajuste** en el mes siguiente, con el número de la
+  venta vieja, en más o en menos.
+- **El tope de los $550.000** es sobre el **saldo a cobrar**.
+- **El efectivo lo habilita cualquiera de los cuatro socios.** Lo que importa
+  es que la plata la reciba un socio, no cuál.
+- **El vendedor no le puede entregar nada al cliente sin cargarlo antes.** Para
+  imprimir o mandar una cotización hacen falta nombre y teléfono.
 - **La terminación mide cuánto paraíso tiene el mueble, y la cara que manda es
   la estructura.** Estructura paraíso con frente laqueado va a *comboParaiso*;
   estructura laqueada con frente paraíso va a *comboBlanco*, que es más barata.

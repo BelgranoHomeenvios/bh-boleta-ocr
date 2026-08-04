@@ -224,23 +224,38 @@ Cosas que hoy no se pueden saber y con esto salen solas:
 
 ---
 
-## 10 · Lo que hay que decidir antes de construir
+## 10 · Decidido
 
-**1 · La orden anulada.** Si se anula una venta, ¿la consulta vuelve a
-"Negociando" o pasa a "Rechazado"? No es lo mismo: una se sigue, la otra no.
+**1 · La orden anulada manda la consulta a Rechazada.** No vuelve a
+seguimiento: si la venta se cayó, la consulta se cerró.
 
-**2 · La consulta sin cotización.** El que entra al local, pregunta y se va
-sin que le armen nada. ¿Se registra igual? Si no, se pierde la mitad de la
-estadística de local. Si sí, alguien tiene que cargarla a mano.
+**2 · El que entra y se va no se registra.** Pero **el que pide que le anoten
+un precio, sí** — y el gancho es este:
 
-**3 · Varias cotizaciones, una venta.** Si el vendedor armó tres presupuestos
-y el cliente compró el segundo, ¿las otras dos quedan como rechazadas o
-simplemente cerradas?
+> **El vendedor no le puede dar NADA al cliente sin cargarlo primero.** Ni
+> imprimir, ni mandar por WhatsApp, ni anotarle un número en un papel. Para
+> que salga una cotización hay que poner **nombre y teléfono**.
 
-**4 · Dos vendedores, un cliente.** El cliente preguntó por Instagram —lo
-atendió Nati— y después pasó por el local —lo atendió Ale—. ¿De quién es la
-consulta, y de quién la comisión?
+Eso resuelve solo el problema de la consulta que no se registra: el vendedor no
+puede hacer su trabajo sin cargarla. No es un recordatorio, es la puerta.
 
-**5 · El cliente que no quiere dar datos.** Pregunta por Instagram y no da ni
-el nombre. ¿La consulta puede vivir sin cliente para siempre, o hay un momento
-en que se le exige?
+**3 · Vender no cierra la consulta entera.** Si preguntó por una cómoda y dos
+mesas de luz y compró la cómoda, **las dos mesas de luz siguen en
+seguimiento**. El vendedor es el que después marca rechazado o cerrado, cuando
+confirma que sólo se llevaba eso.
+
+> Una cotización repetida es el mismo presupuesto, no una consulta nueva.
+
+**4 · Dos vendedores, un cliente: se carga en los dos lados y después se
+fusiona.** A Cintia le tiene que aparecer que hay dos consultas del mismo
+cliente —por nombre, teléfono, usuario de Instagram, o porque el cliente lo
+dice—. Se fusionan y **queda un solo agente siguiéndola**, aunque la comisión
+se reparta entre los dos. Fusionar lo puede hacer Cintia, Dirección o el mismo
+vendedor.
+
+> La consulta la maneja **uno solo**. La comisión se reparte.
+
+**5 · El usuario de Instagram ya es un cliente.** No hace falta el nombre. Es
+un registro válido, y después se le va agregando: primero el teléfono, después
+el nombre. Cuando escribe desde ese teléfono y ya se sabe quién es, **se
+fusiona todo y el teléfono pasa a ser el dato principal**.
