@@ -2344,7 +2344,7 @@
         .srow.noest{grid-template-columns:56px minmax(0,1.4fr) 116px 96px 90px 100px 48px}
         .bwrap{position:relative}
         .srow .busca{width:100%;padding:7px 10px;font-size:13px}
-        .lnk{border:0;background:none;color:var(--brand);font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:0;justify-self:start}
+        .lnk{justify-self:start}
         .lnk:hover{text-decoration:underline}
         .pr-pie{display:flex;justify-content:flex-end;padding:11px 0 0;border-top:1px solid var(--line)}
         .drop{position:absolute;left:0;width:340px;top:100%;z-index:30;background:var(--panel);border:1px solid var(--brand);border-radius:11px;box-shadow:var(--shadow);overflow:hidden;max-height:320px;overflow-y:auto}

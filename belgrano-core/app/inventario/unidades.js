@@ -1110,9 +1110,6 @@
           border-radius:7px;padding:2px 9px;font:inherit;font-size:11.5px;font-weight:700;cursor:pointer;
           white-space:nowrap}
         .bres:hover{background:var(--brand);color:#fff}
-        .b-x{border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:2px 8px;
-          font:inherit;font-size:11.5px;color:var(--muted);cursor:pointer}
-        .b-x:hover{border-color:var(--brand);color:var(--brand)}
         .un-back{position:fixed;inset:0;background:rgba(12,22,44,.4);z-index:50;display:grid;
           place-items:center;padding:20px}
         .un-prev{margin-top:12px;height:200px;border:1px solid var(--line);border-radius:10px;

@@ -29,7 +29,8 @@
         <td class="muted">${UI.esc(r.fecha)}</td>
         <td class="tnum">${r.items.length}</td>
         <td class="tnum nom">${r.total ? UI.pesos(r.total) : this.estimado(r)}</td>
-        <td class="td-acc"><button class="b-x" data-ver="${UI.esc(r.numero)}">${
+        <td class="td-acc"><button class="b-x ${r.estadoCompras === 'pendiente' ? 'hacer' : ''}"
+          data-ver="${UI.esc(r.numero)}">${
           r.estadoCompras === 'pendiente' ? 'Conformar' : 'Ver'}</button></td>
       </tr>`;
       const bloque = (t, lista, pie) => `<div class="cp-b">

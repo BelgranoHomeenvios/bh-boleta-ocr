@@ -63,7 +63,7 @@
                 ? ` <b class="mal">hace ${dias} días</b>` : ''}</td>
               <td>${r.items.length}</td>
               <td class="num muted">${UI.pesos(t)}</td>
-              <td><button class="b-x" data-rec="${UI.esc(r.numero)}">Conformar</button></td>
+              <td><button class="b-x hacer" data-rec="${UI.esc(r.numero)}">Conformar</button></td>
             </tr>`;
           }).join('')}</tbody></table></div>`
           : '<div class="hint">No hay nada esperando. Aparecen solas cuando el depósito recibe.</div>'}

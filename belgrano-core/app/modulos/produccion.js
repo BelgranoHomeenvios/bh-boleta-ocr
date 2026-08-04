@@ -742,7 +742,6 @@
         .pr-tabla .venc{color:var(--crit);font-weight:700}
         .pr-tabla .hoy{color:var(--warn);font-weight:700}
         .pr-tabla td .muted{font-size:11px;margin-left:4px}
-        .td-acc{text-align:right}
         .pr-acc{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;
           border:1px solid var(--line);border-radius:11px;padding:10px 13px;background:var(--panel)}
         .pr-acc .btn[disabled]{opacity:.45;pointer-events:none}
@@ -779,9 +778,6 @@
         .pr-cambio b{color:var(--ink-soft)}
         .pr-back{position:fixed;inset:0;background:rgba(12,22,44,.4);z-index:50;display:grid;
           place-items:center;padding:20px}
-        .b-x{border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:2px 8px;
-          font:inherit;font-size:11.5px;color:var(--muted);cursor:pointer}
-        .b-x:hover{border-color:var(--brand);color:var(--brand)}
       </style>`;
     },
   };
