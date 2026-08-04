@@ -72,11 +72,11 @@
       S('resumen', 'Resumen', resumen('compras')),
       S('oc', 'Órdenes de compra', m => global.ComprasOC.render(m)),
       S('recepciones', 'Recepciones a conformar', m => global.ComprasRecepciones.render(m)),
-      S('proveedores', 'Proveedores', skel('Proveedores')),
-      S('comparador', 'Comparador', skel('Comparador de precios')),
-      S('pendientes', 'Pendientes', skel('Pendientes')),
-      S('historial', 'Historial', skel('Historial')),
-      S('indicadores', 'Indicadores', skel('Indicadores')),
+      S('proveedores', 'Proveedores', m => global.ComprasProveedores.render(m)),
+      S('comparador', 'Comparador', m => global.ComprasComparador.render(m)),
+      S('pendientes', 'Pendientes', m => global.ComprasPendientes.render(m)),
+      S('historial', 'Historial', m => global.ComprasHistorial.render(m)),
+      S('indicadores', 'Indicadores', m => global.ComprasIndicadores.render(m)),
     ]},
 
     inventario: { label: 'Inventario', icon: '📦', subs: [

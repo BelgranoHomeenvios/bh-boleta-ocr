@@ -972,7 +972,76 @@
       return `${this.SERIE_RECEPCION.prefijo}-${String(n).padStart(this.SERIE_RECEPCION.digitos, '0')}`;
     },
     _recs: null,
-    recepciones() { if (!this._recs) this._recs = []; return this._recs; },
+    recepciones() {
+      if (!this._recs) { this._recs = []; this._sembrarRecepciones(); }
+      return this._recs;
+    },
+    // Cuatro meses de entregas ya conformadas. Sin esto, Historial,
+    // Indicadores y la ficha del proveedor arrancan en blanco y no hay
+    // manera de ver si la pantalla sirve.
+    _sembrarRecepciones() {
+      const llegadas = this.unidadesTodas().filter(u => u.provId
+        && (u.estado === 'stock' || u.estado === 'entregada'));
+      const porProv = {};
+      llegadas.forEach(u => { (porProv[u.provId] = porProv[u.provId] || []).push(u); });
+      let n = 92;
+      const out = [];
+      Object.keys(porProv).forEach(pid => {
+        const us = porProv[pid];
+        for (let i = 0; i + 1 < us.length; i += 5) {
+          const lote = us.slice(i, i + 5);
+          const mes = 4 + ((n + i) % 4);
+          const dia = ((n * 7 + i) % 27) + 1;
+          const items = lote.map(u => {
+            const p = this.precioProveedor(pid, u.varianteId);
+            // Un precio parejo se ve falso: el taller redondea, y de vez en
+            // cuando cobra algo distinto de lo que decía la lista.
+            const salto = (u.id % 11 === 0) ? 1.08 : (u.id % 7 === 0 ? 0.96 : 1);
+            return { unidadId: u.id, varianteId: u.varianteId,
+              calidad: u.id % 13 === 0 ? 'detalle' : 'perfecto',
+              modelo: u.modelo, medida: u.medida, color: u.color,
+              orden: u.orden || '', serie: u.serie, nota: '',
+              precio: Math.round(p.precio * salto / 1000) * 1000 };
+          });
+          const prov = this.proveedor(Number(pid));
+          out.push({
+            numero: this.numRecepcion(n++), pedido: lote[0].pedido,
+            provId: Number(pid), proveedor: prov ? this.provLabel(prov.id) : '',
+            fecha: `${dia}/${mes}`, recibidoPor: 'Adrián', items,
+            estadoCompras: 'conformada', conformadaPor: 'Jony',
+            conformadaEl: `${dia}/${mes}`,
+            flete: (n % 4 === 0)
+              ? { modo: 'compra', monto: 45000 + (n % 5) * 12000, quien: 'Jony', el: `${dia}/${mes}` }
+              : { modo: 'proveedor', monto: 0, quien: 'Jony', el: `${dia}/${mes}` },
+            total: items.reduce((a, x) => a + x.precio, 0),
+          });
+        }
+      });
+      // De la más nueva a la más vieja, que es como se mira.
+      out.sort((a, b) => this.diasDesde(a.fecha) - this.diasDesde(b.fecha));
+      // Las tres últimas todavía no las miró nadie: son las que esperan a
+      // Jony en "Recepciones a conformar".
+      out.slice(0, 3).forEach(r => {
+        r.estadoCompras = 'pendiente';
+        delete r.conformadaPor; delete r.conformadaEl; delete r.total;
+        r.items.forEach(it => { delete it.precio; });
+      });
+      this._recs = out;
+      // Lo que se conformó ya es precio conocido de ese taller: así la lista
+      // arranca con lo que de verdad se pagó y el comparador tiene qué
+      // comparar. Si el navegador ya guardó una lista propia, no se toca.
+      const lista = this.listaPrecios();
+      if (!lista.length) {
+        out.filter(r => r.estadoCompras === 'conformada').forEach(r => {
+          r.items.forEach(it => {
+            const i = lista.findIndex(x => x.provId === r.provId && x.varianteId === it.varianteId);
+            const reg = { provId: r.provId, varianteId: it.varianteId,
+              precio: it.precio, desde: r.conformadaEl, quien: 'Jony' };
+            if (i >= 0) lista[i] = reg; else lista.push(reg);
+          });
+        });
+      }
+    },
     proximaRecepcion() {
       return this.numRecepcion(this.recepciones().length + 92);
     },
@@ -1082,6 +1151,197 @@
       return o;
     },
 
+
+    // ---- La lista de Costeo -----------------------------------------------
+    // Es la tabla con la que se trabaja hoy en Belgrano Cost: cuánto sale
+    // cada mueble según su categoría, su medida y su terminación. No mira
+    // quién lo fabrica —es el piso contra el que se compara lo que después
+    // cobra cada proveedor.
+    TERMINACIONES: [
+      { k: 'laqueado',     label: 'Laqueado' },
+      { k: 'comboBlanco',  label: 'Combinado + Blanco' },
+      { k: 'comboParaiso', label: 'Combinado + Paraíso' },
+      { k: 'paraiso',      label: 'Paraíso' },
+    ],
+    // La terminación sale de mirar las dos caras del mueble: si alguna es
+    // paraíso manda el paraíso; si no, va laqueado cuando las dos son del
+    // mismo color y combinado cuando son de dos.
+    terminacionDe(estructura, frente) {
+      const limpio = t => sinTilde(String(t || '')).trim().replace(/a$/, 'o');
+      const esPar = t => limpio(t).includes('paraiso');
+      const a = esPar(estructura), b = esPar(frente);
+      if (a && b) return 'paraiso';
+      if (a || b) return 'comboParaiso';
+      return limpio(estructura) === limpio(frente) ? 'laqueado' : 'comboBlanco';
+    },
+    // Cada tipo de mueble del catálogo con el nombre que tiene en Costeo.
+    CAT_COSTEO: { 2: 'comodas', 3: 'placard', 5: 'ratona', 6: 'mesas-luz', 7: 'muebles-tv' },
+    // categoría · medida (frente x alto x prof, en cm) · los cuatro precios,
+    // en el orden de TERMINACIONES.
+    COSTEO_BASE: [
+      ['escritorios','80x80x45',205720,218230,245340,265080],
+      ['escritorios','100x80x45',209890,221010,249570,274950],
+      ['escritorios','120x80x45',226570,239080,270720,297510],
+      ['escritorios','140x80x45',234910,247420,284820,313020],
+      ['escritorios','160x80x45',257150,271050,307380,338400],
+      ['escritorios','180x80x45',280780,294680,329940,362370],
+      ['escritorios','200x80x45',312750,333600,356730,393390],
+      ['escritorios','220x80x45',333600,354450,380700,415950],
+      ['alzada','60x40x30',123710,129270,136770,149460],
+      ['alzada','80x40x30',132050,139000,155100,170610],
+      ['alzada','100x40x30',145950,154290,180480,198810],
+      ['alzada','120x40x30',162630,165410,181890,200220],
+      ['alzada','150x40x30',179310,184870,204450,225600],
+      ['alzada','160x40x30',194600,209890,221370,242520],
+      ['alzada','180x40x30',209890,218230,236880,260850],
+      ['alzada','200x40x30',239080,252980,270720,297510],
+      ['alzada','220x40x30',259930,275220,303150,331350],
+      ['alzada','60x60x30',123710,129270,136770,149460],
+      ['alzada','80x60x30',132050,139000,155100,170610],
+      ['alzada','100x60x30',145950,154290,180480,198810],
+      ['alzada','120x60x30',162630,165410,181890,200220],
+      ['alzada','150x60x30',179310,184870,204450,225600],
+      ['alzada','160x60x30',194600,209890,221370,242520],
+      ['alzada','180x60x30',209890,218230,236880,260850],
+      ['alzada','200x60x30',239080,252980,270720,297510],
+      ['alzada','220x60x30',259930,275220,303150,331350],
+      ['biblioteca','40x180x30',227960,241860,265080,291870],
+      ['biblioteca','60x180x30',246030,255760,280590,308790],
+      ['biblioteca','80x180x30',259930,269660,289050,318660],
+      ['biblioteca','100x180x30',266880,278000,305970,336990],
+      ['biblioteca','120x180x30',278000,294680,317250,349680],
+      ['botinero','50x50x30',114216,122292,139266,152139],
+      ['botinero','70x50x30',122292,128061,146288,160331],
+      ['botinero','100x50x30',146520,153442,169694,186078],
+      ['botinero','120x50x30',154596,162672,177886,196610],
+      ['botinero','140x50x30',177670,188053,204803,225868],
+      ['botinero','160x50x30',230740,253814,277361,305448],
+      ['botinero','180x50x30',250353,273427,292575,321833],
+      ['botinero','200x50x30',268812,288425,321833,354601],
+      ['botinero','220x50x30',302269,310345,352260,397902],
+      ['botinero','50x90x30',137610,147340,167790,183300],
+      ['botinero','70x90x30',147340,154290,176250,193170],
+      ['botinero','100x90x30',176530,184870,204450,224190],
+      ['botinero','120x90x30',186260,195990,214320,236880],
+      ['botinero','140x90x30',214060,226570,246750,272130],
+      ['botinero','160x90x30',278000,305800,334170,368010],
+      ['botinero','180x90x30',301630,329430,352500,387750],
+      ['botinero','200x90x30',323870,347500,387750,427230],
+      ['botinero','220x90x30',364180,373910,424410,479400],
+      ['botinero','50x130x30',164020,170970,197400,208680],
+      ['botinero','70x130x30',172360,180700,211500,232650],
+      ['botinero','90x130x30',186260,195990,214320,236880],
+      ['comodas','45x90x45',215450,226570,274950,303150],
+      ['comodas','60x90x45',244640,258540,283410,311610],
+      ['comodas','80x90x45',250200,266880,307380,338400],
+      ['comodas','90x90x45',272440,286340,317250,348270],
+      ['comodas','100x90x45',280780,294680,325710,358140],
+      ['comodas','120x90x45',303020,318310,331350,365190],
+      ['comodas','140x90x45',321090,337770,355320,391980],
+      ['comodas','150x90x45',347500,368350,387750,423000],
+      ['comodas','160x90x45',339160,358620,369420,406080],
+      ['comodas','180x90x45',364180,386420,431460,473760],
+      ['comodas','200x90x45',410050,425340,468120,514650],
+      ['chiffonier','50x120x45',255760,268270,305970,336990],
+      ['chiffonier','70x120x45',276610,290510,320070,352500],
+      ['chiffonier','90x120x45',289120,304410,334170,366600],
+      ['estante-flotante','60x30',20850,0,0,22560],
+      ['estante-flotante','80x30',22240,0,0,25380],
+      ['estante-flotante','100x30',25020,0,0,28200],
+      ['estante-flotante','120x30',27800,0,0,35250],
+      ['estante-flotante','150x30',34750,0,0,42300],
+      ['estante-flotante','160x30',37000,0,0,44000],
+      ['estante-flotante','180x30',41700,0,0,52170],
+      ['estante-flotante','200x30',48650,0,0,60630],
+      ['mesas-luz','35x35x40',65330,69500,78960,86010],
+      ['mesas-luz','40x35x40',66720,73670,80370,88830],
+      ['mesas-luz','50x35x40',76450,80620,91650,101520],
+      ['mesas-luz','60x35x40',83400,87570,101520,111390],
+      ['mesas-luz','35x65x40',86180,91740,105750,115620],
+      ['mesas-luz','40x65x40',90350,97300,107160,118440],
+      ['mesas-luz','50x65x40',101470,108420,122670,135360],
+      ['mesas-luz','60x65x40',111200,118150,135360,148050],
+      ['ratona','80x40x50',123710,130660,140845,155100],
+      ['ratona','100x40x50',133440,139000,146640,162150],
+      ['ratona-circular','45-50 diametro',52820,0,57810,63450],
+      ['recibidor','70x90x25',129270,136220,145230,159330],
+      ['recibidor','90x90x25',139000,144560,155100,170610],
+      ['recibidor','120x90x25',145950,152900,160740,176250],
+      ['respaldo','90x130',86180,100080,124080,136770],
+      ['respaldo','120x130',108420,113980,129720,142410],
+      ['respaldo','150x130',111200,116760,141000,155100],
+      ['respaldo','170x130',130660,137610,156510,172020],
+      ['respaldo','190x130',143170,150120,170610,187530],
+      ['respaldo','210x130',157070,164020,188940,207270],
+      ['torre-cerrada','35x180x40',250200,261320,284820,314430],
+      ['torre-cerrada','40x180x40',261320,266880,297510,327120],
+      ['torre-cerrada','50x180x40',268270,278000,310200,338400],
+      ['torre-cerrada','60x180x40',282170,290510,332760,365190],
+      ['torre-cerrada','70x180x40',291900,301630,342630,373650],
+      ['torre-cerrada','80x180x40',318310,325260,356730,393390],
+      ['torre-cerrada','100x180x40',339160,358620,375060,413130],
+      ['torre-cerrada','120x180x40',364180,382250,424410,466710],
+      ['vajilleros','80x90x45',271050,284950,317250,338400],
+      ['vajilleros','100x90x45',287730,301630,324300,345450],
+      ['vajilleros','120x90x45',296070,309970,336990,370830],
+      ['vajilleros','150x90x45',315530,333600,377880,415950],
+      ['vajilleros','160x90x45',329430,348890,382110,420180],
+      ['vajilleros','180x90x45',339160,365570,393390,432870],
+      ['vajilleros','200x90x45',364180,394760,404670,445560],
+      ['vajilleros','220x90x45',396150,430900,451200,479400],
+    ],
+
+    // Cómo se llama en Costeo el tipo de mueble del catálogo.
+    costeoCat(categoriaId) { return this.CAT_COSTEO[Number(categoriaId)] || ''; },
+    // El frente en centímetros: en el catálogo la medida viene en metros
+    // ("1.20") y en Costeo en centímetros ("120x90x45").
+    frenteCm(medida) {
+      const n = parseFloat(String(medida || '').replace(',', '.'));
+      if (!n) return 0;
+      return n < 10 ? Math.round(n * 100) : Math.round(n);
+    },
+    // Busca en la lista de Costeo la fila que corresponde a una variante. Si
+    // la medida exacta no está —el chiffonier de 0,90 se costea con el de
+    // 1,00— toma la más parecida y avisa que no es exacta, para que nadie
+    // confunda el dato de al lado con el propio.
+    costeoDe(varianteId) {
+      const v = (this.variantesTodas() || []).find(x => x.id === Number(varianteId));
+      if (!v) return null;
+      const p = DEMO.productos.find(x => x.id === v.producto_id);
+      const cat = this.costeoCat(p && p.categoria_id);
+      const filas = this.COSTEO_BASE.filter(f => f[0] === cat);
+      if (!filas.length) return null;
+      const term = this.terminacionDe(v.estructura, v.frente);
+      const col = 2 + this.TERMINACIONES.findIndex(t => t.k === term);
+      const busco = this.frenteCm(v.medidaCosteo || v.medida);
+      let mejor = null, dif = Infinity;
+      filas.forEach(f => {
+        const d = Math.abs(this.frenteCm(f[1]) - busco);
+        if (d < dif) { dif = d; mejor = f; }
+      });
+      if (!mejor || !mejor[col]) return null;
+      return { costo: mejor[col], medida: mejor[1], categoria: cat,
+        terminacion: term, exacta: dif === 0 };
+    },
+    terminacion(k) { return this.TERMINACIONES.find(t => t.k === k) || null; },
+    // El mueble al que pertenece una variante, y cómo se lo nombra en
+    // pantalla: modelo y medida, que es como lo pide todo el mundo.
+    productoDeVariante(varianteId) {
+      const v = (this.variantesTodas() || []).find(x => x.id === Number(varianteId));
+      return v ? DEMO.productos.find(p => p.id === v.producto_id) || null : null;
+    },
+    nombreVariante(varianteId) {
+      const v = (this.variantesTodas() || []).find(x => x.id === Number(varianteId));
+      if (!v) return `#${varianteId}`;
+      const p = this.productoDeVariante(varianteId);
+      const u = this.unidadesTodas().find(x => x.varianteId === v.id);
+      const nom = (p && p.nombre) || (u && u.modelo) || `Mueble #${v.producto_id}`;
+      // Varios modelos ya llevan la medida en el nombre ("RACK BERGEN 1.60"):
+      // repetirla queda mal y no aclara nada.
+      const med = String(v.medida || '');
+      return (med && !nom.includes(med) ? `${nom} ${med}` : nom).trim();
+    },
+
     // ---- Lista de precios del proveedor -----------------------------------
     // Lo que nos cobra cada taller por cada variante. Se actualiza sola a
     // medida que van viniendo: cuando Compras conforma un precio distinto,
@@ -1095,14 +1355,26 @@
       this._precios = g;
       return g;
     },
-    // El precio de lista de una variante para un taller. Si nunca se le compró,
-    // se estima con el costo del catálogo — y se avisa que es una estimación.
+    // El precio de lista de una variante para un taller. Va bajando de
+    // escalón hasta encontrar algo: lo que ese proveedor cobró la última
+    // vez, después la lista de Costeo, y recién al final el costo que tiene
+    // cargado el catálogo. Los dos últimos son estimaciones y se avisan.
     precioProveedor(provId, varianteId) {
       const p = this.listaPrecios().find(x => x.provId === Number(provId)
         && x.varianteId === Number(varianteId));
-      if (p) return { precio: Number(p.precio) || 0, desde: p.desde, estimado: false };
+      if (p) return { precio: Number(p.precio) || 0, desde: p.desde,
+        estimado: false, origen: 'proveedor' };
+      const c = this.costeoDe(varianteId);
+      if (c) return { precio: c.costo, desde: '', estimado: true,
+        origen: 'costeo', costeo: c };
       const v = (this.variantesTodas() || []).find(x => x.id === Number(varianteId));
-      return { precio: v ? Number(v.costo) || 0 : 0, desde: '', estimado: true };
+      return { precio: v ? Number(v.costo) || 0 : 0, desde: '',
+        estimado: true, origen: 'catalogo' };
+    },
+    ORIGENES_PRECIO: {
+      proveedor: { label: 'de este proveedor', pill: 'ok' },
+      costeo:    { label: 'de Costeo',         pill: 'soft' },
+      catalogo:  { label: 'del catálogo',      pill: 'warn' },
     },
     guardarPrecioProveedor(provId, varianteId, precio, quien = '') {
       const lista = this.listaPrecios();
@@ -1129,6 +1401,198 @@
       r.total = r.items.reduce((a, x) => a + (Number(x.precio) || 0), 0);
       return r;
     },
+    // ---- Lo que Compras tiene sobre la mesa --------------------------------
+    // Todo lo que está esperando una decisión, junto: entregas que Adrián
+    // registró y nadie conformó, compras de insumos que se mandaron y no
+    // llegaron, y muebles que se compran a ciegas porque nunca se les puso
+    // precio.
+    comprasPendientes() {
+      const recs = this.aConformar();
+      const ocs = this.ordenesCompra().filter(o => o.estado === 'enviada');
+      const vistos = {};
+      const sinPrecio = [], soloCosteo = [];
+      this.unidadesTodas().forEach(u => {
+        if (!u.provId || !u.varianteId) return;
+        const k = `${u.provId}|${u.varianteId}`;
+        if (vistos[k]) return;
+        vistos[k] = 1;
+        const p = this.precioProveedor(u.provId, u.varianteId);
+        if (!p.estimado) return;
+        const fila = { provId: u.provId, proveedor: this.provLabel(u.provId),
+          varianteId: u.varianteId, modelo: u.modelo, medida: u.medida,
+          color: u.color, origen: p.origen, precio: p.precio };
+        // Sin precio de verdad es no tener nada: si Costeo lo cubre, el
+        // número sirve, sólo falta que ese taller diga el suyo.
+        if (p.origen === 'catalogo') sinPrecio.push(fila); else soloCosteo.push(fila);
+      });
+      return { recs, ocs, sinPrecio, soloCosteo };
+    },
+
+    // ---- El historial ------------------------------------------------------
+    // Todo lo comprado en una sola lista, sin importar si fueron muebles o
+    // insumos: son dos circuitos distintos pero una sola plata.
+    historialCompras() {
+      const filas = [];
+      this.recepciones().filter(r => r.estadoCompras === 'conformada').forEach(r => {
+        const flete = r.flete && r.flete.modo === 'compra' ? Number(r.flete.monto) || 0 : 0;
+        filas.push({ tipo: 'muebles', numero: r.numero, fecha: r.conformadaEl || r.fecha,
+          provId: r.provId, proveedor: r.proveedor, detalle: `${r.items.length} muebles`,
+          cantidad: r.items.length, total: (Number(r.total) || 0) + flete,
+          flete, quien: r.conformadaPor || '', ref: r.numero });
+      });
+      this.ordenesCompra().filter(o => o.estado === 'recibida').forEach(o => {
+        filas.push({ tipo: 'insumos', numero: o.numero, fecha: o.recibidaEl || o.entrega,
+          provId: null, proveedor: o.proveedor,
+          detalle: `${o.items.length} insumos`, cantidad: o.items.length,
+          total: this.totalOC(o), flete: 0, quien: o.recibidaPor || '', ref: o.numero });
+      });
+      return filas.sort((a, b) => (this.diasDesde(a.fecha) || 0) - (this.diasDesde(b.fecha) || 0));
+    },
+
+    // ---- Los números -------------------------------------------------------
+    // Cuánto se compró, a quién y cómo se movió el costo. Todo sale del
+    // historial: no hay un número cargado a mano en ningún lado.
+    indicadoresCompras() {
+      const h = this.historialCompras();
+      const total = h.reduce((a, x) => a + x.total, 0);
+      const muebles = h.filter(x => x.tipo === 'muebles');
+      const insumos = h.filter(x => x.tipo === 'insumos');
+      const flete = h.reduce((a, x) => a + x.flete, 0);
+      const piezas = muebles.reduce((a, x) => a + x.cantidad, 0);
+      const porMes = {};
+      h.forEach(x => {
+        const m = String(x.fecha || '').split('/')[1] || '?';
+        (porMes[m] = porMes[m] || { mes: m, total: 0, n: 0 });
+        porMes[m].total += x.total; porMes[m].n++;
+      });
+      const porProv = {};
+      muebles.forEach(x => {
+        const k = x.provId || 0;
+        (porProv[k] = porProv[k] || { provId: k, proveedor: x.proveedor,
+          total: 0, piezas: 0, entregas: 0 });
+        porProv[k].total += x.total; porProv[k].piezas += x.cantidad; porProv[k].entregas++;
+      });
+      const meses = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
+      return {
+        total, flete, piezas,
+        muebles: muebles.reduce((a, x) => a + x.total, 0),
+        insumos: insumos.reduce((a, x) => a + x.total, 0),
+        promedio: piezas ? Math.round(muebles.reduce((a, x) => a + x.total, 0) / piezas) : 0,
+        porMes: Object.values(porMes).sort((a, b) => meses.indexOf(a.mes) - meses.indexOf(b.mes)),
+        porProv: Object.values(porProv).sort((a, b) => b.total - a.total),
+      };
+    },
+
+    // ---- La ficha del proveedor -------------------------------------------
+    // Todo lo que se sabe de uno: qué le compramos, cuánto, cómo llegó y a
+    // qué precio nos deja cada mueble.
+    fichaProveedor(id) {
+      const p = this.proveedor(id); if (!p) return null;
+      const recs = this.recepciones().filter(r => r.provId === p.id);
+      const conf = recs.filter(r => r.estadoCompras === 'conformada');
+      const items = conf.flatMap(r => r.items);
+      const conDetalle = items.filter(x => x.calidad && x.calidad !== 'perfecto').length;
+      const enFabrica = this.aFabricar().filter(u => u.provId === p.id);
+      const atrasados = enFabrica.filter(u => this.vencida(u)).length;
+      const precios = this.listaPrecios().filter(x => x.provId === p.id);
+      return {
+        prov: p, recepciones: recs, conformadas: conf.length,
+        piezas: items.length, conDetalle,
+        total: conf.reduce((a, r) => a + (Number(r.total) || 0), 0),
+        ultima: recs.length ? recs[0].fecha : '',
+        enFabrica: enFabrica.length, atrasados, precios,
+        aConformar: recs.filter(r => r.estadoCompras === 'pendiente').length,
+      };
+    },
+
+    // ---- El comparador -----------------------------------------------------
+    // El mismo mueble, lo que cobra cada uno. Al lado, la lista de Costeo,
+    // que es la referencia contra la que se mira si alguno se fue de precio.
+    compararVariante(varianteId) {
+      const c = this.costeoDe(varianteId);
+      const filas = this.listaPrecios().filter(x => x.varianteId === Number(varianteId))
+        .map(x => {
+          const p = this.proveedor(x.provId);
+          return { provId: x.provId, proveedor: p ? this.provLabel(p.id) : `#${x.provId}`,
+            rubro: p ? p.rubro : '', precio: Number(x.precio) || 0, desde: x.desde,
+            dif: c ? (Number(x.precio) || 0) - c.costo : null };
+        }).sort((a, b) => a.precio - b.precio);
+      return { costeo: c, filas,
+        mejor: filas.length ? filas[0] : null,
+        peor: filas.length ? filas[filas.length - 1] : null };
+    },
+    // Las variantes que tienen precio de más de un taller: son las únicas que
+    // se pueden comparar de verdad.
+    variantesComparables() {
+      const por = {};
+      this.listaPrecios().forEach(x => {
+        (por[x.varianteId] = por[x.varianteId] || []).push(x);
+      });
+      return Object.keys(por).map(Number).filter(vid => por[vid].length > 1);
+    },
+
+    // ---- El flete de la entrega -------------------------------------------
+    // Casi siempre el mueble lo trae el proveedor y no hay nada que anotar.
+    // Cuando lo vamos a buscar nosotros, ese viaje cuesta, y hay que decidir
+    // si engorda el costo del mueble o si va aparte como gasto del mes.
+    FLETES: [
+      { k: 'proveedor', label: 'Lo trajo el proveedor', pill: 'ok',
+        pie: 'Sin costo aparte.' },
+      { k: 'compra', label: 'Lo fuimos a buscar · va en la compra', pill: 'warn',
+        pie: 'Se reparte entre los muebles de la entrega y sube el costo de cada uno.' },
+      { k: 'gasto', label: 'Lo fuimos a buscar · va como gasto', pill: 'soft',
+        pie: 'No toca el costo del mueble. Queda como gasto para Tesorería.' },
+    ],
+    flete(k) { return this.FLETES.find(x => x.k === k) || this.FLETES[0]; },
+    guardarFlete(num, { modo = 'proveedor', monto = 0, quien = '' } = {}) {
+      const r = this.recepcion(num); if (!r) return null;
+      r.flete = { modo, monto: modo === 'proveedor' ? 0 : Number(monto) || 0,
+        quien: quien || 'yo', el: this.hoyCorto() };
+      return r.flete;
+    },
+    // Lo que le toca de flete a cada mueble de la entrega. Sólo cuando se
+    // decidió meterlo en la compra: como gasto no reparte nada.
+    fleteUnitario(r) {
+      const f = r && r.flete;
+      if (!f || f.modo !== 'compra' || !r.items.length) return 0;
+      return Math.round((Number(f.monto) || 0) / r.items.length);
+    },
+
+    // ---- El costo que ve el catálogo --------------------------------------
+    // Cuando Compras conforma un precio distinto al que tenía cargado el
+    // mueble, se le puede pasar al catálogo para que el margen que mira
+    // Ventas sea el de verdad. Nunca se hace solo: lo decide quien conforma.
+    COSTOS_KEY: 'bh_costos_catalogo',
+    costosCatalogo() {
+      if (this._costos) return this._costos;
+      let g = {};
+      try { g = JSON.parse(localStorage.getItem(this.COSTOS_KEY)) || {}; } catch {}
+      this._costos = g;
+      return g;
+    },
+    actualizarCostoCatalogo(varianteId, costo, quien = '') {
+      const v = (this.variantesTodas() || []).find(x => x.id === Number(varianteId));
+      if (!v) return null;
+      const antes = Number(v.costo) || 0;
+      v.costo = Number(costo) || 0;
+      const g = this.costosCatalogo();
+      g[String(varianteId)] = { costo: v.costo, antes,
+        el: this.hoyCorto(), quien: quien || 'yo' };
+      try { localStorage.setItem(this.COSTOS_KEY, JSON.stringify(g)); } catch {}
+      return { antes, ahora: v.costo };
+    },
+    // Si el precio conformado se aparta de lo que dice el catálogo, conviene
+    // preguntar. Por debajo de un 2% no vale la pena molestar a nadie.
+    valeActualizar(varianteId, precio) {
+      const v = (this.variantesTodas() || []).find(x => x.id === Number(varianteId));
+      const c = v ? Number(v.costo) || 0 : 0;
+      const p = Number(precio) || 0;
+      if (!c || !p) return null;
+      const dif = p - c;
+      if (Math.abs(dif) / c < 0.02) return null;
+      return { antes: c, ahora: p, dif, pct: (dif / c) * 100 };
+    },
+
     // Recibir una unidad: acá recién nace su número de serie.
     recibirUnidad(id, { calidad = 'perfecto', nota = '', ubicacion = 'dep-pb', quien = '' } = {}) {
       const u = this.unidad(id); if (!u) return null;

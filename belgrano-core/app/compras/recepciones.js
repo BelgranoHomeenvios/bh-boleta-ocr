@@ -64,7 +64,8 @@
       const lin = r.items.map(it => {
         const pr = global.DB.precioProveedor(r.provId, it.varianteId);
         const puesto = this._lineas[it.unidadId];
-        return { it, lista: pr.precio, estimado: pr.estimado,
+        return { it, lista: pr.precio, estimado: pr.estimado, origen: pr.origen,
+          costeo: pr.costeo || null,
           precio: puesto != null ? puesto : (it.precio != null ? it.precio : pr.precio) };
       });
       const total = lin.reduce((a, l) => a + (Number(l.precio) || 0), 0);
@@ -96,7 +97,8 @@
                 ${l.it.nota ? `<span class="hint">${UI.esc(l.it.nota)}</span>` : ''}</td>
               <td class="muted">${UI.esc(l.it.orden || 'stock')}</td>
               <td class="num muted">${UI.pesos(l.lista)}${l.estimado
-                ? '<span class="cp-est">est.</span>' : ''}</td>
+                ? `<span class="cp-est" title="${UI.esc(this.pieOrigen(l))}">${
+                  UI.esc((global.DB.ORIGENES_PRECIO[l.origen] || {}).label || 'est.')}</span>` : ''}</td>
               <td class="num">${hecha ? UI.pesos(l.precio)
                 : `<input class="cp-in" type="number" value="${l.precio}"
                     data-precio="${l.it.unidadId}">`}</td>
@@ -115,7 +117,8 @@
         ${hecha ? `<div class="hint" style="margin-top:11px">Conformada el
           ${UI.esc(r.conformadaEl)}. Este total es lo que hay que pagarle a
           ${UI.esc(r.proveedor)}.</div>`
-        : `<div class="card pad cp-cierre">
+        : `${this.htmlFlete(r)}
+        <div class="card pad cp-cierre">
           <label class="fld" style="margin:0"><span class="lbl">Total del remito del taller</span>
             <input id="cp-remito" type="number" placeholder="${total}"></label>
           <div><div class="lbl" style="font-size:10.5px;font-weight:700;text-transform:uppercase;
@@ -131,13 +134,102 @@
           que va <b>a reparar se paga igual</b>, el mueble está.</div>`}`;
     },
 
+    // De dónde salió el número que aparece como precio de lista.
+    pieOrigen(l) {
+      if (l.origen === 'costeo' && l.costeo) {
+        return `Lista de Costeo · ${l.costeo.terminacion} ${l.costeo.medida}`
+          + (l.costeo.exacta ? '' : ' (la medida más parecida)');
+      }
+      if (l.origen === 'catalogo') return 'No hay precio de este taller ni fila en Costeo: es el costo cargado en el mueble.';
+      return '';
+    },
+
+    // Casi siempre lo trae el taller. Cuando lo fuimos a buscar nosotros hay
+    // que decir dónde cae ese viaje: adentro de la compra —y entonces sube
+    // el costo de cada mueble— o afuera, como gasto del mes.
+    htmlFlete(r) {
+      const modo = this._flete != null ? this._flete : ((r.flete || {}).modo || 'proveedor');
+      const monto = this._fleteMonto != null ? this._fleteMonto : ((r.flete || {}).monto || '');
+      const rep = modo === 'compra' && r.items.length && Number(monto)
+        ? Math.round(Number(monto) / r.items.length) : 0;
+      return `<div class="card pad cp-flete">
+        <div class="cp-b-h" style="margin-bottom:8px">El flete de esta entrega</div>
+        <div class="cp-fl-op">${global.DB.FLETES.map(f => `
+          <label class="cp-fl ${modo === f.k ? 'on' : ''}">
+            <input type="radio" name="cp-flete" value="${f.k}" ${modo === f.k ? 'checked' : ''}>
+            <span><b>${UI.esc(f.label)}</b><span class="hint">${UI.esc(f.pie)}</span></span>
+          </label>`).join('')}</div>
+        ${modo === 'proveedor' ? '' : `<div class="cp-fl-m">
+          <label class="fld" style="margin:0"><span class="lbl">Cuánto costó el viaje</span>
+            <input id="cp-flete-monto" type="number" value="${monto}" placeholder="45000"></label>
+          <div class="hint">${rep ? `Se reparte entre ${r.items.length} muebles:
+            <b>${UI.pesos(rep)}</b> a cada uno.` : 'Poné cuánto salió y se reparte solo.'}</div>
+        </div>`}
+      </div>`;
+    },
+
+    // Después de conformar: si algún precio se despegó del costo que tiene
+    // cargado el mueble, se pregunta. Nunca se pisa el catálogo solo.
+    modalCatalogo(r, lineas) {
+      const cambios = lineas.map(l => {
+        const v = global.DB.valeActualizar(l.varianteId, l.precio);
+        if (!v) return null;
+        const it = r.items.find(x => x.unidadId === l.unidadId) || {};
+        return { ...l, ...v, modelo: it.modelo, medida: it.medida, color: it.color };
+      }).filter(Boolean);
+      // Un mismo mueble puede venir repetido en la entrega: se pregunta una vez.
+      const unicos = [];
+      cambios.forEach(c => { if (!unicos.some(x => x.varianteId === c.varianteId)) unicos.push(c); });
+      if (!unicos.length) { this.abierta = null; this.render(this._mount); return; }
+      document.body.insertAdjacentHTML('beforeend', `
+        <div class="cp-back" id="cp-mdl"><div class="card pad" style="max-width:560px;width:100%">
+          <h3 class="h-title" style="font-size:17px">¿Lo paso al catálogo?</h3>
+          <p class="h-sub">${unicos.length} mueble${unicos.length === 1 ? ' quedó' : 's quedaron'}
+            con un precio distinto del que tenía cargado. Si lo pasás, el margen que ve
+            Ventas pasa a ser el de verdad.</p>
+          <div class="cp-tabla" style="max-height:280px;overflow:auto;margin:10px 0"><table>
+            <thead><tr><th></th><th>Mueble</th><th class="num">Tenía</th>
+              <th class="num">Pagaste</th><th class="num">Dif.</th></tr></thead>
+            <tbody>${unicos.map(c => `<tr>
+              <td><input type="checkbox" class="cp-ck" data-vid="${c.varianteId}"
+                data-precio="${c.precio}" checked></td>
+              <td class="nom">${UI.esc(c.modelo || '')}
+                <span class="muted">${UI.esc(c.medida || '')} · ${UI.esc(c.color || '')}</span></td>
+              <td class="num muted">${UI.pesos(c.antes)}</td>
+              <td class="num">${UI.pesos(c.ahora)}</td>
+              <td class="num ${c.dif > 0 ? 'sube' : 'baja'}">${c.dif > 0 ? '+' : ''}${
+                Math.round(c.pct)}%</td></tr>`).join('')}</tbody></table></div>
+          <div class="row" style="gap:8px"><div class="sp"></div>
+            <button class="btn" id="cp-no">Dejarlo como está</button>
+            <button class="btn primary" id="cp-si">Actualizar el catálogo</button></div>
+        </div></div>`);
+      const cerrar = () => {
+        const m = document.getElementById('cp-mdl'); if (m) m.remove();
+        this.abierta = null; this.render(this._mount);
+      };
+      document.getElementById('cp-no').onclick = cerrar;
+      document.getElementById('cp-si').onclick = () => {
+        let n = 0;
+        document.querySelectorAll('.cp-ck').forEach(c => {
+          if (!c.checked) return;
+          global.DB.actualizarCostoCatalogo(Number(c.dataset.vid), Number(c.dataset.precio), 'Jony');
+          n++;
+        });
+        UI.aviso(n ? `${n} costo${n === 1 ? '' : 's'} actualizado${n === 1 ? '' : 's'} en el catálogo`
+          : 'No se tocó el catálogo', 'ok');
+        cerrar();
+      };
+    },
+
     enganchar() {
       const q = id => document.getElementById(id);
       const v = q('cp-volver'); if (v) v.onclick = () => {
-        this.abierta = null; this._lineas = {}; this._remito = null; this.render(this._mount);
+        this.abierta = null; this._lineas = {}; this._remito = null;
+        this._flete = null; this._fleteMonto = null; this.render(this._mount);
       };
       document.querySelectorAll('[data-ver]').forEach(b => b.onclick = () => {
         this.abierta = b.dataset.ver; this._lineas = {}; this._remito = null;
+        this._flete = null; this._fleteMonto = null;
         this.render(this._mount);
       });
       document.querySelectorAll('[data-precio]').forEach(i => i.oninput = () => {
@@ -153,6 +245,20 @@
         UI.aviso('Precio actualizado — rige desde hoy', 'ok');
         this.render(this._mount);
       });
+      document.querySelectorAll('[name="cp-flete"]').forEach(r => r.onchange = () => {
+        this._flete = r.value;
+        if (r.value === 'proveedor') this._fleteMonto = 0;
+        this.render(this._mount);
+      });
+      const fm = q('cp-flete-monto');
+      if (fm) fm.oninput = () => {
+        this._fleteMonto = Number(fm.value) || 0;
+        const h = fm.closest('.cp-fl-m').querySelector('.hint');
+        const r = global.DB.recepcion(this.abierta);
+        const rep = r.items.length ? Math.round(this._fleteMonto / r.items.length) : 0;
+        if (h) h.innerHTML = `Se reparte entre ${r.items.length} muebles:
+          <b>${UI.pesos(rep)}</b> a cada uno.`;
+      };
       const rem = q('cp-remito');
       if (rem) rem.oninput = () => { this._remito = rem.value === '' ? null : Number(rem.value); this.recalcular(); };
       const ok = q('cp-ok'); if (ok) ok.onclick = () => {
@@ -164,9 +270,11 @@
         if (this._remito != null && Math.round(this._remito) !== Math.round(total)) {
           return UI.aviso('El total no coincide con el remito — corregí una línea o sacá el remito', 'warn');
         }
+        global.DB.guardarFlete(this.abierta, { modo: this._flete || 'proveedor',
+          monto: this._fleteMonto || 0, quien: 'yo' });
         global.DB.conformarRecepcion(this.abierta, { lineas, quien: 'yo' });
         UI.aviso('Conformada — lista para pagar', 'ok');
-        this.abierta = null; this.render(this._mount);
+        this.modalCatalogo(r, lineas);
       };
       const g = q('cp-guardar'); if (g) g.onclick = () => UI.aviso('Guardado', 'ok');
       this.recalcular();
@@ -222,6 +330,16 @@
         .cp-dif{font-size:19px;font-weight:800;color:var(--navy);margin-top:2px}
         .cp-cierre .btn[disabled]{opacity:.45;pointer-events:none}
         .cp-tabla .hint{display:block;font-size:11px}
+        .cp-flete{margin-top:12px}
+        .cp-fl-op{display:flex;gap:9px;flex-wrap:wrap}
+        .cp-fl{display:flex;gap:7px;align-items:flex-start;padding:8px 11px;cursor:pointer;
+          border:1px solid var(--line);border-radius:10px;background:var(--panel);flex:1 1 210px}
+        .cp-fl.on{border-color:var(--navy);background:var(--panel-2)}
+        .cp-fl b{display:block;font-size:12.5px;color:var(--navy)}
+        .cp-fl .hint{display:block;font-size:11px;margin-top:1px}
+        .cp-fl-m{display:flex;gap:14px;align-items:flex-end;margin-top:10px;flex-wrap:wrap}
+        .cp-back{position:fixed;inset:0;background:rgba(12,20,34,.45);z-index:70;
+          display:flex;align-items:center;justify-content:center;padding:20px}
       </style>`;
     },
   };

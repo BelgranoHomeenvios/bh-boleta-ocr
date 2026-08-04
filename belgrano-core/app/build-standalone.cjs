@@ -22,7 +22,14 @@ const scripts = [
   'modulos/prod-taller.js',
   'modulos/prod-vendidos.js',
   'compras/recepciones.js',
-  'compras/ordenes.js', 'modulos/esqueletos.js',
+  'compras/estilos.js',
+  'compras/ordenes.js',
+  'compras/proveedores.js',
+  'compras/comparador.js',
+  'compras/pendientes.js',
+  'compras/historial.js',
+  'compras/indicadores.js',
+  'modulos/esqueletos.js',
   'comun/app.js',
 ];
 
