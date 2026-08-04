@@ -4282,6 +4282,55 @@
       return d != null && d < 0;
     },
 
+    // La consulta cargada a mano tiene dos puertas: la virtual entra a la cola
+    // sin dueño, y la atención en el local ya nace con el vendedor que atendió.
+    crearConsulta({ canal = 'whatsapp', contacto = {}, que = '', vendedor = '',
+      quien = '' } = {}) {
+      const n = this.consultasTodas().reduce((m, c) =>
+        Math.max(m, Number(String(c.id).replace(/\D/g, '')) || 0), 0) + 1;
+      const c = { id: 'CONS-' + String(n).padStart(6, '0'), f: this.hoyCorto(), canal,
+        vendedor: vendedor || '',
+        contacto: { nombre: contacto.nombre || '', telefono: contacto.telefono || '',
+          instagram: this.igNorm(contacto.instagram), mail: this.mailNorm(contacto.mail) },
+        clienteId: null, etapa: vendedor ? 'contactado' : 'nueva',
+        que: que || 'Consulta', proxima: null, cotizaciones: [], orden: null,
+        historia: [{ f: this.hoyCorto(), texto: vendedor
+          ? `Atendida en el local por ${vendedor}` : 'Entró a la cola', quien: quien || vendedor || 'Cintia' }] };
+      this.consultasTodas().push(c);
+      // Si el contacto alcanza para reconocer al cliente, se engancha ya.
+      if (contacto.telefono || contacto.instagram || contacto.mail) {
+        this.engancharCliente(c.id, { quien });
+      }
+      // La atención en el local deja tarea: seguirla mañana.
+      if (vendedor) c.proxima = { f: this.hoyCorto(), que: 'Mandarle lo que pidió' };
+      return c;
+    },
+    // Todo lo que hizo cada uno un día dado, con el cliente al lado. Es la
+    // pantalla de control de Dirección: sale de la historia de las consultas.
+    movimientosDelDia(fecha) {
+      // "04/08" y "4/8" son el mismo día: se compara sin los ceros.
+      const dia = t => String(t || '').split('/').map(x => Number(x)).join('/');
+      const f = dia(fecha || this.hoyCorto());
+      const out = [];
+      this.consultasTodas().forEach(c => {
+        (c.historia || []).forEach(h => {
+          if (dia(h.f) === f) out.push({ consulta: c, quien: h.quien, texto: h.texto,
+            cliente: this.nombreConsulta(c) });
+        });
+        if (dia(c.f) === f) out.push({ consulta: c, quien: c.vendedor || 'Cola',
+          texto: `Entró por ${this.canalDe(c.canal).label}: ${c.que}`,
+          cliente: this.nombreConsulta(c) });
+      });
+      const por = {};
+      out.forEach(m => { (por[m.quien] = por[m.quien] || []).push(m); });
+      return { total: out.length, por };
+    },
+    nombreConsulta(c) {
+      const k = c.contacto || {};
+      return k.nombre || (k.instagram ? '@' + k.instagram : '') || k.telefono
+        || (c.clienteId && (this.clienteDe(c.clienteId) || {}).nombre) || 'Sin datos';
+    },
+
     // ---- Mover la consulta -------------------------------------------------
     // Derivar es lo único que le pone dueño. Lo hacen Cintia o Dirección.
     derivarConsulta(id, vendedor, { motivo = '', quien = '' } = {}) {

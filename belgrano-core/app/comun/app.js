@@ -18,7 +18,7 @@
     pendientes: { label: 'Mis pendientes', icon: '📌', home: true, r: m => global.Pendientes.render(m) },
 
     crm: { label: 'CRM', icon: '💬', subs: [
-      S('resumen', 'Resumen', resumen('crm')),
+      S('resumen', 'Qué hacer hoy', m => global.CrmTablero.render(m)),
       S('clientes', 'Clientes', m => global.Clientes.render(m)),
       S('consultas', 'Consultas', m => global.CrmConsultas.render(m)),
       S('seguimientos', 'Seguimientos', m => global.CrmSeguimientos.render(m)),

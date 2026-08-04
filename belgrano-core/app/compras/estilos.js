@@ -36,6 +36,7 @@
         margin:1px 0}
       .cx-k-p{display:block;font-size:11px;color:var(--muted)}
       .cx-k.alerta .cx-k-v{color:var(--crit)}
+      .cx-k.ojo .cx-k-v{color:var(--warn)}
 
       .cx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
       .cx-t{text-align:left;cursor:pointer;font:inherit;color:inherit;border:1px solid var(--line)}

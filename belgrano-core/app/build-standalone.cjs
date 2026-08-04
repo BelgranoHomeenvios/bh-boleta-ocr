@@ -34,6 +34,7 @@ const scripts = [
   'compras/indicadores.js',
   'ventas/comisiones.js',
   'compras/materiales.js',
+  'crm/tablero.js',
   'crm/consultas.js',
   'crm/seguimientos.js',
   'crm/fusionar.js',
