@@ -117,7 +117,8 @@
         ${hecha ? `<div class="hint" style="margin-top:11px">Conformada el
           ${UI.esc(r.conformadaEl)}. Este total es lo que hay que pagarle a
           ${UI.esc(r.proveedor)}.</div>`
-        : `${this.htmlFlete(r)}
+        : `${this.htmlComprobante(r, total)}
+        ${this.htmlFlete(r)}
         <div class="card pad cp-cierre">
           <label class="fld" style="margin:0"><span class="lbl">Total del remito del taller</span>
             <input id="cp-remito" type="number" placeholder="${total}"></label>
@@ -142,6 +143,46 @@
       }
       if (l.origen === 'catalogo') return 'No hay precio de este taller ni fila en Costeo: es el costo cargado en el mueble.';
       return '';
+    },
+
+    // La mayoría de las compras son informales: el taller trae los muebles y
+    // un papel escrito a mano. Las que sí facturan hay que cargarlas como
+    // corresponde, con el IVA aparte, porque de eso sale lo que se computa.
+    htmlComprobante(r, neto) {
+      const c = r.comprobante || {};
+      const tipo = this._comp != null ? this._comp : (c.tipo || 'sin');
+      const iva = this._iva != null ? this._iva : (c.iva != null ? c.iva : 21);
+      const otros = this._otros != null ? this._otros : (c.otros || '');
+      const forma = this._forma != null ? this._forma : (c.forma || 'transferencia');
+      const mIva = tipo === 'factura' ? Math.round(neto * (Number(iva) || 0) / 100) : 0;
+      const mOtros = tipo === 'factura' ? Number(otros) || 0 : 0;
+      return `<div class="card pad cp-comp">
+        <div class="cx-b-h" style="margin-bottom:8px">El comprobante</div>
+        <div class="cp-fl-op">${global.DB.TIPOS_COMPROBANTE.map(t => `
+          <label class="cp-fl ${tipo === t.k ? 'on' : ''}">
+            <input type="radio" name="cp-comp" value="${t.k}" ${tipo === t.k ? 'checked' : ''}>
+            <span><b>${UI.esc(t.label)}</b><span class="hint">${UI.esc(t.pie)}</span></span>
+          </label>`).join('')}</div>
+        ${tipo === 'sin' ? '' : `<div class="cp-comp-m">
+          <label class="fld" style="margin:0"><span class="lbl">Número</span>
+            <input id="cp-nro" value="${UI.esc(c.nro || '')}" placeholder="0001-00012345"></label>
+          ${tipo === 'factura' ? `
+            <label class="fld" style="margin:0"><span class="lbl">IVA</span>
+              <select id="cp-iva">${global.DB.ALICUOTAS_IVA.map(a =>
+                `<option value="${a}" ${Number(iva) === a ? 'selected' : ''}>${a}%</option>`).join('')}</select></label>
+            <label class="fld" style="margin:0"><span class="lbl">Otros impuestos</span>
+              <input id="cp-otros" type="number" value="${otros}" placeholder="0"></label>` : ''}
+          <label class="fld" style="margin:0"><span class="lbl">Cómo se paga</span>
+            <select id="cp-forma">${global.DB.FORMAS_PAGO.map(f =>
+              `<option value="${f.k}" ${forma === f.k ? 'selected' : ''}>${UI.esc(f.label)}</option>`).join('')}</select></label>
+        </div>
+        ${tipo === 'factura' ? `<div class="cp-comp-t">
+          <span>Muebles <b>${UI.pesos(neto)}</b></span>
+          <span>+ IVA ${iva}% <b>${UI.pesos(mIva)}</b></span>
+          ${mOtros ? `<span>+ impuestos <b>${UI.pesos(mOtros)}</b></span>` : ''}
+          <span class="cp-comp-tot">= <b>${UI.pesos(neto + mIva + mOtros)}</b></span>
+        </div>` : ''}`}
+      </div>`;
     },
 
     // Casi siempre lo trae el taller. Cuando lo fuimos a buscar nosotros hay
@@ -225,11 +266,14 @@
       const q = id => document.getElementById(id);
       const v = q('cp-volver'); if (v) v.onclick = () => {
         this.abierta = null; this._lineas = {}; this._remito = null;
-        this._flete = null; this._fleteMonto = null; this.render(this._mount);
+        this._flete = null; this._fleteMonto = null;
+        this._comp = null; this._iva = null; this._otros = null; this._forma = null;
+        this.render(this._mount);
       };
       document.querySelectorAll('[data-ver]').forEach(b => b.onclick = () => {
         this.abierta = b.dataset.ver; this._lineas = {}; this._remito = null;
         this._flete = null; this._fleteMonto = null;
+        this._comp = null; this._iva = null; this._otros = null; this._forma = null;
         this.render(this._mount);
       });
       document.querySelectorAll('[data-precio]').forEach(i => i.oninput = () => {
@@ -245,6 +289,15 @@
         UI.aviso('Precio actualizado — rige desde hoy', 'ok');
         this.render(this._mount);
       });
+      document.querySelectorAll('[name="cp-comp"]').forEach(r => r.onchange = () => {
+        this._comp = r.value; this.render(this._mount);
+      });
+      const iva = q('cp-iva');
+      if (iva) iva.onchange = () => { this._iva = Number(iva.value); this.render(this._mount); };
+      const otr = q('cp-otros');
+      if (otr) otr.oninput = () => { this._otros = Number(otr.value) || 0; this.render(this._mount); };
+      const frm = q('cp-forma');
+      if (frm) frm.onchange = () => { this._forma = frm.value; };
       document.querySelectorAll('[name="cp-flete"]').forEach(r => r.onchange = () => {
         this._flete = r.value;
         if (r.value === 'proveedor') this._fleteMonto = 0;
@@ -270,6 +323,11 @@
         if (this._remito != null && Math.round(this._remito) !== Math.round(total)) {
           return UI.aviso('El total no coincide con el remito — corregí una línea o sacá el remito', 'warn');
         }
+        const nro = q('cp-nro');
+        global.DB.guardarComprobante(this.abierta, {
+          tipo: this._comp || 'sin', nro: nro ? nro.value : '',
+          iva: this._iva != null ? this._iva : 21, otros: this._otros || 0,
+          forma: this._forma || 'transferencia', quien: 'Jony' });
         global.DB.guardarFlete(this.abierta, { modo: this._flete || 'proveedor',
           monto: this._fleteMonto || 0, quien: 'yo' });
         global.DB.conformarRecepcion(this.abierta, { lineas, quien: 'yo' });
@@ -338,6 +396,12 @@
         .cp-fl b{display:block;font-size:12.5px;color:var(--navy)}
         .cp-fl .hint{display:block;font-size:11px;margin-top:1px}
         .cp-fl-m{display:flex;gap:14px;align-items:flex-end;margin-top:10px;flex-wrap:wrap}
+        .cp-comp{margin-top:12px}
+        .cp-comp-m{display:flex;gap:14px;align-items:flex-end;margin-top:10px;flex-wrap:wrap}
+        .cp-comp-t{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:10px;
+          padding-top:9px;border-top:1px solid var(--line-soft);font-size:12.5px;color:var(--muted)}
+        .cp-comp-t b{color:var(--navy);font-size:13.5px}
+        .cp-comp-tot b{font-size:17px}
         .cp-back{position:fixed;inset:0;background:rgba(12,20,34,.45);z-index:70;
           display:flex;align-items:center;justify-content:center;padding:20px}
       </style>`;

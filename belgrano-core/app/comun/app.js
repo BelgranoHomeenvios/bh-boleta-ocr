@@ -70,13 +70,17 @@
 
     compras: { label: 'Compras', icon: '🛒', subs: [
       S('resumen', 'Resumen', resumen('compras')),
-      S('oc', 'Órdenes de compra', m => global.ComprasOC.render(m)),
       S('recepciones', 'Recepciones a conformar', m => global.ComprasRecepciones.render(m)),
+      S('cuenta', 'Cuenta corriente', m => global.ComprasCuenta.render(m)),
       S('proveedores', 'Proveedores', m => global.ComprasProveedores.render(m)),
+      S('lista', 'Lista de precios', m => global.ComprasLista.render(m)),
+      S('agenda', 'Agenda de entregas', m => global.ComprasAgenda.render(m)),
       S('comparador', 'Comparador', m => global.ComprasComparador.render(m)),
       S('pendientes', 'Pendientes', m => global.ComprasPendientes.render(m)),
       S('historial', 'Historial', m => global.ComprasHistorial.render(m)),
       S('indicadores', 'Indicadores', m => global.ComprasIndicadores.render(m)),
+      // Los insumos son la segunda etapa: hoy Compras es sólo muebles.
+      S('oc', 'Insumos', m => global.ComprasOC.render(m)),
     ]},
 
     inventario: { label: 'Inventario', icon: '📦', subs: [

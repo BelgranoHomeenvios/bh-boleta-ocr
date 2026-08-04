@@ -104,12 +104,32 @@
         </div>
 
         <div class="cx-kpis">
+          ${this.kpi('Saldo', UI.pesos(Math.abs(f.saldo)),
+            f.saldo > 0 ? 'le debemos' : (f.saldo < 0 ? '<b>nos debe</b>' : 'al día'))}
           ${this.kpi('Comprado', UI.pesos(f.total), `${f.conformadas} entregas conformadas`)}
-          ${this.kpi('Muebles entregados', f.piezas, f.ultima ? `la última el ${UI.esc(f.ultima)}` : '—')}
+          ${this.kpi('Trae por mes', f.porMes || '—',
+            f.porSemana ? `unos ${f.porSemana} por semana` : 'todavía no hay meses para promediar')}
           ${this.kpi('En fábrica ahora', f.enFabrica,
             f.atrasados ? `<b class="mal">${f.atrasados} atrasados</b>` : 'ninguno atrasado')}
           ${this.kpi('Llegan sin detalle', puntual == null ? '—' : `${puntual}%`,
             f.conDetalle ? `${f.conDetalle} con observación` : 'ninguno con observación')}
+          ${this.kpi('Corrió la fecha', f.reprogramaciones,
+            f.proxima ? `viene el ${UI.esc(f.proxima.fecha)}` : 'no está anotado')}
+        </div>
+
+        <div class="cx-b">
+          <div class="cx-b-h">Cómo llega su mercadería</div>
+          <div class="card pad cx-cal2">
+            <span><b>${f.perfectos}</b><span>perfectos</span></span>
+            <span><b class="${f.conDetalle ? 'sube' : ''}">${f.conDetalle}</b><span>con detalle</span></span>
+            <span><b class="${f.devueltos ? 'sube' : ''}">${f.devueltos}</b><span>devueltos</span></span>
+            <span><b class="${f.debeTraer.length ? 'sube' : ''}">${f.debeTraer.length}</b>
+              <span>ya pagos que nos debe traer</span></span>
+            <span class="sp"></span>
+            ${f.aumento ? `<span><b>${Math.round(f.aumento.pct)}%</b>
+              <span>último aumento, el ${UI.esc(f.aumento.fecha)}</span></span>` : ''}
+            <button class="btn" data-cta="${p.id}">Ver su cuenta corriente</button>
+          </div>
         </div>
 
         ${cupo ? `<div class="card pad cx-cupo">
@@ -177,6 +197,11 @@
       document.querySelectorAll('[data-rubro]').forEach(b => b.onclick = () => {
         this.rubro = b.dataset.rubro; this.render(this._mount);
       });
+      document.querySelectorAll('[data-cta]').forEach(b => b.onclick = e => {
+        e.stopPropagation();
+        global.ComprasCuenta.abierto = Number(b.dataset.cta);
+        global.App.goSub('compras', 'cuenta');
+      });
       const v = document.getElementById('cx-volver');
       if (v) v.onclick = () => { this.abierto = null; this.render(this._mount); };
       const q = document.getElementById('cx-q');
@@ -189,7 +214,14 @@
       };
     },
 
-    estilos() { return global.ComprasEstilos ? global.ComprasEstilos() : ''; },
+    estilos() {
+      return (global.ComprasEstilos ? global.ComprasEstilos() : '') + `<style>
+        .cx-cal2{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+        .cx-cal2>span{display:flex;flex-direction:column}
+        .cx-cal2 b{font-size:18px;color:var(--navy)}
+        .cx-cal2 span span{font-size:10.5px;color:var(--muted)}
+      </style>`;
+    },
   };
   global.ComprasProveedores = Prov;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -1380,11 +1380,70 @@
       const lista = this.listaPrecios();
       const i = lista.findIndex(x => x.provId === Number(provId)
         && x.varianteId === Number(varianteId));
+      const antes = i >= 0 ? Number(lista[i].precio) || 0 : 0;
+      const p = Number(precio) || 0;
       const reg = { provId: Number(provId), varianteId: Number(varianteId),
-        precio: Number(precio) || 0, desde: this.hoyCorto(), quien: quien || 'yo' };
+        precio: p, desde: this.hoyCorto(), quien: quien || 'yo' };
       if (i >= 0) lista[i] = reg; else lista.push(reg);
+      // El precio viejo no se tira: sin él no hay manera de saber cuánto
+      // aumentó un mueble ni de dónde salió el margen que hoy vemos.
+      if (antes !== p) {
+        this.historialPrecios().push({ provId: Number(provId), varianteId: Number(varianteId),
+          antes, precio: p, desde: reg.desde, quien: reg.quien,
+          pct: antes ? ((p - antes) / antes) * 100 : null });
+        this._guardarHistPrecios();
+      }
       try { localStorage.setItem(this.PRECIOS_KEY, JSON.stringify(lista)); } catch {}
       return reg;
+    },
+
+    // ---- El historial de precios ------------------------------------------
+    // La lista se toca cada dos o tres meses. Lo que interesa no es el precio
+    // de hoy sino cuánto se movió: eso es lo que se come el margen sin que
+    // nadie lo vea, mueble por mueble.
+    HIST_PRECIOS_KEY: 'bh_hist_precios',
+    historialPrecios() {
+      if (this._histP) return this._histP;
+      let g = [];
+      try { g = JSON.parse(localStorage.getItem(this.HIST_PRECIOS_KEY)) || []; } catch {}
+      this._histP = g;
+      return g;
+    },
+    _guardarHistPrecios() {
+      try { localStorage.setItem(this.HIST_PRECIOS_KEY, JSON.stringify(this._histP || [])); } catch {}
+    },
+    // Los cambios de un mueble en un taller, del más nuevo al más viejo.
+    cambiosDePrecio(provId, varianteId) {
+      return this.historialPrecios()
+        .filter(x => x.provId === Number(provId) && x.varianteId === Number(varianteId))
+        .sort((a, b) => (this.diasDesde(a.desde) || 0) - (this.diasDesde(b.desde) || 0));
+    },
+    // El aumento que pasó un proveedor, de una sola vez. Es como llega en la
+    // realidad: no manda una lista nueva, dice "todo un 12% más".
+    aumentarProveedor(provId, pct, quien = '') {
+      const p = Number(pct) || 0;
+      if (!p) return 0;
+      const suyos = this.listaPrecios().filter(x => x.provId === Number(provId));
+      suyos.forEach(x => this.guardarPrecioProveedor(provId, x.varianteId,
+        Math.round((Number(x.precio) || 0) * (1 + p / 100)), quien));
+      return suyos.length;
+    },
+    // El último aumento que pasó un taller. No el promedio de toda su
+    // historia: eso mezcla el aumento de marzo con el de julio y no dice
+    // nada. Lo que interesa es la última vez que tocó la lista.
+    aumentoDe(provId) {
+      const cs = this.historialPrecios().filter(x => x.provId === Number(provId) && x.antes > 0);
+      if (!cs.length) return null;
+      // El más reciente manda, y con él van todos los del mismo día: un
+      // aumento se pasa de una, no mueble por mueble.
+      let dMin = Infinity, fecha = '';
+      cs.forEach(x => { const d = this.diasDesde(x.desde);
+        if (d != null && d < dMin) { dMin = d; fecha = x.desde; } });
+      const tanda = cs.filter(x => x.desde === fecha);
+      return { n: tanda.length, fecha,
+        pct: tanda.reduce((a, x) => a + (x.pct || 0), 0) / tanda.length,
+        ultimo: fecha, dias: dMin === Infinity ? null : dMin,
+        veces: [...new Set(cs.map(x => x.desde))].length };
     },
     // Conformar cierra la recepción para Compras: los precios quedan firmes y
     // de ahí sale lo que hay que pagarle al taller.
@@ -1399,6 +1458,14 @@
       r.conformadaPor = quien || 'yo';
       r.conformadaEl = this.hoyCorto();
       r.total = r.items.reduce((a, x) => a + (Number(x.precio) || 0), 0);
+      // Conformar ES la deuda: no hay un paso más. Apenas Adrián recibe y
+      // Jony da el visto, esa plata ya está para pagarse.
+      const t = this.totalDeEntrega(r);
+      this.anotarCuenta({ provId: r.provId, tipo: 'compra', monto: t.total,
+        detalle: `${r.items.length} muebles`
+          + (t.iva ? ` · IVA ${(r.comprobante || {}).iva}%` : '')
+          + (t.flete ? ' · con flete' : ''),
+        ref: r.numero, fecha: r.conformadaEl, quien: quien || 'yo' });
       return r;
     },
     // ---- Lo que Compras tiene sobre la mesa --------------------------------
@@ -1495,13 +1562,28 @@
       const enFabrica = this.aFabricar().filter(u => u.provId === p.id);
       const atrasados = enFabrica.filter(u => this.vencida(u)).length;
       const precios = this.listaPrecios().filter(x => x.provId === p.id);
+      // Cuánto trae por mes: la cuenta que importa para saber si un taller
+      // puede con más trabajo o si ya está al límite.
+      const meses = [...new Set(conf.map(r => String(r.conformadaEl || r.fecha).split('/')[1]))];
+      const porMes = meses.length ? Math.round(items.length / meses.length) : 0;
+      const devueltos = this.devoluciones().filter(d => d.provId === p.id);
       return {
         prov: p, recepciones: recs, conformadas: conf.length,
         piezas: items.length, conDetalle,
-        total: conf.reduce((a, r) => a + (Number(r.total) || 0), 0),
+        perfectos: items.filter(x => !x.calidad || x.calidad === 'perfecto').length,
+        devueltos: devueltos.length,
+        debeTraer: this.devolucionesPendientes(p.id),
+        total: conf.reduce((a, r) => a + this.totalDeEntrega(r).total, 0),
         ultima: recs.length ? recs[0].fecha : '',
         enFabrica: enFabrica.length, atrasados, precios,
         aConformar: recs.filter(r => r.estadoCompras === 'pendiente').length,
+        porMes, meses: meses.length,
+        porSemana: meses.length ? Math.round((items.length / meses.length) / 4.3) : 0,
+        saldo: this.saldoProveedor(p.id),
+        movimientos: this.movimientosDe(p.id),
+        reprogramaciones: this.reprogramacionesDe(p.id),
+        proxima: this.agenda().find(x => x.provId === p.id && x.estado === 'reservado') || null,
+        aumento: this.aumentoDe(p.id),
       };
     },
 
@@ -1529,6 +1611,322 @@
         (por[x.varianteId] = por[x.varianteId] || []).push(x);
       });
       return Object.keys(por).map(Number).filter(vid => por[vid].length > 1);
+    },
+
+    // ---- El comprobante de la entrega -------------------------------------
+    // La mayoría de las compras son informales: el taller trae los muebles y
+    // un papel escrito a mano. Las que sí facturan hay que cargarlas como
+    // corresponde —IVA aparte, impuestos aparte— porque de eso sale lo que
+    // después se puede computar.
+    TIPOS_COMPROBANTE: [
+      { k: 'sin', label: 'Sin comprobante', pill: 'soft',
+        pie: 'Informal. Es lo habitual: trae el papel escrito a mano.' },
+      { k: 'remito', label: 'Remito', pill: 'soft',
+        pie: 'El papel que trae con lo que entregó, sin factura.' },
+      { k: 'factura', label: 'Factura', pill: 'ok',
+        pie: 'Compra formal. Se carga el IVA y los impuestos aparte.' },
+    ],
+    comprobante(k) { return this.TIPOS_COMPROBANTE.find(x => x.k === k) || this.TIPOS_COMPROBANTE[0]; },
+    ALICUOTAS_IVA: [0, 10.5, 21],
+    guardarComprobante(num, { tipo = 'sin', nro = '', iva = 21, otros = 0,
+      forma = '', quien = '' } = {}) {
+      const r = this.recepcion(num); if (!r) return null;
+      r.comprobante = { tipo, nro, iva: tipo === 'factura' ? Number(iva) || 0 : 0,
+        otros: tipo === 'factura' ? Number(otros) || 0 : 0,
+        forma, quien: quien || 'yo', el: this.hoyCorto() };
+      return r.comprobante;
+    },
+    // Lo que se paga de verdad: los muebles, más el IVA y los impuestos si la
+    // compra fue formal, más el flete si se decidió meterlo adentro.
+    totalDeEntrega(r) {
+      if (!r) return { neto: 0, iva: 0, otros: 0, flete: 0, total: 0 };
+      const neto = Number(r.total) || r.items.reduce((a, x) => a + (Number(x.precio) || 0), 0);
+      const c = r.comprobante || {};
+      const iva = c.tipo === 'factura' ? Math.round(neto * (Number(c.iva) || 0) / 100) : 0;
+      const otros = c.tipo === 'factura' ? Number(c.otros) || 0 : 0;
+      const flete = (r.flete || {}).modo === 'compra' ? Number(r.flete.monto) || 0 : 0;
+      return { neto, iva, otros, flete, total: neto + iva + otros + flete };
+    },
+
+    // ---- Devoluciones ------------------------------------------------------
+    // Hay dos maneras de devolver y no son la misma cosa. Si el mueble se
+    // devuelve en el momento, sencillamente no se cuenta: no entró y no se
+    // paga, la próxima lo trae. Si se devuelve después —a la semana, cuando
+    // ya se pagó— queda una deuda del taller con nosotros: ese mueble está
+    // pago y nos lo tiene que traer.
+    DEVOL_KEY: 'bh_devoluciones',
+    MOMENTOS_DEVOL: [
+      { k: 'entrega', label: 'En el momento', pill: 'soft',
+        pie: 'No entró y no se paga. La próxima lo trae.' },
+      { k: 'despues', label: 'Después de pagarlo', pill: 'crit',
+        pie: 'Ya está pago: queda como mueble que nos debe traer.' },
+    ],
+    devoluciones() {
+      if (this._devol) return this._devol;
+      let g = [];
+      try { g = JSON.parse(localStorage.getItem(this.DEVOL_KEY)) || []; } catch {}
+      this._devol = g;
+      return g;
+    },
+    _guardarDevol() {
+      try { localStorage.setItem(this.DEVOL_KEY, JSON.stringify(this._devol || [])); } catch {}
+    },
+    devolverMueble(unidadId, { momento = 'entrega', motivo = '', quien = '' } = {}) {
+      const u = this.unidad(unidadId); if (!u) return null;
+      const ds = this.devoluciones();
+      const d = { id: ds.reduce((m, x) => Math.max(m, x.id || 0), 0) + 1,
+        unidadId: u.id, provId: u.provId || null, proveedor: u.proveedor || '',
+        varianteId: u.varianteId, modelo: u.modelo, medida: u.medida, color: u.color,
+        serie: u.serie, momento, motivo, fecha: this.hoyCorto(),
+        quien: quien || 'yo', estado: 'pendiente' };
+      ds.push(d);
+      this._guardarDevol();
+      this.guardarUnidad({ id: u.id, calidad: 'devuelto', calidadNota: motivo });
+      return d;
+    },
+    // Los que ya se pagaron y todavía no volvieron: eso es lo que se le
+    // reclama al taller cuando viene.
+    devolucionesPendientes(provId) {
+      return this.devoluciones().filter(d => d.estado === 'pendiente'
+        && d.momento === 'despues'
+        && (provId == null || d.provId === Number(provId)));
+    },
+    saldarDevolucion(id, quien = '') {
+      const d = this.devoluciones().find(x => x.id === Number(id)); if (!d) return null;
+      d.estado = 'repuesto'; d.repuestoEl = this.hoyCorto(); d.repuestoPor = quien || 'yo';
+      this._guardarDevol();
+      return d;
+    },
+
+    // ---- La agenda de entregas ---------------------------------------------
+    // Cada taller llega con cuarenta o cincuenta muebles y el depósito no da
+    // para dos en el mismo día. Por eso el día se reserva: el proveedor avisa
+    // cuándo viene y ese día queda tomado.
+    AGENDA_KEY: 'bh_agenda_entregas',
+    agenda() {
+      if (this._agenda) return this._agenda;
+      let g = [];
+      try { g = JSON.parse(localStorage.getItem(this.AGENDA_KEY)) || []; } catch {}
+      this._agenda = g;
+      if (!g.length) this._sembrarAgenda();
+      return this._agenda;
+    },
+    _guardarAgenda() {
+      try { localStorage.setItem(this.AGENDA_KEY, JSON.stringify(this._agenda || [])); } catch {}
+    },
+    // Quién tiene tomado un día. null quiere decir que está libre.
+    diaTomado(fecha) {
+      return this.agenda().find(x => x.fecha === fecha && x.estado === 'reservado') || null;
+    },
+    reservarDia(provId, fecha, { muebles = 0, nota = '', quien = '' } = {}) {
+      const ya = this.diaTomado(fecha);
+      if (ya && ya.provId !== Number(provId)) {
+        return { error: `Ese día ya lo tiene ${ya.proveedor}` };
+      }
+      const ag = this.agenda();
+      if (ya) { ya.muebles = Number(muebles) || ya.muebles; ya.nota = nota || ya.nota;
+        this._guardarAgenda(); return ya; }
+      const r = { id: ag.reduce((m, x) => Math.max(m, x.id || 0), 0) + 1,
+        provId: Number(provId), proveedor: this.provLabel(provId), fecha,
+        muebles: Number(muebles) || 0, nota, estado: 'reservado',
+        quien: quien || 'yo', reprogramada: 0 };
+      ag.push(r);
+      this._guardarAgenda();
+      return r;
+    },
+    // Reprogramar no borra: se anota, porque el taller que corre la fecha
+    // tres veces por mes es un dato y no un accidente.
+    reprogramar(id, nuevaFecha, { motivo = '', quien = '' } = {}) {
+      const r = this.agenda().find(x => x.id === Number(id)); if (!r) return null;
+      const ya = this.diaTomado(nuevaFecha);
+      if (ya && ya.id !== r.id) return { error: `Ese día ya lo tiene ${ya.proveedor}` };
+      (r.corridas = r.corridas || []).push({ era: r.fecha, motivo, quien: quien || 'yo',
+        el: this.hoyCorto() });
+      r.fecha = nuevaFecha;
+      r.reprogramada = (r.reprogramada || 0) + 1;
+      this._guardarAgenda();
+      return r;
+    },
+    liberarDia(id) {
+      const r = this.agenda().find(x => x.id === Number(id)); if (!r) return null;
+      r.estado = 'libre';
+      this._guardarAgenda();
+      return r;
+    },
+    reprogramacionesDe(provId) {
+      return this.agenda().filter(x => x.provId === Number(provId))
+        .reduce((a, x) => a + (x.reprogramada || 0), 0);
+    },
+    // Las próximas visitas, que es lo que hay que tener a mano.
+    proximasEntregas(n = 8) {
+      return this.agenda().filter(x => x.estado === 'reservado')
+        .map(x => ({ ...x, faltan: this.diasHasta(x.fecha) }))
+        .filter(x => x.faltan == null || x.faltan >= 0)
+        .sort((a, b) => (a.faltan == null ? 999 : a.faltan) - (b.faltan == null ? 999 : b.faltan))
+        .slice(0, n);
+    },
+    _sembrarAgenda() {
+      this._agenda = [];
+      const provs = this.proveedores().filter(p => p.rubro === 'carpinteria');
+      // Un taller por día hábil, empezando la semana que viene.
+      let dia = 1;
+      provs.forEach((p, i) => {
+        const f = this.sumarDias(this.hoyCorto(), dia);
+        this.reservarDia(p.id, f, { muebles: 38 + (p.id * 5) % 18,
+          nota: i % 3 === 0 ? 'trae los del pedido cerrado' : '', quien: 'Jony' });
+        dia += (i % 2) ? 2 : 1;
+      });
+      // Uno que ya corrió la fecha dos veces: pasa y hay que verlo.
+      const r = this._agenda[1];
+      if (r) {
+        // Se corre a días que nadie tomó: si cayera sobre otro taller la
+        // reprogramación se rechaza y el ejemplo no se vería.
+        const libre = n => { let f = this.sumarDias(r.fecha, n);
+          while (this.diaTomado(f)) f = this.sumarDias(f, 1); return f; };
+        this.reprogramar(r.id, libre(6), { motivo: 'no llegó con la laca', quien: 'Jony' });
+        this.reprogramar(r.id, libre(4), { motivo: 'se le rompió la camioneta', quien: 'Jony' });
+      }
+    },
+
+    // ---- La cuenta corriente del proveedor --------------------------------
+    // Va en los dos sentidos y por eso no alcanza con "cuánto le debo". Él
+    // nos trae muebles, y nosotros le vendemos materiales: correderas,
+    // paquetes de paraíso. Cuando viene a entregar se sientan, se compensa
+    // lo uno con lo otro y se paga la diferencia. Esta cuenta es esa charla,
+    // anotada.
+    //
+    // El signo: positivo es plata NUESTRA que va para él —le debemos—;
+    // negativo es plata suya que viene para acá.
+    MOVS_CTA: [
+      { k: 'compra', label: 'Muebles que trajo', signo: 1, pill: 'soft',
+        pie: 'Nace sola cuando se conforma la entrega.' },
+      { k: 'pago', label: 'Le pagamos', signo: -1, pill: 'ok',
+        pie: 'Efectivo, transferencia o cheque.' },
+      { k: 'anticipo', label: 'Anticipo o seña', signo: -1, pill: 'warn',
+        pie: 'Plata adelantada antes de que traiga nada.' },
+      { k: 'materiales', label: 'Le vendimos materiales', signo: -1, pill: 'ok',
+        pie: 'Correderas, placas, paraíso. Se descuenta de lo que le debemos.' },
+      { k: 'descuento', label: 'Descuento', signo: -1, pill: 'crit',
+        pie: 'Vino mal, vino errónea, o el mueble tenía mucho detalle.' },
+      { k: 'ajuste', label: 'Ajuste', signo: 1, pill: 'soft',
+        pie: 'Para cuadrar la cuenta cuando algo no dio.' },
+    ],
+    movCta(k) { return this.MOVS_CTA.find(x => x.k === k) || null; },
+    FORMAS_PAGO: [
+      { k: 'efectivo', label: 'Efectivo' },
+      { k: 'transferencia', label: 'Transferencia' },
+      { k: 'cheque', label: 'Cheque' },
+    ],
+    CTA_KEY: 'bh_cta_prov',
+    cuentaCorriente() {
+      if (this._cta) return this._cta;
+      let g = [];
+      try { g = JSON.parse(localStorage.getItem(this.CTA_KEY)) || []; } catch {}
+      this._cta = g;
+      if (!g.length) this._sembrarCuenta();
+      return this._cta;
+    },
+    _guardarCta() {
+      try { localStorage.setItem(this.CTA_KEY, JSON.stringify(this._cta || [])); } catch {}
+    },
+    _proxMovCta() {
+      return (this._cta || []).reduce((m, x) => Math.max(m, x.id || 0), 0) + 1;
+    },
+    // Anotar un movimiento. El monto se guarda siempre positivo: el signo lo
+    // pone el tipo, así nadie tiene que acordarse de ponerlo con menos.
+    anotarCuenta({ provId, tipo, monto, detalle = '', ref = '', forma = '',
+      fecha = '', quien = '' } = {}) {
+      const m = this.movCta(tipo); if (!m) return null;
+      const cta = this.cuentaCorriente();
+      const mov = { id: this._proxMovCta(), provId: Number(provId), tipo,
+        monto: Math.abs(Number(monto) || 0), signo: m.signo, detalle, ref,
+        forma: forma || '', fecha: fecha || this.hoyCorto(), quien: quien || 'yo' };
+      cta.push(mov);
+      this._guardarCta();
+      return mov;
+    },
+    movimientosDe(provId) {
+      return this.cuentaCorriente().filter(x => x.provId === Number(provId))
+        .sort((a, b) => (this.diasDesde(a.fecha) || 0) - (this.diasDesde(b.fecha) || 0));
+    },
+    // Lo que queda entre los dos. Positivo: le debemos. Negativo: nos debe.
+    saldoProveedor(provId) {
+      return this.cuentaCorriente().filter(x => x.provId === Number(provId))
+        .reduce((a, x) => a + x.signo * x.monto, 0);
+    },
+    // Cómo se lee un saldo sin tener que pensar el signo.
+    leerSaldo(s) {
+      if (Math.abs(s) < 1) return { txt: 'al día', pill: 'ok', monto: 0 };
+      return s > 0
+        ? { txt: `le debemos ${this.plata(s)}`, pill: 'warn', monto: s }
+        : { txt: `nos debe ${this.plata(-s)}`, pill: 'ok', monto: s };
+    },
+    plata(n) {
+      return '$' + Math.round(Math.abs(Number(n) || 0)).toLocaleString('es-AR');
+    },
+    // Todos los saldos de una, que es lo que Jony mira antes de que llegue
+    // el camión.
+    saldosProveedores() {
+      return this.proveedores().map(p => ({ prov: p, saldo: this.saldoProveedor(p.id),
+        movs: this.movimientosDe(p.id).length }))
+        .filter(x => x.movs > 0 || x.saldo !== 0)
+        .sort((a, b) => b.saldo - a.saldo);
+    },
+    // Cuando el proveedor está enfrente: esto le debemos, esto nos debe,
+    // esto se le paga hoy.
+    compensacion(provId) {
+      const movs = this.movimientosDe(provId);
+      const debe = movs.filter(x => x.signo > 0).reduce((a, x) => a + x.monto, 0);
+      const haber = movs.filter(x => x.signo < 0).reduce((a, x) => a + x.monto, 0);
+      return { debe, haber, saldo: debe - haber,
+        materiales: movs.filter(x => x.tipo === 'materiales').reduce((a, x) => a + x.monto, 0),
+        anticipos: movs.filter(x => x.tipo === 'anticipo').reduce((a, x) => a + x.monto, 0) };
+    },
+    // Cuatro meses de cuenta ya andando, para que la pantalla se pueda mirar.
+    _sembrarCuenta() {
+      this._cta = [];
+      this.recepciones().filter(r => r.estadoCompras === 'conformada').forEach(r => {
+        const t = this.totalDeEntrega(r);
+        this.anotarCuenta({ provId: r.provId, tipo: 'compra', monto: t.total,
+          detalle: `${r.items.length} muebles${t.flete ? ' · con flete' : ''}`,
+          ref: r.numero, fecha: r.conformadaEl, quien: 'Jony' });
+      });
+      // Materiales que les vendimos y pagos, que es como se salda de verdad.
+      const provs = [...new Set(this._cta.map(x => x.provId))];
+      const MAT = ['2 cajas de correderas', '30 paquetes de paraíso',
+        '12 placas de MDF 18', '1 caja de bisagras', '4 planchas de melamina'];
+      provs.forEach((pid, i) => {
+        const movs = this.movimientosDe(pid);
+        movs.forEach((m, j) => {
+          if (j % 3 === 1) {
+            this.anotarCuenta({ provId: pid, tipo: 'materiales',
+              monto: 180000 + ((pid * 7 + j) % 6) * 45000,
+              detalle: MAT[(pid + j) % MAT.length], fecha: m.fecha, quien: 'Jony' });
+          }
+          // Se le paga cuando entrega: casi todo, no siempre todo.
+          if (j < movs.length - 1) {
+            this.anotarCuenta({ provId: pid, tipo: 'pago',
+              monto: Math.round(m.monto * (j % 4 === 0 ? 0.8 : 1)),
+              forma: ['transferencia', 'efectivo', 'cheque'][(pid + j) % 3],
+              detalle: `contra ${m.ref}`, fecha: m.fecha, quien: 'Jony' });
+          }
+        });
+        if (i % 3 === 0) {
+          this.anotarCuenta({ provId: pid, tipo: 'anticipo', monto: 300000,
+            detalle: 'para arrancar el pedido', forma: 'transferencia',
+            fecha: this.hoyCorto(), quien: 'Jony' });
+        }
+      });
+      // Uno se llevó más materiales de los que trajo en muebles y la cuenta
+      // le queda en contra: es él el que nos debe. Pasa seguido, y la
+      // pantalla tiene que saber mostrarlo.
+      const flojo = this.saldosProveedores().slice(-1)[0];
+      if (flojo) {
+        this.anotarCuenta({ provId: flojo.prov.id, tipo: 'materiales',
+          monto: flojo.saldo + 640000,
+          detalle: '60 paquetes de paraíso y 3 cajas de correderas',
+          fecha: this.hoyCorto(), quien: 'Jony' });
+      }
     },
 
     // ---- El flete de la entrega -------------------------------------------

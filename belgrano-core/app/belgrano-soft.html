@@ -1593,11 +1593,70 @@ tr:hover td{background:var(--panel-2)}
       const lista = this.listaPrecios();
       const i = lista.findIndex(x => x.provId === Number(provId)
         && x.varianteId === Number(varianteId));
+      const antes = i >= 0 ? Number(lista[i].precio) || 0 : 0;
+      const p = Number(precio) || 0;
       const reg = { provId: Number(provId), varianteId: Number(varianteId),
-        precio: Number(precio) || 0, desde: this.hoyCorto(), quien: quien || 'yo' };
+        precio: p, desde: this.hoyCorto(), quien: quien || 'yo' };
       if (i >= 0) lista[i] = reg; else lista.push(reg);
+      // El precio viejo no se tira: sin él no hay manera de saber cuánto
+      // aumentó un mueble ni de dónde salió el margen que hoy vemos.
+      if (antes !== p) {
+        this.historialPrecios().push({ provId: Number(provId), varianteId: Number(varianteId),
+          antes, precio: p, desde: reg.desde, quien: reg.quien,
+          pct: antes ? ((p - antes) / antes) * 100 : null });
+        this._guardarHistPrecios();
+      }
       try { localStorage.setItem(this.PRECIOS_KEY, JSON.stringify(lista)); } catch {}
       return reg;
+    },
+
+    // ---- El historial de precios ------------------------------------------
+    // La lista se toca cada dos o tres meses. Lo que interesa no es el precio
+    // de hoy sino cuánto se movió: eso es lo que se come el margen sin que
+    // nadie lo vea, mueble por mueble.
+    HIST_PRECIOS_KEY: 'bh_hist_precios',
+    historialPrecios() {
+      if (this._histP) return this._histP;
+      let g = [];
+      try { g = JSON.parse(localStorage.getItem(this.HIST_PRECIOS_KEY)) || []; } catch {}
+      this._histP = g;
+      return g;
+    },
+    _guardarHistPrecios() {
+      try { localStorage.setItem(this.HIST_PRECIOS_KEY, JSON.stringify(this._histP || [])); } catch {}
+    },
+    // Los cambios de un mueble en un taller, del más nuevo al más viejo.
+    cambiosDePrecio(provId, varianteId) {
+      return this.historialPrecios()
+        .filter(x => x.provId === Number(provId) && x.varianteId === Number(varianteId))
+        .sort((a, b) => (this.diasDesde(a.desde) || 0) - (this.diasDesde(b.desde) || 0));
+    },
+    // El aumento que pasó un proveedor, de una sola vez. Es como llega en la
+    // realidad: no manda una lista nueva, dice "todo un 12% más".
+    aumentarProveedor(provId, pct, quien = '') {
+      const p = Number(pct) || 0;
+      if (!p) return 0;
+      const suyos = this.listaPrecios().filter(x => x.provId === Number(provId));
+      suyos.forEach(x => this.guardarPrecioProveedor(provId, x.varianteId,
+        Math.round((Number(x.precio) || 0) * (1 + p / 100)), quien));
+      return suyos.length;
+    },
+    // El último aumento que pasó un taller. No el promedio de toda su
+    // historia: eso mezcla el aumento de marzo con el de julio y no dice
+    // nada. Lo que interesa es la última vez que tocó la lista.
+    aumentoDe(provId) {
+      const cs = this.historialPrecios().filter(x => x.provId === Number(provId) && x.antes > 0);
+      if (!cs.length) return null;
+      // El más reciente manda, y con él van todos los del mismo día: un
+      // aumento se pasa de una, no mueble por mueble.
+      let dMin = Infinity, fecha = '';
+      cs.forEach(x => { const d = this.diasDesde(x.desde);
+        if (d != null && d < dMin) { dMin = d; fecha = x.desde; } });
+      const tanda = cs.filter(x => x.desde === fecha);
+      return { n: tanda.length, fecha,
+        pct: tanda.reduce((a, x) => a + (x.pct || 0), 0) / tanda.length,
+        ultimo: fecha, dias: dMin === Infinity ? null : dMin,
+        veces: [...new Set(cs.map(x => x.desde))].length };
     },
     // Conformar cierra la recepción para Compras: los precios quedan firmes y
     // de ahí sale lo que hay que pagarle al taller.
@@ -1612,6 +1671,14 @@ tr:hover td{background:var(--panel-2)}
       r.conformadaPor = quien || 'yo';
       r.conformadaEl = this.hoyCorto();
       r.total = r.items.reduce((a, x) => a + (Number(x.precio) || 0), 0);
+      // Conformar ES la deuda: no hay un paso más. Apenas Adrián recibe y
+      // Jony da el visto, esa plata ya está para pagarse.
+      const t = this.totalDeEntrega(r);
+      this.anotarCuenta({ provId: r.provId, tipo: 'compra', monto: t.total,
+        detalle: `${r.items.length} muebles`
+          + (t.iva ? ` · IVA ${(r.comprobante || {}).iva}%` : '')
+          + (t.flete ? ' · con flete' : ''),
+        ref: r.numero, fecha: r.conformadaEl, quien: quien || 'yo' });
       return r;
     },
     // ---- Lo que Compras tiene sobre la mesa --------------------------------
@@ -1708,13 +1775,28 @@ tr:hover td{background:var(--panel-2)}
       const enFabrica = this.aFabricar().filter(u => u.provId === p.id);
       const atrasados = enFabrica.filter(u => this.vencida(u)).length;
       const precios = this.listaPrecios().filter(x => x.provId === p.id);
+      // Cuánto trae por mes: la cuenta que importa para saber si un taller
+      // puede con más trabajo o si ya está al límite.
+      const meses = [...new Set(conf.map(r => String(r.conformadaEl || r.fecha).split('/')[1]))];
+      const porMes = meses.length ? Math.round(items.length / meses.length) : 0;
+      const devueltos = this.devoluciones().filter(d => d.provId === p.id);
       return {
         prov: p, recepciones: recs, conformadas: conf.length,
         piezas: items.length, conDetalle,
-        total: conf.reduce((a, r) => a + (Number(r.total) || 0), 0),
+        perfectos: items.filter(x => !x.calidad || x.calidad === 'perfecto').length,
+        devueltos: devueltos.length,
+        debeTraer: this.devolucionesPendientes(p.id),
+        total: conf.reduce((a, r) => a + this.totalDeEntrega(r).total, 0),
         ultima: recs.length ? recs[0].fecha : '',
         enFabrica: enFabrica.length, atrasados, precios,
         aConformar: recs.filter(r => r.estadoCompras === 'pendiente').length,
+        porMes, meses: meses.length,
+        porSemana: meses.length ? Math.round((items.length / meses.length) / 4.3) : 0,
+        saldo: this.saldoProveedor(p.id),
+        movimientos: this.movimientosDe(p.id),
+        reprogramaciones: this.reprogramacionesDe(p.id),
+        proxima: this.agenda().find(x => x.provId === p.id && x.estado === 'reservado') || null,
+        aumento: this.aumentoDe(p.id),
       };
     },
 
@@ -1742,6 +1824,322 @@ tr:hover td{background:var(--panel-2)}
         (por[x.varianteId] = por[x.varianteId] || []).push(x);
       });
       return Object.keys(por).map(Number).filter(vid => por[vid].length > 1);
+    },
+
+    // ---- El comprobante de la entrega -------------------------------------
+    // La mayoría de las compras son informales: el taller trae los muebles y
+    // un papel escrito a mano. Las que sí facturan hay que cargarlas como
+    // corresponde —IVA aparte, impuestos aparte— porque de eso sale lo que
+    // después se puede computar.
+    TIPOS_COMPROBANTE: [
+      { k: 'sin', label: 'Sin comprobante', pill: 'soft',
+        pie: 'Informal. Es lo habitual: trae el papel escrito a mano.' },
+      { k: 'remito', label: 'Remito', pill: 'soft',
+        pie: 'El papel que trae con lo que entregó, sin factura.' },
+      { k: 'factura', label: 'Factura', pill: 'ok',
+        pie: 'Compra formal. Se carga el IVA y los impuestos aparte.' },
+    ],
+    comprobante(k) { return this.TIPOS_COMPROBANTE.find(x => x.k === k) || this.TIPOS_COMPROBANTE[0]; },
+    ALICUOTAS_IVA: [0, 10.5, 21],
+    guardarComprobante(num, { tipo = 'sin', nro = '', iva = 21, otros = 0,
+      forma = '', quien = '' } = {}) {
+      const r = this.recepcion(num); if (!r) return null;
+      r.comprobante = { tipo, nro, iva: tipo === 'factura' ? Number(iva) || 0 : 0,
+        otros: tipo === 'factura' ? Number(otros) || 0 : 0,
+        forma, quien: quien || 'yo', el: this.hoyCorto() };
+      return r.comprobante;
+    },
+    // Lo que se paga de verdad: los muebles, más el IVA y los impuestos si la
+    // compra fue formal, más el flete si se decidió meterlo adentro.
+    totalDeEntrega(r) {
+      if (!r) return { neto: 0, iva: 0, otros: 0, flete: 0, total: 0 };
+      const neto = Number(r.total) || r.items.reduce((a, x) => a + (Number(x.precio) || 0), 0);
+      const c = r.comprobante || {};
+      const iva = c.tipo === 'factura' ? Math.round(neto * (Number(c.iva) || 0) / 100) : 0;
+      const otros = c.tipo === 'factura' ? Number(c.otros) || 0 : 0;
+      const flete = (r.flete || {}).modo === 'compra' ? Number(r.flete.monto) || 0 : 0;
+      return { neto, iva, otros, flete, total: neto + iva + otros + flete };
+    },
+
+    // ---- Devoluciones ------------------------------------------------------
+    // Hay dos maneras de devolver y no son la misma cosa. Si el mueble se
+    // devuelve en el momento, sencillamente no se cuenta: no entró y no se
+    // paga, la próxima lo trae. Si se devuelve después —a la semana, cuando
+    // ya se pagó— queda una deuda del taller con nosotros: ese mueble está
+    // pago y nos lo tiene que traer.
+    DEVOL_KEY: 'bh_devoluciones',
+    MOMENTOS_DEVOL: [
+      { k: 'entrega', label: 'En el momento', pill: 'soft',
+        pie: 'No entró y no se paga. La próxima lo trae.' },
+      { k: 'despues', label: 'Después de pagarlo', pill: 'crit',
+        pie: 'Ya está pago: queda como mueble que nos debe traer.' },
+    ],
+    devoluciones() {
+      if (this._devol) return this._devol;
+      let g = [];
+      try { g = JSON.parse(localStorage.getItem(this.DEVOL_KEY)) || []; } catch {}
+      this._devol = g;
+      return g;
+    },
+    _guardarDevol() {
+      try { localStorage.setItem(this.DEVOL_KEY, JSON.stringify(this._devol || [])); } catch {}
+    },
+    devolverMueble(unidadId, { momento = 'entrega', motivo = '', quien = '' } = {}) {
+      const u = this.unidad(unidadId); if (!u) return null;
+      const ds = this.devoluciones();
+      const d = { id: ds.reduce((m, x) => Math.max(m, x.id || 0), 0) + 1,
+        unidadId: u.id, provId: u.provId || null, proveedor: u.proveedor || '',
+        varianteId: u.varianteId, modelo: u.modelo, medida: u.medida, color: u.color,
+        serie: u.serie, momento, motivo, fecha: this.hoyCorto(),
+        quien: quien || 'yo', estado: 'pendiente' };
+      ds.push(d);
+      this._guardarDevol();
+      this.guardarUnidad({ id: u.id, calidad: 'devuelto', calidadNota: motivo });
+      return d;
+    },
+    // Los que ya se pagaron y todavía no volvieron: eso es lo que se le
+    // reclama al taller cuando viene.
+    devolucionesPendientes(provId) {
+      return this.devoluciones().filter(d => d.estado === 'pendiente'
+        && d.momento === 'despues'
+        && (provId == null || d.provId === Number(provId)));
+    },
+    saldarDevolucion(id, quien = '') {
+      const d = this.devoluciones().find(x => x.id === Number(id)); if (!d) return null;
+      d.estado = 'repuesto'; d.repuestoEl = this.hoyCorto(); d.repuestoPor = quien || 'yo';
+      this._guardarDevol();
+      return d;
+    },
+
+    // ---- La agenda de entregas ---------------------------------------------
+    // Cada taller llega con cuarenta o cincuenta muebles y el depósito no da
+    // para dos en el mismo día. Por eso el día se reserva: el proveedor avisa
+    // cuándo viene y ese día queda tomado.
+    AGENDA_KEY: 'bh_agenda_entregas',
+    agenda() {
+      if (this._agenda) return this._agenda;
+      let g = [];
+      try { g = JSON.parse(localStorage.getItem(this.AGENDA_KEY)) || []; } catch {}
+      this._agenda = g;
+      if (!g.length) this._sembrarAgenda();
+      return this._agenda;
+    },
+    _guardarAgenda() {
+      try { localStorage.setItem(this.AGENDA_KEY, JSON.stringify(this._agenda || [])); } catch {}
+    },
+    // Quién tiene tomado un día. null quiere decir que está libre.
+    diaTomado(fecha) {
+      return this.agenda().find(x => x.fecha === fecha && x.estado === 'reservado') || null;
+    },
+    reservarDia(provId, fecha, { muebles = 0, nota = '', quien = '' } = {}) {
+      const ya = this.diaTomado(fecha);
+      if (ya && ya.provId !== Number(provId)) {
+        return { error: `Ese día ya lo tiene ${ya.proveedor}` };
+      }
+      const ag = this.agenda();
+      if (ya) { ya.muebles = Number(muebles) || ya.muebles; ya.nota = nota || ya.nota;
+        this._guardarAgenda(); return ya; }
+      const r = { id: ag.reduce((m, x) => Math.max(m, x.id || 0), 0) + 1,
+        provId: Number(provId), proveedor: this.provLabel(provId), fecha,
+        muebles: Number(muebles) || 0, nota, estado: 'reservado',
+        quien: quien || 'yo', reprogramada: 0 };
+      ag.push(r);
+      this._guardarAgenda();
+      return r;
+    },
+    // Reprogramar no borra: se anota, porque el taller que corre la fecha
+    // tres veces por mes es un dato y no un accidente.
+    reprogramar(id, nuevaFecha, { motivo = '', quien = '' } = {}) {
+      const r = this.agenda().find(x => x.id === Number(id)); if (!r) return null;
+      const ya = this.diaTomado(nuevaFecha);
+      if (ya && ya.id !== r.id) return { error: `Ese día ya lo tiene ${ya.proveedor}` };
+      (r.corridas = r.corridas || []).push({ era: r.fecha, motivo, quien: quien || 'yo',
+        el: this.hoyCorto() });
+      r.fecha = nuevaFecha;
+      r.reprogramada = (r.reprogramada || 0) + 1;
+      this._guardarAgenda();
+      return r;
+    },
+    liberarDia(id) {
+      const r = this.agenda().find(x => x.id === Number(id)); if (!r) return null;
+      r.estado = 'libre';
+      this._guardarAgenda();
+      return r;
+    },
+    reprogramacionesDe(provId) {
+      return this.agenda().filter(x => x.provId === Number(provId))
+        .reduce((a, x) => a + (x.reprogramada || 0), 0);
+    },
+    // Las próximas visitas, que es lo que hay que tener a mano.
+    proximasEntregas(n = 8) {
+      return this.agenda().filter(x => x.estado === 'reservado')
+        .map(x => ({ ...x, faltan: this.diasHasta(x.fecha) }))
+        .filter(x => x.faltan == null || x.faltan >= 0)
+        .sort((a, b) => (a.faltan == null ? 999 : a.faltan) - (b.faltan == null ? 999 : b.faltan))
+        .slice(0, n);
+    },
+    _sembrarAgenda() {
+      this._agenda = [];
+      const provs = this.proveedores().filter(p => p.rubro === 'carpinteria');
+      // Un taller por día hábil, empezando la semana que viene.
+      let dia = 1;
+      provs.forEach((p, i) => {
+        const f = this.sumarDias(this.hoyCorto(), dia);
+        this.reservarDia(p.id, f, { muebles: 38 + (p.id * 5) % 18,
+          nota: i % 3 === 0 ? 'trae los del pedido cerrado' : '', quien: 'Jony' });
+        dia += (i % 2) ? 2 : 1;
+      });
+      // Uno que ya corrió la fecha dos veces: pasa y hay que verlo.
+      const r = this._agenda[1];
+      if (r) {
+        // Se corre a días que nadie tomó: si cayera sobre otro taller la
+        // reprogramación se rechaza y el ejemplo no se vería.
+        const libre = n => { let f = this.sumarDias(r.fecha, n);
+          while (this.diaTomado(f)) f = this.sumarDias(f, 1); return f; };
+        this.reprogramar(r.id, libre(6), { motivo: 'no llegó con la laca', quien: 'Jony' });
+        this.reprogramar(r.id, libre(4), { motivo: 'se le rompió la camioneta', quien: 'Jony' });
+      }
+    },
+
+    // ---- La cuenta corriente del proveedor --------------------------------
+    // Va en los dos sentidos y por eso no alcanza con "cuánto le debo". Él
+    // nos trae muebles, y nosotros le vendemos materiales: correderas,
+    // paquetes de paraíso. Cuando viene a entregar se sientan, se compensa
+    // lo uno con lo otro y se paga la diferencia. Esta cuenta es esa charla,
+    // anotada.
+    //
+    // El signo: positivo es plata NUESTRA que va para él —le debemos—;
+    // negativo es plata suya que viene para acá.
+    MOVS_CTA: [
+      { k: 'compra', label: 'Muebles que trajo', signo: 1, pill: 'soft',
+        pie: 'Nace sola cuando se conforma la entrega.' },
+      { k: 'pago', label: 'Le pagamos', signo: -1, pill: 'ok',
+        pie: 'Efectivo, transferencia o cheque.' },
+      { k: 'anticipo', label: 'Anticipo o seña', signo: -1, pill: 'warn',
+        pie: 'Plata adelantada antes de que traiga nada.' },
+      { k: 'materiales', label: 'Le vendimos materiales', signo: -1, pill: 'ok',
+        pie: 'Correderas, placas, paraíso. Se descuenta de lo que le debemos.' },
+      { k: 'descuento', label: 'Descuento', signo: -1, pill: 'crit',
+        pie: 'Vino mal, vino errónea, o el mueble tenía mucho detalle.' },
+      { k: 'ajuste', label: 'Ajuste', signo: 1, pill: 'soft',
+        pie: 'Para cuadrar la cuenta cuando algo no dio.' },
+    ],
+    movCta(k) { return this.MOVS_CTA.find(x => x.k === k) || null; },
+    FORMAS_PAGO: [
+      { k: 'efectivo', label: 'Efectivo' },
+      { k: 'transferencia', label: 'Transferencia' },
+      { k: 'cheque', label: 'Cheque' },
+    ],
+    CTA_KEY: 'bh_cta_prov',
+    cuentaCorriente() {
+      if (this._cta) return this._cta;
+      let g = [];
+      try { g = JSON.parse(localStorage.getItem(this.CTA_KEY)) || []; } catch {}
+      this._cta = g;
+      if (!g.length) this._sembrarCuenta();
+      return this._cta;
+    },
+    _guardarCta() {
+      try { localStorage.setItem(this.CTA_KEY, JSON.stringify(this._cta || [])); } catch {}
+    },
+    _proxMovCta() {
+      return (this._cta || []).reduce((m, x) => Math.max(m, x.id || 0), 0) + 1;
+    },
+    // Anotar un movimiento. El monto se guarda siempre positivo: el signo lo
+    // pone el tipo, así nadie tiene que acordarse de ponerlo con menos.
+    anotarCuenta({ provId, tipo, monto, detalle = '', ref = '', forma = '',
+      fecha = '', quien = '' } = {}) {
+      const m = this.movCta(tipo); if (!m) return null;
+      const cta = this.cuentaCorriente();
+      const mov = { id: this._proxMovCta(), provId: Number(provId), tipo,
+        monto: Math.abs(Number(monto) || 0), signo: m.signo, detalle, ref,
+        forma: forma || '', fecha: fecha || this.hoyCorto(), quien: quien || 'yo' };
+      cta.push(mov);
+      this._guardarCta();
+      return mov;
+    },
+    movimientosDe(provId) {
+      return this.cuentaCorriente().filter(x => x.provId === Number(provId))
+        .sort((a, b) => (this.diasDesde(a.fecha) || 0) - (this.diasDesde(b.fecha) || 0));
+    },
+    // Lo que queda entre los dos. Positivo: le debemos. Negativo: nos debe.
+    saldoProveedor(provId) {
+      return this.cuentaCorriente().filter(x => x.provId === Number(provId))
+        .reduce((a, x) => a + x.signo * x.monto, 0);
+    },
+    // Cómo se lee un saldo sin tener que pensar el signo.
+    leerSaldo(s) {
+      if (Math.abs(s) < 1) return { txt: 'al día', pill: 'ok', monto: 0 };
+      return s > 0
+        ? { txt: `le debemos ${this.plata(s)}`, pill: 'warn', monto: s }
+        : { txt: `nos debe ${this.plata(-s)}`, pill: 'ok', monto: s };
+    },
+    plata(n) {
+      return '$' + Math.round(Math.abs(Number(n) || 0)).toLocaleString('es-AR');
+    },
+    // Todos los saldos de una, que es lo que Jony mira antes de que llegue
+    // el camión.
+    saldosProveedores() {
+      return this.proveedores().map(p => ({ prov: p, saldo: this.saldoProveedor(p.id),
+        movs: this.movimientosDe(p.id).length }))
+        .filter(x => x.movs > 0 || x.saldo !== 0)
+        .sort((a, b) => b.saldo - a.saldo);
+    },
+    // Cuando el proveedor está enfrente: esto le debemos, esto nos debe,
+    // esto se le paga hoy.
+    compensacion(provId) {
+      const movs = this.movimientosDe(provId);
+      const debe = movs.filter(x => x.signo > 0).reduce((a, x) => a + x.monto, 0);
+      const haber = movs.filter(x => x.signo < 0).reduce((a, x) => a + x.monto, 0);
+      return { debe, haber, saldo: debe - haber,
+        materiales: movs.filter(x => x.tipo === 'materiales').reduce((a, x) => a + x.monto, 0),
+        anticipos: movs.filter(x => x.tipo === 'anticipo').reduce((a, x) => a + x.monto, 0) };
+    },
+    // Cuatro meses de cuenta ya andando, para que la pantalla se pueda mirar.
+    _sembrarCuenta() {
+      this._cta = [];
+      this.recepciones().filter(r => r.estadoCompras === 'conformada').forEach(r => {
+        const t = this.totalDeEntrega(r);
+        this.anotarCuenta({ provId: r.provId, tipo: 'compra', monto: t.total,
+          detalle: `${r.items.length} muebles${t.flete ? ' · con flete' : ''}`,
+          ref: r.numero, fecha: r.conformadaEl, quien: 'Jony' });
+      });
+      // Materiales que les vendimos y pagos, que es como se salda de verdad.
+      const provs = [...new Set(this._cta.map(x => x.provId))];
+      const MAT = ['2 cajas de correderas', '30 paquetes de paraíso',
+        '12 placas de MDF 18', '1 caja de bisagras', '4 planchas de melamina'];
+      provs.forEach((pid, i) => {
+        const movs = this.movimientosDe(pid);
+        movs.forEach((m, j) => {
+          if (j % 3 === 1) {
+            this.anotarCuenta({ provId: pid, tipo: 'materiales',
+              monto: 180000 + ((pid * 7 + j) % 6) * 45000,
+              detalle: MAT[(pid + j) % MAT.length], fecha: m.fecha, quien: 'Jony' });
+          }
+          // Se le paga cuando entrega: casi todo, no siempre todo.
+          if (j < movs.length - 1) {
+            this.anotarCuenta({ provId: pid, tipo: 'pago',
+              monto: Math.round(m.monto * (j % 4 === 0 ? 0.8 : 1)),
+              forma: ['transferencia', 'efectivo', 'cheque'][(pid + j) % 3],
+              detalle: `contra ${m.ref}`, fecha: m.fecha, quien: 'Jony' });
+          }
+        });
+        if (i % 3 === 0) {
+          this.anotarCuenta({ provId: pid, tipo: 'anticipo', monto: 300000,
+            detalle: 'para arrancar el pedido', forma: 'transferencia',
+            fecha: this.hoyCorto(), quien: 'Jony' });
+        }
+      });
+      // Uno se llevó más materiales de los que trajo en muebles y la cuenta
+      // le queda en contra: es él el que nos debe. Pasa seguido, y la
+      // pantalla tiene que saber mostrarlo.
+      const flojo = this.saldosProveedores().slice(-1)[0];
+      if (flojo) {
+        this.anotarCuenta({ provId: flojo.prov.id, tipo: 'materiales',
+          monto: flojo.saldo + 640000,
+          detalle: '60 paquetes de paraíso y 3 cajas de correderas',
+          fecha: this.hoyCorto(), quien: 'Jony' });
+      }
     },
 
     // ---- El flete de la entrega -------------------------------------------
@@ -15053,7 +15451,8 @@ tr:hover td{background:var(--panel-2)}
         ${hecha ? `<div class="hint" style="margin-top:11px">Conformada el
           ${UI.esc(r.conformadaEl)}. Este total es lo que hay que pagarle a
           ${UI.esc(r.proveedor)}.</div>`
-        : `${this.htmlFlete(r)}
+        : `${this.htmlComprobante(r, total)}
+        ${this.htmlFlete(r)}
         <div class="card pad cp-cierre">
           <label class="fld" style="margin:0"><span class="lbl">Total del remito del taller</span>
             <input id="cp-remito" type="number" placeholder="${total}"></label>
@@ -15078,6 +15477,46 @@ tr:hover td{background:var(--panel-2)}
       }
       if (l.origen === 'catalogo') return 'No hay precio de este taller ni fila en Costeo: es el costo cargado en el mueble.';
       return '';
+    },
+
+    // La mayoría de las compras son informales: el taller trae los muebles y
+    // un papel escrito a mano. Las que sí facturan hay que cargarlas como
+    // corresponde, con el IVA aparte, porque de eso sale lo que se computa.
+    htmlComprobante(r, neto) {
+      const c = r.comprobante || {};
+      const tipo = this._comp != null ? this._comp : (c.tipo || 'sin');
+      const iva = this._iva != null ? this._iva : (c.iva != null ? c.iva : 21);
+      const otros = this._otros != null ? this._otros : (c.otros || '');
+      const forma = this._forma != null ? this._forma : (c.forma || 'transferencia');
+      const mIva = tipo === 'factura' ? Math.round(neto * (Number(iva) || 0) / 100) : 0;
+      const mOtros = tipo === 'factura' ? Number(otros) || 0 : 0;
+      return `<div class="card pad cp-comp">
+        <div class="cx-b-h" style="margin-bottom:8px">El comprobante</div>
+        <div class="cp-fl-op">${global.DB.TIPOS_COMPROBANTE.map(t => `
+          <label class="cp-fl ${tipo === t.k ? 'on' : ''}">
+            <input type="radio" name="cp-comp" value="${t.k}" ${tipo === t.k ? 'checked' : ''}>
+            <span><b>${UI.esc(t.label)}</b><span class="hint">${UI.esc(t.pie)}</span></span>
+          </label>`).join('')}</div>
+        ${tipo === 'sin' ? '' : `<div class="cp-comp-m">
+          <label class="fld" style="margin:0"><span class="lbl">Número</span>
+            <input id="cp-nro" value="${UI.esc(c.nro || '')}" placeholder="0001-00012345"></label>
+          ${tipo === 'factura' ? `
+            <label class="fld" style="margin:0"><span class="lbl">IVA</span>
+              <select id="cp-iva">${global.DB.ALICUOTAS_IVA.map(a =>
+                `<option value="${a}" ${Number(iva) === a ? 'selected' : ''}>${a}%</option>`).join('')}</select></label>
+            <label class="fld" style="margin:0"><span class="lbl">Otros impuestos</span>
+              <input id="cp-otros" type="number" value="${otros}" placeholder="0"></label>` : ''}
+          <label class="fld" style="margin:0"><span class="lbl">Cómo se paga</span>
+            <select id="cp-forma">${global.DB.FORMAS_PAGO.map(f =>
+              `<option value="${f.k}" ${forma === f.k ? 'selected' : ''}>${UI.esc(f.label)}</option>`).join('')}</select></label>
+        </div>
+        ${tipo === 'factura' ? `<div class="cp-comp-t">
+          <span>Muebles <b>${UI.pesos(neto)}</b></span>
+          <span>+ IVA ${iva}% <b>${UI.pesos(mIva)}</b></span>
+          ${mOtros ? `<span>+ impuestos <b>${UI.pesos(mOtros)}</b></span>` : ''}
+          <span class="cp-comp-tot">= <b>${UI.pesos(neto + mIva + mOtros)}</b></span>
+        </div>` : ''}`}
+      </div>`;
     },
 
     // Casi siempre lo trae el taller. Cuando lo fuimos a buscar nosotros hay
@@ -15161,11 +15600,14 @@ tr:hover td{background:var(--panel-2)}
       const q = id => document.getElementById(id);
       const v = q('cp-volver'); if (v) v.onclick = () => {
         this.abierta = null; this._lineas = {}; this._remito = null;
-        this._flete = null; this._fleteMonto = null; this.render(this._mount);
+        this._flete = null; this._fleteMonto = null;
+        this._comp = null; this._iva = null; this._otros = null; this._forma = null;
+        this.render(this._mount);
       };
       document.querySelectorAll('[data-ver]').forEach(b => b.onclick = () => {
         this.abierta = b.dataset.ver; this._lineas = {}; this._remito = null;
         this._flete = null; this._fleteMonto = null;
+        this._comp = null; this._iva = null; this._otros = null; this._forma = null;
         this.render(this._mount);
       });
       document.querySelectorAll('[data-precio]').forEach(i => i.oninput = () => {
@@ -15181,6 +15623,15 @@ tr:hover td{background:var(--panel-2)}
         UI.aviso('Precio actualizado — rige desde hoy', 'ok');
         this.render(this._mount);
       });
+      document.querySelectorAll('[name="cp-comp"]').forEach(r => r.onchange = () => {
+        this._comp = r.value; this.render(this._mount);
+      });
+      const iva = q('cp-iva');
+      if (iva) iva.onchange = () => { this._iva = Number(iva.value); this.render(this._mount); };
+      const otr = q('cp-otros');
+      if (otr) otr.oninput = () => { this._otros = Number(otr.value) || 0; this.render(this._mount); };
+      const frm = q('cp-forma');
+      if (frm) frm.onchange = () => { this._forma = frm.value; };
       document.querySelectorAll('[name="cp-flete"]').forEach(r => r.onchange = () => {
         this._flete = r.value;
         if (r.value === 'proveedor') this._fleteMonto = 0;
@@ -15206,6 +15657,11 @@ tr:hover td{background:var(--panel-2)}
         if (this._remito != null && Math.round(this._remito) !== Math.round(total)) {
           return UI.aviso('El total no coincide con el remito — corregí una línea o sacá el remito', 'warn');
         }
+        const nro = q('cp-nro');
+        global.DB.guardarComprobante(this.abierta, {
+          tipo: this._comp || 'sin', nro: nro ? nro.value : '',
+          iva: this._iva != null ? this._iva : 21, otros: this._otros || 0,
+          forma: this._forma || 'transferencia', quien: 'Jony' });
         global.DB.guardarFlete(this.abierta, { modo: this._flete || 'proveedor',
           monto: this._fleteMonto || 0, quien: 'yo' });
         global.DB.conformarRecepcion(this.abierta, { lineas, quien: 'yo' });
@@ -15274,6 +15730,12 @@ tr:hover td{background:var(--panel-2)}
         .cp-fl b{display:block;font-size:12.5px;color:var(--navy)}
         .cp-fl .hint{display:block;font-size:11px;margin-top:1px}
         .cp-fl-m{display:flex;gap:14px;align-items:flex-end;margin-top:10px;flex-wrap:wrap}
+        .cp-comp{margin-top:12px}
+        .cp-comp-m{display:flex;gap:14px;align-items:flex-end;margin-top:10px;flex-wrap:wrap}
+        .cp-comp-t{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:10px;
+          padding-top:9px;border-top:1px solid var(--line-soft);font-size:12.5px;color:var(--muted)}
+        .cp-comp-t b{color:var(--navy);font-size:13.5px}
+        .cp-comp-tot b{font-size:17px}
         .cp-back{position:fixed;inset:0;background:rgba(12,20,34,.45);z-index:70;
           display:flex;align-items:center;justify-content:center;padding:20px}
       </style>`;
@@ -15722,12 +16184,32 @@ tr:hover td{background:var(--panel-2)}
         </div>
 
         <div class="cx-kpis">
+          ${this.kpi('Saldo', UI.pesos(Math.abs(f.saldo)),
+            f.saldo > 0 ? 'le debemos' : (f.saldo < 0 ? '<b>nos debe</b>' : 'al día'))}
           ${this.kpi('Comprado', UI.pesos(f.total), `${f.conformadas} entregas conformadas`)}
-          ${this.kpi('Muebles entregados', f.piezas, f.ultima ? `la última el ${UI.esc(f.ultima)}` : '—')}
+          ${this.kpi('Trae por mes', f.porMes || '—',
+            f.porSemana ? `unos ${f.porSemana} por semana` : 'todavía no hay meses para promediar')}
           ${this.kpi('En fábrica ahora', f.enFabrica,
             f.atrasados ? `<b class="mal">${f.atrasados} atrasados</b>` : 'ninguno atrasado')}
           ${this.kpi('Llegan sin detalle', puntual == null ? '—' : `${puntual}%`,
             f.conDetalle ? `${f.conDetalle} con observación` : 'ninguno con observación')}
+          ${this.kpi('Corrió la fecha', f.reprogramaciones,
+            f.proxima ? `viene el ${UI.esc(f.proxima.fecha)}` : 'no está anotado')}
+        </div>
+
+        <div class="cx-b">
+          <div class="cx-b-h">Cómo llega su mercadería</div>
+          <div class="card pad cx-cal2">
+            <span><b>${f.perfectos}</b><span>perfectos</span></span>
+            <span><b class="${f.conDetalle ? 'sube' : ''}">${f.conDetalle}</b><span>con detalle</span></span>
+            <span><b class="${f.devueltos ? 'sube' : ''}">${f.devueltos}</b><span>devueltos</span></span>
+            <span><b class="${f.debeTraer.length ? 'sube' : ''}">${f.debeTraer.length}</b>
+              <span>ya pagos que nos debe traer</span></span>
+            <span class="sp"></span>
+            ${f.aumento ? `<span><b>${Math.round(f.aumento.pct)}%</b>
+              <span>último aumento, el ${UI.esc(f.aumento.fecha)}</span></span>` : ''}
+            <button class="btn" data-cta="${p.id}">Ver su cuenta corriente</button>
+          </div>
         </div>
 
         ${cupo ? `<div class="card pad cx-cupo">
@@ -15795,6 +16277,11 @@ tr:hover td{background:var(--panel-2)}
       document.querySelectorAll('[data-rubro]').forEach(b => b.onclick = () => {
         this.rubro = b.dataset.rubro; this.render(this._mount);
       });
+      document.querySelectorAll('[data-cta]').forEach(b => b.onclick = e => {
+        e.stopPropagation();
+        global.ComprasCuenta.abierto = Number(b.dataset.cta);
+        global.App.goSub('compras', 'cuenta');
+      });
       const v = document.getElementById('cx-volver');
       if (v) v.onclick = () => { this.abierto = null; this.render(this._mount); };
       const q = document.getElementById('cx-q');
@@ -15807,9 +16294,691 @@ tr:hover td{background:var(--panel-2)}
       };
     },
 
-    estilos() { return global.ComprasEstilos ? global.ComprasEstilos() : ''; },
+    estilos() {
+      return (global.ComprasEstilos ? global.ComprasEstilos() : '') + `<style>
+        .cx-cal2{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+        .cx-cal2>span{display:flex;flex-direction:column}
+        .cx-cal2 b{font-size:18px;color:var(--navy)}
+        .cx-cal2 span span{font-size:10.5px;color:var(--muted)}
+      </style>`;
+    },
   };
   global.ComprasProveedores = Prov;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script><script>
+// =====================================================================
+//  Belgrano Soft · Compras · Cuenta corriente
+//  La cuenta va en los dos sentidos: él nos trae muebles y nosotros le
+//  vendemos materiales. Cuando llega a entregar se sientan, se compensa
+//  lo uno con lo otro y se paga la diferencia. Esta pantalla es esa
+//  charla anotada, y es la que Jony va a tener abierta con el proveedor
+//  enfrente.
+// =====================================================================
+(function (global) {
+  const Cta = {
+    _mount: 'view',
+    abierto: null,
+    _form: null,
+
+    async render(mount = 'view') {
+      this._mount = mount;
+      const v = document.getElementById(mount);
+      v.innerHTML = (this.abierto ? this.htmlUno(this.abierto) : this.htmlLista())
+        + this.estilos();
+      this.enganchar();
+    },
+
+    // ---- Todos los saldos --------------------------------------------
+    htmlLista() {
+      const ss = global.DB.saldosProveedores();
+      const debemos = ss.filter(x => x.saldo > 0).reduce((a, x) => a + x.saldo, 0);
+      const nosdeben = ss.filter(x => x.saldo < 0).reduce((a, x) => a - x.saldo, 0);
+      const prox = global.DB.proximasEntregas(4);
+      return `
+        <div class="row" style="margin-bottom:12px;align-items:flex-start">
+          <div><div class="kick">Compras</div><h1 class="h-title">Cuenta corriente</h1>
+            <div class="h-sub">${ss.length} proveedores con cuenta abierta</div></div>
+        </div>
+
+        <div class="cx-kpis">
+          ${this.kpi('Les debemos', UI.pesos(debemos),
+            `${ss.filter(x => x.saldo > 0).length} proveedores`, debemos > 0)}
+          ${this.kpi('Nos deben', UI.pesos(nosdeben),
+            'materiales que se llevaron', false)}
+          ${this.kpi('Neto', UI.pesos(Math.abs(debemos - nosdeben)),
+            debemos - nosdeben > 0 ? 'a favor de ellos' : 'a favor nuestro', false)}
+        </div>
+
+        ${prox.length ? `<div class="card pad cx-prox">
+          <div class="cx-b-h">Vienen a entregar</div>
+          ${prox.map(p => {
+            const s = global.DB.leerSaldo(global.DB.saldoProveedor(p.provId));
+            return `<div class="cx-prox-f">
+              <b>${UI.esc(p.fecha)}</b>
+              <span>${UI.esc(p.proveedor)}</span>
+              <span class="muted">${p.muebles} muebles</span>
+              <span class="sp"></span>
+              <span class="pill ${s.pill}">${UI.esc(s.txt)}</span>
+              <button class="b-x" data-prov="${p.provId}">Abrir la cuenta</button>
+            </div>`;
+          }).join('')}
+        </div>` : ''}
+
+        <div class="cx-b">
+          <div class="cx-b-h">Saldo con cada uno</div>
+          <div class="card cx-tabla"><table>
+            <thead><tr><th>Proveedor</th><th>Rubro</th><th>Movimientos</th>
+              <th class="num">Nos trajo</th><th class="num">Le pagamos y le vendimos</th>
+              <th class="num">Saldo</th><th></th></tr></thead>
+            <tbody>${ss.map(x => {
+              const c = global.DB.compensacion(x.prov.id);
+              const s = global.DB.leerSaldo(x.saldo);
+              return `<tr class="cliq" data-prov="${x.prov.id}">
+                <td class="nom">${UI.esc(x.prov.nombre)} <span class="muted">#${x.prov.id}</span></td>
+                <td class="muted">${UI.esc((global.DB.rubro(x.prov.rubro) || {}).label || x.prov.rubro)}</td>
+                <td>${x.movs}</td>
+                <td class="num muted">${UI.pesos(c.debe)}</td>
+                <td class="num muted">${UI.pesos(c.haber)}</td>
+                <td class="num"><b class="${x.saldo > 0 ? 'sube' : 'baja'}">${
+                  UI.pesos(Math.abs(x.saldo))}</b></td>
+                <td><span class="pill ${s.pill}">${x.saldo > 0 ? 'le debemos'
+                  : (x.saldo < 0 ? 'nos debe' : 'al día')}</span></td>
+              </tr>`;
+            }).join('')}</tbody></table></div>
+        </div>
+
+        <div class="hint">La deuda nace sola cuando Jony conforma una entrega: no hay un paso
+          intermedio. Lo que se le vende de materiales se descuenta de ahí, y lo que queda es
+          lo que se le paga el día que viene.</div>`;
+    },
+
+    // ---- La cuenta de uno --------------------------------------------
+    htmlUno(id) {
+      const p = global.DB.proveedor(id);
+      if (!p) return UI.vacio('No existe ese proveedor.');
+      const movs = global.DB.movimientosDe(id);
+      const c = global.DB.compensacion(id);
+      const s = global.DB.leerSaldo(c.saldo);
+      const debeTraer = global.DB.devolucionesPendientes(id);
+      const prox = global.DB.agenda().find(x => x.provId === id && x.estado === 'reservado');
+      // El saldo corrido, para poder seguir la cuenta renglón por renglón.
+      let acum = 0;
+      const filas = [...movs].reverse().map(m => {
+        acum += m.signo * m.monto;
+        return { m, acum };
+      }).reverse();
+      return `
+        <div class="fk-bar" style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
+          <button class="lnk" id="cx-volver">‹ Cuentas corrientes</button></div>
+        <div class="row" style="align-items:flex-start;margin-bottom:14px">
+          <span class="cx-av grande">${UI.esc(this.inicial(p.nombre))}</span>
+          <div style="margin-left:11px">
+            <div class="kick">${UI.esc((global.DB.rubro(p.rubro) || {}).label || p.rubro)}</div>
+            <h1 class="h-title">${UI.esc(p.nombre)} <span class="muted">#${p.id}</span></h1>
+            <div class="h-sub">${UI.esc(p.direccion || '')}${prox
+              ? ` · viene el <b>${UI.esc(prox.fecha)}</b> con ${prox.muebles} muebles` : ''}</div></div>
+          <div class="sp"></div>
+          <div class="cx-saldo ${c.saldo > 0 ? 'debe' : 'haber'}">
+            <span class="cx-saldo-t">${c.saldo > 0 ? 'Le debemos'
+              : (c.saldo < 0 ? 'Nos debe' : 'Al día')}</span>
+            <b>${UI.pesos(Math.abs(c.saldo))}</b></div>
+        </div>
+
+        <div class="card pad cx-comp">
+          <div class="cx-b-h">Cómo se compone</div>
+          <div class="cx-comp-g">
+            <span><b>${UI.pesos(c.debe)}</b><span>muebles que trajo</span></span>
+            <span class="cx-menos">−</span>
+            <span><b>${UI.pesos(c.materiales)}</b><span>materiales que le vendimos</span></span>
+            <span class="cx-menos">−</span>
+            <span><b>${UI.pesos(c.haber - c.materiales)}</b><span>pagos y anticipos</span></span>
+            <span class="cx-menos">=</span>
+            <span class="cx-igual"><b class="${c.saldo > 0 ? 'sube' : 'baja'}">${
+              UI.pesos(Math.abs(c.saldo))}</b><span>${UI.esc(s.txt)}</span></span>
+          </div>
+        </div>
+
+        <div class="cx-acc">
+          ${global.DB.MOVS_CTA.filter(m => m.k !== 'compra').map(m =>
+            `<button class="btn" data-nuevo="${m.k}">${UI.esc(m.label)}</button>`).join('')}
+        </div>
+
+        ${debeTraer.length ? `<div class="card pad cx-debe">
+          <div class="cx-b-h">Muebles que ya pagamos y nos tiene que traer
+            <span class="muted">${debeTraer.length}</span></div>
+          ${debeTraer.map(d => `<div class="cx-debe-f">
+            <b>${UI.esc(d.modelo || '')}</b>
+            <span class="muted">${UI.esc(d.medida || '')} · ${UI.esc(d.color || '')}
+              · ${UI.esc(d.serie || '')}</span>
+            <span class="muted">${UI.esc(d.motivo || '')} · devuelto el ${UI.esc(d.fecha)}</span>
+            <span class="sp"></span>
+            <button class="b-x" data-repuesto="${d.id}">Ya lo trajo</button>
+          </div>`).join('')}
+        </div>` : ''}
+
+        <div class="cx-b">
+          <div class="cx-b-h">Movimientos <span class="muted">${movs.length}</span></div>
+          <div class="card cx-tabla"><table>
+            <thead><tr><th>Fecha</th><th>Qué</th><th>Detalle</th><th>Cómo</th><th>Quién</th>
+              <th class="num">Le debemos</th><th class="num">Le pagamos</th>
+              <th class="num">Saldo</th></tr></thead>
+            <tbody>${filas.map(({ m, acum }) => {
+              const t = global.DB.movCta(m.tipo) || {};
+              return `<tr>
+                <td class="muted">${UI.esc(m.fecha)}</td>
+                <td><span class="pill ${t.pill}">${UI.esc(t.label)}</span></td>
+                <td class="muted">${UI.esc(m.detalle || '')}${m.ref
+                  ? ` <b>${UI.esc(m.ref)}</b>` : ''}</td>
+                <td class="muted">${UI.esc((global.DB.FORMAS_PAGO.find(f => f.k === m.forma) || {}).label || '')}</td>
+                <td class="muted">${UI.esc(m.quien)}</td>
+                <td class="num">${m.signo > 0 ? UI.pesos(m.monto) : ''}</td>
+                <td class="num">${m.signo < 0 ? UI.pesos(m.monto) : ''}</td>
+                <td class="num nom">${UI.pesos(Math.abs(acum))}</td>
+              </tr>`;
+            }).join('')}</tbody></table></div>
+        </div>`;
+    },
+
+    // ---- Anotar un movimiento ----------------------------------------
+    modalNuevo(tipo) {
+      const t = global.DB.movCta(tipo); if (!t) return;
+      const p = global.DB.proveedor(this.abierto);
+      const conForma = tipo === 'pago' || tipo === 'anticipo';
+      const saldo = global.DB.saldoProveedor(this.abierto);
+      document.body.insertAdjacentHTML('beforeend', `
+        <div class="cx-back" id="cx-mdl"><div class="card pad" style="max-width:420px;width:100%">
+          <h3 class="h-title" style="font-size:17px">${UI.esc(t.label)}</h3>
+          <p class="h-sub">${UI.esc(p.nombre)} · ${UI.esc(t.pie)}</p>
+          ${tipo === 'pago' && saldo > 0 ? `<div class="hint" style="margin:8px 0">
+            Hoy le debemos <b>${UI.pesos(saldo)}</b>.
+            <button class="lnk" id="cx-todo">Poner todo</button></div>` : ''}
+          <label class="fld"><span class="lbl">Cuánto</span>
+            <input id="cx-monto" type="number" placeholder="0"></label>
+          <label class="fld"><span class="lbl">Detalle</span>
+            <input id="cx-detalle" placeholder="${tipo === 'materiales'
+              ? '2 cajas de correderas' : (tipo === 'descuento'
+                ? 'la cómoda vino con la tapa rayada' : 'contra la entrega de hoy')}"></label>
+          ${conForma ? `<label class="fld"><span class="lbl">Cómo</span>
+            <select id="cx-forma">${global.DB.FORMAS_PAGO.map(f =>
+              `<option value="${f.k}">${UI.esc(f.label)}</option>`).join('')}</select></label>` : ''}
+          <div class="row" style="gap:8px;margin-top:12px"><div class="sp"></div>
+            <button class="btn" id="cx-cancel">Cancelar</button>
+            <button class="btn primary" id="cx-ok">Anotar</button></div>
+        </div></div>`);
+      const cerrar = () => { const m = document.getElementById('cx-mdl'); if (m) m.remove(); };
+      const todo = document.getElementById('cx-todo');
+      if (todo) todo.onclick = () => { document.getElementById('cx-monto').value = saldo; };
+      document.getElementById('cx-cancel').onclick = cerrar;
+      document.getElementById('cx-monto').focus();
+      document.getElementById('cx-ok').onclick = () => {
+        const monto = Number(document.getElementById('cx-monto').value) || 0;
+        if (!monto) return UI.aviso('Falta el monto', 'warn');
+        const f = document.getElementById('cx-forma');
+        global.DB.anotarCuenta({ provId: this.abierto, tipo, monto,
+          detalle: document.getElementById('cx-detalle').value,
+          forma: f ? f.value : '', quien: 'Jony' });
+        UI.aviso(`${t.label}: ${UI.pesos(monto)}`, 'ok');
+        cerrar(); this.render(this._mount);
+      };
+    },
+
+    inicial(nombre) {
+      const m = /[a-záéíóúñ]/i.exec(String(nombre || ''));
+      return (m ? m[0] : String(nombre || '?')[0] || '?').toUpperCase();
+    },
+
+    kpi(t, v, pie, alerta) {
+      return `<div class="cx-k ${alerta ? 'alerta' : ''}"><span class="cx-k-t">${t}</span>
+        <span class="cx-k-v" style="font-size:19px">${v}</span>
+        <span class="cx-k-p">${pie}</span></div>`;
+    },
+
+    enganchar() {
+      document.querySelectorAll('[data-prov]').forEach(b => b.onclick = e => {
+        e.stopPropagation();
+        this.abierto = Number(b.dataset.prov); this.render(this._mount);
+      });
+      const v = document.getElementById('cx-volver');
+      if (v) v.onclick = () => { this.abierto = null; this.render(this._mount); };
+      document.querySelectorAll('[data-nuevo]').forEach(b => b.onclick = () =>
+        this.modalNuevo(b.dataset.nuevo));
+      document.querySelectorAll('[data-repuesto]').forEach(b => b.onclick = () => {
+        global.DB.saldarDevolucion(Number(b.dataset.repuesto), 'Jony');
+        UI.aviso('Anotado: lo trajo', 'ok');
+        this.render(this._mount);
+      });
+    },
+
+    estilos() {
+      return (global.ComprasEstilos ? global.ComprasEstilos() : '') + `<style>
+        .cx-saldo{text-align:right;padding:7px 14px;border-radius:11px;border:1px solid var(--line);
+          background:var(--panel)}
+        .cx-saldo-t{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.05em;
+          color:var(--muted);font-weight:700}
+        .cx-saldo b{font-size:23px;color:var(--navy)}
+        .cx-saldo.debe{border-color:var(--warn);background:var(--warn-bg)}
+        .cx-saldo.haber{border-color:var(--ok);background:var(--ok-bg)}
+        .cx-comp{margin-bottom:12px}
+        .cx-comp-g{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+        .cx-comp-g>span{display:flex;flex-direction:column}
+        .cx-comp-g b{font-size:16px;color:var(--navy)}
+        .cx-comp-g span span{font-size:10.5px;color:var(--muted)}
+        .cx-menos{font-size:17px;color:var(--muted);font-weight:700}
+        .cx-igual{padding-left:12px;border-left:1px solid var(--line)}
+        .cx-acc{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+        .cx-prox{margin-bottom:16px}
+        .cx-prox-f{display:flex;gap:10px;align-items:center;padding:5px 0;
+          border-bottom:1px solid var(--line-soft);font-size:12.5px}
+        .cx-prox-f:last-child{border-bottom:0}
+        .cx-prox-f b{color:var(--navy);min-width:44px}
+        .cx-debe{margin-bottom:16px;border-color:var(--crit)}
+        .cx-debe-f{display:flex;gap:9px;align-items:center;flex-wrap:wrap;padding:5px 0;
+          border-bottom:1px solid var(--line-soft);font-size:12.5px}
+        .cx-debe-f:last-child{border-bottom:0}
+        .cx-debe-f b{color:var(--navy)}
+        .cx-debe-f .muted{font-size:11px}
+        .cx-back{position:fixed;inset:0;background:rgba(12,20,34,.45);z-index:70;
+          display:flex;align-items:center;justify-content:center;padding:20px}
+      </style>`;
+    },
+  };
+  global.ComprasCuenta = Cta;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script><script>
+// =====================================================================
+//  Belgrano Soft · Compras · Lista de precios
+//  La lista la arma Dirección, no Compras: el proveedor rara vez pasa una
+//  planilla, y cuando aumenta lo dice de una —"todo un 12% más"—. Por eso
+//  hay un botón para eso. Lo que no puede perderse nunca es el precio
+//  viejo: sin él no hay manera de saber cuánto subió un mueble ni de
+//  dónde se fue el margen.
+// =====================================================================
+(function (global) {
+  const Lista = {
+    _mount: 'view',
+    prov: null,
+    q: '',
+    abierta: null,
+
+    async render(mount = 'view') {
+      this._mount = mount;
+      const v = document.getElementById(mount);
+      v.innerHTML = this.html() + this.estilos();
+      this.enganchar();
+    },
+
+    html() {
+      const provs = global.DB.proveedores().map(p => ({ p,
+        n: global.DB.listaPrecios().filter(x => x.provId === p.id).length,
+        aum: global.DB.aumentoDe(p.id) }))
+        .filter(x => x.n > 0);
+      if (!this.prov && provs.length) this.prov = provs[0].p.id;
+      const p = global.DB.proveedor(this.prov);
+      const t = String(this.q || '').toLowerCase();
+      const filas = global.DB.listaPrecios().filter(x => x.provId === this.prov)
+        .map(x => {
+          const c = global.DB.costeoDe(x.varianteId);
+          const v = (global.DB.variantesTodas() || []).find(y => y.id === x.varianteId);
+          return { ...x, costeo: c, v, nombre: global.DB.nombreVariante(x.varianteId),
+            cambios: global.DB.cambiosDePrecio(x.provId, x.varianteId) };
+        })
+        .filter(f => !t || f.nombre.toLowerCase().includes(t))
+        .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+      const aum = this.prov ? global.DB.aumentoDe(this.prov) : null;
+      return `
+        <div class="row" style="margin-bottom:12px;align-items:flex-start">
+          <div><div class="kick">Compras</div><h1 class="h-title">Lista de precios</h1>
+            <div class="h-sub">Lo que nos cobra cada taller, y cuánto se movió</div></div>
+          <div class="sp"></div>
+          <input id="cx-q" class="cx-buscar" placeholder="Buscar un mueble" value="${UI.esc(this.q)}">
+        </div>
+
+        <div class="cx-filtros">
+          ${provs.map(x => `<button class="cx-f ${this.prov === x.p.id ? 'on' : ''}"
+            data-prov="${x.p.id}">${UI.esc(x.p.nombre)}
+            <span class="muted">${x.n}</span></button>`).join('')}
+        </div>
+
+        ${p ? `<div class="card pad cx-aum">
+          <div>
+            <div class="cx-b-h" style="margin:0">${UI.esc(p.nombre)}</div>
+            <div class="hint">${filas.length} muebles con precio${aum
+              ? ` · último aumento del <b>${Math.round(aum.pct)}%</b> el ${UI.esc(aum.ultimo)}`
+              : ' · todavía no pasó ningún aumento'}</div>
+          </div>
+          <div class="sp"></div>
+          <label class="fld" style="margin:0"><span class="lbl">Pasó un aumento del</span>
+            <div class="cx-aum-in"><input id="cx-pct" type="number" step="0.5" placeholder="12">
+              <span>%</span></div></label>
+          <button class="btn primary" id="cx-aplicar">Aplicar a toda su lista</button>
+        </div>` : ''}
+
+        ${filas.length ? `<div class="card cx-tabla"><table>
+          <thead><tr><th>Mueble</th><th>Terminación</th><th class="num">Precio</th>
+            <th class="num">Costeo</th><th class="num">Dif.</th>
+            <th>Desde</th><th>Cambios</th></tr></thead>
+          <tbody>${filas.map(f => {
+            const d = f.costeo ? f.precio - f.costeo.costo : null;
+            const ab = this.abierta === f.varianteId;
+            return `<tr class="cliq" data-vid="${f.varianteId}">
+              <td class="nom">${UI.esc(f.nombre)}</td>
+              <td class="muted">${f.v ? UI.esc(`${f.v.estructura || ''} · ${f.v.frente || ''}`) : '—'}</td>
+              <td class="num nom">${UI.pesos(f.precio)}</td>
+              <td class="num muted">${f.costeo ? UI.pesos(f.costeo.costo) : '—'}</td>
+              <td class="num ${d == null ? '' : (d > 0 ? 'sube' : 'baja')}">${d == null ? '—'
+                : `${d > 0 ? '+' : ''}${UI.pesos(d)}`}</td>
+              <td class="muted">${UI.esc(f.desde || '—')}</td>
+              <td>${f.cambios.length ? `<span class="pill soft">${f.cambios.length}</span>`
+                : '<span class="muted">—</span>'}</td>
+            </tr>${ab ? this.htmlCambios(f) : ''}`;
+          }).join('')}</tbody></table></div>`
+          : UI.vacio('Este taller todavía no tiene ningún precio cargado.')}
+
+        <div class="hint" style="margin-top:10px">El precio se carga solo la primera vez que se
+          conforma una entrega suya. Los aumentos se cargan acá, y cada cambio queda anotado con
+          la fecha: eso es lo que después dice si la rentabilidad bajó porque vendemos peor o
+          porque nos aumentaron.</div>`;
+    },
+
+    // La historia de un mueble: cada aumento con su fecha y su porcentaje.
+    htmlCambios(f) {
+      if (!f.cambios.length) {
+        return `<tr class="cx-det"><td colspan="7"><div class="hint">Este precio nunca cambió
+          desde que se cargó.</div></td></tr>`;
+      }
+      const primero = f.cambios[f.cambios.length - 1];
+      const total = primero.antes ? ((f.precio - primero.antes) / primero.antes) * 100 : null;
+      return `<tr class="cx-det"><td colspan="7"><div class="cx-hist">
+        ${f.cambios.map(c => `<div class="cx-hist-f">
+          <b>${UI.esc(c.desde)}</b>
+          <span class="muted">${UI.pesos(c.antes)} →</span>
+          <b>${UI.pesos(c.precio)}</b>
+          ${c.pct == null ? '' : `<span class="pill ${c.pct > 0 ? 'warn' : 'ok'}">${
+            c.pct > 0 ? '+' : ''}${Math.round(c.pct)}%</span>`}
+          <span class="muted">lo cargó ${UI.esc(c.quien)}</span>
+        </div>`).join('')}
+        ${total == null ? '' : `<div class="hint">Desde el ${UI.esc(primero.desde)} aumentó
+          <b>${Math.round(total)}%</b> en total.</div>`}
+      </div></td></tr>`;
+    },
+
+    enganchar() {
+      document.querySelectorAll('[data-prov]').forEach(b => b.onclick = () => {
+        this.prov = Number(b.dataset.prov); this.abierta = null; this.render(this._mount);
+      });
+      document.querySelectorAll('[data-vid]').forEach(tr => tr.onclick = () => {
+        const v = Number(tr.dataset.vid);
+        this.abierta = this.abierta === v ? null : v;
+        this.render(this._mount);
+      });
+      const ap = document.getElementById('cx-aplicar');
+      if (ap) ap.onclick = () => {
+        const pct = Number(document.getElementById('cx-pct').value) || 0;
+        if (!pct) return UI.aviso('Poné el porcentaje del aumento', 'warn');
+        const p = global.DB.proveedor(this.prov);
+        if (!confirm(`¿Aumentar un ${pct}% toda la lista de ${p.nombre}?`)) return;
+        const n = global.DB.aumentarProveedor(this.prov, pct, 'Brian');
+        UI.aviso(`${n} precios aumentados un ${pct}%`, 'ok');
+        this.render(this._mount);
+      };
+      const q = document.getElementById('cx-q');
+      if (q) q.oninput = () => {
+        this.q = q.value;
+        const pos = q.selectionStart;
+        this.render(this._mount);
+        const n = document.getElementById('cx-q');
+        if (n) { n.focus(); n.setSelectionRange(pos, pos); }
+      };
+    },
+
+    estilos() {
+      return (global.ComprasEstilos ? global.ComprasEstilos() : '') + `<style>
+        .cx-aum{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px}
+        .cx-aum-in{display:flex;align-items:center;gap:5px}
+        .cx-aum-in input{width:84px}
+        .cx-det td{background:var(--panel-2);white-space:normal}
+        .cx-hist{display:flex;flex-direction:column;gap:5px;padding:4px 0}
+        .cx-hist-f{display:flex;gap:9px;align-items:center;font-size:12.5px}
+        .cx-hist-f b{color:var(--navy)}
+      </style>`;
+    },
+  };
+  global.ComprasLista = Lista;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script><script>
+// =====================================================================
+//  Belgrano Soft · Compras · Agenda de entregas
+//  Cada taller llega con cuarenta o cincuenta muebles y el depósito no da
+//  para dos en el mismo día. Por eso el día se reserva: uno por jornada,
+//  y el que corre la fecha queda anotado. Un proveedor que la corre tres
+//  veces por mes no es mala suerte, es un dato.
+// =====================================================================
+(function (global) {
+  const Agenda = {
+    _mount: 'view',
+    _mes: null,
+
+    async render(mount = 'view') {
+      this._mount = mount;
+      const v = document.getElementById(mount);
+      v.innerHTML = this.html() + this.estilos();
+      this.enganchar();
+    },
+
+    MESES: ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
+      'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'],
+    DIAS: ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'],
+
+    // El mes que se está mirando. Arranca en el de hoy.
+    mes() {
+      if (this._mes == null) this._mes = new Date().getMonth();
+      return this._mes;
+    },
+
+    // Las celdas del mes, arrancando el lunes de la primera semana.
+    celdas() {
+      const hoy = new Date();
+      const año = hoy.getFullYear();
+      const m = this.mes();
+      const primero = new Date(año, m, 1);
+      // getDay() da 0 para domingo; acá la semana arranca el lunes.
+      const corr = (primero.getDay() + 6) % 7;
+      const ultimo = new Date(año, m + 1, 0).getDate();
+      const out = [];
+      for (let i = 0; i < corr; i++) out.push(null);
+      for (let d = 1; d <= ultimo; d++) {
+        const fecha = `${d}/${m + 1}`;
+        const r = global.DB.diaTomado(fecha);
+        const finde = new Date(año, m, d).getDay();
+        out.push({ d, fecha, r, finde: finde === 0 || finde === 6,
+          hoy: d === hoy.getDate() && m === hoy.getMonth(),
+          pasado: new Date(año, m, d) < new Date(año, hoy.getMonth(), hoy.getDate()) });
+      }
+      return out;
+    },
+
+    html() {
+      const cs = this.celdas();
+      const delMes = cs.filter(c => c && c.r);
+      const muebles = delMes.reduce((a, c) => a + (c.r.muebles || 0), 0);
+      const corridas = delMes.reduce((a, c) => a + (c.r.reprogramada || 0), 0);
+      const libres = cs.filter(c => c && !c.r && !c.finde && !c.pasado).length;
+      return `
+        <div class="row" style="margin-bottom:12px;align-items:flex-start">
+          <div><div class="kick">Compras</div><h1 class="h-title">Agenda de entregas</h1>
+            <div class="h-sub">Un proveedor por día — el depósito no da para dos</div></div>
+          <div class="sp"></div>
+          <div class="cx-nav">
+            <button class="b-x" id="cx-ant">‹</button>
+            <b>${UI.esc(this.MESES[this.mes()])}</b>
+            <button class="b-x" id="cx-sig">›</button>
+          </div>
+        </div>
+
+        <div class="cx-kpis">
+          ${this.kpi('Entregas del mes', delMes.length, `${muebles} muebles en total`)}
+          ${this.kpi('Días libres', libres, 'hábiles, sin nadie anotado')}
+          ${this.kpi('Fechas corridas', corridas,
+            corridas ? 'alguien reprogramó' : 'nadie corrió la fecha')}
+        </div>
+
+        <div class="card pad cx-cal">
+          <div class="cx-cal-h">${this.DIAS.map(d => `<span>${d}</span>`).join('')}</div>
+          <div class="cx-cal-g">${cs.map(c => this.celda(c)).join('')}</div>
+        </div>
+
+        ${delMes.length ? `<div class="cx-b" style="margin-top:16px">
+          <div class="cx-b-h">Las entregas de ${UI.esc(this.MESES[this.mes()])}</div>
+          <div class="card cx-tabla"><table>
+            <thead><tr><th>Día</th><th>Proveedor</th><th>Muebles</th><th>Nota</th>
+              <th>Corrió la fecha</th><th></th></tr></thead>
+            <tbody>${delMes.map(c => `<tr class="${c.r.reprogramada > 1 ? 'ojo' : ''}">
+              <td class="nom">${UI.esc(c.r.fecha)}</td>
+              <td>${UI.esc(c.r.proveedor)}</td>
+              <td>${c.r.muebles}</td>
+              <td class="muted">${UI.esc(c.r.nota || '')}</td>
+              <td class="muted">${c.r.reprogramada
+                ? `<b class="${c.r.reprogramada > 1 ? 'mal' : ''}">${c.r.reprogramada} ${
+                  c.r.reprogramada === 1 ? 'vez' : 'veces'}</b> ·
+                  ${UI.esc((c.r.corridas || []).map(x => x.motivo).join(' · '))}`
+                : 'no'}</td>
+              <td class="td-acc">
+                <button class="b-x" data-mover="${c.r.id}">Correr</button>
+                <button class="b-x" data-libre="${c.r.id}">Liberar</button></td>
+            </tr>`).join('')}</tbody></table></div>
+        </div>` : ''}
+
+        <div class="hint" style="margin-top:10px">Tocá un día libre para anotar quién viene. Si el
+          día ya está tomado el sistema no deja poner a otro encima: hay que correr uno de los dos.</div>`;
+    },
+
+    celda(c) {
+      if (!c) return '<span class="cx-d vacia"></span>';
+      const cls = [c.finde ? 'finde' : '', c.hoy ? 'hoy' : '', c.pasado ? 'pasado' : '',
+        c.r ? 'tomado' : 'libre'].filter(Boolean).join(' ');
+      return `<button class="cx-d ${cls}" data-dia="${UI.esc(c.fecha)}"
+        ${c.pasado ? 'disabled' : ''}>
+        <span class="cx-d-n">${c.d}</span>
+        ${c.r ? `<span class="cx-d-p">${UI.esc(c.r.proveedor)}</span>
+          <span class="cx-d-m">${c.r.muebles} muebles</span>
+          ${c.r.reprogramada ? `<span class="cx-d-r">corrida ${c.r.reprogramada}×</span>` : ''}`
+          : ''}</button>`;
+    },
+
+    // ---- Anotar quién viene -------------------------------------------
+    modalDia(fecha) {
+      const ya = global.DB.diaTomado(fecha);
+      const provs = global.DB.proveedores();
+      document.body.insertAdjacentHTML('beforeend', `
+        <div class="cx-back" id="cx-mdl"><div class="card pad" style="max-width:400px;width:100%">
+          <h3 class="h-title" style="font-size:17px">${ya ? 'Cambiar el' : 'Anotar el'} ${UI.esc(fecha)}</h3>
+          <p class="h-sub">${ya ? `Hoy está ${UI.esc(ya.proveedor)}. Si ponés otro hay que
+            correr a éste primero.` : 'Un solo proveedor por día.'}</p>
+          <label class="fld"><span class="lbl">Quién viene</span>
+            <select id="cx-prov">${provs.map(p => `<option value="${p.id}" ${
+              ya && ya.provId === p.id ? 'selected' : ''}>${UI.esc(p.nombre)} · ${
+              UI.esc((global.DB.rubro(p.rubro) || {}).label || p.rubro)}</option>`).join('')}</select></label>
+          <label class="fld"><span class="lbl">Cuántos muebles trae</span>
+            <input id="cx-mue" type="number" value="${ya ? ya.muebles : 45}"></label>
+          <label class="fld"><span class="lbl">Nota</span>
+            <input id="cx-nota" value="${ya ? UI.esc(ya.nota || '') : ''}"
+              placeholder="trae los del pedido cerrado"></label>
+          <div class="row" style="gap:8px;margin-top:12px"><div class="sp"></div>
+            <button class="btn" id="cx-cancel">Cancelar</button>
+            <button class="btn primary" id="cx-ok">Anotar</button></div>
+        </div></div>`);
+      const cerrar = () => { const m = document.getElementById('cx-mdl'); if (m) m.remove(); };
+      document.getElementById('cx-cancel').onclick = cerrar;
+      document.getElementById('cx-ok').onclick = () => {
+        const r = global.DB.reservarDia(Number(document.getElementById('cx-prov').value), fecha, {
+          muebles: Number(document.getElementById('cx-mue').value) || 0,
+          nota: document.getElementById('cx-nota').value, quien: 'Jony' });
+        if (r && r.error) return UI.aviso(r.error, 'warn');
+        UI.aviso(`Anotado el ${fecha}`, 'ok');
+        cerrar(); this.render(this._mount);
+      };
+    },
+
+    modalMover(id) {
+      const r = global.DB.agenda().find(x => x.id === Number(id)); if (!r) return;
+      document.body.insertAdjacentHTML('beforeend', `
+        <div class="cx-back" id="cx-mdl"><div class="card pad" style="max-width:400px;width:100%">
+          <h3 class="h-title" style="font-size:17px">Correr la fecha de ${UI.esc(r.proveedor)}</h3>
+          <p class="h-sub">Venía el ${UI.esc(r.fecha)}. Queda anotado que la corrió.</p>
+          <label class="fld"><span class="lbl">Nueva fecha</span>
+            <input id="cx-f" placeholder="${UI.esc(r.fecha)}" value=""></label>
+          <label class="fld"><span class="lbl">Por qué</span>
+            <input id="cx-m" placeholder="no llegó con la laca"></label>
+          <div class="row" style="gap:8px;margin-top:12px"><div class="sp"></div>
+            <button class="btn" id="cx-cancel">Cancelar</button>
+            <button class="btn primary" id="cx-ok">Correr</button></div>
+        </div></div>`);
+      const cerrar = () => { const m = document.getElementById('cx-mdl'); if (m) m.remove(); };
+      document.getElementById('cx-cancel').onclick = cerrar;
+      document.getElementById('cx-ok').onclick = () => {
+        const f = document.getElementById('cx-f').value.trim();
+        if (!/^\d{1,2}\/\d{1,2}$/.test(f)) return UI.aviso('La fecha va como 14/8', 'warn');
+        const res = global.DB.reprogramar(r.id, f,
+          { motivo: document.getElementById('cx-m').value, quien: 'Jony' });
+        if (res && res.error) return UI.aviso(res.error, 'warn');
+        UI.aviso(`Corrida al ${f}`, 'ok');
+        cerrar(); this.render(this._mount);
+      };
+    },
+
+    kpi(t, v, pie) {
+      return `<div class="cx-k"><span class="cx-k-t">${t}</span>
+        <span class="cx-k-v">${v}</span><span class="cx-k-p">${pie}</span></div>`;
+    },
+
+    enganchar() {
+      const a = document.getElementById('cx-ant');
+      if (a) a.onclick = () => { this._mes = (this.mes() + 11) % 12; this.render(this._mount); };
+      const s = document.getElementById('cx-sig');
+      if (s) s.onclick = () => { this._mes = (this.mes() + 1) % 12; this.render(this._mount); };
+      document.querySelectorAll('[data-dia]').forEach(b => b.onclick = () =>
+        this.modalDia(b.dataset.dia));
+      document.querySelectorAll('[data-mover]').forEach(b => b.onclick = () =>
+        this.modalMover(b.dataset.mover));
+      document.querySelectorAll('[data-libre]').forEach(b => b.onclick = () => {
+        global.DB.liberarDia(Number(b.dataset.libre));
+        UI.aviso('Día liberado', 'ok');
+        this.render(this._mount);
+      });
+    },
+
+    estilos() {
+      return (global.ComprasEstilos ? global.ComprasEstilos() : '') + `<style>
+        .cx-nav{display:flex;gap:8px;align-items:center}
+        .cx-nav b{min-width:96px;text-align:center;color:var(--navy);text-transform:capitalize}
+        .cx-cal-h{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:5px}
+        .cx-cal-h span{font-size:10px;text-transform:uppercase;letter-spacing:.05em;
+          color:var(--muted);font-weight:700;text-align:center}
+        .cx-cal-g{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+        .cx-d{border:1px solid var(--line);border-radius:9px;background:var(--panel);
+          min-height:66px;padding:5px 6px;text-align:left;font:inherit;cursor:pointer;
+          display:flex;flex-direction:column;gap:1px}
+        .cx-d.vacia{border:0;background:none;cursor:default;min-height:0}
+        .cx-d:hover:not([disabled]){border-color:var(--brand)}
+        .cx-d[disabled]{opacity:.4;cursor:default}
+        .cx-d.finde{background:var(--panel-2)}
+        .cx-d.hoy{border-color:var(--navy);border-width:2px}
+        .cx-d.tomado{background:var(--warn-bg);border-color:var(--warn)}
+        .cx-d-n{font-size:11.5px;font-weight:700;color:var(--muted)}
+        .cx-d.tomado .cx-d-n{color:var(--navy)}
+        .cx-d-p{font-size:11.5px;font-weight:700;color:var(--navy);line-height:1.15}
+        .cx-d-m{font-size:10px;color:var(--muted)}
+        .cx-d-r{font-size:9.5px;color:var(--crit);font-weight:700}
+        .cx-back{position:fixed;inset:0;background:rgba(12,20,34,.45);z-index:70;
+          display:flex;align-items:center;justify-content:center;padding:20px}
+        @media (max-width:640px){ .cx-d{min-height:54px} .cx-d-p{font-size:10px} }
+      </style>`;
+    },
+  };
+  global.ComprasAgenda = Agenda;
 })(typeof window !== 'undefined' ? window : globalThis);
 
 </script><script>
@@ -16486,13 +17655,17 @@ tr:hover td{background:var(--panel-2)}
 
     compras: { label: 'Compras', icon: '🛒', subs: [
       S('resumen', 'Resumen', resumen('compras')),
-      S('oc', 'Órdenes de compra', m => global.ComprasOC.render(m)),
       S('recepciones', 'Recepciones a conformar', m => global.ComprasRecepciones.render(m)),
+      S('cuenta', 'Cuenta corriente', m => global.ComprasCuenta.render(m)),
       S('proveedores', 'Proveedores', m => global.ComprasProveedores.render(m)),
+      S('lista', 'Lista de precios', m => global.ComprasLista.render(m)),
+      S('agenda', 'Agenda de entregas', m => global.ComprasAgenda.render(m)),
       S('comparador', 'Comparador', m => global.ComprasComparador.render(m)),
       S('pendientes', 'Pendientes', m => global.ComprasPendientes.render(m)),
       S('historial', 'Historial', m => global.ComprasHistorial.render(m)),
       S('indicadores', 'Indicadores', m => global.ComprasIndicadores.render(m)),
+      // Los insumos son la segunda etapa: hoy Compras es sólo muebles.
+      S('oc', 'Insumos', m => global.ComprasOC.render(m)),
     ]},
 
     inventario: { label: 'Inventario', icon: '📦', subs: [
