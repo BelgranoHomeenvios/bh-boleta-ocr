@@ -36,8 +36,16 @@ historial de aumentos, la agenda de entregas, el comparador, los pendientes,
 el historial, los indicadores y las compras de material.
 
 ### Tesorería
-Los gastos con los 86 conceptos de la planilla real, y **el número** del mes
-armado solo: venta − costos − gastos − adicionales.
+Los gastos con los 86 conceptos de la planilla real, **el número** del mes
+armado solo —venta − costos − gastos − adicionales— y **los cobros a
+confirmar**: la cola de plata que alguien anotó y nadie vio todavía en el
+banco, con el aviso a los 7 días y la baja a los 10.
+
+### La venta baja a fábrica
+Confirmar un cobro es lo que crea las unidades: una por cada mueble de cada
+línea, con el cliente, el vendedor y la fecha prometida. Si la boleta no baja,
+la pantalla dice por qué —seña sin confirmar, venta a confirmar, anulada— y no
+hay que ir a buscarlo a ningún lado.
 
 ### Logística
 Las entregas, los viajes, los cupos por chofer.

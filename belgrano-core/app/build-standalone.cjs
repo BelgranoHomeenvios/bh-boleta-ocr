@@ -35,6 +35,7 @@ const scripts = [
   'ventas/comisiones.js',
   'compras/materiales.js',
   'tesoreria/gastos.js',
+  'tesoreria/cobros.js',
   'tesoreria/numero.js',
   'modulos/esqueletos.js',
   'comun/app.js',

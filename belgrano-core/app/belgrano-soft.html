@@ -2466,6 +2466,243 @@ tr:hover td{background:var(--panel-2)}
     },
 
 
+
+    // ---- De la venta a la fábrica -------------------------------------------
+    // Este es el eslabón que faltaba. Hoy se vende y no pasa nada: las
+    // unidades de Producción son de muestra. Con esto, cada línea de la boleta
+    // se convierte en una unidad a fabricar, con su orden, su cliente y su
+    // fecha prometida.
+    //
+    // Pero no apenas se vende: **la boleta no baja a fábrica hasta que la seña
+    // esté confirmada**. Una transferencia que nadie vio en el banco no manda
+    // a nadie a cortar madera.
+    //
+    // La línea de la boleta trae el mueble escrito ("Cómoda Amberes 1.20" ·
+    // "Paraíso / Blanco"). Hay que encontrar a qué variante corresponde: es
+    // texto que escribió un vendedor, no un id.
+    // Las boletas se escriben a mano y el nombre nunca coincide letra por letra
+    // con el catálogo: "Mesa de Luz Estocolmo" tiene que dar con las mesas de
+    // luz aunque ese modelo no exista. Por eso se compara por palabras.
+    PALABRAS_VACIAS: ['de', 'del', 'la', 'el', 'los', 'las', 'con', 'y', 'a', 'en',
+      'por', 'para', 'medida'],
+    palabrasDe(txt) {
+      return sinTilde(String(txt || ''))
+        .replace(/[^a-z0-9]+/g, ' ').trim().split(' ')
+        // El plural del catálogo —CÓMODAS, MESAS DE LUZ— y el singular de la
+        // boleta son la misma palabra.
+        .map(p => (p.length > 3 && p.endsWith('s') ? p.slice(0, -1) : p))
+        .filter(p => p.length > 1 && !this.PALABRAS_VACIAS.includes(p));
+    },
+    _comparte(pedidas, txt) {
+      const suyas = this.palabrasDe(txt);
+      return pedidas.filter(w => suyas.includes(w)).length;
+    },
+    varianteDeLinea(l) {
+      const t = x => sinTilde(String(x || '')).replace(/[^a-z0-9]/g, '');
+      const pedidas = this.palabrasDe(l.producto);
+      if (!pedidas.length) return null;
+      // Primero el tipo de mueble, que es lo que no se puede errar: un aparador
+      // no es una cómoda por más que los dos se llamen Amberes. Si el catálogo
+      // no tiene esa categoría, no hay con qué adivinar.
+      let mejorCat = 0;
+      const cats = (DEMO.categorias || []).map(c => {
+        const n = this._comparte(pedidas, c.nombre);
+        if (n > mejorCat) mejorCat = n;
+        return { c, n };
+      });
+      if (!mejorCat) return null;
+      const ids = cats.filter(x => x.n === mejorCat).map(x => x.c.id);
+      const dentro = DEMO.productos.filter(p => ids.includes(p.categoria_id));
+      if (!dentro.length) return null;
+      // Ya adentro del tipo, gana el modelo que más palabras comparte. Si
+      // ninguno coincide queda el primero: es una mesa de luz igual.
+      let mejor = 0;
+      const puntajes = dentro.map(p => {
+        const n = this._comparte(pedidas, p.nombre);
+        if (n > mejor) mejor = n;
+        return { p, n };
+      });
+      const prods = puntajes.filter(x => x.n === mejor).map(x => x.p);
+      const vs = this.variantesTodas().filter(v => prods.some(p => p.id === v.producto_id));
+      if (!vs.length) return null;
+      // Con la variante escrita se afina: "Paraíso / Blanco" tiene que dar con
+      // la estructura y el frente.
+      const va = t(l.variante);
+      if (va) {
+        const exacta = vs.find(v => {
+          const e = t(v.estructura), f = t(v.frente);
+          return (!e || va.includes(e.replace(/a$/, ''))) && (!f || va.includes(f));
+        });
+        if (exacta) return exacta;
+      }
+      // Si la medida está en el nombre, se usa para elegir.
+      const med = /(\d[,.]\d\d)/.exec(String(l.producto || ''));
+      if (med) {
+        const m = vs.find(v => String(v.medida).replace(',', '.') === med[1].replace(',', '.'));
+        if (m) return m;
+      }
+      return vs[0];
+    },
+    // La seña confirmada es la puerta: sin eso no se fabrica nada.
+    senaConfirmada(o) {
+      return (o.cobros || []).filter(c => this.cobroCuenta(c))
+        .reduce((a, c) => a + (Number(c.m) || 0), 0);
+    },
+    // ¿Esta boleta puede bajar a fábrica? Y si no, por qué.
+    puedeIrAFabrica(o) {
+      if (!o) return { ok: false, motivo: 'no existe la boleta' };
+      if (o.estado === 'anulada') return { ok: false, motivo: 'la venta está anulada' };
+      const sinVer = (o.cobros || []).filter(c => this.cobroPendiente(c));
+      if (sinVer.length) {
+        return { ok: false, sinVer,
+          motivo: `hay ${this.plata(sinVer.reduce((a, c) => a + (Number(c.m) || 0), 0))}`
+            + ' cobrados que nadie confirmó' };
+      }
+      if (!this.senaConfirmada(o)) {
+        return { ok: false, motivo: 'todavía no dejó seña' };
+      }
+      if (o.estado === 'a_confirmar') {
+        return { ok: false, motivo: 'la venta está a confirmar' };
+      }
+      return { ok: true };
+    },
+    unidadesDeOrden(numero) {
+      return this.unidadesTodas().filter(u => u.orden === `#${numero}` || u.orden === numero);
+    },
+    // Bajar la boleta a fábrica: una unidad por cada mueble de cada línea.
+    bajarAFabrica(numero, quien = '') {
+      const o = (DEMO.ordenes || []).find(x => x.numero === numero);
+      if (!o) return { error: 'no existe la boleta' };
+      const puede = this.puedeIrAFabrica(o);
+      if (!puede.ok) return { error: puede.motivo };
+      if (this.unidadesDeOrden(numero).length) {
+        return { error: 'esta boleta ya bajó a fábrica' };
+      }
+      const us = this.unidadesTodas();
+      const nuevas = [];
+      const sinCatalogo = [];
+      (o.lineas || []).forEach(l => {
+        const v = this.varianteDeLinea(l) || null;
+        // Un mueble vendido no puede desaparecer porque no lo reconocimos. Si
+        // no da con el catálogo baja igual, marcado, y alguien lo completa.
+        if (!v) sinCatalogo.push(l.producto || '(sin nombre)');
+        const prod = v && DEMO.productos.find(p => p.id === v.producto_id) || {};
+        for (let i = 0; i < Math.max(1, Number(l.cantidad) || 1); i++) {
+          const id = us.reduce((mx, x) => Math.max(mx, x.id), 0) + 1;
+          // El mueble a medida nace sin dibujo: alguien lo tiene que hacer.
+          const aMedida = l.tipo === 'medida' || !v;
+          const u = { id, serie: '—', productoId: v ? v.producto_id : null,
+            varianteId: v ? v.id : null,
+            modelo: prod.nombre || l.producto || '', medida: v ? (v.medida || '') : '',
+            color: v ? [v.estructura, v.frente].filter(Boolean).join(' · ') : (l.variante || ''),
+            terminacion: v ? (v.estructura || '') : '',
+            sinCatalogo: !v,
+            tipo: aMedida ? 'medida' : (l.bloqueo ? 'modificado' : 'estandar'),
+            planoEstado: aMedida ? 'a_dibujar' : 'ok',
+            detalle: l.detalle || '', foto: '',
+            estado: 'pedir', ubicacion: '', proveedor: '', llega: '', listo: '',
+            orden: `#${o.numero}`, fechaVenta: o.fecha, cliente: o.cliente,
+            vendedor: o.vendedor, marca: null,
+            // La fecha que le prometimos al cliente es la que manda.
+            prometida: o.entrega || '',
+            creadaEl: this.hoyCorto(), creadaPor: quien || 'yo', deLinea: l.id };
+          us.push(u); nuevas.push(u);
+        }
+      });
+      o.bajadaEl = this.hoyCorto();
+      o.bajadaPor = quien || 'yo';
+      return { unidades: nuevas, n: nuevas.length, sinCatalogo };
+    },
+    // Las boletas que tendrían que estar en fábrica y no bajaron todavía.
+    aBajar() {
+      return (DEMO.ordenes || [])
+        .filter(o => !this.unidadesDeOrden(o.numero).length)
+        .map(o => ({ o, puede: this.puedeIrAFabrica(o) }))
+        .filter(x => x.o.estado !== 'anulada');
+    },
+
+    // ---- La confirmación de los cobros --------------------------------------
+    // Iara mira el banco y marca qué entró. Hasta que no lo hace, esa plata no
+    // existe: no baja el saldo, no paga comisión y no manda el mueble a
+    // fábrica. Es el freno más importante del sistema.
+    // Un cobro rechazado ya no espera a nadie: no cuenta y tampoco está
+    // pendiente. Pendiente es sólo lo que Iara todavía no miró.
+    cobroPendiente(c) {
+      return !!c && !this.cobroCuenta(c)
+        && c.estado !== 'rechazado' && c.estado !== 'anulado';
+    },
+    cobrosAConfirmar() {
+      const out = [];
+      (DEMO.ordenes || []).forEach(o => {
+        (o.cobros || []).forEach(c => {
+          if (!this.cobroPendiente(c)) return;
+          out.push({ orden: o, cobro: c,
+            dias: this.diasDesde(c.f),
+            // Diez días sin confirmar y la orden se da de baja. A los siete se
+            // avisa, para que el vendedor tenga tiempo de hablar con el cliente.
+            vence: Math.max(0, this.DIAS_PARA_DAR_BAJA - (this.diasDesde(c.f) || 0)) });
+        });
+      });
+      return out.sort((a, b) => (b.dias || 0) - (a.dias || 0));
+    },
+    DIAS_PARA_DAR_BAJA: 10,
+    DIAS_AVISO_BAJA: 7,
+    confirmarCobro(numero, cobroId, { quien = '', banco = '' } = {}) {
+      const o = (DEMO.ordenes || []).find(x => x.numero === numero);
+      if (!o) return null;
+      const c = (o.cobros || []).find(x => x.id === cobroId);
+      if (!c) return null;
+      c.estado = c.metodo === 'efectivo' ? 'rendido' : 'confirmado';
+      c.confirmadoPor = quien || 'yo';
+      c.confirmadoEl = this.hoyCorto();
+      if (banco) c.banco = banco;
+      // Recalcular lo cobrado de la boleta: el saldo es una consecuencia, no
+      // un número que alguien mantiene.
+      this._recalcularOrden(o);
+      // Si esta confirmación era lo último que faltaba, la boleta baja sola.
+      // Nadie tiene que acordarse: la plata confirmada ES la orden de fabricar.
+      c.bajo = null;
+      if (this.puedeIrAFabrica(o).ok && !this.unidadesDeOrden(numero).length) {
+        const r = this.bajarAFabrica(numero, quien);
+        if (r && !r.error) c.bajo = r;
+      }
+      return c;
+    },
+    rechazarCobro(numero, cobroId, { motivo = '', quien = '' } = {}) {
+      const o = (DEMO.ordenes || []).find(x => x.numero === numero);
+      if (!o) return null;
+      const c = (o.cobros || []).find(x => x.id === cobroId);
+      if (!c) return null;
+      c.estado = 'rechazado';
+      c.motivoRechazo = motivo;
+      c.rechazadoPor = quien || 'yo';
+      c.rechazadoEl = this.hoyCorto();
+      this._recalcularOrden(o);
+      return c;
+    },
+    _recalcularOrden(o) {
+      o.sena = (o.cobros || []).filter(c => this.cobroCuenta(c))
+        .reduce((a, c) => a + (Number(c.m) || 0), 0);
+      o.saldo = Math.max(0, (Number(o.total) || 0) - o.sena);
+      return o;
+    },
+    // Anotar un cobro nuevo —la seña, un refuerzo, el saldo—. Nace sin
+    // confirmar si no es efectivo: la plata que no se toca hay que verla.
+    anotarCobro(numero, { monto, metodo = 'efectivo', recibidoPor = '',
+      depositante = '', referencia = '', quien = '' } = {}) {
+      const o = (DEMO.ordenes || []).find(x => x.numero === numero);
+      if (!o) return null;
+      const cs = (o.cobros = o.cobros || []);
+      const c = { id: `c${cs.length + 1}-${o.numero}`, f: this.hoyCorto(),
+        m: Math.abs(Number(monto) || 0), metodo,
+        recibidoPor: recibidoPor || quien || 'yo', depositante, referencia,
+        estado: metodo === 'efectivo' ? 'rendido' : 'pendiente_banco',
+        cargadoPor: quien || 'yo' };
+      cs.push(c);
+      this._recalcularOrden(o);
+      return c;
+    },
+
     // ---- Comisiones del vendedor -------------------------------------------
     // El vendedor no carga su venta: la venta ya está en la boleta. De ahí
     // salen solos el número de pedido, el cliente, el local, el canal y cómo
@@ -19439,6 +19676,263 @@ tr:hover td{background:var(--panel-2)}
 
 </script><script>
 // =====================================================================
+//  Belgrano Soft · Tesorería · Cobros a confirmar
+//
+//  El freno más importante del sistema. El vendedor anota que el cliente
+//  transfirió; hasta que alguien no lo ve en el banco esa plata no existe:
+//  no baja el saldo, no paga comisión y el mueble no baja a fábrica.
+//
+//  Al revés también: confirmar acá es lo que manda la boleta a fabricar.
+//  Nadie tiene que acordarse de nada, y por eso la pantalla avisa cuándo
+//  bajó y con cuántos muebles.
+// =====================================================================
+(function (global) {
+  const Cobros = {
+    _mount: 'view',
+    abierto: null,     // id del cobro con el panel abierto
+    accion: '',        // 'confirmar' | 'rechazar'
+    hecho: null,       // lo último que se resolvió, para mostrarlo arriba
+
+    async render(mount = 'view') {
+      this._mount = mount;
+      const v = document.getElementById(mount);
+      v.innerHTML = this.html() + this.estilos();
+      this.enganchar();
+    },
+
+    html() {
+      const DB = global.DB;
+      const pend = DB.cobrosAConfirmar();
+      const plata = pend.reduce((a, x) => a + (Number(x.cobro.m) || 0), 0);
+      const vencidos = pend.filter(x => x.dias >= DB.DIAS_PARA_DAR_BAJA);
+      const avisar = pend.filter(x => x.dias >= DB.DIAS_AVISO_BAJA
+        && x.dias < DB.DIAS_PARA_DAR_BAJA);
+      const bajar = DB.aBajar();
+
+      return `
+        <div class="row" style="margin-bottom:12px;align-items:flex-start">
+          <div><div class="kick">Tesorería</div><h1 class="h-title">Cobros a confirmar</h1>
+            <div class="h-sub">Plata que alguien anotó y todavía nadie vio en el banco</div></div>
+        </div>
+
+        ${this.htmlHecho()}
+
+        <div class="cx-kpis">
+          <div class="cx-k"><span class="cx-k-t">Esperando</span>
+            <span class="cx-k-v">${UI.pesos(plata)}</span>
+            <span class="cx-k-p">${pend.length} cobro${pend.length === 1 ? '' : 's'}</span></div>
+          <div class="cx-k ${avisar.length ? 'ojo' : ''}"><span class="cx-k-t">Por avisar</span>
+            <span class="cx-k-v">${avisar.length}</span>
+            <span class="cx-k-p">pasaron ${DB.DIAS_AVISO_BAJA} días o más</span></div>
+          <div class="cx-k ${vencidos.length ? 'alerta' : ''}"><span class="cx-k-t">Para dar de baja</span>
+            <span class="cx-k-v">${vencidos.length}</span>
+            <span class="cx-k-p">pasaron ${DB.DIAS_PARA_DAR_BAJA} días</span></div>
+          <div class="cx-k"><span class="cx-k-t">Trabadas por esto</span>
+            <span class="cx-k-v">${bajar.filter(x => x.puede.sinVer).length}</span>
+            <span class="cx-k-p">boletas que no bajan a fábrica</span></div>
+        </div>
+
+        <div class="cx-b">
+          <div class="cx-b-h">La cola</div>
+          ${pend.length ? `<div class="card cx-tabla"><table>
+            <thead><tr><th>Boleta</th><th>Cliente</th><th>Vendedor</th><th>Cómo</th>
+              <th>Quién dice que la recibió</th><th>Referencia</th>
+              <th class="num">Monto</th><th class="num">Días</th><th></th></tr></thead>
+            <tbody>${pend.map(x => this.fila(x)).join('')}</tbody>
+            </table></div>`
+            : '<div class="hint">No hay nada esperando. Toda la plata anotada está confirmada.</div>'}
+        </div>
+
+        <div class="cx-b">
+          <div class="cx-b-h">Boletas que todavía no bajaron a fábrica</div>
+          ${bajar.length ? `<div class="card cx-tabla"><table>
+            <thead><tr><th>Boleta</th><th>Cliente</th><th>Vendedor</th><th>Muebles</th>
+              <th>Por qué no bajó</th><th></th></tr></thead>
+            <tbody>${bajar.map(x => {
+              const n = (x.o.lineas || []).reduce((a, l) =>
+                a + Math.max(1, Number(l.cantidad) || 1), 0);
+              return `<tr class="${x.puede.ok ? '' : 'ojo'}">
+                <td class="nom">${UI.esc(x.o.numero)}</td>
+                <td>${UI.esc(x.o.cliente)}</td>
+                <td class="muted">${UI.esc(x.o.vendedor)}</td>
+                <td class="muted">${n} · ${UI.esc((x.o.lineas || [])
+                  .map(l => l.producto).join(' · '))}</td>
+                <td class="${x.puede.ok ? 'ok-t' : ''}">${x.puede.ok
+                  ? 'nada, está lista' : UI.esc(x.puede.motivo)}</td>
+                <td class="td-acc">${x.puede.ok
+                  ? `<button class="b-x hacer" data-bajar="${UI.esc(x.o.numero)}">Bajar a fábrica</button>`
+                  : ''}</td></tr>`;
+            }).join('')}</tbody></table></div>`
+            : '<div class="hint">Todas las boletas vendidas ya están en fábrica.</div>'}
+        </div>
+
+        <div class="hint">Confirmar un cobro es lo que hace bajar la boleta a fábrica: si con
+          esta plata la boleta queda completa, las unidades se crean solas. Rechazar no borra
+          nada —queda anotado el motivo— pero esa plata deja de contar para el saldo y para
+          la comisión.</div>`;
+    },
+
+    fila(x) {
+      const DB = global.DB;
+      const c = x.cobro, o = x.orden;
+      const mal = x.dias >= DB.DIAS_PARA_DAR_BAJA;
+      const ojo = !mal && x.dias >= DB.DIAS_AVISO_BAJA;
+      const abierto = this.abierto === c.id;
+      return `<tr class="${mal ? 'mal' : ojo ? 'ojo' : ''}">
+          <td class="nom"><button class="lnk" data-orden="${UI.esc(o.numero)}"
+            >${UI.esc(o.numero)}</button></td>
+          <td>${UI.esc(o.cliente)}</td>
+          <td class="muted">${UI.esc(o.vendedor)}</td>
+          <td>${UI.esc(c.metodo)}</td>
+          <td class="muted">${UI.esc(c.recibidoPor || '—')}</td>
+          <td class="muted">${UI.esc(c.depositante || '')}${c.depositante && c.referencia
+            ? ' · ' : ''}${UI.esc(c.referencia || c.comprobante || '')}</td>
+          <td class="num nom">${UI.pesos(c.m)}</td>
+          <td class="num ${mal ? 'sube' : ''}">${x.dias == null ? '—' : x.dias}
+            ${mal ? '<span class="tc-tag">dar de baja</span>'
+              : ojo ? `<span class="tc-tag ojo">${x.vence === 1 ? 'último día'
+                : `faltan ${x.vence} días`}</span>` : ''}</td>
+          <td class="td-acc">
+            <button class="b-x hacer" data-conf="${UI.esc(c.id)}"
+              data-num="${UI.esc(o.numero)}">Confirmar</button>
+            <button class="b-x" data-rech="${UI.esc(c.id)}"
+              data-num="${UI.esc(o.numero)}">Rechazar</button>
+          </td>
+        </tr>
+        ${abierto ? `<tr class="tc-panel-fila"><td colspan="9">${this.panel(x)}</td></tr>` : ''}`;
+    },
+
+    // El panel pide lo único que hace falta y nada más: para confirmar, en qué
+    // cuenta apareció; para rechazar, por qué. Sin motivo no se rechaza: el
+    // vendedor tiene que poder decirle algo al cliente.
+    panel(x) {
+      const conf = this.accion === 'confirmar';
+      return `<div class="tc-panel">
+        <b>${conf ? 'Confirmar' : 'Rechazar'} ${UI.pesos(x.cobro.m)} de ${
+          UI.esc(x.orden.cliente)}</b>
+        ${conf
+          ? `<label>¿En qué cuenta apareció?
+              <input id="tc-banco" placeholder="Galicia · Cuenta Belgrano" autocomplete="off"></label>`
+          : `<label>¿Por qué?
+              <input id="tc-motivo" placeholder="No figura en el banco" autocomplete="off"></label>`}
+        <div class="row" style="gap:7px">
+          <button class="btn${conf ? '' : ' tc-no'}" id="tc-ok">${
+            conf ? 'Sí, entró' : 'Rechazar'}</button>
+          <button class="b-x" id="tc-cancel">Cancelar</button>
+        </div>
+        ${conf ? `<span class="hint" style="margin:0">Si con esto la boleta queda cobrada,
+          baja a fábrica sola.</span>` : ''}
+      </div>`;
+    },
+
+    htmlHecho() {
+      const h = this.hecho;
+      if (!h) return '';
+      return `<div class="tc-hecho ${h.mal ? 'mal' : ''}">${UI.esc(h.texto)}</div>`;
+    },
+
+    enganchar() {
+      const q = id => document.getElementById(id);
+      const abrir = (id, accion) => {
+        this.abierto = this.abierto === id && this.accion === accion ? null : id;
+        this.accion = accion;
+        this.hecho = null;
+        this.render(this._mount);
+      };
+      document.querySelectorAll('[data-conf]').forEach(b =>
+        b.onclick = () => abrir(b.dataset.conf, 'confirmar'));
+      document.querySelectorAll('[data-rech]').forEach(b =>
+        b.onclick = () => abrir(b.dataset.rech, 'rechazar'));
+      document.querySelectorAll('[data-orden]').forEach(b => b.onclick = () => {
+        const f = global.DB.cobrosAConfirmar().find(x => x.orden.numero === b.dataset.orden);
+        const o = f && f.orden;
+        if (o) global.OrdenDetalle.render(this._mount, { boleta: o }, () => this.render(this._mount));
+      });
+      document.querySelectorAll('[data-bajar]').forEach(b =>
+        b.onclick = () => this.bajar(b.dataset.bajar));
+
+      const cancel = q('tc-cancel');
+      if (cancel) cancel.onclick = () => { this.abierto = null; this.render(this._mount); };
+
+      const ok = q('tc-ok');
+      if (ok) ok.onclick = () => {
+        const fila = global.DB.cobrosAConfirmar().find(x => x.cobro.id === this.abierto);
+        if (!fila) return;
+        if (this.accion === 'confirmar') this.confirmar(fila);
+        else this.rechazar(fila);
+      };
+    },
+
+    confirmar(x) {
+      const banco = (document.getElementById('tc-banco') || {}).value || '';
+      const c = global.DB.confirmarCobro(x.orden.numero, x.cobro.id,
+        { quien: this.quien(), banco: banco.trim() });
+      this.abierto = null;
+      const bajo = c && c.bajo;
+      this.hecho = { texto: `Confirmados ${UI.pesos(x.cobro.m)} de ${x.orden.cliente}.`
+        + (bajo ? ` ${x.orden.numero} bajó a fábrica con ${bajo.n} mueble${
+          bajo.n === 1 ? '' : 's'}.`
+          + (bajo.sinCatalogo && bajo.sinCatalogo.length
+            ? ` Ojo: ${bajo.sinCatalogo.join(', ')} no está en el catálogo, la unidad quedó`
+              + ' marcada para completar.' : '')
+        : ` ${x.orden.numero} todavía no baja a fábrica: `
+          + global.DB.puedeIrAFabrica(x.orden).motivo + '.') };
+      this.render(this._mount);
+    },
+
+    rechazar(x) {
+      const motivo = ((document.getElementById('tc-motivo') || {}).value || '').trim();
+      if (!motivo) { UI.aviso('Poné el motivo: el vendedor lo necesita para hablar con el cliente.', 'mal'); return; }
+      global.DB.rechazarCobro(x.orden.numero, x.cobro.id,
+        { motivo, quien: this.quien() });
+      this.abierto = null;
+      this.hecho = { mal: true, texto: `Rechazados ${UI.pesos(x.cobro.m)} de ${
+        x.orden.cliente}: ${motivo}. Esa plata dejó de contar para el saldo y la comisión.` };
+      this.render(this._mount);
+    },
+
+    bajar(numero) {
+      const r = global.DB.bajarAFabrica(numero, this.quien());
+      this.hecho = r.error
+        ? { mal: true, texto: `${numero} no bajó: ${r.error}.` }
+        : { texto: `${numero} bajó a fábrica con ${r.n} mueble${r.n === 1 ? '' : 's'}.`
+            + (r.sinCatalogo && r.sinCatalogo.length
+              ? ` ${r.sinCatalogo.join(', ')} no está en el catálogo.` : '') };
+      this.render(this._mount);
+    },
+
+    quien() {
+      const r = global.App && global.App.rol;
+      return r === 'direccion' ? 'Dirección' : 'Tesorería';
+    },
+
+    estilos() {
+      return (global.ComprasEstilos ? global.ComprasEstilos() : '') + `<style>
+        .tc-tag{display:inline-block;margin-left:5px;font-size:9.5px;font-weight:700;
+          text-transform:uppercase;letter-spacing:.04em;padding:1px 5px;border-radius:5px;
+          background:var(--crit-bg);color:var(--crit)}
+        .tc-tag.ojo{background:var(--warn-bg);color:var(--warn)}
+        .tc-panel-fila td{background:var(--panel-2);white-space:normal}
+        .tc-panel{display:flex;flex-direction:column;gap:7px;padding:4px 0;max-width:460px}
+        .tc-panel label{display:flex;flex-direction:column;gap:3px;font-size:11px;
+          color:var(--muted);font-weight:700}
+        .tc-panel input{border:1px solid var(--line);border-radius:8px;padding:6px 8px;
+          font:inherit;font-weight:400;color:var(--navy);background:var(--panel)}
+        .tc-hecho{border:1px solid var(--ok);background:var(--ok-bg);color:var(--ok);
+          border-radius:10px;padding:8px 11px;font-size:12.5px;font-weight:600;
+          margin-bottom:12px}
+        .tc-hecho.mal{border-color:var(--crit);background:var(--crit-bg);color:var(--crit)}
+        .ok-t{color:var(--ok);font-weight:600}
+        .btn.tc-no{background:var(--crit);border-color:var(--crit)}
+        .cx-k.ojo .cx-k-v{color:var(--warn)}
+      </style>`;
+    },
+  };
+  global.TesoCobros = Cobros;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script><script>
+// =====================================================================
 //  Belgrano Soft · Tesorería · El número
 //  Es la misma cuenta de la planilla:
 //
@@ -19893,7 +20387,7 @@ tr:hover td{background:var(--panel-2)}
       S('resumen', 'Resumen', resumen('tesoreria')),
       S('numero', 'El número', m => global.TesoNumero.render(m)),
       S('gastos', 'Gastos', m => global.TesoGastos.render(m)),
-      S('cobros', 'Cobros', skel('Cobros')),
+      S('cobros', 'Cobros', m => global.TesoCobros.render(m)),
       S('senas', 'Señas', skel('Señas')),
       S('rendiciones', 'Rendiciones', skel('Rendiciones')),
       S('cajas', 'Cajas', skel('Cajas')),

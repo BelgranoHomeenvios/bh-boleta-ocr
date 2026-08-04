@@ -2225,6 +2225,243 @@
     },
 
 
+
+    // ---- De la venta a la fábrica -------------------------------------------
+    // Este es el eslabón que faltaba. Hoy se vende y no pasa nada: las
+    // unidades de Producción son de muestra. Con esto, cada línea de la boleta
+    // se convierte en una unidad a fabricar, con su orden, su cliente y su
+    // fecha prometida.
+    //
+    // Pero no apenas se vende: **la boleta no baja a fábrica hasta que la seña
+    // esté confirmada**. Una transferencia que nadie vio en el banco no manda
+    // a nadie a cortar madera.
+    //
+    // La línea de la boleta trae el mueble escrito ("Cómoda Amberes 1.20" ·
+    // "Paraíso / Blanco"). Hay que encontrar a qué variante corresponde: es
+    // texto que escribió un vendedor, no un id.
+    // Las boletas se escriben a mano y el nombre nunca coincide letra por letra
+    // con el catálogo: "Mesa de Luz Estocolmo" tiene que dar con las mesas de
+    // luz aunque ese modelo no exista. Por eso se compara por palabras.
+    PALABRAS_VACIAS: ['de', 'del', 'la', 'el', 'los', 'las', 'con', 'y', 'a', 'en',
+      'por', 'para', 'medida'],
+    palabrasDe(txt) {
+      return sinTilde(String(txt || ''))
+        .replace(/[^a-z0-9]+/g, ' ').trim().split(' ')
+        // El plural del catálogo —CÓMODAS, MESAS DE LUZ— y el singular de la
+        // boleta son la misma palabra.
+        .map(p => (p.length > 3 && p.endsWith('s') ? p.slice(0, -1) : p))
+        .filter(p => p.length > 1 && !this.PALABRAS_VACIAS.includes(p));
+    },
+    _comparte(pedidas, txt) {
+      const suyas = this.palabrasDe(txt);
+      return pedidas.filter(w => suyas.includes(w)).length;
+    },
+    varianteDeLinea(l) {
+      const t = x => sinTilde(String(x || '')).replace(/[^a-z0-9]/g, '');
+      const pedidas = this.palabrasDe(l.producto);
+      if (!pedidas.length) return null;
+      // Primero el tipo de mueble, que es lo que no se puede errar: un aparador
+      // no es una cómoda por más que los dos se llamen Amberes. Si el catálogo
+      // no tiene esa categoría, no hay con qué adivinar.
+      let mejorCat = 0;
+      const cats = (DEMO.categorias || []).map(c => {
+        const n = this._comparte(pedidas, c.nombre);
+        if (n > mejorCat) mejorCat = n;
+        return { c, n };
+      });
+      if (!mejorCat) return null;
+      const ids = cats.filter(x => x.n === mejorCat).map(x => x.c.id);
+      const dentro = DEMO.productos.filter(p => ids.includes(p.categoria_id));
+      if (!dentro.length) return null;
+      // Ya adentro del tipo, gana el modelo que más palabras comparte. Si
+      // ninguno coincide queda el primero: es una mesa de luz igual.
+      let mejor = 0;
+      const puntajes = dentro.map(p => {
+        const n = this._comparte(pedidas, p.nombre);
+        if (n > mejor) mejor = n;
+        return { p, n };
+      });
+      const prods = puntajes.filter(x => x.n === mejor).map(x => x.p);
+      const vs = this.variantesTodas().filter(v => prods.some(p => p.id === v.producto_id));
+      if (!vs.length) return null;
+      // Con la variante escrita se afina: "Paraíso / Blanco" tiene que dar con
+      // la estructura y el frente.
+      const va = t(l.variante);
+      if (va) {
+        const exacta = vs.find(v => {
+          const e = t(v.estructura), f = t(v.frente);
+          return (!e || va.includes(e.replace(/a$/, ''))) && (!f || va.includes(f));
+        });
+        if (exacta) return exacta;
+      }
+      // Si la medida está en el nombre, se usa para elegir.
+      const med = /(\d[,.]\d\d)/.exec(String(l.producto || ''));
+      if (med) {
+        const m = vs.find(v => String(v.medida).replace(',', '.') === med[1].replace(',', '.'));
+        if (m) return m;
+      }
+      return vs[0];
+    },
+    // La seña confirmada es la puerta: sin eso no se fabrica nada.
+    senaConfirmada(o) {
+      return (o.cobros || []).filter(c => this.cobroCuenta(c))
+        .reduce((a, c) => a + (Number(c.m) || 0), 0);
+    },
+    // ¿Esta boleta puede bajar a fábrica? Y si no, por qué.
+    puedeIrAFabrica(o) {
+      if (!o) return { ok: false, motivo: 'no existe la boleta' };
+      if (o.estado === 'anulada') return { ok: false, motivo: 'la venta está anulada' };
+      const sinVer = (o.cobros || []).filter(c => this.cobroPendiente(c));
+      if (sinVer.length) {
+        return { ok: false, sinVer,
+          motivo: `hay ${this.plata(sinVer.reduce((a, c) => a + (Number(c.m) || 0), 0))}`
+            + ' cobrados que nadie confirmó' };
+      }
+      if (!this.senaConfirmada(o)) {
+        return { ok: false, motivo: 'todavía no dejó seña' };
+      }
+      if (o.estado === 'a_confirmar') {
+        return { ok: false, motivo: 'la venta está a confirmar' };
+      }
+      return { ok: true };
+    },
+    unidadesDeOrden(numero) {
+      return this.unidadesTodas().filter(u => u.orden === `#${numero}` || u.orden === numero);
+    },
+    // Bajar la boleta a fábrica: una unidad por cada mueble de cada línea.
+    bajarAFabrica(numero, quien = '') {
+      const o = (DEMO.ordenes || []).find(x => x.numero === numero);
+      if (!o) return { error: 'no existe la boleta' };
+      const puede = this.puedeIrAFabrica(o);
+      if (!puede.ok) return { error: puede.motivo };
+      if (this.unidadesDeOrden(numero).length) {
+        return { error: 'esta boleta ya bajó a fábrica' };
+      }
+      const us = this.unidadesTodas();
+      const nuevas = [];
+      const sinCatalogo = [];
+      (o.lineas || []).forEach(l => {
+        const v = this.varianteDeLinea(l) || null;
+        // Un mueble vendido no puede desaparecer porque no lo reconocimos. Si
+        // no da con el catálogo baja igual, marcado, y alguien lo completa.
+        if (!v) sinCatalogo.push(l.producto || '(sin nombre)');
+        const prod = v && DEMO.productos.find(p => p.id === v.producto_id) || {};
+        for (let i = 0; i < Math.max(1, Number(l.cantidad) || 1); i++) {
+          const id = us.reduce((mx, x) => Math.max(mx, x.id), 0) + 1;
+          // El mueble a medida nace sin dibujo: alguien lo tiene que hacer.
+          const aMedida = l.tipo === 'medida' || !v;
+          const u = { id, serie: '—', productoId: v ? v.producto_id : null,
+            varianteId: v ? v.id : null,
+            modelo: prod.nombre || l.producto || '', medida: v ? (v.medida || '') : '',
+            color: v ? [v.estructura, v.frente].filter(Boolean).join(' · ') : (l.variante || ''),
+            terminacion: v ? (v.estructura || '') : '',
+            sinCatalogo: !v,
+            tipo: aMedida ? 'medida' : (l.bloqueo ? 'modificado' : 'estandar'),
+            planoEstado: aMedida ? 'a_dibujar' : 'ok',
+            detalle: l.detalle || '', foto: '',
+            estado: 'pedir', ubicacion: '', proveedor: '', llega: '', listo: '',
+            orden: `#${o.numero}`, fechaVenta: o.fecha, cliente: o.cliente,
+            vendedor: o.vendedor, marca: null,
+            // La fecha que le prometimos al cliente es la que manda.
+            prometida: o.entrega || '',
+            creadaEl: this.hoyCorto(), creadaPor: quien || 'yo', deLinea: l.id };
+          us.push(u); nuevas.push(u);
+        }
+      });
+      o.bajadaEl = this.hoyCorto();
+      o.bajadaPor = quien || 'yo';
+      return { unidades: nuevas, n: nuevas.length, sinCatalogo };
+    },
+    // Las boletas que tendrían que estar en fábrica y no bajaron todavía.
+    aBajar() {
+      return (DEMO.ordenes || [])
+        .filter(o => !this.unidadesDeOrden(o.numero).length)
+        .map(o => ({ o, puede: this.puedeIrAFabrica(o) }))
+        .filter(x => x.o.estado !== 'anulada');
+    },
+
+    // ---- La confirmación de los cobros --------------------------------------
+    // Iara mira el banco y marca qué entró. Hasta que no lo hace, esa plata no
+    // existe: no baja el saldo, no paga comisión y no manda el mueble a
+    // fábrica. Es el freno más importante del sistema.
+    // Un cobro rechazado ya no espera a nadie: no cuenta y tampoco está
+    // pendiente. Pendiente es sólo lo que Iara todavía no miró.
+    cobroPendiente(c) {
+      return !!c && !this.cobroCuenta(c)
+        && c.estado !== 'rechazado' && c.estado !== 'anulado';
+    },
+    cobrosAConfirmar() {
+      const out = [];
+      (DEMO.ordenes || []).forEach(o => {
+        (o.cobros || []).forEach(c => {
+          if (!this.cobroPendiente(c)) return;
+          out.push({ orden: o, cobro: c,
+            dias: this.diasDesde(c.f),
+            // Diez días sin confirmar y la orden se da de baja. A los siete se
+            // avisa, para que el vendedor tenga tiempo de hablar con el cliente.
+            vence: Math.max(0, this.DIAS_PARA_DAR_BAJA - (this.diasDesde(c.f) || 0)) });
+        });
+      });
+      return out.sort((a, b) => (b.dias || 0) - (a.dias || 0));
+    },
+    DIAS_PARA_DAR_BAJA: 10,
+    DIAS_AVISO_BAJA: 7,
+    confirmarCobro(numero, cobroId, { quien = '', banco = '' } = {}) {
+      const o = (DEMO.ordenes || []).find(x => x.numero === numero);
+      if (!o) return null;
+      const c = (o.cobros || []).find(x => x.id === cobroId);
+      if (!c) return null;
+      c.estado = c.metodo === 'efectivo' ? 'rendido' : 'confirmado';
+      c.confirmadoPor = quien || 'yo';
+      c.confirmadoEl = this.hoyCorto();
+      if (banco) c.banco = banco;
+      // Recalcular lo cobrado de la boleta: el saldo es una consecuencia, no
+      // un número que alguien mantiene.
+      this._recalcularOrden(o);
+      // Si esta confirmación era lo último que faltaba, la boleta baja sola.
+      // Nadie tiene que acordarse: la plata confirmada ES la orden de fabricar.
+      c.bajo = null;
+      if (this.puedeIrAFabrica(o).ok && !this.unidadesDeOrden(numero).length) {
+        const r = this.bajarAFabrica(numero, quien);
+        if (r && !r.error) c.bajo = r;
+      }
+      return c;
+    },
+    rechazarCobro(numero, cobroId, { motivo = '', quien = '' } = {}) {
+      const o = (DEMO.ordenes || []).find(x => x.numero === numero);
+      if (!o) return null;
+      const c = (o.cobros || []).find(x => x.id === cobroId);
+      if (!c) return null;
+      c.estado = 'rechazado';
+      c.motivoRechazo = motivo;
+      c.rechazadoPor = quien || 'yo';
+      c.rechazadoEl = this.hoyCorto();
+      this._recalcularOrden(o);
+      return c;
+    },
+    _recalcularOrden(o) {
+      o.sena = (o.cobros || []).filter(c => this.cobroCuenta(c))
+        .reduce((a, c) => a + (Number(c.m) || 0), 0);
+      o.saldo = Math.max(0, (Number(o.total) || 0) - o.sena);
+      return o;
+    },
+    // Anotar un cobro nuevo —la seña, un refuerzo, el saldo—. Nace sin
+    // confirmar si no es efectivo: la plata que no se toca hay que verla.
+    anotarCobro(numero, { monto, metodo = 'efectivo', recibidoPor = '',
+      depositante = '', referencia = '', quien = '' } = {}) {
+      const o = (DEMO.ordenes || []).find(x => x.numero === numero);
+      if (!o) return null;
+      const cs = (o.cobros = o.cobros || []);
+      const c = { id: `c${cs.length + 1}-${o.numero}`, f: this.hoyCorto(),
+        m: Math.abs(Number(monto) || 0), metodo,
+        recibidoPor: recibidoPor || quien || 'yo', depositante, referencia,
+        estado: metodo === 'efectivo' ? 'rendido' : 'pendiente_banco',
+        cargadoPor: quien || 'yo' };
+      cs.push(c);
+      this._recalcularOrden(o);
+      return c;
+    },
+
     // ---- Comisiones del vendedor -------------------------------------------
     // El vendedor no carga su venta: la venta ya está en la boleta. De ahí
     // salen solos el número de pedido, el cliente, el local, el canal y cómo
