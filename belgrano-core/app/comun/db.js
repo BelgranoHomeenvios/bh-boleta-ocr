@@ -1992,6 +1992,263 @@
       }
     },
 
+
+    // ---- Los gastos --------------------------------------------------------
+    // La estructura sale de la planilla con la que se lleva el número hoy:
+    // los mismos rubros y los mismos conceptos, para que lo que se cargue acá
+    // se pueda comparar con lo de siempre. Lo único que cambia es cuándo se
+    // carga: en vez de una vez por mes, el día que pasa.
+    GRUPOS_GASTO: [
+      { k: 'inmuebles', label: 'Inmuebles', pie: 'Amortización, servicios, seguridad y seguros.' },
+      { k: 'sueldos', label: 'Sueldos', pie: 'Operarios, administración, marketing, vendedores y cargas.' },
+      { k: 'marketing', label: 'Marketing', pie: 'Pauta y gente de afuera.' },
+      { k: 'generales', label: 'Gastos generales', pie: 'Limpieza, logística, mantenimiento, asesorías.' },
+      { k: 'impuestos', label: 'Impuestos', pie: 'IIBB, IVA, ganancias y aportes.' },
+    ],
+    grupoGasto(k) { return this.GRUPOS_GASTO.find(x => x.k === k) || null; },
+    RUBROS_GASTO: [
+      { k: 'amortizacion', grupo: 'inmuebles', label: "Amortizacion",
+        conceptos: ["Belgrano 2299 Amort.", "Belgrano 2020 Amort,", "Zavaleta 699 Amort."] },
+      { k: 'servicios', grupo: 'inmuebles', label: "Servicios",
+        conceptos: ["Belgrano 2299 ABL", "Belgrano 2020 ABL", "Zavaleta 699 ABL", "Belgrano 2299 AySA", "Belgrano 2020 AySa", "Zavaleta 699 AySA", "Belgrano 2299 EDESUR", "Zavaleta 699 EDESUR", "Belgrano 2020 Edesur", "Belgrano 2299 TE (TE+Internet)", "Belgrano 2020 TE (TE+Internet)", "Zavaleta 699 TE (TE+Internet)", "Zavaleta 699 MetroGas"] },
+      { k: 'seguridad', grupo: 'inmuebles', label: "Seguridad",
+        conceptos: ["Zavaleta Seguridad", "Zavaleta Alarmas"] },
+      { k: 'seguros', grupo: 'inmuebles', label: "Seguros",
+        conceptos: ["seguro belgrano 2160", "seguro belgrano 2299", "Seguro Zavaleta 699", "Seguros autos", "Seguro moto LA CAJA"] },
+      { k: 'operarios', grupo: 'sueldos', label: "Operarios",
+        conceptos: ["Mario", "Edgar", "Pëdro", "Andrew", "otros", "Seba"] },
+      { k: 'sueldos-administrativos', grupo: 'sueldos', label: "Sueldos Administrativos",
+        conceptos: ["Iara", "Cinthia", "Agus-lucas", "Adrian"] },
+      { k: 'sueldos-marketing', grupo: 'sueldos', label: "Sueldos Marketing",
+        conceptos: ["Ari", "Nicki", "Lunier"] },
+      { k: 'sueldos-vendedores', grupo: 'sueldos', label: "Sueldos Vendedores",
+        conceptos: ["Sergio", "Cristian", "Nati", "Ale"] },
+      { k: 'sueldos-gerenciales', grupo: 'sueldos', label: "Sueldos Gerenciales",
+        conceptos: ["Sueldos Gerenciales"] },
+      { k: 'cargas-sociales', grupo: 'sueldos', label: "Cargas Sociales",
+        conceptos: ["Cargas Sociales"] },
+      { k: 'inversion-marketing', grupo: 'marketing', label: "Inversion Marketing",
+        conceptos: ["Pinterest", "Facebook", "Perfit", "Google", "Live connect", "tienda nube web", "messi"] },
+      { k: 'personas-externas-en-marketi', grupo: 'marketing', label: "Personas Externas En Marketing",
+        conceptos: ["Otros", "Render (johan)", "Yoha diseño grafico", "Diseñador grafico (nico)"] },
+      { k: 'gastos-generales', grupo: 'generales', label: "Gastos Generales",
+        conceptos: ["Gastos administrativos", "Gastos de Limpieza", "Gastos de limpieza zavaleta", "Gastos Generales (hojas/toner/ lapiceras)", "Basurero fabrica", "Telefonia CLARO celulares", "Carpinteria", "matafuego generales", "grafica", "Mantenimiento", "Ascensor", "otros"] },
+      { k: 'logistica', grupo: 'generales', label: "Logistica",
+        conceptos: ["Nafta", "Patente oroch", "LOGISTICA", "Envios", "Patente cronos", "Patente citroen", "Patente versa"] },
+      { k: 'legal-y-asesorias', grupo: 'generales', label: "Legal Y Asesorias",
+        conceptos: ["Contadora", "Abogado"] },
+      { k: 'impuestos', grupo: 'impuestos', label: "Impuestos",
+        conceptos: ["Impuestos iibb", "Participaciones Accionarias", "OSECAC", "faecys", "SEC DEC Aportes sindicato de comercio", "SOEMCF", "USIMRA", "INACAP", "Aportes sindicales", "Impuesto ganancias", "Impuesto iva", "Impuestos de Linkestore TN"] },
+    ],
+    rubroGasto(k) { return this.RUBROS_GASTO.find(x => x.k === k) || null; },
+    rubrosDeGrupo(g) { return this.RUBROS_GASTO.filter(x => x.grupo === g); },
+    // Todos los conceptos sueltos, para el buscador de la pantalla de carga.
+    conceptosGasto() {
+      return this.RUBROS_GASTO.flatMap(r =>
+        r.conceptos.map(c => ({ rubro: r.k, rubroLabel: r.label, grupo: r.grupo, concepto: c })));
+    },
+
+    GASTOS_KEY: 'bh_gastos',
+    gastos() {
+      if (this._gastos) return this._gastos;
+      let g = [];
+      try { g = JSON.parse(localStorage.getItem(this.GASTOS_KEY)) || []; } catch {}
+      this._gastos = g;
+      if (!g.length) this._sembrarGastos();
+      return this._gastos;
+    },
+    _guardarGastos() {
+      try { localStorage.setItem(this.GASTOS_KEY, JSON.stringify(this._gastos || [])); } catch {}
+    },
+    // Cargar un gasto tiene que ser de tres toques: qué, cuánto, cómo se pagó.
+    // Si es difícil, el gasto chico no se anota y el número deja de servir.
+    cargarGasto({ rubro, concepto, monto, fecha = '', forma = 'efectivo',
+      comprobante = '', quien = '', nota = '' } = {}) {
+      const r = this.rubroGasto(rubro); if (!r) return null;
+      const gs = this.gastos();
+      const g = { id: gs.reduce((m, x) => Math.max(m, x.id || 0), 0) + 1,
+        rubro, grupo: r.grupo, concepto: concepto || r.label,
+        monto: Math.abs(Number(monto) || 0), fecha: fecha || this.hoyCorto(),
+        forma, comprobante, nota, quien: quien || 'yo', anulado: false };
+      gs.unshift(g);
+      this._guardarGastos();
+      return g;
+    },
+    // Un gasto no se borra nunca: se anula con motivo y el original queda.
+    anularGasto(id, motivo = '', quien = '') {
+      const g = this.gastos().find(x => x.id === Number(id)); if (!g) return null;
+      g.anulado = true; g.motivoAnulacion = motivo;
+      g.anuladoPor = quien || 'yo'; g.anuladoEl = this.hoyCorto();
+      this._guardarGastos();
+      return g;
+    },
+    // El mes de una fecha "14/8". Sin año, como en toda la planilla.
+    mesDe(fecha) { return Number(String(fecha || '').split('/')[1]) || 0; },
+    gastosDeMes(mes) {
+      return this.gastos().filter(g => !g.anulado && this.mesDe(g.fecha) === Number(mes));
+    },
+    // Los gastos del mes ordenados como la planilla: por grupo y por rubro.
+    gastosPorGrupo(mes) {
+      const gs = this.gastosDeMes(mes);
+      return this.GRUPOS_GASTO.map(gr => {
+        const suyos = gs.filter(x => x.grupo === gr.k);
+        const rubros = {};
+        suyos.forEach(x => { (rubros[x.rubro] = rubros[x.rubro] || []).push(x); });
+        return { ...gr, total: suyos.reduce((a, x) => a + x.monto, 0), n: suyos.length,
+          rubros: Object.keys(rubros).map(k => ({ k,
+            label: (this.rubroGasto(k) || {}).label || k,
+            total: rubros[k].reduce((a, x) => a + x.monto, 0),
+            items: rubros[k] })) };
+      }).filter(x => x.n > 0);
+    },
+
+
+    // ---- El número económico -----------------------------------------------
+    // Es la tabla que hoy se arma una vez por mes en la planilla:
+    //
+    //   VENTA − COSTOS − GASTOS − ADICIONALES = RESULTADO
+    //
+    // La diferencia es de dónde salen los números. La venta sale de las
+    // boletas, el costo de los muebles sale de lo que Compras conformó, y los
+    // gastos de lo que se fue cargando. Nadie los transcribe: el mes se va
+    // armando solo mientras pasa.
+    ADICIONAL_PCT: 1,
+    LOCALES: [
+      { k: '2020', label: 'Belgrano 2020' },
+      { k: '2299', label: 'Belgrano 2299' },
+      { k: 'home', label: 'Belgrano Home' },
+      { k: 'tienda-nube', label: 'Tienda Nube' },
+      { k: 'zavaleta', label: 'Zavaleta' },
+    ],
+    localDe(k) {
+      const t = sinTilde(String(k || ''));
+      return this.LOCALES.find(l => sinTilde(l.k) === t || sinTilde(l.label) === t)
+        || { k: k || 'otro', label: k || 'Otro' };
+    },
+    // Lo vendido en un mes, abierto por local y por cómo pagaron —que es
+    // exactamente como está en la planilla—.
+    ventasDelMes(mes) {
+      const os = (DEMO.ordenes || []).filter(o => this.mesDe(o.fecha) === Number(mes));
+      const por = {};
+      os.forEach(o => {
+        const l = this.localDe(o.local);
+        const tarjeta = /tarjeta|credito|cuota|debito/i.test(String(o.pago || ''));
+        const b = (por[l.k] = por[l.k] || { local: l.k, label: l.label,
+          efectivo: 0, tarjeta: 0, total: 0, ops: 0 });
+        b[tarjeta ? 'tarjeta' : 'efectivo'] += Number(o.total) || 0;
+        b.total += Number(o.total) || 0;
+        b.ops++;
+      });
+      const filas = Object.values(por).sort((a, b) => b.total - a.total);
+      const total = filas.reduce((a, x) => a + x.total, 0);
+      const ops = filas.reduce((a, x) => a + x.ops, 0);
+      return { filas, total, ops, ticket: ops ? Math.round(total / ops) : 0,
+        efectivo: filas.reduce((a, x) => a + x.efectivo, 0),
+        tarjeta: filas.reduce((a, x) => a + x.tarjeta, 0) };
+    },
+    // El costo del mes: los muebles que se conformaron y los insumos que
+    // llegaron. Es lo mismo que en la planilla se carga como "producto
+    // terminado" y "materia prima", pero sale solo de Compras.
+    costosDelMes(mes) {
+      const recs = this.recepciones().filter(r => r.estadoCompras === 'conformada'
+        && this.mesDe(r.conformadaEl || r.fecha) === Number(mes));
+      const porProv = {};
+      recs.forEach(r => {
+        const t = this.totalDeEntrega(r).total;
+        const b = (porProv[r.provId] = porProv[r.provId] || { provId: r.provId,
+          label: r.proveedor, total: 0, piezas: 0, entregas: 0 });
+        b.total += t; b.piezas += r.items.length; b.entregas++;
+      });
+      const ocs = this.ordenesCompra().filter(o => o.estado === 'recibida'
+        && this.mesDe(o.recibidaEl || o.entrega) === Number(mes));
+      const terminado = Object.values(porProv).sort((a, b) => b.total - a.total);
+      const prima = ocs.map(o => ({ numero: o.numero, label: o.proveedor,
+        total: this.totalOC(o), items: o.items.length }));
+      return { terminado, prima,
+        totalTerminado: terminado.reduce((a, x) => a + x.total, 0),
+        totalPrima: prima.reduce((a, x) => a + x.total, 0),
+        total: terminado.reduce((a, x) => a + x.total, 0)
+          + prima.reduce((a, x) => a + x.total, 0),
+        piezas: terminado.reduce((a, x) => a + x.piezas, 0) };
+    },
+    // El mes entero, con la misma cuenta de la planilla.
+    numeroEconomico(mes) {
+      const v = this.ventasDelMes(mes);
+      const c = this.costosDelMes(mes);
+      const grupos = this.gastosPorGrupo(mes);
+      const gastos = grupos.reduce((a, g) => a + g.total, 0);
+      const adicionales = Math.round(c.total * this.ADICIONAL_PCT / 100);
+      const total = v.total - c.total - gastos - adicionales;
+      const egresos = c.total + gastos + adicionales;
+      return { mes: Number(mes), venta: v, costos: c, grupos, gastos, adicionales,
+        total, egresos,
+        // El margen de la planilla es sobre el costo, no sobre la venta:
+        // dice cuánto se ganó por cada peso que se gastó.
+        margen: egresos ? (total / egresos) * 100 : 0,
+        sobreVenta: v.total ? (total / v.total) * 100 : 0 };
+    },
+    // El mes que conviene mostrar al entrar: el último que tenga algo. Abrir
+    // en un mes vacío hace pensar que el sistema no tiene datos.
+    ultimoMesConDatos() {
+      const hoy = new Date().getMonth() + 1;
+      for (let i = 0; i < 12; i++) {
+        const m = hoy - i > 0 ? hoy - i : 12 + (hoy - i);
+        const n = this.numeroEconomico(m);
+        if (n.venta.total || n.costos.total || n.gastos) return m;
+      }
+      return hoy;
+    },
+    // Los doce meses, para ver la película y no la foto.
+    anioEconomico() {
+      return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        .map(m => this.numeroEconomico(m))
+        .filter(x => x.venta.total || x.costos.total || x.gastos);
+    },
+    // Gastos de ejemplo del mes, para que la pantalla no arranque en blanco.
+    _sembrarGastos() {
+      this._gastos = [];
+      const hoy = new Date();
+      const mes = hoy.getMonth() + 1;
+      const D = [
+        ['servicios', 'Belgrano 2020 ABL', 237966, 3, 'transferencia'],
+        ['servicios', 'Belgrano 2299 EDESUR', 170950, 4, 'transferencia'],
+        ['servicios', 'Zavaleta 699 AySA', 250164, 5, 'transferencia'],
+        ['seguridad', 'Zavaleta Seguridad', 14722000, 5, 'transferencia'],
+        ['operarios', 'Mario', 1850000, 5, 'efectivo'],
+        ['operarios', 'Edgar', 1720000, 5, 'efectivo'],
+        ['sueldos-administrativos', 'Iara', 1450000, 5, 'transferencia'],
+        ['sueldos-vendedores', 'Sergio', 1900000, 5, 'transferencia'],
+        ['inversion-marketing', 'Google', 2340000, 2, 'transferencia'],
+        ['inversion-marketing', 'Facebook', 1980000, 2, 'transferencia'],
+        ['logistica', 'Nafta', 145000, 1, 'efectivo'],
+        ['logistica', 'Envios', 320000, 3, 'transferencia'],
+        ['gastos-generales', 'Gastos de Limpieza', 180000, 2, 'efectivo'],
+        ['gastos-generales', 'Gastos Generales (hojas/toner/ lapiceras', 62000, 4, 'efectivo'],
+        ['legal-y-asesorias', 'Contadora', 890000, 5, 'transferencia'],
+        ['impuestos', 'Impuestos iibb', 2365889, 6, 'transferencia'],
+      ];
+      // Los rubros y los conceptos son los de verdad, y también el peso que
+      // tiene cada uno. Los montos no: el demo compra y vende una fracción
+      // de lo real, así que se llevan a esa escala. Si se dejaran los de la
+      // planilla, el resultado daría siempre en rojo y la pantalla no se
+      // podría juzgar.
+      const suma = D.reduce((a, x) => a + x[2], 0);
+      for (let atras = 0; atras < 5; atras++) {
+        const mm = mes - atras > 0 ? mes - atras : 12 + (mes - atras);
+        // En la planilla real los gastos son poco más de la mitad de los
+        // costos del mes. Se respeta esa proporción.
+        const costoMes = this.costosDelMes(mm).total;
+        if (!costoMes) continue;
+        const escala = (costoMes * 0.57) / suma;
+        D.forEach(([r, c, m, d, f], i) => {
+          const ruido = 1 + (((i + atras * 3) % 7) - 3) * 0.04;
+          this.cargarGasto({ rubro: r, concepto: c,
+            monto: Math.max(1000, Math.round(m * escala * ruido / 1000) * 1000),
+            fecha: `${d}/${mm}`, forma: f, quien: 'Iara' });
+        });
+      }
+    },
+
     // ---- La cuenta corriente del proveedor --------------------------------
     // Va en los dos sentidos y por eso no alcanza con "cuánto le debo". Él
     // nos trae muebles, y nosotros le vendemos materiales: correderas,

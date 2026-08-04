@@ -32,6 +32,8 @@ const scripts = [
   'compras/pendientes.js',
   'compras/historial.js',
   'compras/indicadores.js',
+  'tesoreria/gastos.js',
+  'tesoreria/numero.js',
   'modulos/esqueletos.js',
   'comun/app.js',
 ];

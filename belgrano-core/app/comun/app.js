@@ -108,6 +108,8 @@
 
     tesoreria: { label: 'Tesorería', icon: '💳', subs: [
       S('resumen', 'Resumen', resumen('tesoreria')),
+      S('numero', 'El número', m => global.TesoNumero.render(m)),
+      S('gastos', 'Gastos', m => global.TesoGastos.render(m)),
       S('cobros', 'Cobros', skel('Cobros')),
       S('senas', 'Señas', skel('Señas')),
       S('rendiciones', 'Rendiciones', skel('Rendiciones')),
