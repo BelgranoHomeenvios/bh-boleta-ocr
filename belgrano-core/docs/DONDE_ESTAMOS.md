@@ -97,10 +97,9 @@ Está en **`SEGURIDAD.md`** y es bloqueante:
 diferencias contra lo que se paga son grandes. ¿Sale directo de Costeo donde
 Costeo tiene fila?
 
-**2 · Las categorías de compra.** Brian nombró: gastos fijos, gastos
-variables, materia prima, mercadería, y quizá equipamiento. Hoy hay gastos
-(en cinco grupos) y materia prima. Falta separar fijo de variable y decidir
-dónde entra el equipamiento.
+**2 · El equipamiento y la amortización.** Hoy el equipamiento entra como
+*obra* —inversión, no gasto del mes—. Amortizarlo de verdad (repartir una
+camioneta en 48 meses) queda para la segunda etapa.
 
 ---
 
@@ -128,6 +127,13 @@ dónde entra el equipamiento.
   es que la plata la reciba un socio, no cuál.
 - **El vendedor no le puede entregar nada al cliente sin cargarlo antes.** Para
   imprimir o mandar una cotización hacen falta nombre y teléfono.
+- **Una compra se clasifica en dos ejes**, como lo hace la contadora: el
+  **tipo** —costo, gasto, personal, obra— dice dónde cae en el número; la
+  **categoría** —materias primas, logística, servicios, mantenimiento…— dice
+  en qué se fue la plata. Y cada categoría es **fija o variable**: fija se
+  paga aunque no se venda nada.
+- **El IVA se separa por alícuota** (21, 27, 10,5 y no gravado), no con un
+  porcentaje solo: una factura puede traer las cuatro.
 - **La terminación mide cuánto paraíso tiene el mueble, y la cara que manda es
   la estructura.** Estructura paraíso con frente laqueado va a *comboParaiso*;
   estructura laqueada con frente paraíso va a *comboBlanco*, que es más barata.

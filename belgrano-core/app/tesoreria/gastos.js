@@ -59,6 +59,8 @@
           }).join('')}
         </div>
 
+        ${this.bloqueFV()}
+
         <div class="row" style="margin-bottom:10px">
           <input id="tg-q" class="cx-buscar" placeholder="Buscar un gasto"
             value="${UI.esc(this.q)}">
@@ -66,22 +68,25 @@
         </div>
 
         ${todos.length ? `<div class="card cx-tabla"><table>
-          <thead><tr><th>Fecha</th><th>Rubro</th><th>Concepto</th><th>Cómo se pagó</th>
-            <th>Comprobante</th><th>Quién</th><th class="num">Monto</th><th></th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Rubro</th><th>Concepto</th><th>Para el contador</th>
+            <th>Fijo o variable</th><th>Cómo se pagó</th><th>Comprobante</th>
+            <th class="num">Monto</th><th></th></tr></thead>
           <tbody>${todos.map(g => `<tr class="${g.anulado ? 'anul' : ''}">
             <td class="muted">${UI.esc(g.fecha)}</td>
             <td><span class="pill soft">${UI.esc((global.DB.rubroGasto(g.rubro) || {}).label || g.rubro)}</span></td>
             <td class="nom">${UI.esc(g.concepto)}${g.nota
               ? `<span class="hint">${UI.esc(g.nota)}</span>` : ''}</td>
+            <td class="muted">${UI.esc((global.DB.catCompra(g.cat) || {}).label || '—')}
+              <span class="hint">${UI.esc((global.DB.tipoCompra(g.tipoCompra) || {}).label || '')}</span></td>
+            <td><span class="pill ${g.fijo ? 'soft' : 'ok'}">${g.fijo ? 'fijo' : 'variable'}</span></td>
             <td class="muted">${UI.esc((global.DB.FORMAS_PAGO.find(f => f.k === g.forma) || {}).label || g.forma)}</td>
             <td class="muted">${UI.esc(g.comprobante || '—')}</td>
-            <td class="muted">${UI.esc(g.quien)}</td>
             <td class="num nom">${UI.pesos(g.monto)}</td>
             <td class="td-acc">${g.anulado
               ? `<span class="pill crit">anulado</span>`
               : `<button class="b-x" data-anular="${g.id}">Anular</button>`}</td>
           </tr>`).join('')}
-          <tr class="cx-tot"><td colspan="6">Total de lo que se está viendo</td>
+          <tr class="cx-tot"><td colspan="7">Total de lo que se está viendo</td>
             <td class="num">${UI.pesos(todos.filter(g => !g.anulado)
               .reduce((a, g) => a + g.monto, 0))}</td><td></td></tr>
           </tbody></table></div>`
@@ -90,6 +95,28 @@
         <div class="hint" style="margin-top:10px">Un gasto no se borra nunca: se anula con motivo
           y el original queda a la vista. Los rubros son los mismos de la planilla, así que lo que
           se carga acá se puede comparar con lo de siempre.</div>`;
+    },
+
+    // Fijo contra variable. Es lo que dice cuánto hay que vender para no
+    // perder: lo fijo se paga aunque el mes sea malo.
+    bloqueFV() {
+      const fv = global.DB.fijoVariable(this.mes);
+      const tot = fv.fijo + fv.variable;
+      if (!tot) return '';
+      const pct = Math.round((fv.fijo / tot) * 100);
+      return `<div class="card pad tg-fv">
+        <div class="tg-fv-b">
+          <span class="tg-fv-f" style="width:${pct}%"></span>
+          <span class="tg-fv-v" style="width:${100 - pct}%"></span>
+        </div>
+        <div class="tg-fv-l">
+          <span><b>${UI.pesos(fv.fijo)}</b><span>fijos · ${pct}% — se pagan aunque no se venda</span></span>
+          <span><b>${UI.pesos(fv.variable)}</b><span>variables · se mueven con la venta</span></span>
+          <span class="sp"></span>
+          ${fv.puntoEquilibrio ? `<span><b>${UI.pesos(fv.puntoEquilibrio)}</b>
+            <span>hay que vender para no perder</span></span>` : ''}
+        </div>
+      </div>`;
     },
 
     // ---- Cargar ------------------------------------------------------
@@ -190,6 +217,15 @@
         .tg-k.on{border-color:var(--navy);background:var(--panel-2)}
         .cx-tabla tr.anul td{opacity:.5;text-decoration:line-through}
         .cx-tabla tr.anul td:last-child{text-decoration:none;opacity:1}
+        .tg-fv{margin-bottom:12px}
+        .tg-fv-b{display:flex;height:11px;border-radius:999px;overflow:hidden;
+          border:1px solid var(--line);margin-bottom:8px}
+        .tg-fv-f{background:var(--navy)} .tg-fv-v{background:var(--ok)}
+        .tg-fv-l{display:flex;gap:22px;flex-wrap:wrap;align-items:baseline}
+        .tg-fv-l>span{display:flex;flex-direction:column}
+        .tg-fv-l b{font-size:15px;color:var(--navy)}
+        .tg-fv-l span span{font-size:10.5px;color:var(--muted)}
+        .cx-tabla .hint{display:block;font-size:10px}
         .cx-back{position:fixed;inset:0;background:rgba(12,20,34,.45);z-index:70;
           display:flex;align-items:center;justify-content:center;padding:20px}
       </style>`;

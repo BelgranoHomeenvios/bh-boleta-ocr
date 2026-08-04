@@ -2079,8 +2079,12 @@
       comprobante = '', quien = '', nota = '' } = {}) {
       const r = this.rubroGasto(rubro); if (!r) return null;
       const gs = this.gastos();
+      const cat = this.catCompra(this.catDeRubro(rubro)) || {};
       const g = { id: gs.reduce((m, x) => Math.max(m, x.id || 0), 0) + 1,
         rubro, grupo: r.grupo, concepto: concepto || r.label,
+        // La clasificación contable viaja con el gasto: así lo que se carga
+        // una vez sirve para el número y para el contador.
+        cat: cat.k || 'otros', tipoCompra: cat.tipo || 'gasto', fijo: !!cat.fijo,
         monto: Math.abs(Number(monto) || 0), fecha: fecha || this.hoyCorto(),
         forma, comprobante, nota, quien: quien || 'yo', anulado: false };
       gs.unshift(g);
@@ -2460,6 +2464,83 @@
         ] }));
     },
 
+
+    // ---- Cómo se clasifica una compra ---------------------------------------
+    // Sale de cómo lo clasifica la contadora, que ya tiene 739 proveedores
+    // etiquetados. Son DOS EJES distintos y mezclarlos es el error clásico:
+    //
+    //   TIPO      → dónde cae en el número del mes. Un costo se le resta a la
+    //               venta; un gasto es de la estructura; obra es inversión.
+    //   CATEGORÍA → en qué se fue la plata. Sirve para mirar, no para el
+    //               resultado.
+    //
+    // Y aparte, cada categoría es FIJA o VARIABLE. Fija es la que se paga
+    // aunque no se venda nada —el alquiler, los sueldos, el seguro—. Variable
+    // es la que se mueve con la venta —la madera, el flete, el embalaje—.
+    // Esa distinción es la que dice cuánto hay que vender para no perder.
+    TIPOS_COMPRA: [
+      { k: 'costo', label: 'Costo', pie: 'Va contra la venta: sin esto no hay mueble.' },
+      { k: 'gasto', label: 'Gasto', pie: 'La estructura: se paga aunque no se venda.' },
+      { k: 'personal', label: 'Personal', pie: 'Sueldos y cargas.' },
+      { k: 'obra', label: 'Obra', pie: 'Inversión en los locales. No es del mes.' },
+    ],
+    tipoCompra(k) { return this.TIPOS_COMPRA.find(x => x.k === k) || null; },
+    // Las categorías con las que ya trabaja la contadora, cada una con su tipo
+    // y si es fija o variable.
+    CATEGORIAS_COMPRA: [
+      { k: 'materias-primas', label: 'Materias primas', tipo: 'costo', fijo: false },
+      { k: 'carpinteria', label: 'Carpintería', tipo: 'costo', fijo: false },
+      { k: 'lacas', label: 'Lacas', tipo: 'costo', fijo: false },
+      { k: 'mercaderias', label: 'Mercaderías', tipo: 'costo', fijo: false },
+      { k: 'logistica', label: 'Logística', tipo: 'gasto', fijo: false },
+      { k: 'marketing', label: 'Marketing', tipo: 'gasto', fijo: false },
+      { k: 'herramientas', label: 'Herramientas', tipo: 'gasto', fijo: false },
+      { k: 'mantenimiento', label: 'Mantenimiento', tipo: 'gasto', fijo: false },
+      { k: 'gastos-generales', label: 'Gastos generales', tipo: 'gasto', fijo: false },
+      { k: 'servicios', label: 'Servicios', tipo: 'gasto', fijo: true },
+      { k: 'alquiler', label: 'Alquiler', tipo: 'gasto', fijo: true },
+      { k: 'seguros', label: 'Seguros', tipo: 'gasto', fijo: true },
+      { k: 'seguridad', label: 'Seguridad', tipo: 'gasto', fijo: true },
+      { k: 'gastos-administrativos', label: 'Gastos administrativos', tipo: 'gasto', fijo: true },
+      { k: 'sueldos', label: 'Sueldos y cargas', tipo: 'personal', fijo: true },
+      { k: 'obra', label: 'Obra', tipo: 'obra', fijo: false },
+      { k: 'equipamiento', label: 'Equipamiento', tipo: 'obra', fijo: false },
+      { k: 'impuestos', label: 'Impuestos', tipo: 'gasto', fijo: true },
+      { k: 'otros', label: 'Otros', tipo: 'gasto', fijo: false },
+    ],
+    catCompra(k) { return this.CATEGORIAS_COMPRA.find(x => x.k === k) || null; },
+    catsDeTipo(t) { return this.CATEGORIAS_COMPRA.filter(x => x.tipo === t); },
+    // Los rubros de gasto que ya existen, mapeados a la categoría contable.
+    // Así lo que se carga sirve para las dos cosas sin cargarlo dos veces.
+    CAT_DE_RUBRO: {
+      amortizacion: 'obra', servicios: 'servicios', seguridad: 'seguridad',
+      seguros: 'seguros', operarios: 'sueldos',
+      'sueldos-administrativos': 'sueldos', 'sueldos-marketing': 'sueldos',
+      'sueldos-vendedores': 'sueldos', 'sueldos-gerenciales': 'sueldos',
+      'cargas-sociales': 'sueldos', 'inversion-marketing': 'marketing',
+      'personas-externas-en-marke': 'marketing', 'gastos-generales': 'gastos-generales',
+      logistica: 'logistica', 'legal-y-asesorias': 'gastos-administrativos',
+      impuestos: 'impuestos',
+    },
+    catDeRubro(r) { return this.CAT_DE_RUBRO[r] || 'otros'; },
+
+    // ---- El IVA de la compra formal -----------------------------------------
+    // La contadora separa el monto por alícuota, no un IVA solo: una factura
+    // puede traer parte al 21, parte al 10,5 y parte no gravada.
+    ALICUOTAS: [
+      { k: 'a21', pct: 21, label: '21%' },
+      { k: 'a27', pct: 27, label: '27% (servicios)' },
+      { k: 'a105', pct: 10.5, label: '10,5%' },
+      { k: 'nog', pct: 0, label: 'No gravado' },
+    ],
+    // El IVA que se puede computar de una compra formal.
+    ivaDeCompra(m) {
+      if (!m || !m.neto) return 0;
+      return this.ALICUOTAS.reduce((a, x) =>
+        a + Math.round((Number(m.neto[x.k]) || 0) * x.pct / 100), 0);
+    },
+    TIPOS_COMPROB: ['A', 'B', 'C', 'ABL', 'Ticket', 'Recibo', 'Sin comprobante'],
+
     // ---- El número económico -----------------------------------------------
     // Es la tabla que hoy se arma una vez por mes en la planilla:
     //
@@ -2554,6 +2635,25 @@
         if (n.venta.total || n.costos.total || n.gastos) return m;
       }
       return hoy;
+    },
+    // Fijo contra variable: lo que se paga aunque no se venda nada, y lo que
+    // se mueve con la venta. Es el número que dice cuánto hay que vender para
+    // no perder.
+    fijoVariable(mes) {
+      const gs = this.gastosDeMes(mes);
+      const fijo = gs.filter(x => x.fijo).reduce((a, x) => a + x.monto, 0);
+      const variable = gs.filter(x => !x.fijo).reduce((a, x) => a + x.monto, 0);
+      const n = this.numeroEconomico(mes);
+      // El costo del mueble es variable por definición: si no se vende, no se
+      // compra. Los materiales también.
+      const varTotal = variable + n.costos.total + n.adicionales;
+      const margenBruto = n.venta.total - varTotal;
+      return { fijo, variable, varTotal, margenBruto,
+        // Cuánto hay que vender para cubrir lo fijo, con el margen que deja
+        // cada peso vendido.
+        contribucion: n.venta.total ? margenBruto / n.venta.total : 0,
+        puntoEquilibrio: n.venta.total && margenBruto > 0
+          ? Math.round(fijo / (margenBruto / n.venta.total)) : null };
     },
     // Los doce meses, para ver la película y no la foto.
     anioEconomico() {
