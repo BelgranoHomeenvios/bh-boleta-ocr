@@ -1183,9 +1183,9 @@
       if (e && f) return 'paraiso';
       if (e) return 'comboParaiso';
       if (f) return 'comboBlanco';
-      // Sin paraíso: laqueado si las dos caras van del mismo color, y
-      // combinado si son dos colores distintos —son dos pasadas de laca—.
-      return limpio(estructura) === limpio(frente) ? 'laqueado' : 'comboBlanco';
+      // Sin paraíso es laqueado, aunque las dos caras sean de distinto color:
+      // un blanco con negro se lacquea igual que un blanco con blanco.
+      return 'laqueado';
     },
     // Cada tipo de mueble del catálogo con el nombre que tiene en Costeo.
     CAT_COSTEO: { 2: 'comodas', 3: 'placard', 5: 'ratona', 6: 'mesas-luz', 7: 'muebles-tv' },

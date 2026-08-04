@@ -92,18 +92,11 @@ Está en **`SEGURIDAD.md`** y es bloqueante:
 
 ## Preguntas abiertas
 
-**1 · La terminación combinada.** Brian dijo que si la estructura es paraíso
-es *combinado + paraíso*, y que si la estructura es blanca o negra con frentes
-paraíso es *más blanco que paraíso*. **Su catálogo de Costeo dice lo
-contrario**: 389 filas de Blanca+Paraíso están como comboParaiso, y comboBlanco
-nunca lleva paraíso. Cambiarlo mueve el precio de 776 combinaciones. Sin
-resolver.
-
-**2 · El costo del catálogo.** Hoy es un número cargado a mano y por eso las
+**1 · El costo del catálogo.** Hoy es un número cargado a mano y por eso las
 diferencias contra lo que se paga son grandes. ¿Sale directo de Costeo donde
 Costeo tiene fila?
 
-**3 · Las categorías de compra.** Brian nombró: gastos fijos, gastos
+**2 · Las categorías de compra.** Brian nombró: gastos fijos, gastos
 variables, materia prima, mercadería, y quizá equipamiento. Hoy hay gastos
 (en cinco grupos) y materia prima. Falta separar fijo de variable y decidir
 dónde entra el equipamiento.
@@ -123,3 +116,10 @@ dónde entra el equipamiento.
 - La deuda con el proveedor **nace al conformar**, sin paso intermedio.
 - Devolver en el momento y devolver después de pagar **son dos cosas
   distintas**.
+- **La terminación mide cuánto paraíso tiene el mueble, y la cara que manda es
+  la estructura.** Estructura paraíso con frente laqueado va a *comboParaiso*;
+  estructura laqueada con frente paraíso va a *comboBlanco*, que es más barata.
+  Sin paraíso es *laqueado*, aunque las dos caras sean de distinto color.
+  **Belgrano Cost tiene esto mal etiquetado** y hay que corregirlo allá: son
+  776 combinaciones costeadas en la columna cara, y de ese costo sale el precio
+  de venta.
