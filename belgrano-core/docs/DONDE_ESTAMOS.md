@@ -1,6 +1,6 @@
 # Dónde estamos
 
-Al 4/8/2026. Qué está hecho, qué está a medias y qué no se tocó todavía.
+Al 4/8/2026, a la noche. Qué está hecho, qué está a medias y qué no se tocó todavía.
 
 ---
 
@@ -47,8 +47,27 @@ línea, con el cliente, el vendedor y la fecha prometida. Si la boleta no baja,
 la pantalla dice por qué —seña sin confirmar, venta a confirmar, anulada— y no
 hay que ir a buscarlo a ningún lado.
 
+### CRM
+La cola de Cintia con la derivación, las consultas con su etapa que sube sola
+y no baja, la ficha con la historia entera del cliente, los seguimientos con
+lo vencido arriba, la fusión de clientes duplicados, y el enganche con
+Ventas: **cotizar crea la consulta, la orden la concreta, la anulación la
+rechaza**. El teléfono se normaliza (+54, el 9, el 15) para que el mismo
+cliente escrito de seis maneras sea uno.
+
 ### Logística
-Las entregas, los viajes, los cupos por chofer.
+La entrega **nace sola** de la boleta lista, con el saldo de AHORA —el
+confirmado, no el anotado—. El freno: sin plata confirmada no se coordina, y
+el destrabe lo hace Dirección con motivo y registro. El tope de $550.000 de
+saldo pide autorización para salir. El cupo por chofer por día. La rendición
+entra como cobro de la boleta, la diferencia exige motivo y el flete va a
+Gastos. La ruta del chofer es un rol aparte que ve SOLO sus paradas de hoy.
+
+### Ventas — agenda e indicadores
+La agenda del vendedor sale sola de sus consultas, sus boletas y sus
+entregas. Los indicadores juntan el mes por vendedor con la conversión del
+CRM, y el tablero por canal junta el canal con la plata: cuánto vendió
+Instagram contra cuánto vendió la publicidad.
 
 ---
 
@@ -59,18 +78,15 @@ Las entregas, los viajes, los cupos por chofer.
 | **Producción** | Cola de trabajo, planificación, control de calidad como pantalla propia, historial y stock a pedir siguen siendo esqueletos. |
 | **Compras** | El stock de insumos —cuántas placas quedan— es segunda etapa. Hoy se anota la plata, no el inventario. |
 | **Tesorería** | Están el número y los gastos. Faltan cajas, movimientos, cobros, señas, rendiciones, cheques, conciliación, arqueos y el calendario de plata. |
-| **Ventas** | Comisiones anda; faltan la agenda del vendedor, los indicadores, las reseñas y la venta compartida entre dos vendedores. |
-| **CRM** | Diseñado en `ARQUITECTURA_CRM.md`, sin construir. |
-| **Logística** | Andan entregas, viajes y cupos. La integración está diseñada en `ARQUITECTURA_LOGISTICA.md`, sin construir. |
+| **Ventas** | Faltan las reseñas y la venta compartida entre dos vendedores. |
+| **CRM** | Falta que "no son el mismo" se acuerde, y la vista de estado directo para la consulta de estado. |
+| **Logística** | Falta la entrega parcial ("3 de 5"), el movimiento interno entre locales, y los choferes reales. |
 | **Reclamos** | Sin desarrollar. |
 
 ---
 
 ## Lo que no se tocó
 
-- **La confirmación de cobros.** Es lo que Brian marcó como más urgente: que
-  cuando entre plata aparezca la necesidad de confirmarla, y que la boleta no
-  avance a fábrica hasta que esté confirmada.
 - **La rendición de vendedores**, por boleta y no por total.
 - **Los cheques**, que salen y no entran.
 - **El calendario de plata**: qué entra y qué sale las próximas dos semanas.

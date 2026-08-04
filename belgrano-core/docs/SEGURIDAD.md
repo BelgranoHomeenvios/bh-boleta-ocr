@@ -158,3 +158,69 @@ Base de datos / Storage
 La barrera que importa es la de abajo. Un vendedor que edite el HTML y pida
 `select * from costos` tiene que recibir `permission denied`. Que el botón
 esté escondido es comodidad, no seguridad.
+
+---
+
+## Cómo se registra un usuario — diseño, pedido el 4/8
+
+Brian pidió pensarlo antes de construirlo. Esta es la propuesta.
+
+**No hay registro abierto. Hay invitación.** Nadie se crea una cuenta en
+Belgrano Soft: Dirección invita. La lista de usuarios es la lista de la
+empresa —Brian, Jony, Claudia, Daniel, Iara, Cintia, Adrián, Nati, Ale,
+Sergio, Cristian, los choferes— y no crece sola.
+
+```
+Dirección carga: nombre, mail o teléfono, ROL
+   ↓
+Supabase manda la invitación (link de un solo uso, vence a las 48 h)
+   ↓
+la persona pone SU contraseña (nunca la elige otro, nunca viaja por chat)
+   ↓
+queda en la tabla usuarios: id de Auth + rol + activo
+   ↓
+el rol NO lo puede cambiar el propio usuario — sólo Dirección
+```
+
+Reglas que van con esto:
+
+- **Un usuario, una persona.** Nada de "la cuenta del local". Si Nati y Ale
+  comparten computadora, cada una entra con lo suyo: la trazabilidad —quién
+  confirmó una plata, quién destrabó una entrega— depende de esto.
+- **Contraseña fuerte + segundo factor** para los roles que tocan plata
+  (Dirección, Tesorería). Para el chofer, acceso por link mágico al teléfono
+  puede alcanzar: su pantalla no muestra nada sensible.
+- **Dar de baja es desactivar, no borrar.** El que se va deja de entrar hoy
+  mismo, pero su historia queda: las rendiciones que firmó no se vuelven
+  anónimas.
+- **La sesión vence.** Corta en los roles sensibles, más larga en el chofer.
+  Cerrar sesión remoto desde Dirección (un vendedor pierde el teléfono → se
+  lo saca de todos lados).
+- **El selector "Ver como" desaparece** para todos menos Dirección, y aun
+  para Dirección: ver como vendedor no otorga los permisos de escritura del
+  vendedor, sólo la vista.
+
+## Cómo se guarda la información — diseño
+
+Regla general: **cada dato vive donde se lo puede proteger.**
+
+| Dato | Dónde | Por qué |
+|---|---|---|
+| Clientes, consultas, órdenes, unidades | Postgres (Supabase, esquema `core`) con RLS por rol | Es el negocio. Una sola verdad, permisos por fila. |
+| Precios de proveedor, cuentas corrientes | `core`, sólo roles Compras/Dirección | El vendedor no los lee ni pidiéndolos por API. |
+| Cobros, rendiciones, gastos | esquema `finanzas`, **sin API directa**: sólo funciones (RPC) que validan y auditan | La plata no se toca con un `update`: se pasa por una función que deja rastro. |
+| Saldos consolidados (lo que pidió Brian) | **No se guardan.** Se calculan al momento en una función que sólo Dirección puede llamar, con segundo factor fresco | Lo que no está almacenado no se puede robar almacenado. El flujo queda; la foto de "cuánta plata hay" no existe como dato. |
+| Auditoría (quién, cuándo, antes/después) | esquema `audit`, **sólo escritura** desde funciones; ni Dirección lo edita | Un registro que se puede editar no es un registro. |
+| Fotos y planos | Storage de Supabase con URL firmada que vence | Hoy van adentro del HTML; eso muere con el archivo único. |
+| Preferencias (tema, filtros, última solapa) | `localStorage` | Lo único que puede quedar en el navegador: perderlo no duele. |
+
+Tres consecuencias prácticas:
+
+1. **El HTML deja de ser la app y pasa a ser el frente.** Se sirve desde un
+   dominio con HTTPS; la clave de conexión la inyecta el servidor. El archivo
+   que se manda por chat deja de existir como forma de distribución.
+2. **Lo que el navegador guarda hoy (las ~20 claves de `localStorage`) migra
+   a Postgres** el día uno de la capa de seguridad. Es la deuda más grande.
+3. **El "quien" de cada registro sale del JWT**, nunca de un campo que llena
+   el front. `confirmadoPor: 'Iara'` escrito por el navegador vale cero; el
+   servidor sabe quién es porque la sesión lo dice.

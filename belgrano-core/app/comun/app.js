@@ -20,9 +20,9 @@
     crm: { label: 'CRM', icon: '💬', subs: [
       S('resumen', 'Resumen', resumen('crm')),
       S('clientes', 'Clientes', m => global.Clientes.render(m)),
-      S('consultas', 'Consultas', skel('Consultas / atenciones')),
-      S('seguimientos', 'Seguimientos', skel('Seguimientos')),
-      S('fusiones', 'Fusionar', skel('Fusionar clientes')),
+      S('consultas', 'Consultas', m => global.CrmConsultas.render(m)),
+      S('seguimientos', 'Seguimientos', m => global.CrmSeguimientos.render(m)),
+      S('fusiones', 'Fusionar', m => global.CrmFusionar.render(m)),
     ]},
 
     ventas: { label: 'Ventas', icon: '💰', subs: [
@@ -33,9 +33,9 @@
       // se resuelven adentro de Resumen y de Or. Venta.
       S('ordenes', 'Or. Venta', m => global.Ordenes.render(m)),
       S('clientes', 'Clientes', m => global.Clientes.render(m)),
-      S('agenda', 'Agenda', skel('Agenda del vendedor')),
+      S('agenda', 'Mi agenda', m => global.VentasAgenda.render(m)),
       S('comisiones', 'Comisiones', m => global.Comisiones.render(m)),
-      S('indicadores', 'Indicadores', skel('Indicadores de ventas')),
+      S('indicadores', 'Indicadores', m => global.VentasIndicadores.render(m)),
     ]},
 
     catalogo: { label: 'Catálogo', icon: '🪑', subs: [
@@ -99,13 +99,11 @@
 
     logistica: { label: 'Logística', icon: '🚚', subs: [
       S('resumen', 'Resumen', resumen('logistica')),
-      S('agenda', 'Agenda', skel('Agenda de entregas')),
-      S('entregas', 'Entregas', skel('Entregas')),
-      S('proximas', 'Próximas', skel('Próximas entregas')),
-      S('choferes', 'Choferes', skel('Choferes')),
-      S('vehiculos', 'Vehículos', skel('Vehículos')),
-      S('mapa', 'Mapa', skel('Mapa de entregas')),
-      S('indicadores', 'Indicadores', skel('Indicadores')),
+      S('entregas', 'Entregas', m => global.LogEntregas.render(m)),
+      S('ruta', 'Mi ruta', m => global.LogRuta.render(m)),
+      S('agenda', 'Agenda y ruta', m => global.LogAgenda.render(m)),
+      S('choferes', 'Choferes y vehículos', m => global.LogChoferes.render(m)),
+      S('indicadores', 'Indicadores y zonas', m => global.LogIndicadores.render(m)),
     ]},
 
     tesoreria: { label: 'Tesorería', icon: '💳', subs: [
@@ -153,6 +151,9 @@
     prod:           { label: 'Encargado de Producción', tabs: ['dashboard', 'pendientes', 'produccion', 'inventario', 'compras', 'catalogo'] },
     logi:           { label: 'Logística',              tabs: ['dashboard', 'pendientes', 'logistica', 'reclamos'] },
     gestion:        { label: 'Gestión de Cliente',     tabs: ['dashboard', 'pendientes', 'crm', 'ventas'] },
+    // El chofer anda con el teléfono en la calle: ve su ruta y nada más.
+    chofer:         { label: 'Chofer',                 tabs: ['logistica'],
+                      solo: { logistica: ['ruta'] } },
   };
 
   // Quién puede hacer qué. Se afina cuando exista el login real; hoy sale del
@@ -222,8 +223,13 @@
         mod.r('mview');
         return;
       }
-      const cur = this._sub[key] || mod.subs[0].k;
-      subbar.innerHTML = mod.subs.map(s => `<button class="subtab" data-sub="${s.k}">${UI.esc(s.label)}</button>`).join('');
+      // Un rol puede ver un módulo recortado: el chofer entra a Logística y
+      // sólo existe su ruta. No es seguridad —eso va en Supabase— es enfoque.
+      const solo = (ROLES[this.rol].solo || {})[key];
+      const subs = solo ? mod.subs.filter(s => solo.includes(s.k)) : mod.subs;
+      const cur = (this._sub[key] && subs.some(s => s.k === this._sub[key]))
+        ? this._sub[key] : subs[0].k;
+      subbar.innerHTML = subs.map(s => `<button class="subtab" data-sub="${s.k}">${UI.esc(s.label)}</button>`).join('');
       subbar.querySelectorAll('[data-sub]').forEach(b => b.onclick = () => this.goSub(key, b.dataset.sub));
       view.innerHTML = '<div id="mview"></div>';
       this._renderSub(key, cur);
@@ -231,7 +237,9 @@
 
     _renderSub(key, subK) {
       const mod = MODULOS[key];
-      const s = mod.subs.find(x => x.k === subK) || mod.subs[0];
+      const solo = (ROLES[this.rol].solo || {})[key];
+      const subs = solo ? mod.subs.filter(x => solo.includes(x.k)) : mod.subs;
+      const s = subs.find(x => x.k === subK) || subs[0];
       this._sub[key] = s.k;
       document.querySelectorAll('#subbar [data-sub]').forEach(b => b.setAttribute('aria-current', b.dataset.sub === s.k));
       const mv = document.getElementById('mview');

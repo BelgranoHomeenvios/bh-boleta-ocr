@@ -25,15 +25,9 @@
         { label: 'Señadas', val: 28, pct: 37.8 }, { label: 'Órdenes', val: 21, pct: 75.0 }, { label: 'Entregadas', val: 16, pct: 76.2 },
       ],
     },
-    crm: {
-      titulo: 'CRM', sub: '¿A qué clientes tengo que responder o seguir hoy?',
-      kpis: [
-        { lab: 'Clientes', em: '👥', tono: 'info', val: '6.393', foot: '1.100 ya compraron' },
-        { lab: 'Consultas del mes', em: '💬', tono: 'soft', val: '182' },
-        { lab: 'En seguimiento', em: '⏳', tono: 'warn', val: '28', foot: 'esperando respuesta' },
-        { lab: 'Recompra', em: '🔁', tono: 'ok', val: '17%', foot: 'de los que compraron' },
-      ],
-    },
+    // CRM y Logística salen de los datos de verdad, no de números escritos:
+    // ver vivo() más abajo.
+    crm: { titulo: 'CRM', sub: '¿A qué clientes tengo que responder o seguir hoy?', vivo: 'crm' },
     catalogo: {
       titulo: 'Catálogo', sub: '¿Qué productos necesitan revisión de costo o precio?',
       alarmas: [
@@ -73,17 +67,7 @@
         { lab: 'Reservados', em: '🔒', tono: 'soft', val: '88' }, { lab: 'Sin ubicación', em: '❓', tono: 'warn', val: '12' },
       ],
     },
-    logistica: {
-      titulo: 'Logística', sub: '¿Qué entregas corren riesgo hoy?',
-      alarmas: [
-        { tono: 'crit', em: '🚚', titulo: '3 entregas demoradas', rt: 'hoy' },
-        { tono: 'warn', em: '🧑‍✈️', titulo: '1 entrega sin chofer' },
-      ],
-      kpis: [
-        { lab: 'Entregas hoy', em: '🚚', tono: 'info', val: '6' }, { lab: 'Próximas 7 días', em: '📅', tono: 'soft', val: '14' },
-        { lab: 'Retiros', em: '🏬', tono: 'soft', val: '3' }, { lab: 'Demoradas', em: '⏰', tono: 'crit', val: '3' },
-      ],
-    },
+    logistica: { titulo: 'Logística', sub: '¿Qué entregas corren riesgo hoy?', vivo: 'logistica' },
     tesoreria: {
       titulo: 'Tesorería', sub: '¿Qué tengo que cobrar y qué pagar esta semana?',
       kpis: [
@@ -108,9 +92,56 @@
     },
   };
 
+  // Los resúmenes que se arman con lo que ya está cargado, en vez de con
+  // números pintados. A medida que cada módulo se hace de verdad, pasa acá.
+  const VIVO = {
+    crm() {
+      const r = global.DB.resumenCRM();
+      return {
+        alarmas: [
+          r.cola ? { tono: 'warn', em: '📥', titulo: `${r.cola} en la cola sin derivar` } : null,
+          r.vencidas ? { tono: 'crit', em: '⏰', titulo: `${r.vencidas} seguimientos vencidos` } : null,
+          r.sinRespuesta ? { tono: 'warn', em: '🙈', titulo: `${r.sinRespuesta} derivadas que el vendedor no tocó` } : null,
+          r.fusionar ? { tono: 'warn', em: '⇄', titulo: `${r.fusionar} clientes que parecen la misma persona` } : null,
+        ].filter(Boolean),
+        kpis: [
+          { lab: 'Clientes', em: '👥', tono: 'info', val: String(r.clientes) },
+          { lab: 'Consultas', em: '💬', tono: 'soft', val: String(r.consultas),
+            foot: `${r.vivas} vivas` },
+          { lab: 'En seguimiento', em: '⏳', tono: r.vencidas ? 'warn' : 'soft',
+            val: String(r.vivas), foot: `${r.vencidas} vencidas` },
+          { lab: 'Convierte', em: '🎯', tono: 'ok', val: `${r.conv}%`,
+            foot: `${r.concret} concretadas` },
+        ],
+      };
+    },
+    logistica() {
+      const DB = global.DB;
+      const ind = DB.indicadoresLogistica();
+      const alertas = DB.alertasLogistica();
+      const hoy = DB.entregasDelDia(DB.hoyCorto());
+      const de = k => (ind.porEstado.find(x => x.k === k) || {}).n || 0;
+      return {
+        alarmas: alertas.slice(0, 4).map(a => ({
+          tono: a.tipo === 'freno' ? 'crit' : 'warn',
+          em: a.tipo === 'rendir' ? '💰' : a.tipo === 'freno' ? '⛔' : '⏰',
+          titulo: a.texto })),
+        kpis: [
+          { lab: 'Entregas hoy', em: '🚚', tono: 'info', val: String(hoy.length) },
+          { lab: 'Por coordinar', em: '📋', tono: de('por_completar') ? 'warn' : 'soft',
+            val: String(de('por_completar')) },
+          { lab: 'Sin rendir', em: '💰', tono: de('entregada') ? 'crit' : 'soft',
+            val: String(de('entregada')), foot: 'plata parada' },
+          { lab: 'Rendido', em: '✅', tono: 'ok', val: UI.pesos(ind.rendido) },
+        ],
+      };
+    },
+  };
+
   const Resumen = {
     render(mount, modulo) {
-      const c = CFG[modulo] || { titulo: modulo, sub: '', kpis: [] };
+      let c = CFG[modulo] || { titulo: modulo, sub: '', kpis: [] };
+      if (c.vivo && VIVO[c.vivo]) c = { titulo: c.titulo, sub: c.sub, ...VIVO[c.vivo]() };
       const W = global.Widgets;
       let extra = '';
       if (c.pipeline) extra += `<div style="margin-top:14px">${W.card('Pipeline de órdenes', W.pipeline(c.pipeline))}</div>`;

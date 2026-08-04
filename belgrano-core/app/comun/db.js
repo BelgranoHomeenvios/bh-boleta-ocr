@@ -321,11 +321,11 @@
         lineas: [{ id: 'L1', producto: 'Vajillero Nórdico', cantidad: 1, precio: 700000, tipo: 'estandar', img: null }],
         recordatorios: [], comentarios: [{ area: 'Tesorería', texto: 'Cliente dice que transfirió — sin acreditar en el banco', f: '29/07' }], archivos: [],
         cobros: [{ id: 'c2', f: '29/07', m: 700000, metodo: 'transferencia', recibidoPor: 'Cuenta Cristian', depositante: 'Juan López', referencia: 'Mercado Pago', estado: 'pendiente_banco' }] },
-      { id: 3, numero: 'S00019', fecha: '28/07', cliente: 'Bibiana',        vendedor: 'Ale',      local: '2020', pago: 'Tarjeta',       items: 2, total: 516000,  sena: 516000, saldo: 0,      entrega: '05/08', estado: 'listo',           situacion: 'lista',       reclamo: true,  factura: 'no',
+      { id: 3, numero: 'S00019', fecha: '28/07', cliente: 'Bibiana', domicilio: { dir: 'Av. Rivadavia 4820 3ºB', localidad: 'Caballito', zona: 'CABA', telefono: '1161636645', escalera: false },        vendedor: 'Ale',      local: '2020', pago: 'Tarjeta',       items: 2, total: 516000,  sena: 516000, saldo: 0,      entrega: '05/08', estado: 'listo',           situacion: 'lista',       reclamo: true,  factura: 'no',
         lineas: [{ id: 'L1', producto: 'Mesa de Luz Estocolmo', cantidad: 2, precio: 258000, tipo: 'estandar', img: null }],
         recordatorios: [], comentarios: [{ area: 'Reclamos', texto: 'Vino con una veta distinta a la del showroom', f: '28/07' }], archivos: [],
         cobros: [{ id: 'c3', f: '28/07', m: 516000, metodo: 'efectivo', recibidoPor: 'Caja Belgrano 2020', estado: 'rendido' }] },
-      { id: 4, numero: 'S00018', fecha: '28/07', cliente: 'Laura y Hernán', vendedor: 'Cristian', local: '2299', pago: 'Mixto',         items: 2, total: 731250,  sena: 481250, saldo: 250000, entrega: '02/08', estado: 'logistica',       situacion: 'en_logistica', reclamo: false, factura: 'no',
+      { id: 4, numero: 'S00018', fecha: '28/07', cliente: 'Laura y Hernán', domicilio: { dir: 'Güemes 1130 2º', localidad: 'Vicente López', zona: 'GBA Norte', telefono: '1152233445', escalera: true }, vendedor: 'Cristian', local: '2299', pago: 'Mixto',         items: 2, total: 731250,  sena: 481250, saldo: 250000, entrega: '02/08', estado: 'logistica',       situacion: 'en_logistica', reclamo: false, factura: 'no',
         flete: { monto: 60000, detalle: 'Subida x escalera · 2 pisos', escalera: true }, instalacion: { monto: 35000, detalle: 'Armado en domicilio' },
         lineas: [
           { id: 'L1', producto: 'Aparador Amberes',   variante: 'Roble / Negro', cantidad: 1, precio: 481250, tipo: 'estandar', img: null },
@@ -338,11 +338,11 @@
         lineas: [{ id: 'L1', producto: 'Biblioteca Borges 1.20', cantidad: 1, precio: 968000, tipo: 'estandar', img: null }],
         recordatorios: [], comentarios: [{ area: 'Reclamos', texto: 'Golpe en el lateral, reclamo abierto post-entrega', f: '28/07' }], archivos: [{ nombre: 'Factura A-0001-00002.pdf', tipo: 'factura', area: 'Contabilidad' }],
         cobros: [{ id: 'c6', f: '27/07', m: 968000, metodo: 'efectivo', recibidoPor: 'Dirección', estado: 'rendido' }] },
-      { id: 6, numero: 'S00016', fecha: '27/07', cliente: 'Diego',          vendedor: 'Sergio',   local: '2299', pago: 'Transferencia', items: 1, total: 733000,  sena: 0,      saldo: 733000, entrega: '10/08', estado: 'falta_tesoreria', situacion: 'impacto',     reclamo: false, factura: 'solicitada',
+      { id: 6, numero: 'S00016', fecha: '27/07', cliente: 'Diego', domicilio: { dir: 'Castelli 940', localidad: 'Lomas de Zamora', zona: 'GBA Sur', telefono: '5491131554640', escalera: false },          vendedor: 'Sergio',   local: '2299', pago: 'Transferencia', items: 1, total: 733000,  sena: 0,      saldo: 733000, entrega: '10/08', estado: 'falta_tesoreria', situacion: 'impacto',     reclamo: false, factura: 'solicitada',
         lineas: [{ id: 'L1', producto: 'Placard Oliver a medida', cantidad: 1, precio: 733000, tipo: 'medida', img: null, bloqueo: 'precio' }],
         recordatorios: [], comentarios: [{ area: 'Tesorería', texto: 'El cliente mandó 2 comprobantes por el mismo pago', f: '27/07' }], archivos: [{ nombre: 'Plano Placard Oliver.pdf', tipo: 'plano', area: 'Producción' }],
         cobros: [{ id: 'c7', f: '27/07', m: 733000, metodo: 'transferencia', recibidoPor: 'Cuenta Sergio', depositante: 'Diego Fernández', referencia: 'Transferencia inmediata', estado: 'pendiente_banco' }] },
-      { id: 8, numero: 'S00014', fecha: '25/07', cliente: 'Marta Gómez',    vendedor: 'Nati',     local: '2020', pago: 'Transferencia', items: 1, total: 640000,  sena: 200000, saldo: 440000, entrega: '18/08', estado: 'preproduccion',   situacion: 'con_frenos',  reclamo: false, factura: 'no',
+      { id: 8, numero: 'S00014', fecha: '25/07', cliente: 'Marta Gómez', domicilio: { dir: 'Zapiola 2210', localidad: 'Belgrano', zona: 'CABA', telefono: '1144556677', escalera: false },    vendedor: 'Nati',     local: '2020', pago: 'Transferencia', items: 1, total: 640000,  sena: 200000, saldo: 440000, entrega: '18/08', estado: 'preproduccion',   situacion: 'con_frenos',  reclamo: false, factura: 'no',
         lineas: [{ id: 'L1', producto: 'Ropero Escandinavo a medida', cantidad: 1, precio: 640000, tipo: 'medida', img: null }],
         recordatorios: [], comentarios: [{ area: 'Producción', texto: 'Falta confirmar color de frente antes de cortar', f: '25/07' }], archivos: [],
         cobros: [{ id: 'c8', f: '25/07', m: 200000, metodo: 'transferencia', recibidoPor: 'Cuenta Nati', depositante: 'Marta Gómez', cuit: '27-28999111-4', comprobante: 'GAL-771201', montoConfirmado: 200000, confirmadoPor: 'Administración', estado: 'confirmado' }] },
@@ -362,11 +362,76 @@
     ],
     // Clientes de ejemplo (una fila por teléfono, como el CRM).
     clientes: [
-      { id: 1, nombre: 'Bibiana',        telefono: '1161636645',    vendedor: 'Ale',      consultas: 2, concret: 2, seguim: 0, comprado: 1691700, ultima: 'Ayer' },
-      { id: 2, nombre: 'Victoria',       telefono: '5491168145568', vendedor: 'Ale',      consultas: 1, concret: 1, seguim: 0, comprado: 1520000, ultima: 'Hace 6 días' },
-      { id: 3, nombre: 'Liliana y Javier', telefono: '1151099144',  vendedor: 'Cristian', consultas: 1, concret: 1, seguim: 0, comprado: 1335750, ultima: 'Hace 2 días' },
-      { id: 4, nombre: 'Diego',          telefono: '5491131554640', vendedor: 'Cristian', consultas: 1, concret: 1, seguim: 0, comprado: 733000,  ultima: 'Hace 9 días' },
-      { id: 5, nombre: 'Paloma',         telefono: '5491141715700', vendedor: 'Ale',      consultas: 1, concret: 0, seguim: 1, comprado: 0,       ultima: 'Hoy' },
+      { id: 1, nombre: 'Bibiana',        telefono: '1161636645',    instagram: '', mail: '', vendedor: 'Ale',      consultas: 2, concret: 2, seguim: 0, comprado: 1691700, ultima: 'Ayer' },
+      { id: 2, nombre: 'Victoria',       telefono: '5491168145568', instagram: 'vicky.deco', mail: '', vendedor: 'Ale', consultas: 1, concret: 1, seguim: 0, comprado: 1520000, ultima: 'Hace 6 días' },
+      { id: 3, nombre: 'Liliana y Javier', telefono: '1151099144',  instagram: '', mail: 'lilianayjavier@gmail.com', vendedor: 'Cristian', consultas: 1, concret: 1, seguim: 0, comprado: 1335750, ultima: 'Hace 2 días' },
+      { id: 4, nombre: 'Diego',          telefono: '5491131554640', instagram: '', mail: '', vendedor: 'Cristian', consultas: 1, concret: 1, seguim: 0, comprado: 733000,  ultima: 'Hace 9 días' },
+      { id: 5, nombre: 'Paloma',         telefono: '5491141715700', instagram: '', mail: '', vendedor: 'Ale',      consultas: 1, concret: 0, seguim: 1, comprado: 0,       ultima: 'Hoy' },
+      // El usuario de Instagram ya es un cliente: se le va agregando el resto.
+      { id: 6, nombre: 'martitaok',      telefono: '',              instagram: 'martitaok', mail: '', vendedor: '', consultas: 1, concret: 0, seguim: 1, comprado: 0, ultima: 'Hoy' },
+      // Cargada dos veces por dos vendedores: es la misma Victoria (mismo tel
+      // escrito distinto). Está para probar la fusión.
+      { id: 7, nombre: 'Victoria G.',    telefono: '11-6814-5568',  instagram: '', mail: '', vendedor: 'Nati', consultas: 1, concret: 0, seguim: 1, comprado: 0, ultima: 'Ayer' },
+    ],
+    // Las consultas del CRM. La mayoría no llega a nada, y está bien: lo que
+    // no puede pasar es que se pierdan.
+    consultas: [
+      // La cola de Cintia: sin dueño todavía.
+      { id: 'CONS-000101', f: '04/08', canal: 'instagram', vendedor: '',
+        contacto: { nombre: '', telefono: '', instagram: 'martitaok', mail: '' }, clienteId: 6,
+        etapa: 'nueva', que: 'Pregunta si la cómoda Amberes viene en 1,60', proxima: null,
+        cotizaciones: [], orden: null, historia: [] },
+      { id: 'CONS-000102', f: '03/08', canal: 'whatsapp', vendedor: '',
+        contacto: { nombre: 'Gustavo', telefono: '1155667788', instagram: '', mail: '' }, clienteId: null,
+        etapa: 'nueva', que: 'Quiere un placard a medida para un pasillo', proxima: null,
+        cotizaciones: [], orden: null, historia: [] },
+      { id: 'CONS-000103', f: '04/08', canal: 'estado', vendedor: '',
+        contacto: { nombre: 'Marta Gómez', telefono: '1144556677', instagram: '', mail: '' }, clienteId: null,
+        etapa: 'nueva', que: '¿Cuándo llega mi ropero? Compró el 25/07', proxima: null,
+        cotizaciones: [], orden: 'S00014', historia: [] },
+      // Derivadas, en seguimiento.
+      { id: 'CONS-000104', f: '01/08', canal: 'whatsapp', vendedor: 'Ale',
+        contacto: { nombre: 'Paloma', telefono: '5491141715700', instagram: '', mail: '' }, clienteId: 5,
+        etapa: 'negociando', que: 'Mesa ratona Noruega, compara con otra casa',
+        proxima: { f: '03/08', que: 'Llamarla: se le vence el precio' },
+        cotizaciones: ['C00088'], orden: null, derivadaPor: 'Cintia', derivadaEl: '01/08',
+        historia: [{ f: '02/08', texto: 'Le pasé fotos del lustre', quien: 'Ale' }] },
+      { id: 'CONS-000105', f: '02/08', canal: 'publicidad', vendedor: 'Nati',
+        contacto: { nombre: 'Victoria G.', telefono: '11-6814-5568', instagram: '', mail: '' }, clienteId: 7,
+        etapa: 'presupuesto', que: 'Vio el vajillero nórdico en la publicidad',
+        proxima: { f: '05/08', que: 'Preguntarle qué le pareció' },
+        cotizaciones: ['C00090'], orden: null, derivadaPor: 'Cintia', derivadaEl: '02/08', historia: [] },
+      // Derivada y sin tocar: el control de Cintia.
+      { id: 'CONS-000106', f: '31/07', canal: 'facebook', vendedor: 'Sergio',
+        contacto: { nombre: 'Rubén', telefono: '1133445566', instagram: '', mail: '' }, clienteId: null,
+        etapa: 'contactado', que: 'Precio del rack de TV en paraíso', proxima: null,
+        cotizaciones: [], orden: null, derivadaPor: 'Cintia', derivadaEl: '31/07', historia: [] },
+      // Concretadas: las pone la venta, no la persona.
+      { id: 'CONS-000107', f: '27/07', canal: 'instagram', vendedor: 'Ale',
+        contacto: { nombre: 'Bibiana', telefono: '1161636645', instagram: '', mail: '' }, clienteId: 1,
+        etapa: 'concretado', que: 'Dos mesas de luz', proxima: null,
+        cotizaciones: ['C00082'], orden: 'S00019', historia: [
+          { f: '28/07', texto: 'Presupuesto enviado → Concretado — venta S00019', quien: 'sistema' }] },
+      { id: 'CONS-000108', f: '25/07', canal: 'local', vendedor: 'Cristian',
+        contacto: { nombre: 'Laura y Hernán', telefono: '1152233445', instagram: '', mail: '' }, clienteId: null,
+        etapa: 'concretado', que: 'Aparador y ratona para el living', proxima: null,
+        cotizaciones: ['C00080'], orden: 'S00018', historia: [] },
+      // Rechazada: la venta se anuló y la consulta se cerró con ella.
+      { id: 'CONS-000109', f: '26/07', canal: 'tienda-nube', vendedor: 'Nati',
+        contacto: { nombre: 'Camila', telefono: '1160708090', instagram: '', mail: '' }, clienteId: null,
+        etapa: 'rechazado', que: 'Silla Meier', proxima: null,
+        cotizaciones: ['C00081'], orden: 'S00015', historia: [
+          { f: '30/07', texto: 'Negociando → Rechazado — se anuló la venta S00015', quien: 'sistema' }] },
+    ],
+    // Los que manejan y con qué. El flete tercero cobra por viaje.
+    choferes: [
+      { id: 1, nombre: 'Marcos',  tipo: 'propio', telefono: '1140001111', vehiculoId: 1, cupoDia: 8 },
+      { id: 2, nombre: 'El Tano', tipo: 'flete',  telefono: '1140002222', vehiculoId: 3, cupoDia: 6, costoViaje: 90000 },
+    ],
+    vehiculos: [
+      { id: 1, nombre: 'Camioneta blanca', patente: 'AF 123 XX', capacidad: 8, estado: 'anda' },
+      { id: 2, nombre: 'Camión chico',     patente: 'AC 456 YY', capacidad: 14, estado: 'taller' },
+      { id: 3, nombre: 'Flete del Tano',   patente: '—',         capacidad: 6, estado: 'anda' },
     ],
   };
 
@@ -4072,6 +4137,18 @@
       return orden;
     },
 
+    // Anular una venta es una decisión con nombre: queda el motivo, la
+    // consulta del CRM pasa a Rechazada y la comisión deja de contar.
+    anularOrden(numero, { motivo = '', quien = '' } = {}) {
+      const o = (DEMO.ordenes || []).find(x => x.numero === numero);
+      if (!o) return { error: 'no existe la boleta' };
+      if (!String(motivo).trim()) return { error: 'la anulación lleva motivo' };
+      o.estado = 'anulado'; o.situacion = 'anulada';
+      o.anulada = { motivo, quien: quien || 'yo', f: this.hoyCorto() };
+      this.consultaAnulada(numero, { motivo, quien });
+      return o;
+    },
+
     async ordenes({ texto = '' } = {}) {
       const t = sinTilde(texto);
       return DEMO.ordenes.filter(o => !t || sinTilde(o.cliente).includes(t) || sinTilde(o.numero).includes(t));
@@ -4120,6 +4197,594 @@
       const t = sinTilde(texto);
       return DEMO.cotizaciones.filter(c => !t || sinTilde(c.cliente).includes(t) || sinTilde(c.numero).includes(t));
     },
+    // ---- CRM ---------------------------------------------------------------
+    // Una consulta es alguien que preguntó. La mayoría no llega a nada, y está
+    // bien: lo que no puede pasar es que se pierda o que quede viva para
+    // siempre porque nadie se acordó de cerrarla.
+    CANALES: [
+      { k: 'whatsapp', label: 'WhatsApp', venta: true },
+      { k: 'instagram', label: 'Instagram', venta: true },
+      { k: 'facebook', label: 'Facebook', venta: true },
+      { k: 'publicidad', label: 'Publicidad', venta: true },
+      { k: 'tienda-nube', label: 'Tienda Nube', venta: true },
+      { k: 'google', label: 'Google Shopping', venta: true },
+      { k: 'mail', label: 'Mail', venta: true },
+      { k: 'local', label: 'Local', venta: true },
+      { k: 'telefono', label: 'Teléfono', venta: true },
+      // Estos no van a un vendedor y no generan cotización.
+      { k: 'estado', label: 'Consulta de estado', venta: false },
+      { k: 'reclamo', label: 'Reclamo', venta: false },
+      { k: 'proveedores', label: 'Proveedores', venta: false },
+      { k: 'cv', label: 'CV', venta: false },
+      { k: 'otros', label: 'Otros', venta: false },
+    ],
+    canalDe(k) { return this.CANALES.find(c => c.k === k) || { k, label: k, venta: true }; },
+    // La etapa es la verdad del embudo. Sube sola con los hechos de Ventas y
+    // no baja nunca, salvo que la venta se anule.
+    ETAPAS: [
+      { k: 'nueva', label: 'Consulta nueva', n: 1, viva: true },
+      { k: 'contactado', label: 'Contactado', n: 2, viva: true },
+      { k: 'presupuesto', label: 'Le envié el presupuesto', n: 3, viva: true },
+      { k: 'negociando', label: 'Negociando', n: 4, viva: true },
+      { k: 'concretado', label: 'Concretado', n: 5, viva: false },
+      { k: 'rechazado', label: 'Rechazado', n: 6, viva: false },
+      { k: 'cerrado', label: 'Cerrado', n: 6, viva: false },
+    ],
+    etapaDe(k) { return this.ETAPAS.find(e => e.k === k) || this.ETAPAS[0]; },
+
+    // El mismo teléfono escrito de seis maneras es el mismo teléfono. Se saca
+    // el +54, el 9 y el 15, que es lo que cambia según quién lo anotó.
+    telNorm(t) {
+      let d = String(t || '').replace(/\D/g, '');
+      if (d.startsWith('54')) d = d.slice(2);
+      if (d.startsWith('9')) d = d.slice(1);
+      if (d.startsWith('0')) d = d.slice(1);
+      // El 15 va después de la característica, así que se saca donde esté.
+      d = d.replace(/^(\d{2,4})15(\d{6,8})$/, '$1$2');
+      return d;
+    },
+    igNorm(u) { return String(u || '').trim().toLowerCase().replace(/^@/, ''); },
+    mailNorm(m) { return String(m || '').trim().toLowerCase(); },
+
+    consultasTodas() { return (DEMO.consultas = DEMO.consultas || []); },
+    consulta(id) { return this.consultasTodas().find(c => c.id === id) || null; },
+    // La cola: lo que entró y todavía no tiene dueño. Es la pantalla de Cintia.
+    colaConsultas() {
+      return this.consultasTodas()
+        .filter(c => !c.vendedor && this.etapaDe(c.etapa).viva)
+        .sort((a, b) => (this.diasDesde(b.f) || 0) - (this.diasDesde(a.f) || 0));
+    },
+    consultas({ vendedor = '', canal = '', etapa = '', texto = '', vivas = null,
+      sinDueno = null } = {}) {
+      const t = sinTilde(texto);
+      return this.consultasTodas().filter(c => {
+        if (vendedor && c.vendedor !== vendedor) return false;
+        if (canal && c.canal !== canal) return false;
+        if (etapa && c.etapa !== etapa) return false;
+        if (vivas != null && this.etapaDe(c.etapa).viva !== vivas) return false;
+        if (sinDueno != null && !!c.vendedor === sinDueno) return false;
+        if (!t) return true;
+        const q = [c.que, c.contacto.nombre, c.contacto.telefono, c.contacto.instagram,
+          c.contacto.mail, c.orden].map(x => sinTilde(String(x || ''))).join(' ');
+        return q.includes(t);
+      }).sort((a, b) => this.ordenSeguimiento(a) - this.ordenSeguimiento(b));
+    },
+    // Ordena por urgencia: lo vencido primero, después por próxima acción, y
+    // al final lo que no tiene nada agendado.
+    ordenSeguimiento(c) {
+      if (!c.proxima || !c.proxima.f) return 1e6;
+      const d = this.diasHasta(c.proxima.f);
+      return d == null ? 1e6 : d;
+    },
+    consultaVencida(c) {
+      if (!c.proxima || !c.proxima.f) return false;
+      const d = this.diasHasta(c.proxima.f);
+      return d != null && d < 0;
+    },
+
+    // ---- Mover la consulta -------------------------------------------------
+    // Derivar es lo único que le pone dueño. Lo hacen Cintia o Dirección.
+    derivarConsulta(id, vendedor, { motivo = '', quien = '' } = {}) {
+      const c = this.consulta(id);
+      if (!c) return { error: 'no existe la consulta' };
+      if (!vendedor) return { error: 'hay que elegir un vendedor' };
+      c.vendedor = vendedor;
+      c.derivadaPor = quien || 'Cintia';
+      c.derivadaEl = this.hoyCorto();
+      c.motivoDerivacion = motivo;
+      if (this.etapaDe(c.etapa).n < 2) c.etapa = 'contactado';
+      // Recién derivada, la próxima acción es hoy: hay que contestarle.
+      if (!c.proxima || !c.proxima.f) c.proxima = { f: this.hoyCorto(), que: 'Contestarle' };
+      this.anotarConsulta(id, `Derivada a ${vendedor}${motivo ? ' — ' + motivo : ''}`,
+        quien || 'Cintia');
+      return c;
+    },
+    // La etapa nunca retrocede sola. Bajarla es una decisión de una persona y
+    // queda anotada.
+    moverEtapa(id, etapa, { quien = '', motivo = '', forzar = false } = {}) {
+      const c = this.consulta(id);
+      if (!c) return { error: 'no existe la consulta' };
+      const antes = this.etapaDe(c.etapa), ahora = this.etapaDe(etapa);
+      if (ahora.n < antes.n && !forzar) {
+        return { error: `no se puede volver de "${antes.label}" a "${ahora.label}"` };
+      }
+      c.etapa = etapa;
+      if (!ahora.viva) c.proxima = null;   // cerrada no tiene próxima acción
+      this.anotarConsulta(id, `${antes.label} → ${ahora.label}${
+        motivo ? ' — ' + motivo : ''}`, quien);
+      return c;
+    },
+    anotarConsulta(id, texto, quien = '') {
+      const c = this.consulta(id);
+      if (!c) return null;
+      (c.historia = c.historia || []).unshift({ f: this.hoyCorto(), texto, quien: quien || 'yo' });
+      return c;
+    },
+    agendarConsulta(id, fecha, que, quien = '') {
+      const c = this.consulta(id);
+      if (!c) return null;
+      c.proxima = fecha ? { f: fecha, que: que || 'Seguir' } : null;
+      this.anotarConsulta(id, fecha ? `Agendado para el ${fecha}: ${que || 'seguir'}`
+        : 'Sacó la próxima acción', quien);
+      return c;
+    },
+
+    // ---- El cliente único --------------------------------------------------
+    // La búsqueda es floja a propósito: el mismo cliente escribe por Instagram
+    // en marzo y pasa por el local en agosto. Si no los une, el vendedor no
+    // sabe que ya lo atendió.
+    buscarCliente({ telefono = '', instagram = '', mail = '', nombre = '' } = {}) {
+      const tel = this.telNorm(telefono), ig = this.igNorm(instagram), ma = this.mailNorm(mail);
+      const nom = sinTilde(nombre).trim();
+      return DEMO.clientes.filter(c => {
+        if (tel && this.telNorm(c.telefono) === tel) return true;
+        if (ig && this.igNorm(c.instagram) === ig) return true;
+        if (ma && this.mailNorm(c.mail) === ma) return true;
+        // El nombre solo no alcanza para unir, pero sirve para sugerir.
+        return !!(nom && nom.length > 3 && sinTilde(c.nombre).trim() === nom);
+      });
+    },
+    // Un usuario de Instagram ya es un cliente. No hace falta el nombre: se le
+    // va agregando lo que aparezca.
+    crearCliente({ nombre = '', telefono = '', instagram = '', mail = '', vendedor = '' } = {}) {
+      const id = DEMO.clientes.reduce((m, c) => Math.max(m, c.id), 0) + 1;
+      const c = { id, nombre: nombre || this.igNorm(instagram) || telefono || 'Sin nombre',
+        telefono, instagram: this.igNorm(instagram), mail: this.mailNorm(mail), vendedor,
+        consultas: 0, concret: 0, seguim: 0, comprado: 0, ultima: this.hoyCorto() };
+      DEMO.clientes.push(c);
+      return c;
+    },
+    // Engancha la consulta a un cliente: si ya existe se usa, si no se crea.
+    // Cuando hay más de un candidato NO se adivina — unir dos que no son el
+    // mismo es peor que tenerlos separados.
+    engancharCliente(id, { quien = '' } = {}) {
+      const c = this.consulta(id);
+      if (!c) return { error: 'no existe la consulta' };
+      if (c.clienteId) return { cliente: this.clienteDe(c.clienteId), ya: true };
+      const cand = this.buscarCliente(c.contacto);
+      if (cand.length > 1) return { candidatos: cand, preguntar: true };
+      const cli = cand[0] || this.crearCliente({ ...c.contacto, vendedor: c.vendedor });
+      c.clienteId = cli.id;
+      this.anotarConsulta(id, cand.length ? `Es ${cli.nombre}, que ya estaba`
+        : `Se creó el cliente ${cli.nombre}`, quien);
+      return { cliente: cli, nuevo: !cand.length };
+    },
+    clienteDe(id) { return DEMO.clientes.find(c => c.id === id) || null; },
+    consultasDeCliente(id) {
+      return this.consultasTodas().filter(c => c.clienteId === id);
+    },
+
+    // ---- Fusionar ----------------------------------------------------------
+    // Dos vendedores cargaron al mismo cliente. Se fusiona y queda uno solo
+    // siguiéndolo, aunque la comisión después se reparta.
+    candidatosFusion() {
+      const pares = [], vistos = new Set();
+      const cs = DEMO.clientes;
+      for (let i = 0; i < cs.length; i++) {
+        for (let j = i + 1; j < cs.length; j++) {
+          const a = cs[i], b = cs[j];
+          const por = [];
+          if (a.telefono && this.telNorm(a.telefono) === this.telNorm(b.telefono)) por.push('el teléfono');
+          if (a.instagram && this.igNorm(a.instagram) === this.igNorm(b.instagram)) por.push('el Instagram');
+          if (a.mail && this.mailNorm(a.mail) === this.mailNorm(b.mail)) por.push('el mail');
+          if (sinTilde(a.nombre).trim() && sinTilde(a.nombre).trim() === sinTilde(b.nombre).trim()) por.push('el nombre');
+          if (!por.length) continue;
+          const k = `${a.id}-${b.id}`;
+          if (vistos.has(k)) continue;
+          vistos.add(k);
+          // Coincidir por nombre solo es débil; por teléfono o mail es fuerte.
+          pares.push({ a, b, por, fuerte: por.some(p => p !== 'el nombre') });
+        }
+      }
+      return pares.sort((x, y) => (y.fuerte ? 1 : 0) - (x.fuerte ? 1 : 0));
+    },
+    // Gana el que se queda: se le suma lo del otro y el otro desaparece. El
+    // teléfono pasa a ser el dato principal cuando aparece.
+    fusionarClientes(quedaId, vaId, { quien = '' } = {}) {
+      const q = this.clienteDe(quedaId), v = this.clienteDe(vaId);
+      if (!q || !v) return { error: 'falta uno de los dos clientes' };
+      if (q.id === v.id) return { error: 'es el mismo cliente' };
+      q.nombre = q.nombre && q.nombre !== this.igNorm(q.instagram) ? q.nombre : (v.nombre || q.nombre);
+      q.telefono = q.telefono || v.telefono;
+      q.instagram = q.instagram || v.instagram;
+      q.mail = q.mail || v.mail;
+      q.comprado = (q.comprado || 0) + (v.comprado || 0);
+      q.consultas = (q.consultas || 0) + (v.consultas || 0);
+      q.concret = (q.concret || 0) + (v.concret || 0);
+      this.consultasDeCliente(v.id).forEach(c => { c.clienteId = q.id; });
+      DEMO.clientes = DEMO.clientes.filter(c => c.id !== v.id);
+      return { cliente: q, fusionado: v, quien: quien || 'yo' };
+    },
+
+    // ---- El enganche con Ventas -------------------------------------------
+    // Cotizar ES registrar la atención. El vendedor no carga la consulta a
+    // mano: se crea con la cotización, y si ya había una del mismo cliente
+    // sube de etapa en vez de duplicarse.
+    consultaDeCotizacion({ cliente = {}, vendedor = '', canal = 'local', que = '',
+      cotizacion = '', quien = '' } = {}) {
+      const cand = this.buscarCliente(cliente);
+      const cli = cand.length === 1 ? cand[0] : null;
+      // ¿Ya hay una consulta viva de este cliente con este vendedor?
+      let c = cli && this.consultasTodas().find(x => x.clienteId === cli.id
+        && this.etapaDe(x.etapa).viva);
+      if (!c) {
+        const id = 'CONS-' + String(this.consultasTodas().length + 1).padStart(6, '0');
+        c = { id, f: this.hoyCorto(), canal, vendedor,
+          contacto: { nombre: cliente.nombre || '', telefono: cliente.telefono || '',
+            instagram: this.igNorm(cliente.instagram), mail: this.mailNorm(cliente.mail) },
+          clienteId: cli ? cli.id : null, etapa: 'nueva', que: que || 'Pidió un presupuesto',
+          proxima: null, cotizaciones: [], orden: null, historia: [] };
+        this.consultasTodas().push(c);
+        if (!cli) this.engancharCliente(id, { quien });
+      }
+      if (cotizacion && !c.cotizaciones.includes(cotizacion)) c.cotizaciones.push(cotizacion);
+      if (this.etapaDe(c.etapa).n < 3) {
+        this.moverEtapa(c.id, 'presupuesto', { quien, motivo: `cotización ${cotizacion}` });
+      } else {
+        this.anotarConsulta(c.id, `Otra cotización: ${cotizacion}`, quien);
+      }
+      // Toda cotización deja una próxima acción: a los dos días se pregunta.
+      if (!c.proxima || !c.proxima.f) c.proxima = { f: this.hoyCorto(), que: 'Preguntarle qué le pareció' };
+      return c;
+    },
+    // Concretado lo pone la venta, no la persona: significa que hay una orden
+    // con número. Vender no cierra la consulta entera —si preguntó por tres
+    // cosas y compró una, las otras dos siguen en seguimiento—.
+    consultaConcretada(numeroOrden, { cotizacion = '', quien = '' } = {}) {
+      const c = this.consultasTodas().find(x =>
+        (cotizacion && x.cotizaciones.includes(cotizacion))
+        || (x.orden === numeroOrden));
+      if (!c) return null;
+      c.orden = numeroOrden;
+      this.moverEtapa(c.id, 'concretado', { quien, motivo: `venta ${numeroOrden}` });
+      return c;
+    },
+    // La orden anulada manda la consulta a Rechazada: si la venta se cayó, la
+    // consulta se cerró.
+    consultaAnulada(numeroOrden, { motivo = '', quien = '' } = {}) {
+      const c = this.consultasTodas().find(x => x.orden === numeroOrden);
+      if (!c) return null;
+      return this.moverEtapa(c.id, 'rechazado',
+        { quien, forzar: true, motivo: motivo || `se anuló la venta ${numeroOrden}` });
+    },
+
+    // ---- Los números del CRM ----------------------------------------------
+    // Lo que hoy no se puede saber: cuánto vendió cada canal. El canal vive en
+    // el CRM y la plata en Ventas; acá se juntan.
+    tableroCanal() {
+      const ords = DEMO.ordenes || [];
+      const filas = this.CANALES.filter(ca => ca.venta).map(ca => {
+        const cs = this.consultasTodas().filter(c => c.canal === ca.k);
+        const con = cs.filter(c => c.etapa === 'concretado');
+        const plata = con.reduce((a, c) => {
+          const o = ords.find(x => x.numero === c.orden);
+          return a + (o ? Number(o.total) || 0 : 0);
+        }, 0);
+        return { canal: ca.k, label: ca.label, consultas: cs.length, concret: con.length,
+          plata, conv: cs.length ? Math.round(con.length / cs.length * 100) : 0,
+          ticket: con.length ? Math.round(plata / con.length) : 0 };
+      }).filter(f => f.consultas);
+      return filas.sort((a, b) => b.plata - a.plata);
+    },
+    // Quién convierte mejor, no quién vende más: el que recibe 100 y cierra 20
+    // es mejor que el que recibe 300 y cierra 25.
+    tableroVendedor() {
+      return this.vendedores().map(v => {
+        const cs = this.consultasTodas().filter(c => c.vendedor === v);
+        const con = cs.filter(c => c.etapa === 'concretado');
+        const vivas = cs.filter(c => this.etapaDe(c.etapa).viva);
+        return { vendedor: v, consultas: cs.length, concret: con.length,
+          abiertas: vivas.length,
+          vencidas: vivas.filter(c => this.consultaVencida(c)).length,
+          conv: cs.length ? Math.round(con.length / cs.length * 100) : 0 };
+      }).filter(f => f.consultas).sort((a, b) => b.conv - a.conv);
+    },
+    // El control de Cintia: lo que derivó y el vendedor no tocó.
+    sinRespuesta() {
+      return this.consultasTodas().filter(c => c.vendedor && c.etapa === 'contactado'
+        && (this.diasDesde(c.derivadaEl || c.f) || 0) >= 2)
+        .sort((a, b) => (this.diasDesde(a.derivadaEl || a.f) || 0)
+          - (this.diasDesde(b.derivadaEl || b.f) || 0));
+    },
+    resumenCRM() {
+      const todas = this.consultasTodas();
+      const vivas = todas.filter(c => this.etapaDe(c.etapa).viva);
+      const con = todas.filter(c => c.etapa === 'concretado');
+      return { clientes: DEMO.clientes.length, consultas: todas.length,
+        cola: this.colaConsultas().length, vivas: vivas.length,
+        vencidas: vivas.filter(c => this.consultaVencida(c)).length,
+        concret: con.length,
+        conv: todas.length ? Math.round(con.length / todas.length * 100) : 0,
+        sinRespuesta: this.sinRespuesta().length,
+        fusionar: this.candidatosFusion().filter(p => p.fuerte).length };
+    },
+
+    // ---- Logística ----------------------------------------------------------
+    // La entrega no se carga: nace de la boleta. El sistema ya sabe el
+    // cliente, el domicilio, los muebles y el saldo; lo único que falta es lo
+    // que no puede saber: qué día va, con quién, y qué pasó en la puerta.
+    ESTADOS_ENTREGA: [
+      { k: 'por_completar', label: 'Por completar', pill: 'warn' },
+      { k: 'coordinada', label: 'Coordinada', pill: 'info' },
+      { k: 'en_viaje', label: 'En viaje', pill: 'info' },
+      { k: 'entregada', label: 'Entregada', pill: 'ok' },
+      { k: 'cerrada', label: 'Cerrada', pill: 'soft' },
+    ],
+    estadoEntrega(k) { return this.ESTADOS_ENTREGA.find(e => e.k === k) || this.ESTADOS_ENTREGA[0]; },
+    TOPE_SALIDA: 550000,   // arriba de esto, sin autorización el mueble no sale
+    choferes() { return DEMO.choferes || []; },
+    chofer(id) { return this.choferes().find(c => c.id === Number(id)) || null; },
+    vehiculos() { return DEMO.vehiculos || []; },
+    // El saldo de AHORA, no una copia: señas y refuerzos confirmados restan,
+    // lo pendiente no. Es el número que sale en el remito.
+    saldoVivo(o) { return Math.max(0, (Number(o.total) || 0) - this.senaConfirmada(o)); },
+    aCobrarEnPuerta(o) {
+      const flete = Number((o.flete || {}).monto) || 0;
+      const inst = Number((o.instalacion || {}).monto) || 0;
+      return { saldo: this.saldoVivo(o), flete, instalacion: inst,
+        total: this.saldoVivo(o) + flete + inst };
+    },
+    // Una entrega por boleta que llegó a estar lista. La que no tiene
+    // domicilio es un retiro por el local: no lleva chofer pero sí saldo.
+    _logDe(o) {
+      if (!o.log) {
+        o.log = { estado: o.estado === 'entregado' || o.estado === 'archivado'
+          ? 'entregada' : 'por_completar',
+          fecha: '', franja: '', choferId: null, historia: [] };
+        if (o.log.estado === 'entregada') {
+          o.log.fecha = o.entrega || '';
+          o.log.entrega = { f: o.entrega || '', quienRecibio: o.cliente };
+        }
+      }
+      return o.log;
+    },
+    entregas() {
+      return (DEMO.ordenes || [])
+        .filter(o => ['listo', 'logistica', 'entregado', 'archivado'].includes(o.estado))
+        .map(o => ({ o, log: this._logDe(o), retira: !o.domicilio,
+          puerta: this.aCobrarEnPuerta(o), freno: this.frenoEntrega(o) }));
+    },
+    entregaDe(numero) {
+      return this.entregas().find(e => e.o.numero === numero) || null;
+    },
+    // El freno: un mueble no sale sin que la plata esté confirmada por alguien
+    // nuestro. Si Dirección lo destraba, queda registrado quién y por qué.
+    frenoEntrega(o) {
+      const log = this._logDe(o);
+      const pend = (o.cobros || []).filter(c => this.cobroPendiente(c));
+      if (pend.length && !log.destrabo) {
+        const m = pend.reduce((a, c) => a + (Number(c.m) || 0), 0);
+        return { trabada: true, motivo: `hay ${this.plata(m)} cobrados por ${
+          pend[0].recibidoPor || 'alguien'} que nadie confirmó` };
+      }
+      return { trabada: false, destrabo: log.destrabo || null };
+    },
+    destrabarEntrega(numero, { quien = '', motivo = '' } = {}) {
+      const e = this.entregaDe(numero);
+      if (!e) return { error: 'no existe la entrega' };
+      if (!motivo) return { error: 'el destrabe lleva motivo: queda registrado' };
+      e.log.destrabo = { quien: quien || 'Dirección', motivo, f: this.hoyCorto() };
+      this._anotarEntrega(e, `Destrabada por ${e.log.destrabo.quien}: ${motivo}`);
+      return e;
+    },
+    _anotarEntrega(e, texto, quien = '') {
+      (e.log.historia = e.log.historia || []).unshift(
+        { f: this.hoyCorto(), texto, quien: quien || 'sistema' });
+    },
+    // Coordinar: día, franja y chofer. Con el freno puesto no se coordina.
+    coordinarEntrega(numero, { fecha, franja = 'manana', choferId = null, quien = '' } = {}) {
+      const e = this.entregaDe(numero);
+      if (!e) return { error: 'no existe la entrega' };
+      if (!fecha) return { error: 'falta el día' };
+      const freno = this.frenoEntrega(e.o);
+      if (freno.trabada) return { error: `no se puede coordinar: ${freno.motivo}` };
+      if (!e.retira) {
+        const ch = this.chofer(choferId);
+        if (!ch) return { error: 'falta el chofer' };
+        const carga = this.cargaChofer(ch.id, fecha).muebles + (Number(e.o.items) || 1);
+        if (carga > ch.cupoDia) {
+          return { error: `${ch.nombre} ya tiene ${carga - (Number(e.o.items) || 1)
+            } muebles ese día y entran ${ch.cupoDia}` };
+        }
+      }
+      Object.assign(e.log, { estado: 'coordinada', fecha, franja,
+        choferId: e.retira ? null : Number(choferId) });
+      this._anotarEntrega(e, `Coordinada para el ${fecha} ${franja === 'tarde' ? 'a la tarde'
+        : 'a la mañana'}${e.retira ? ' — retira por el local'
+        : ` con ${this.chofer(choferId).nombre}`}`, quien);
+      return e;
+    },
+    // Salir a la calle. Arriba del tope, sin la firma de un socio no sale.
+    salidaEntrega(numero, { quien = '' } = {}) {
+      const e = this.entregaDe(numero);
+      if (!e) return { error: 'no existe la entrega' };
+      if (e.log.estado !== 'coordinada') return { error: 'todavía no está coordinada' };
+      const p = this.aCobrarEnPuerta(e.o);
+      if (p.saldo > this.TOPE_SALIDA && !e.log.autorizo) {
+        return { error: `el saldo es ${this.plata(p.saldo)} y arriba de ${
+          this.plata(this.TOPE_SALIDA)} tiene que autorizarlo Brian o Jony`, tope: true };
+      }
+      e.log.estado = 'en_viaje';
+      e.log.salida = { f: this.hoyCorto(), quien: quien || 'Logística' };
+      this._anotarEntrega(e, 'Salió a la calle', quien);
+      return e;
+    },
+    autorizarSalida(numero, { quien = '' } = {}) {
+      const e = this.entregaDe(numero);
+      if (!e) return { error: 'no existe la entrega' };
+      e.log.autorizo = { quien: quien || 'Dirección', f: this.hoyCorto() };
+      this._anotarEntrega(e, `Salida autorizada por ${e.log.autorizo.quien} (saldo ${
+        this.plata(this.saldoVivo(e.o))})`);
+      return e;
+    },
+    entregadaEntrega(numero, { quienRecibio = '', quien = '' } = {}) {
+      const e = this.entregaDe(numero);
+      if (!e) return { error: 'no existe la entrega' };
+      if (!['en_viaje', 'coordinada'].includes(e.log.estado)) {
+        return { error: 'esa entrega no está en la calle' };
+      }
+      e.log.estado = 'entregada';
+      e.log.entrega = { f: this.hoyCorto(), quienRecibio: quienRecibio || e.o.cliente };
+      e.o.estado = 'entregado';
+      this._anotarEntrega(e, `Entregada — recibió ${e.log.entrega.quienRecibio}`, quien);
+      return e;
+    },
+    // La rendición: la plata del día vuelve a la casa. Lo cobrado entra como
+    // cobro de la boleta —no como número suelto— y la diferencia traba el
+    // cierre hasta que alguien escriba por qué.
+    rendirEntrega(numero, { cobrado = 0, forma = 'efectivo', fletePagado = 0,
+      motivoDif = '', quien = '' } = {}) {
+      const e = this.entregaDe(numero);
+      if (!e) return { error: 'no existe la entrega' };
+      if (e.log.estado !== 'entregada') return { error: 'todavía no está entregada' };
+      const esperado = e.log.esperado != null ? e.log.esperado : this.aCobrarEnPuerta(e.o).total;
+      const dif = esperado - (Number(cobrado) || 0);
+      if (dif !== 0 && !String(motivoDif).trim()) {
+        return { error: `tenía que traer ${this.plata(esperado)} y trajo ${
+          this.plata(Number(cobrado) || 0)}: la diferencia lleva motivo`, dif };
+      }
+      if (Number(cobrado) > 0) {
+        this.anotarCobro(e.o.numero, { monto: cobrado, metodo: forma,
+          recibidoPor: quien || 'Rendición', quien });
+      }
+      // Lo que se le paga al flete es un gasto y entra al número del mes.
+      if (Number(fletePagado) > 0) {
+        this.cargarGasto({ rubro: 'logistica', concepto: 'LOGISTICA',
+          monto: fletePagado, quien, nota: `Flete ${e.o.numero}` });
+      }
+      e.log.estado = 'cerrada';
+      e.log.rendicion = { esperado, cobrado: Number(cobrado) || 0, forma,
+        fletePagado: Number(fletePagado) || 0, dif, motivo: motivoDif,
+        f: this.hoyCorto(), quien: quien || 'yo' };
+      this._anotarEntrega(e, dif ? `Rendida con diferencia de ${this.plata(dif)}: ${motivoDif}`
+        : 'Rendida completa', quien);
+      return e;
+    },
+    // La agenda: qué sale cada día y cuánta carga tiene cada chofer.
+    entregasDelDia(fecha) {
+      return this.entregas().filter(e => e.log.fecha === fecha
+        && ['coordinada', 'en_viaje'].includes(e.log.estado));
+    },
+    cargaChofer(choferId, fecha) {
+      const es = this.entregasDelDia(fecha).filter(e => e.log.choferId === Number(choferId));
+      return { entregas: es.length,
+        muebles: es.reduce((a, e) => a + (Number(e.o.items) || 1), 0) };
+    },
+    // La ruta del chofer: SOLO lo suyo de hoy. Domicilio, teléfono, muebles y
+    // cuánto cobrar. Nada de márgenes ni de otras entregas.
+    rutaDelDia(choferId, fecha) {
+      return this.entregasDelDia(fecha || this.hoyCorto())
+        .filter(e => e.log.choferId === Number(choferId))
+        .map(e => ({ numero: e.o.numero, cliente: e.o.cliente,
+          domicilio: e.o.domicilio || null, franja: e.log.franja,
+          muebles: (e.o.lineas || []).map(l => `${l.cantidad || 1}× ${l.producto}`),
+          cobrar: this.aCobrarEnPuerta(e.o) }));
+    },
+    // Las dos alertas de plata parada, más lo que no se pudo coordinar.
+    alertasLogistica() {
+      const out = [];
+      this.entregas().forEach(e => {
+        const falta = this.diasHasta(e.log.fecha || e.o.entrega);
+        if (e.log.estado === 'entregada' && (this.diasDesde(e.log.entrega && e.log.entrega.f) || 0) >= 2) {
+          out.push({ tipo: 'rendir', e, texto: `${e.o.numero} entregada hace ${
+            this.diasDesde(e.log.entrega.f)} días y nadie rindió esa plata` });
+        }
+        if (e.freno.trabada && e.log.estado === 'por_completar') {
+          out.push({ tipo: 'freno', e, texto: `${e.o.numero} no se puede coordinar: ${e.freno.motivo}` });
+        }
+        if (e.log.estado === 'coordinada' && falta != null && falta < 0) {
+          out.push({ tipo: 'demorada', e, texto: `${e.o.numero} estaba coordinada para el ${
+            e.log.fecha} y no salió` });
+        }
+      });
+      return out;
+    },
+    indicadoresLogistica() {
+      const es = this.entregas();
+      const cerradas = es.filter(e => e.log.estado === 'cerrada');
+      const rend = cerradas.map(e => e.log.rendicion).filter(Boolean);
+      return {
+        total: es.length,
+        porEstado: this.ESTADOS_ENTREGA.map(x => ({ ...x,
+          n: es.filter(e => e.log.estado === x.k).length })),
+        retiros: es.filter(e => e.retira).length,
+        rendido: rend.reduce((a, r) => a + r.cobrado, 0),
+        diferencias: rend.reduce((a, r) => a + Math.abs(r.dif || 0), 0),
+        fletes: rend.reduce((a, r) => a + (r.fletePagado || 0), 0),
+        porChofer: this.choferes().map(ch => {
+          const suyas = es.filter(e => e.log.choferId === ch.id);
+          return { chofer: ch, entregas: suyas.length,
+            muebles: suyas.reduce((a, e) => a + (Number(e.o.items) || 1), 0) };
+        }),
+      };
+    },
+
+    // ---- La agenda y los números del vendedor -------------------------------
+    // Todo lo que ese vendedor tiene que hacer hoy, junto: las consultas con
+    // próxima acción, los recordatorios de sus boletas y sus entregas.
+    agendaVendedor(v) {
+      const out = [];
+      this.consultas({ vendedor: v, vivas: true }).forEach(c => {
+        if (c.proxima && c.proxima.f) {
+          out.push({ tipo: 'consulta', f: c.proxima.f, que: c.proxima.que,
+            quien: c.contacto.nombre || c.contacto.instagram || c.contacto.telefono,
+            vencida: this.consultaVencida(c), ref: c.id });
+        }
+      });
+      (DEMO.ordenes || []).filter(o => o.vendedor === v && o.estado !== 'anulado')
+        .forEach(o => {
+          (o.recordatorios || []).forEach(r => { const d = this.diasHasta(r.f);
+            out.push({ tipo: 'boleta', f: r.f, que: r.texto, quien: o.cliente,
+              ref: o.numero, vencida: d != null && d < 0 }); });
+          const e = o.log && ['coordinada', 'en_viaje'].includes(o.log.estado);
+          if (e) out.push({ tipo: 'entrega', f: o.log.fecha,
+            que: 'Se entrega — avisarle al cliente', quien: o.cliente, ref: o.numero,
+            vencida: false });
+        });
+      // Lo vencido arriba; el resto en orden de calendario, lo más cerca primero.
+      return out.sort((a, b) => (b.vencida ? 1 : 0) - (a.vencida ? 1 : 0)
+        || (this.diasHasta(a.f) ?? 1e6) - (this.diasHasta(b.f) ?? 1e6));
+    },
+    indicadoresVentas(mes) {
+      const m = mes || this.ultimoMesConVentas();
+      const enMes = o => { const p = String(o.fecha || '').split('/');
+        return Number(p[1]) === m && o.estado !== 'anulado'; };
+      const os = (DEMO.ordenes || []).filter(enMes);
+      const crm = this.tableroVendedor();
+      return this.vendedores().map(v => {
+        const suyas = os.filter(o => o.vendedor === v);
+        const total = suyas.reduce((a, o) => a + (Number(o.total) || 0), 0);
+        const cobrado = suyas.reduce((a, o) => a + this.senaConfirmada(o), 0);
+        const c = crm.find(x => x.vendedor === v) || {};
+        return { vendedor: v, boletas: suyas.length, total,
+          ticket: suyas.length ? Math.round(total / suyas.length) : 0,
+          cobrado, porCobrar: total - cobrado,
+          consultas: c.consultas || 0, conv: c.conv || 0,
+          vencidas: c.vencidas || 0 };
+      }).filter(f => f.boletas || f.consultas)
+        .sort((a, b) => b.total - a.total);
+    },
+
     async clientes({ texto = '' } = {}) {
       const t = sinTilde(texto);
       return DEMO.clientes.filter(c => !t || sinTilde(c.nombre).includes(t) || sinTilde(c.telefono).includes(t));

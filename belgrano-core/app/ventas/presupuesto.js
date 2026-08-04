@@ -1736,6 +1736,16 @@
         ? `Guardó la cotización ${global.DB.numeroCotizacion(this.nro)}`
         : `Guardó los cambios${this.esOrden() ? ` de ${this.nroOrden}` : ''}`);
       this.pintarSide();
+      // Cotizar ES registrar la atención: la consulta del CRM se crea o sube
+      // de etapa sola. El vendedor no carga nada dos veces.
+      if (global.DB.consultaDeCotizacion) {
+        global.DB.consultaDeCotizacion({
+          cliente: { nombre: this.nombreCli(), telefono: this.cli.telefono,
+            instagram: this.cli.instagram, mail: this.cli.email },
+          vendedor: this.vendedor, canal: this.cli.canal || 'local',
+          que: this.lineas.map(l => l.prodNombre).filter(Boolean).join(' · '),
+          cotizacion: global.DB.numeroCotizacion(this.nro), quien: this.vendedor });
+      }
       UI.aviso(`${global.DB.numeroCotizacion(this.nro)} guardada (demo)`, 'ok');
     },
 
@@ -1825,6 +1835,12 @@
           this.confirmadas = {};   // se revisa todo de nuevo antes de cobrar
           this.etapa = 'cliente';
           this.log(this.vendedor, `Confirmó la venta ${orden.numero}`);
+          // Concretado lo pone la venta: la consulta del CRM se cierra sola y
+          // queda linkeada a la orden.
+          if (global.DB.consultaConcretada) {
+            global.DB.consultaConcretada(orden.numero,
+              { cotizacion: global.DB.numeroCotizacion(this.nro), quien: this.vendedor });
+          }
           UI.aviso(`Orden ${orden.numero} creada — completala`, 'ok');
           this.render(this._mount);
         };
